@@ -9,14 +9,8 @@
   <title>特效预览 · 血战滕县</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css">
-  <link rel="stylesheet" href="./Style_Editor.css">
-  <style>
-    html, body { margin: 0; height: 100%; background: #08080a; overflow: hidden; }
-    #view { position: fixed; top: var(--vfx-bar-h, 46px); left: 0; right: var(--ed-inspector-w, 380px); bottom: 0;
-      width: calc(100% - var(--ed-inspector-w, 380px)); height: calc(100% - var(--vfx-bar-h, 46px)); display: block; outline: none; }
-    #vfxPreviewPage #edRoot .edPanel.work:not(.debugRendering):not(.ai):not(.assetStandards)::before { content: "高级工具 / 特效预览"; }
-    #vfxBootError { position: fixed; left: 24px; bottom: 24px; z-index: 60; color: #ffae98; font: 14px/1.5 var(--ui-font, sans-serif); }
-  </style>
+  <link rel="stylesheet" href="./Style_Editor.css?v=20261125VfxWorkbench">
+  <link rel="stylesheet" href="./AdvancedTools/Style_VfxPreview.css?v=20261125VfxWorkbench">
   <!-- 这一页只认 three；特效模块之间都是相对路径，不读游戏 index.html 的整张 import map。 -->
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }

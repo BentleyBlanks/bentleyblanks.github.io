@@ -99,6 +99,7 @@
 
 /* --- 行与控件 ------------------------------------------------------------ */
 .edRow { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.edRow[hidden] { display: none !important; }
 .edRow > .l { flex: 0 0 82px; color: var(--ui-muted); font-size: 12px; }
 .edRow > .c { flex: 1 1 auto; min-width: 0; }
 
@@ -850,4 +851,708 @@ body.edHideHud #hud > [class^="hud"] { display: none !important; }
 }
 @media (max-width: 600px) {
   .edPanel.ai { left: 10px; right: 10px; width: auto; top: 84px; bottom: 10px; z-index: 1; }
+}
+
+/* --- 粒子特效检查器（Unity / UE 风格模块卡片、紧凑属性网格、曲线与渐变条） --- */
+.vfxTabBar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  border-bottom: 1px solid var(--ed-rule);
+  background: #090a08d0;
+}
+.vfxTabBar .vfxTabBtn {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ed-text-3);
+  font: 400 12.5px/1 var(--ui-font);
+  letter-spacing: 0.12em;
+  padding: 0 6px;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
+}
+.vfxTabBar .vfxTabBtn:hover { color: var(--ed-text-hi); background: #d8d4c30d; }
+.vfxTabBar .vfxTabBtn.on {
+  color: var(--ed-gold-text);
+  border-bottom-color: var(--ed-gold);
+  background: var(--ed-sel);
+}
+.vfxLibHead {
+  flex: none;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--ed-rule-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vfxSearchWrap { position: relative; }
+.vfxSearchWrap::before, .vfxSearchWrap::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  color: var(--ed-text-4);
+}
+.vfxSearchWrap::before {
+  top: 50%; left: 9px; width: 8px; height: 8px; margin-top: -5px;
+  border: 1px solid currentColor; border-radius: 50%;
+}
+.vfxSearchWrap::after {
+  top: 50%; left: 16px; width: 4px; margin-top: 3px;
+  border-top: 1px solid currentColor; transform: rotate(45deg);
+}
+.vfxSearch {
+  width: 100%;
+  height: 27px;
+  min-height: 27px !important;
+  padding: 2px 8px 2px 26px !important;
+  font-size: 12px !important;
+  background: var(--ed-field);
+  border: 1px solid var(--ed-edge);
+  color: var(--ed-text);
+  box-sizing: border-box;
+}
+.vfxSearch::placeholder { color: var(--ed-text-4); }
+.vfxCatBar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.vfxCatChip {
+  cursor: pointer;
+  padding: 2px 1px;
+  border: 1px solid var(--ed-rule-2);
+  background: transparent;
+  color: var(--ed-text-3);
+  font: 10.5px/1.45 var(--ui-font);
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+}
+.vfxCatChip:hover { color: var(--ed-text-hi); border-color: var(--ed-edge); }
+.vfxCatChip.on {
+  color: var(--ed-gold-text);
+  border-color: #cdb77b88;
+  background: var(--ed-sel-strong);
+}
+
+.vfxLayerBar {
+  flex: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ed-rule);
+  background: #0c0d0ab8;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vfxLayerList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 118px;
+  overflow-y: auto;
+  border: 1px solid var(--ed-rule-2);
+  background: #090a0899;
+}
+.vfxLayerRow {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px 4px 7px;
+  border: 0;
+  border-left: 3px solid transparent;
+  background: transparent;
+  color: var(--ed-text-2);
+  font: 12px/1.35 var(--ui-font);
+  text-align: left;
+}
+.vfxLayerRow:hover { background: #d8d4c310; color: var(--ed-text-hi); }
+.vfxLayerRow.on {
+  border-left-color: var(--ed-gold);
+  background: var(--ed-sel-strong);
+  color: var(--ed-gold-text);
+}
+.vfxLayerDot {
+  width: 6px; height: 6px; flex: none;
+  background: var(--ed-gold);
+  opacity: 0.85;
+}
+.vfxLayerRow.off .vfxLayerDot { background: var(--ed-text-4); opacity: 0.35; }
+.vfxLayerName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vfxLayerTag {
+  flex: none;
+  font: 10.5px/1 var(--ui-mono);
+  color: var(--ed-text-4);
+  padding: 2px 5px;
+  background: #07080788;
+  border: 1px solid var(--ed-rule-2);
+}
+.vfxLayerRow.on .vfxLayerTag { color: var(--ed-gold-text); border-color: #edca8344; }
+.vfxLayerControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  align-items: center;
+}
+.vfxLayerControls select {
+  min-height: 26px !important;
+  height: 26px;
+  padding: 2px 6px !important;
+  font-size: 11.5px !important;
+}
+.vfxLayerControls .edBtn {
+  min-height: 26px !important;
+  height: 26px;
+  padding: 0 8px !important;
+  font-size: 11.5px !important;
+  letter-spacing: 0.04em !important;
+  white-space: nowrap;
+}
+.vfxLayerSelectRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.vfxLayerSelectRow > span {
+  font-size: 11px;
+  color: var(--ed-text-3);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
+.vfxLayerSelectRow select {
+  min-height: 23px !important;
+  height: 23px;
+  padding: 0 6px !important;
+  font-size: 11px !important;
+}
+
+/* 模块手风琴卡片（Unity Shuriken / UE Niagara 风格） */
+.vfxCard {
+  margin-bottom: 5px;
+  border: 1px solid var(--ed-rule-2);
+  background: #121410d8;
+}
+.vfxCard[open] {
+  border-color: #c1bdab48;
+}
+.vfxCard.disabled > .vfxCardHead .vfxCardTitle {
+  color: var(--ed-text-4);
+}
+.vfxCardHead {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 9px 4px 8px;
+  background: #1a1c17e8;
+  transition: background 0.12s linear;
+}
+.vfxCardHead::-webkit-details-marker { display: none; }
+.vfxCardHead:hover { background: #22241de8; }
+.vfxCard[open] > .vfxCardHead {
+  border-bottom: 1px solid var(--ed-rule-2);
+  background: linear-gradient(90deg, #21221a, #171914);
+}
+.vfxCardArrow {
+  flex: none;
+  width: 0;
+  height: 0;
+  font-size: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--ed-gold-text);
+  margin: 0 2px;
+  transition: transform 0.12s ease;
+}
+.vfxCard[open] > .vfxCardHead .vfxCardArrow { transform: rotate(90deg); }
+.vfxCardCheck {
+  flex: none;
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: var(--ed-gold);
+  cursor: pointer;
+}
+.vfxCardTitle {
+  color: var(--ed-text-hi);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.vfxCardSub {
+  color: var(--ed-text-4);
+  font: 10.5px/1 var(--ui-mono);
+  letter-spacing: 0.03em;
+}
+.vfxCardBadge {
+  margin-left: auto;
+  flex: none;
+  font: 10.5px/1 var(--ui-mono);
+  color: var(--ed-text-3);
+  padding: 2px 6px;
+  border: 1px solid var(--ed-rule-2);
+  background: #0c0d0aaa;
+}
+.vfxCardGradPreview {
+  margin-left: auto;
+  flex: none;
+  width: 66px;
+  height: 11px;
+  border: 1px solid var(--ed-edge);
+  background-color: #181a18;
+}
+.vfxCardBody {
+  padding: 6px 9px 8px;
+}
+
+/* 紧凑属性行（2 列：96px 标签 + 1fr 控件） */
+.vfxProp {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-height: 24px;
+  margin: 3px 0;
+}
+.vfxProp[hidden] { display: none !important; }
+.vfxProp.compact { grid-template-columns: 58px minmax(0, 1fr); }
+.vfxPropLabel {
+  color: var(--ed-text-3);
+  font-size: 11.5px;
+  letter-spacing: 0.03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vfxPropLabel[data-scrub] {
+  cursor: ew-resize;
+  user-select: none;
+}
+.vfxPropLabel[data-scrub]:hover { color: var(--ed-gold-text); }
+.vfxPropCtrl {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.vfxPropCtrl > input[type="number"],
+.vfxPropCtrl > input[type="text"],
+.vfxPropCtrl > select {
+  width: 100%;
+  min-height: 24px !important;
+  height: 24px;
+  padding: 1px 6px !important;
+  font-size: 11.5px !important;
+  line-height: 1.2 !important;
+}
+.vfxPropCtrl > input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 20px !important;
+}
+.vfxPropVal {
+  flex: none;
+  min-width: 44px;
+  text-align: right;
+  font: 11.5px/1 var(--ui-mono);
+  color: var(--ed-text);
+  font-variant-numeric: tabular-nums;
+}
+.vfxPropVal.resettable { cursor: pointer; }
+.vfxPropVal.resettable:hover { color: var(--ed-gold-hi); }
+
+/* 紧凑复选框行（多个布尔开关并排一行） */
+.vfxCheckGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 4px 0 5px;
+  padding: 2px 0;
+}
+.vfxCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: var(--ed-text-2);
+  font-size: 11.5px;
+  user-select: none;
+}
+.vfxCheck input[type="checkbox"] {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: var(--ed-gold);
+  cursor: pointer;
+}
+.vfxCheck:hover { color: var(--ed-text-hi); }
+
+/* Vector2 / Vector3 单行带色轴标 */
+.vfxVec {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+.vfxVec.v2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.vfxAxis {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid var(--ed-edge);
+  background: var(--ed-field);
+  height: 24px;
+  box-sizing: border-box;
+}
+.vfxAxis:focus-within { border-color: var(--ed-gold); }
+.vfxAxisTag {
+  flex: none;
+  width: 16px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font: 700 10px/1 var(--ui-mono);
+  color: var(--ed-text-hi);
+  border-right: 1px solid var(--ed-rule-2);
+  cursor: ew-resize;
+  user-select: none;
+}
+.vfxAxisTag.ax { background: #8a3a2c70; }
+.vfxAxisTag.ay { background: #4d7a3470; }
+.vfxAxisTag.az { background: #34588a70; }
+.vfxAxis input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0 !important;
+  height: 100% !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 4px !important;
+  font: 11.5px/1 var(--ui-mono) !important;
+  color: var(--ed-text);
+  appearance: textfield;
+}
+.vfxAxis input::-webkit-inner-spin-button { appearance: none; }
+
+/* 单行 HDR 颜色控件（色块 + 亮度 + 透明度） */
+.vfxColorRow {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  width: 100%;
+  align-items: center;
+}
+.vfxColorSwatch {
+  width: 30px;
+  height: 24px;
+  padding: 1px;
+  border: 1px solid var(--ed-edge);
+  background: var(--ed-field);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.vfxColorSwatch::-webkit-color-swatch-wrapper { padding: 1px; }
+.vfxColorSwatch::-webkit-color-swatch { border: 0; }
+.vfxMiniField {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--ed-edge);
+  background: var(--ed-field);
+  box-sizing: border-box;
+  min-width: 0;
+}
+.vfxMiniField:focus-within { border-color: var(--ed-gold); }
+.vfxMiniField > span {
+  flex: none;
+  padding: 0 4px;
+  font: 10px/1 var(--ui-mono);
+  color: var(--ed-text-4);
+  border-right: 1px solid var(--ed-rule-2);
+  height: 100%;
+  display: grid;
+  place-items: center;
+  cursor: ew-resize;
+  user-select: none;
+}
+.vfxMiniField input {
+  width: 100%;
+  min-width: 0;
+  min-height: 0 !important;
+  height: 100% !important;
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 4px !important;
+  font: 11.5px/1 var(--ui-mono) !important;
+  appearance: textfield;
+}
+.vfxMiniField input::-webkit-inner-spin-button { appearance: none; }
+
+/* Unity MinMaxCurve 字段 */
+.vfxCurve {
+  margin: 4px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #c1bdab18;
+}
+.vfxCurve:last-child { border-bottom: 0; padding-bottom: 0; }
+.vfxCurveHead {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 68px;
+  gap: 5px;
+  align-items: center;
+  min-height: 24px;
+}
+.vfxCurveInline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.vfxCurveInline input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  min-height: 24px !important;
+  height: 24px;
+  padding: 1px 5px !important;
+  font-size: 11.5px !important;
+}
+.vfxCurveInline .vfxDash {
+  flex: none;
+  color: var(--ed-text-4);
+  font-size: 11px;
+}
+.vfxCurveMode {
+  min-height: 24px !important;
+  height: 24px;
+  padding: 0 4px !important;
+  font-size: 11px !important;
+  color: var(--ed-text-2) !important;
+}
+.vfxCurveGraphWrap {
+  margin-top: 5px;
+  border: 1px solid var(--ed-edge);
+  background: #0b0d0c;
+}
+.vfxCurveSubLabel {
+  padding: 2px 6px;
+  font-size: 10.5px;
+  color: var(--ed-text-4);
+  border-bottom: 1px solid var(--ed-rule-2);
+  background: #121410;
+}
+.vfxCurveSvg {
+  width: 100%;
+  height: 104px;
+  display: block;
+  touch-action: none;
+}
+.vfxCurveBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  border-top: 1px solid var(--ed-rule-2);
+  background: #11130f;
+}
+.vfxCurveBar button {
+  cursor: pointer;
+  flex: 1;
+  height: 21px;
+  padding: 0 4px;
+  border: 1px solid var(--ed-rule-2);
+  background: #181a15;
+  color: var(--ed-text-3);
+  font: 10.5px/1 var(--ui-font);
+}
+.vfxCurveBar button:hover { color: var(--ed-gold-hi); border-color: #cdb77b77; background: var(--ed-sel); }
+
+/* Unity / UE 颜色渐变条编辑器 */
+.vfxGradEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vfxGradHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vfxGradBarWrap {
+  position: relative;
+  flex: 1 1 auto;
+  padding-bottom: 11px;
+}
+.vfxGradBar {
+  height: 18px;
+  border: 1px solid var(--ed-edge);
+  background-image:
+    linear-gradient(45deg, #252725 25%, transparent 25%),
+    linear-gradient(-45deg, #252725 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #252725 75%),
+    linear-gradient(-45deg, transparent 75%, #252725 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+  background-color: #161816;
+  position: relative;
+  overflow: hidden;
+  cursor: crosshair;
+}
+.vfxGradBarFill {
+  position: absolute;
+  inset: 0;
+}
+.vfxGradPins {
+  position: relative;
+  height: 11px;
+}
+.vfxGradPin {
+  position: absolute;
+  top: 2px;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 1px solid #d6d9d1aa;
+  background: var(--pin-color, #fff);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.vfxGradPin.on {
+  border-color: var(--ed-gold-hi);
+  box-shadow: 0 0 0 1px #080907, 0 0 0 2px var(--ed-gold);
+  z-index: 2;
+}
+.vfxGradStopEdit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--ed-rule-2);
+  background: #0d0e0bb8;
+}
+.vfxGradStopTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vfxGradStopTop .vfxMiniField { width: 88px; }
+.vfxGradStopTop .vfxMiniBtn { margin-left: auto; }
+
+/* Emission Bursts 紧凑表 */
+.vfxBurstCard {
+  margin: 4px 0;
+  padding: 5px 6px;
+  border: 1px solid var(--ed-rule-2);
+  background: #0d0e0baa;
+}
+.vfxBurstHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--ed-text-3);
+  font-size: 11px;
+}
+.vfxBurstGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* 预设面板紧凑布局 */
+.vfxPresetBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ed-rule-2);
+}
+.vfxPresetBlock:last-child { border-bottom: 0; margin-bottom: 0; }
+.vfxPresetTitle {
+  color: var(--ed-text-3);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+.vfxPresetRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px;
+}
+.vfxPresetRow input, .vfxPresetRow select {
+  min-height: 27px !important;
+  height: 27px;
+  padding: 2px 7px !important;
+  font-size: 12px !important;
+}
+.vfxPresetRow .edBtn {
+  min-height: 27px !important;
+  height: 27px;
+  padding: 0 9px !important;
+  font-size: 11.5px !important;
+}
+.vfxPresetActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.vfxPresetActions .edBtn {
+  min-height: 27px !important;
+  height: 27px;
+  padding: 0 6px !important;
+  font-size: 11.5px !important;
+}
+.vfxFileLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 27px;
+  border: 1px dashed var(--ed-edge);
+  background: #10120e88;
+  color: var(--ed-text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.vfxFileLabel:hover { border-color: var(--ed-gold); color: var(--ed-gold-hi); }
+.vfxFileLabel input { display: none; }
+
+/* 落土参数顶栏 */
+.vfxSoilTop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ed-rule-2);
+}
+.vfxSoilBtns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.vfxSoilBtns .edBtn {
+  min-height: 25px !important;
+  height: 25px;
+  padding: 0 4px !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+}
+.vfxEmptyState {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--ed-text-4);
+  font-size: 12px;
+  letter-spacing: 0.06em;
 }

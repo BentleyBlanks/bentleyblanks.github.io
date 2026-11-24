@@ -2,48 +2,50 @@
 // 持续效果来自 SCENE_EFFECTS，因而这里确认过的火/烟参数可以原样进场景布设 JSON。
 
 import * as THREE from "three";
-import { El, Panel, Section, Slider, Select, Toggle, ButtonRow, Facts, Note, ListBox, TextArea }
+import { El, Panel, Section, Slider, Select, Toggle, ButtonRow, Facts, ListBox, TextArea }
   from "../Script_EditorUi.mjs";
 import { SCENE_EFFECTS } from "../Script_Vfx.mjs";
-import {ParticleInspector} from './Script_EditorParticleInspector.mjs';
-import {MergeParticleModules,NormalizeParticleModules,EvaluateCurve,IntegrateCurve} from '../Script_ParticleModules.mjs';
-import {Mulberry32} from '../Script_Noise.mjs';
-import {PLUME_STYLES,PlumeProfile} from '../Data_SmokePlumeStyles.mjs';
-import {PARTICLE_SURFACE_ART} from '../Data_Tuning_Particles.mjs';
-import {FlareDirector,MakeFlareHost,SampleFlarePosition} from '../Script_Flare.mjs';
-import {FlareVisuals} from '../Script_FlareVisual.mjs';
-import {FlareSurfaceIndex} from '../Script_FlareSurfaces.mjs';
-import {FLARE_EFFECTS,FLARE_PREVIEW} from '../Data_Tuning_FlareEffects.mjs';
-import {FlarePreviewField} from './Script_EditorFlareField.mjs';
-import {FALLING_SOIL_PRESETS} from '../Data_Tuning_FallingSoil.mjs';
-import {FallingSoilInspector} from './Script_EditorFallingSoil.mjs';
-import {NormalizeFallingSoil,NormalizeSoilPreview} from '../Script_FallingSoilRules.mjs';
+import { BindScrub, ParticleInspector } from './Script_EditorParticleInspector.mjs';
+import { MergeParticleModules, NormalizeParticleModules, EvaluateCurve, IntegrateCurve } from '../Script_ParticleModules.mjs';
+import { Mulberry32 } from '../Script_Noise.mjs';
+import { PLUME_STYLES, PlumeProfile } from '../Data_SmokePlumeStyles.mjs';
+import { PARTICLE_SURFACE_ART } from '../Data_Tuning_Particles.mjs';
+import { FlareDirector, MakeFlareHost, SampleFlarePosition } from '../Script_Flare.mjs';
+import { FlareVisuals } from '../Script_FlareVisual.mjs';
+import { FlareSurfaceIndex } from '../Script_FlareSurfaces.mjs';
+import { FLARE_EFFECTS, FLARE_PREVIEW } from '../Data_Tuning_FlareEffects.mjs';
+import { FlarePreviewField } from './Script_EditorFlareField.mjs';
+import { FALLING_SOIL_PRESETS } from '../Data_Tuning_FallingSoil.mjs';
+import { FallingSoilInspector } from './Script_EditorFallingSoil.mjs';
+import { NormalizeFallingSoil, NormalizeSoilPreview } from '../Script_FallingSoilRules.mjs';
 import { TOOL_INFO } from "../Data_DevTools.mjs";
 
 const INSTANT_EFFECTS = [
-  ...Object.entries(FALLING_SOIL_PRESETS).map(([id,spec])=>({id,name:spec.label,note:spec.note,soil:true})),
-  ...Object.entries(FLARE_EFFECTS).map(([id,spec])=>({id,name:spec.label,note:'史料类型参考 · 完整升空、燃烧、熄灭 · 可切换近景',flare:true})),
-  ...[['VolumeFire','三维体积 · 营火',true],['VolumePlume','三维体积 · 烟流',true],['VolumeDensePlume','三维体积 · 浓烟',true],['VolumeDustImpact','三维体积 · 土尘冲击',false],['VolumeExplosion','三维体积 · 燃油爆炸',false]].map(([id,name,continuous])=>({
-    id,name,note:'CC0 流体模拟 · 多视角体积',continuous,particleHandle:true,run:(v,s)=>v.particles.Create({preset:id,modules:{main:{startSize:s}},name:'VolumePreview/'+id}),
+  ...Object.entries(FALLING_SOIL_PRESETS).map(([id, spec]) => ({ id, name: spec.label, note: spec.note, soil: true })),
+  ...Object.entries(FLARE_EFFECTS).map(([id, spec]) => ({ id, name: spec.label, note: '史料类型参考 · 完整升空、燃烧、熄灭 · 可切换近景', flare: true })),
+  ...[['VolumeFire', '三维体积 · 营火', true], ['VolumePlume', '三维体积 · 烟流', true], ['VolumeDensePlume', '三维体积 · 浓烟', true], ['VolumeDustImpact', '三维体积 · 土尘冲击', false], ['VolumeExplosion', '三维体积 · 燃油爆炸', false]].map(([id, name, continuous]) => ({
+    id, name, note: 'CC0 流体模拟 · 多视角体积', continuous, particleHandle: true,
+    run: (v, s) => v.particles.Create({ preset: id, modules: { main: { startSize: s } }, name: 'VolumePreview/' + id }),
   })),
-  ...[['SootColumn',0,'浓黑烟柱'],['BillowColumn',1,'翻卷烟团'],['DustBank',2,'贴地尘幕'],['WindShear',3,'风切烟带'],['GroundScreen',4,'白色烟幕'],['DustPulse',5,'间歇土烟']].map(([id,frame,name])=>({
-    id:'Plume'+id,name:'烟场 · '+name,note:'真实场景同源体积烟',continuous:true,sourceHandle:true,run:(v,s)=>{
+  ...[['SootColumn', 0, '浓黑烟柱'], ['BillowColumn', 1, '翻卷烟团'], ['DustBank', 2, '贴地尘幕'], ['WindShear', 3, '风切烟带'], ['GroundScreen', 4, '白色烟幕'], ['DustPulse', 5, '间歇土烟']].map(([id, frame, name]) => ({
+    id: 'Plume' + id, name: '烟场 · ' + name, note: '真实场景同源体积烟', continuous: true, sourceHandle: true,
+    run: (v, s) => {
       // 样式来自烟场样式表（与第一关撒点同一份定义），不为预览载入关卡的路线与地块。
-      const backdrop={...PlumeProfile(PLUME_STYLES[frame],1,Mulberry32(1938+frame)),seed:1938};
-      for(const key of ['height','baseWidth','crownWidth','driftX','driftZ','spread'])backdrop[key]*=s;
-      return v.SmokeSource({x:0,y:.04,z:0},{rate:0,fire:0,backdrop});
+      const backdrop = { ...PlumeProfile(PLUME_STYLES[frame], 1, Mulberry32(1938 + frame)), seed: 1938 };
+      for (const key of ['height', 'baseWidth', 'crownWidth', 'driftX', 'driftZ', 'spread']) backdrop[key] *= s;
+      return v.SmokeSource({ x: 0, y: 0.04, z: 0 }, { rate: 0, fire: 0, backdrop });
     },
   })),
-  {id:'Empty',name:'空白粒子效果',note:'添加粒子层建立新预设',run:()=>{}},
-  {id:'DustMotes',name:'环境 · 悬浮尘',note:'具有世界视差的微粒',continuous:true,run:v=>v.AmbientDust(new THREE.Box3(new THREE.Vector3(-8,0,-8),new THREE.Vector3(8,6,8)),.12)},
-  {id:'ShellCasings',name:'弹壳 · 抛出与弹跳',note:'真实口径尺寸与金属反光',run:v=>{for(let i=0;i<6;i++)v.ShellCasing(new THREE.Vector3(0,1.1,0),new THREE.Vector3(1,.2,0),'7.92');}},
-  {id:'ImpactWater',name:'命中 · 水面',note:'水花与涟漪',run:v=>v.Impact(new THREE.Vector3(0,.02,0),new THREE.Vector3(0,1,0),'water')},
+  { id: 'Empty', name: '空白粒子效果', note: '添加粒子层建立新预设', run: () => {} },
+  { id: 'DustMotes', name: '环境 · 悬浮尘', note: '具有世界视差的微粒', continuous: true, run: (v) => v.AmbientDust(new THREE.Box3(new THREE.Vector3(-8, 0, -8), new THREE.Vector3(8, 6, 8)), 0.12) },
+  { id: 'ShellCasings', name: '弹壳 · 抛出与弹跳', note: '真实口径尺寸与金属反光', run: (v) => { for (let i = 0; i < 6; i += 1) v.ShellCasing(new THREE.Vector3(0, 1.1, 0), new THREE.Vector3(1, 0.2, 0), '7.92'); } },
+  { id: 'ImpactWater', name: '命中 · 水面', note: '水花与涟漪', run: (v) => v.Impact(new THREE.Vector3(0, 0.02, 0), new THREE.Vector3(0, 1, 0), 'water') },
   { id: "ExplosionGrenade", name: "爆炸 · 手榴弹", note: "半径 4 m", run: (v, s) => v.Explosion({ x: 0, y: 0.12, z: 0 }, { radius: 4 * s, kind: "grenade", groundY: 0 }) },
   { id: "ExplosionMortar", name: "爆炸 · 掷弹筒", note: "半径 7 m", run: (v, s) => v.Explosion({ x: 0, y: 0.16, z: 0 }, { radius: 7 * s, kind: "launcher", groundY: 0 }) },
   { id: "ExplosionShell", name: "爆炸 · 炮弹", note: "半径 11 m", run: (v, s) => v.Explosion({ x: 0, y: 0.18, z: 0 }, { radius: 11 * s, kind: "shell", groundY: 0 }) },
-  { id: "ExplosionTank", name: "爆炸 · 战车燃油", note: "燃油热相与烟团", run: (v,s)=>v.Explosion({x:0,y:.18,z:0},{radius:9*s,kind:'tank',groundY:0}) },
-  {id:'BombSmall',name:'爆炸 · 50 kg 级航空炸弹',note:'22 kg 装药 · 土柱与冷却烟体',run:(v,s)=>v.BombBlast({x:0,y:0,z:0},{chargeKg:22*s*s*s,groundY:0})},
-  {id:'BombHeavy',name:'爆炸 · 250 kg 级航空炸弹',note:'100 kg 装药 · 抛射幕与烟体',run:(v,s)=>v.BombBlast({x:0,y:0,z:0},{chargeKg:100*s*s*s,groundY:0})},
+  { id: "ExplosionTank", name: "爆炸 · 战车燃油", note: "燃油热相与烟团", run: (v, s) => v.Explosion({ x: 0, y: 0.18, z: 0 }, { radius: 9 * s, kind: 'tank', groundY: 0 }) },
+  { id: 'BombSmall', name: '爆炸 · 50 kg 级航空炸弹', note: '22 kg 装药 · 土柱与冷却烟体', run: (v, s) => v.BombBlast({ x: 0, y: 0, z: 0 }, { chargeKg: 22 * s * s * s, groundY: 0 }) },
+  { id: 'BombHeavy', name: '爆炸 · 250 kg 级航空炸弹', note: '100 kg 装药 · 抛射幕与烟体', run: (v, s) => v.BombBlast({ x: 0, y: 0, z: 0 }, { chargeKg: 100 * s * s * s, groundY: 0 }) },
   { id: "MuzzleRifle", name: "枪口焰 · 步枪", note: "两帧焰 + 枪烟", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "rifle" }) },
   { id: "MuzzleMg", name: "枪口焰 · 机枪", note: "连续武器单次反馈", run: (v, s) => v.MuzzleFlash(new THREE.Vector3(0, 1.05, 0), new THREE.Vector3(0, 0, -1), { scale: s, kind: "lmg" }) },
   { id: "ImpactBrick", name: "命中 · 砖墙", note: "砖粉、碎块与弹孔", run: (v) => v.Impact(new THREE.Vector3(0, 0.85, 0), new THREE.Vector3(0, 0, -1), "brick") },
@@ -62,6 +64,49 @@ const CONTINUOUS = Object.entries(SCENE_EFFECTS).map(([id, effect]) => ({
 }));
 const ALL_EFFECTS = [...CONTINUOUS, ...INSTANT_EFFECTS];
 
+const EFFECT_CATEGORIES = [
+  { id: 'all', label: '全部' },
+  { id: 'fire', label: '火烟' },
+  { id: 'blast', label: '爆炸' },
+  { id: 'combat', label: '战斗' },
+  { id: 'volume', label: '体积' },
+  { id: 'flare', label: '弹药' },
+  { id: 'soil', label: '落土' },
+];
+
+function CategoryOf(effect) {
+  if (effect.soil) return 'soil';
+  if (effect.flare) return 'flare';
+  if (/^Volume/.test(effect.id)) return 'volume';
+  if (/^(Explosion|Bomb)/.test(effect.id)) return 'blast';
+  if (/^(Muzzle|Impact|Tracer|Blood|ShellCasings|Incoming)/.test(effect.id)) return 'combat';
+  if (SCENE_EFFECTS[effect.id] || /^Plume/.test(effect.id) || effect.id === 'DustMotes') return 'fire';
+  return 'all';
+}
+
+function CompactSelect(options, value, onChange, aria = '') {
+  const select = El('select');
+  if (aria) select.setAttribute('aria-label', aria);
+  const Fill = (list, nextVal = undefined) => {
+    select.replaceChildren();
+    for (const raw of list) {
+      const opt = typeof raw === 'string' ? { value: raw, label: raw } : raw;
+      const el = El('option', '', opt.label);
+      el.value = String(opt.value);
+      select.appendChild(el);
+    }
+    if (nextVal !== undefined && nextVal !== null) select.value = String(nextVal);
+  };
+  Fill(options, value);
+  select.addEventListener('change', () => onChange(select.value));
+  return {
+    root: select,
+    Set: (v) => { select.value = String(v); },
+    Fill,
+    Value: () => select.value,
+  };
+}
+
 export class VfxEditor {
   static id = "vfx";
   static label = TOOL_INFO.vfx.label;
@@ -72,11 +117,11 @@ export class VfxEditor {
     this.studio = host.studio;
     this.cameraMode = "studio";
     this.panel = null;
-    const requested=new URLSearchParams(location.search).get('effect');
-    this.effectId = ALL_EFFECTS.some(effect=>effect.id===requested)?requested:"FireMedium";
-    const requestedCamera=new URLSearchParams(location.search).get('flareCamera');
-    this.flareCamera=['follow','field','flight','ground','observer'].includes(requestedCamera)?requestedCamera:FLARE_PREVIEW.camera;
-    this.previewEnvironment=null;
+    const requested = new URLSearchParams(location.search).get('effect');
+    this.effectId = ALL_EFFECTS.some((effect) => effect.id === requested) ? requested : "FireMedium";
+    const requestedCamera = new URLSearchParams(location.search).get('flareCamera');
+    this.flareCamera = ['follow', 'field', 'flight', 'ground', 'observer'].includes(requestedCamera) ? requestedCamera : FLARE_PREVIEW.camera;
+    this.previewEnvironment = null;
     this.handle = 0;
     this.scale = 1;
     this.loop = true;
@@ -90,23 +135,41 @@ export class VfxEditor {
     this.savedParticles = null;
     this.savedDustVisible = null;
     this.wind = new THREE.Vector3();
-    this.previewTime=0;this.paused=false;this.speed=1;this.seed=1938;
-    this.layerPatches=new Map();this.layerRecords=new Map();this.customLayers=[];this.customIds=[];
-    this.selectedLayer=null;this.customIndex=0;this.uiAge=0;this.seekFrame=0;this.banks=new Map();this.sampleParticleIds=[];
+    this.previewTime = 0;
+    this.paused = false;
+    this.speed = 1;
+    this.seed = 1938;
+    this.timelineMax = 10;
+    this.searchQuery = '';
+    this.category = 'all';
+    this.layerPatches = new Map();
+    this.layerRecords = new Map();
+    this.customLayers = [];
+    this.customIds = [];
+    this.selectedLayer = null;
+    this.customIndex = 0;
+    this.uiAge = 0;
+    this.seekFrame = 0;
+    this.toastTimer = 0;
+    this.banks = new Map();
+    this.sampleParticleIds = [];
   }
 
   Enter(root) {
     const vfx = this.host.vfx;
-    this.previewEnvironment=null;
-    this.initialLook=this.host.previewEnvironment?.lookId??null;
+    this.previewEnvironment = null;
+    this.initialLook = this.host.previewEnvironment?.lookId ?? null;
     this.savedWind = vfx.wind.clone();
     this.wind.copy(this.savedWind);
     this.savedVfxVisible = vfx.root.visible;
     this.savedVfxTime = vfx.time;
-    this.savedFlareVisuals=vfx.flareVisuals;this.savedFlareVisible=vfx.flareVisuals.root.visible;
-    vfx.flareVisuals.root.visible=false;vfx.flareVisuals=new FlareVisuals(vfx.root,this.host.lights);
-    this.savedFlareSurfaces=vfx.flareSurfaces;vfx.flareSurfaces=new FlareSurfaceIndex(this.host.scene,this.host.library);
-    this.flarePreview=new FlareDirector(MakeFlareHost({vfx,lights:this.host.lights}),{exposure:false,seed:this.seed});
+    this.savedFlareVisuals = vfx.flareVisuals;
+    this.savedFlareVisible = vfx.flareVisuals.root.visible;
+    vfx.flareVisuals.root.visible = false;
+    vfx.flareVisuals = new FlareVisuals(vfx.root, this.host.lights);
+    this.savedFlareSurfaces = vfx.flareSurfaces;
+    vfx.flareSurfaces = new FlareSurfaceIndex(this.host.scene, this.host.library);
+    this.flarePreview = new FlareDirector(MakeFlareHost({ vfx, lights: this.host.lights }), { exposure: false, seed: this.seed });
     this.savedVfxRandom = vfx.random;
     // 预览必须是隔离的：现关烟柱不能在摄影棚期间偷偷推进，预览的弹孔/爆炸也
     // 不能关掉工具后留在正片原点。保存池与持续源，退出时逐字节还原。
@@ -114,14 +177,16 @@ export class VfxEditor {
     this.savedParticleEffectsVisible = vfx.particles.root.visible;
     this.savedParticleEffects.root.visible = false;
     vfx.particles = vfx.particles.Fork();
-    this.savedParticlePools=vfx.pools;
-    vfx.pools=Object.fromEntries(Object.entries(vfx.pools).map(([name,pool])=>[name,pool.particleId?vfx.particles.channels.get(pool.profile):pool]));
-    this.savedDebris=vfx.debris;this.savedChunks=vfx.chunks;
-    vfx.debris=vfx.particles.channels.get(vfx.debris.profile);
-    vfx.chunks=Object.fromEntries(Object.entries(vfx.chunks).map(([name,pool])=>[name,vfx.particles.channels.get(pool.profile)]));
-    this.savedBlood=vfx.bloodEffects.BeginPreview(vfx.pools.bloodMist,vfx.pools.bloodDrop);
-    this.savedGroundLevel=vfx.groundLevel;vfx.SetGroundLevel(0);
-    vfx.bloodSpurts=vfx.bloodEffects.sources;
+    this.savedParticlePools = vfx.pools;
+    vfx.pools = Object.fromEntries(Object.entries(vfx.pools).map(([name, pool]) => [name, pool.particleId ? vfx.particles.channels.get(pool.profile) : pool]));
+    this.savedDebris = vfx.debris;
+    this.savedChunks = vfx.chunks;
+    vfx.debris = vfx.particles.channels.get(vfx.debris.profile);
+    vfx.chunks = Object.fromEntries(Object.entries(vfx.chunks).map(([name, pool]) => [name, vfx.particles.channels.get(pool.profile)]));
+    this.savedBlood = vfx.bloodEffects.BeginPreview(vfx.pools.bloodMist, vfx.pools.bloodDrop);
+    this.savedGroundLevel = vfx.groundLevel;
+    vfx.SetGroundLevel(0);
+    vfx.bloodSpurts = vfx.bloodEffects.sources;
     this.savedBattleSmoke = vfx.battleSmoke;
     this.savedBattleSmokeVisible = vfx.battleSmoke?.mesh.visible;
     if (vfx.battleSmoke) vfx.battleSmoke.mesh.visible = false;
@@ -129,82 +194,89 @@ export class VfxEditor {
     this.savedSources = vfx.smokeSources;
     this.savedNextSourceId = vfx.nextSourceId;
     this.savedParticles = this.CaptureParticles(vfx);
-    this.savedLighting=this.host.lights?.BeginEffectPreview?.();
-    this.savedFlareExposure=this.host.post?.exposurePass?.transientWeight||0;
-    if(this.host.post?.exposurePass)this.host.post.exposurePass.transientWeight=0;
-    if(!this.savedLighting)for (const source of this.savedSources.values()) vfx.DetachSourceLight(source);
+    this.savedLighting = this.host.lights?.BeginEffectPreview?.();
+    this.savedFlareExposure = this.host.post?.exposurePass?.transientWeight || 0;
+    if (this.host.post?.exposurePass) this.host.post.exposurePass.transientWeight = 0;
+    if (!this.savedLighting) for (const source of this.savedSources.values()) vfx.DetachSourceLight(source);
     vfx.smokeSources = new Map();
     for (const pool of Object.values(vfx.pools)) pool.Clear();
     vfx.debris.Clear();
-    this.savedDust=vfx.dust;this.savedDustVisible=vfx.dust?.mesh.visible;
-    if(vfx.dust)vfx.dust.mesh.visible=false;
-    vfx.dust=null;
+    this.savedDust = vfx.dust;
+    this.savedDustVisible = vfx.dust?.mesh.visible;
+    if (vfx.dust) vfx.dust.mesh.visible = false;
+    vfx.dust = null;
     this.studio.Open(this.host.hideInStudio);
-    this.savedStudioMaxDistance=this.studio.maxDistance;
-    this.savedStudioFov=this.host.camera.fov;
-    this.savedPadGeometry=this.studio.pad.geometry;
-    this.flareField=new FlarePreviewField(this.studio,this.host.library);
-    this.flarePadGeometry=this.flareField.groundGeometry;
+    this.savedStudioMaxDistance = this.studio.maxDistance;
+    this.savedStudioFov = this.host.camera.fov;
+    this.savedPadGeometry = this.studio.pad.geometry;
+    this.flareField = new FlarePreviewField(this.studio, this.host.library);
+    this.flarePadGeometry = this.flareField.groundGeometry;
     // WorldMask 会把场景直属的 VfxRoot 一起藏掉；预览器明确把它列为展品。
     vfx.root.visible = true;
     this.studio.SetGridVisible(true);
     this.studio.Frame(3.4, 8.5);
-    this.panel = Panel({
-      title: "粒子特效编辑器", sub: "游戏同源预览",
-      variant: "work", onClose: () => this.host.Close(),
-    });
-    root.appendChild(this.panel.root);
-    this.panel.root.dataset.vfxEditor='modules';
-    this.baseModules=new Map([...vfx.particles.channels].map(([name,channel])=>[name,JSON.parse(JSON.stringify(channel.system.modules))]));
-    this.BuildUi(this.panel.body);
-    this.onPreviewKey=event=>{
-      if(event.target.closest?.('input,textarea,select,button,summary'))return;
-      if(event.code==='Space'){event.preventDefault();event.stopPropagation();this.TogglePause();}
-      if(event.code==='ArrowRight'){event.preventDefault();event.stopPropagation();this.Step(event.shiftKey?10:1);}
-      if(event.code==='Home'){event.preventDefault();event.stopPropagation();this.Seek(0);}
+
+    this.baseModules = new Map([...vfx.particles.channels].map(([name, channel]) => [name, JSON.parse(JSON.stringify(channel.system.modules))]));
+    if (this.host.standalone) {
+      this.BuildStandaloneUi(root);
+    } else {
+      this.panel = Panel({ title: "粒子特效编辑器", sub: "", variant: "work", onClose: () => this.host.Close() });
+      root.appendChild(this.panel.root);
+      this.panel.root.dataset.vfxEditor = 'modules';
+      this.BuildDockedUi(this.panel.body);
+    }
+
+    this.onPreviewKey = (event) => {
+      if (event.target.closest?.('input,textarea,select,button,summary')) return;
+      if (event.code === 'Space') { event.preventDefault(); event.stopPropagation(); this.TogglePause(); }
+      else if (event.code === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); this.Step(event.shiftKey ? 10 : 1); }
+      else if (event.code === 'Home') { event.preventDefault(); event.stopPropagation(); this.Seek(0); }
+      else if (event.code === 'KeyF') { event.preventDefault(); event.stopPropagation(); this.FrameEffect(); }
     };
-    document.addEventListener('keydown',this.onPreviewKey,true);
+    document.addEventListener('keydown', this.onPreviewKey, true);
     this.Play();
-    if(FALLING_SOIL_PRESETS[this.effectId]||FLARE_EFFECTS[this.effectId])this.FrameEffect();
+    if (FALLING_SOIL_PRESETS[this.effectId] || FLARE_EFFECTS[this.effectId]) this.FrameEffect();
     return this;
   }
 
   Exit() {
-    cancelAnimationFrame(this.seekFrame);document.removeEventListener('keydown',this.onPreviewKey,true);
+    cancelAnimationFrame(this.seekFrame);
+    clearTimeout(this.toastTimer);
+    document.removeEventListener('keydown', this.onPreviewKey, true);
     this.Stop();
     this.SetPreviewEnvironment('original');
     this.flareField.Dispose();
     const vfx = this.host.vfx;
-    vfx.flareVisuals.Dispose();vfx.flareVisuals=this.savedFlareVisuals;vfx.flareVisuals.root.visible=this.savedFlareVisible;
-    vfx.flareSurfaces.Clear();vfx.flareSurfaces=this.savedFlareSurfaces;
-    vfx.bloodEffects.EndPreview(this.savedBlood);vfx.bloodSpurts=vfx.bloodEffects.sources;
+    vfx.flareVisuals.Dispose(); vfx.flareVisuals = this.savedFlareVisuals; vfx.flareVisuals.root.visible = this.savedFlareVisible;
+    vfx.flareSurfaces.Clear(); vfx.flareSurfaces = this.savedFlareSurfaces;
+    vfx.bloodEffects.EndPreview(this.savedBlood); vfx.bloodSpurts = vfx.bloodEffects.sources;
     vfx.particles.Dispose();
     vfx.particles = this.savedParticleEffects;
-    vfx.pools=this.savedParticlePools;this.savedParticlePools=null;
-    vfx.debris=this.savedDebris;vfx.chunks=this.savedChunks;
+    vfx.pools = this.savedParticlePools; this.savedParticlePools = null;
+    vfx.debris = this.savedDebris; vfx.chunks = this.savedChunks;
     vfx.SetGroundLevel(this.savedGroundLevel);
     vfx.particles.root.visible = this.savedParticleEffectsVisible;
     this.savedParticleEffects = null;
-    vfx.battleSmoke?.Dispose();vfx.battleSmoke=this.savedBattleSmoke;
+    vfx.battleSmoke?.Dispose(); vfx.battleSmoke = this.savedBattleSmoke;
     if (vfx.battleSmoke) vfx.battleSmoke.mesh.visible = this.savedBattleSmokeVisible;
-    vfx.time=this.savedVfxTime;vfx.shared.uTime.value=vfx.time;
-    vfx.random=this.savedVfxRandom;
+    vfx.time = this.savedVfxTime; vfx.shared.uTime.value = vfx.time;
+    vfx.random = this.savedVfxRandom;
     if (this.savedSources) {
       vfx.smokeSources = this.savedSources;
-      if(!this.savedLighting)for (const source of this.savedSources.values()) vfx.AttachSourceLight(source);
+      if (!this.savedLighting) for (const source of this.savedSources.values()) vfx.AttachSourceLight(source);
     }
     vfx.nextSourceId = this.savedNextSourceId;
     if (this.savedParticles) this.RestoreParticles(vfx, this.savedParticles);
-    vfx.dust?.Dispose();vfx.dust=this.savedDust;
+    vfx.dust?.Dispose(); vfx.dust = this.savedDust;
     if (vfx.dust && this.savedDustVisible != null) vfx.dust.mesh.visible = this.savedDustVisible;
     if (this.savedWind) vfx.SetWind(this.savedWind);
     if (this.panel) this.panel.root.remove();
     this.panel = null;
     this.studio.Close();
-    this.studio.maxDistance=this.savedStudioMaxDistance;
-    this.studio.pad.geometry=this.savedPadGeometry;this.flarePadGeometry.dispose();
-    if(this.savedLighting)this.host.lights.EndEffectPreview(this.savedLighting,this.savedVfxTime);
-    if(this.host.post?.exposurePass){this.host.post.exposurePass.transientWeight=this.savedFlareExposure;this.host.post.exposurePass.RequestReset();}
+    this.studio.maxDistance = this.savedStudioMaxDistance;
+    this.studio.pad.geometry = this.savedPadGeometry; this.flarePadGeometry.dispose();
+    if (this.savedLighting) this.host.lights.EndEffectPreview(this.savedLighting, this.savedVfxTime);
+    if (this.host.post?.exposurePass) { this.host.post.exposurePass.transientWeight = this.savedFlareExposure; this.host.post.exposurePass.RequestReset(); }
     vfx.root.visible = this.savedVfxVisible;
     this.savedSources = null;
     this.savedParticles = null;
@@ -215,14 +287,11 @@ export class VfxEditor {
     const Capture = (pool) => ({
       cursor: pool.cursor,
       deathTime: pool.deathTime.slice(),
-      arrays: Object.fromEntries(Object.entries(pool.arrays)
-        .map(([name, array]) => [name, array.slice()])),
+      arrays: Object.fromEntries(Object.entries(pool.arrays).map(([name, array]) => [name, array.slice()])),
     });
     return {
-      pools: Object.fromEntries(Object.entries(vfx.pools)
-        .filter(([,pool])=>!pool.particleId)
-        .map(([name, pool]) => [name, Capture(pool)])),
-      debris: vfx.debris.particleId?null:Capture(vfx.debris),
+      pools: Object.fromEntries(Object.entries(vfx.pools).filter(([, pool]) => !pool.particleId).map(([name, pool]) => [name, Capture(pool)])),
+      debris: vfx.debris.particleId ? null : Capture(vfx.debris),
       lastExplosionSprite: vfx.lastExplosionSprite,
       lastMuzzleProfile: vfx.lastMuzzleProfile,
     };
@@ -239,366 +308,1328 @@ export class VfxEditor {
       pool.Flush(vfx.time);
     };
     for (const [name, saved] of Object.entries(snapshot.pools)) Restore(vfx.pools[name], saved);
-    if(snapshot.debris)Restore(vfx.debris, snapshot.debris);
+    if (snapshot.debris) Restore(vfx.debris, snapshot.debris);
     vfx.lastExplosionSprite = snapshot.lastExplosionSprite;
     vfx.lastMuzzleProfile = snapshot.lastMuzzleProfile;
   }
 
-  BuildUi(body) {
-    // 固定在标题下、不随正文滚动的播放栏；配色与内边距归 Style_Editor.css 的 .edPanelBar。
-    const transport=El('div','edPanelBar');this.panel.root.insertBefore(transport,body);
-    const playback=Section(transport,'播放与时间');
-    const buttons=ButtonRow(playback,[{label:'播放',onClick:()=>this.Play()},{label:'暂停',onClick:()=>this.TogglePause()},
-      {label:'单帧',onClick:()=>this.Step()},{label:'归零',onClick:()=>this.Seek(0)},{label:'停止',onClick:()=>this.Stop()}]);
-    ['play','pause','step','restart','stop'].forEach((key,i)=>buttons.children[i].dataset.vfxAction=key);this.pauseButton=buttons.children[1];
-    this.timeSlider=Slider(playback,{label:'时间',min:0,max:10,step:1/60,value:0,format:v=>v.toFixed(2)+' s',onInput:value=>this.QueueSeek(value)});
-    this.timeSlider.root.querySelector('input').dataset.vfxTime='true';
-    this.timeLength=Select(playback,'时间轴长度',[{value:10,label:'10 秒'},{value:30,label:'30 秒'},{value:60,label:'60 秒'}],10,value=>this.timeSlider.root.querySelector('input').max=value);
-    Select(playback,'播放速度',[.1,.25,.5,1,2].map(value=>({value,label:value+'×'})),1,value=>{this.speed=Number(value)});
-    Note(playback,'空格暂停/继续 · → 单帧 · Shift+→ 十帧 · Home 归零');
-    const env=this.host.previewEnvironment;
-    if(env){
-      // 独立窗口：昼夜取项目的环境预设（预设 + 它自带的白天 / 黄昏 / 晚上），不另写时段。
-      this.envPresetSelect=Select(playback,'环境预设',env.Options(),env.presetId,value=>this.SetEnvironmentPreset(value));
-      this.envPresetSelect.root.dataset.vfxEnvPreset='true';
-      this.environmentSelect=Select(playback,'预览昼夜',env.LookOptions(),env.lookId,value=>this.SetPreviewEnvironment(value));
-    }else this.environmentSelect=Select(playback,'预览昼夜',[{value:'original',label:'进入时环境'},{value:'day',label:'白天 · 看结构'},{value:'night',label:'夜晚 · 看照明'}],this.previewEnvironment||'original',value=>this.SetPreviewEnvironment(value));
-    this.environmentSelect.root.dataset.vfxEnvironment='true';
-    this.flareCameraSelect=Select(playback,'弹药镜头',[{value:'observer',label:'人眼高度 · 夜间观察'},{value:'follow',label:'燃烧体近景'},{value:'field',label:'夜间照明全景'},{value:'flight',label:'完整弹道'},{value:'ground',label:'地面与阴影'}],this.flareCamera,value=>{this.flareCamera=value;this.FrameEffect();});
-    this.flareCameraSelect.root.dataset.flareCamera='true';
-    this.message=Note(transport,'');this.message.setAttribute('role','status');this.message.dataset.vfxStatus='true';
-    const tabs=ButtonRow(transport,[{label:'效果库',onClick:()=>this.ShowTab('library')},{label:'粒子模块',onClick:()=>this.ShowTab('modules')},{label:'落土参数',onClick:()=>this.ShowTab('soil')},{label:'预设',onClick:()=>this.ShowTab('presets')}]);
-    ['library','modules','soil','presets'].forEach((key,i)=>tabs.children[i].dataset.vfxTab=key);
-    this.tabs={};for(const key of ['library','modules','soil','presets']){const box=El('div');box.dataset.vfxPanel=key;body.appendChild(box);this.tabs[key]=box;}
-    this.soil=new FallingSoilInspector(this,this.tabs.soil);
-    const library=Section(this.tabs.library,'效果库');
-    this.effectList=ListBox(library,{height:240,onPick:id=>this.SelectEffect(id)});
-    this.effectList.Fill(ALL_EFFECTS.map(effect=>({id:effect.id,name:effect.name,tail:effect.continuous?'持续':'瞬时',title:effect.note})));this.effectList.Select(this.effectId);
-    const environment=Section(this.tabs.library,'规模与环境');
-    Toggle(environment,'自动重播瞬时效果',this.loop,on=>{this.loop=on});
-    Slider(environment,{label:'整体缩放',min:.25,max:3,step:.05,value:this.scale,onInput:value=>{this.scale=value;this.Play()}});
-    Slider(environment,{label:'重播间隔',min:.4,max:12,step:.1,value:this.loopInterval,onInput:value=>{this.loopInterval=value}});
-    for(const axis of ['x','z'])Slider(environment,{label:'风 '+axis.toUpperCase(),min:-4,max:4,step:.1,value:this.wind[axis],onInput:value=>{this.wind[axis]=value;this.ApplyWind()}});
-    const seed=El('input');seed.type='number';seed.min='0';seed.max='4294967295';seed.step='1';seed.value=this.seed;seed.dataset.vfxSeed='true';seed.setAttribute('aria-label','预览随机种子');
-    seed.addEventListener('change',()=>{const value=Number(seed.value);if(Number.isInteger(value)&&value>=0&&value<=4294967295){this.seed=value;this.Play();}});environment.appendChild(seed);
-    Toggle(environment,'显示米格',true,on=>this.studio.SetGridVisible(on));
-    ButtonRow(environment,[{label:'适配镜头',onClick:()=>this.FrameEffect()}]);Note(environment,'在画面空白处拖动旋转，滚轮缩放。');
-    Note(environment,'昼夜和弹药镜头在顶部播放栏。照明场中的立柱高 1.7 米，前后间距 50 米；屋顶与矮墙用来检查照明范围及投影。');
-    Note(environment,'弹药按米制预览，不受整体缩放影响；风与种子在重播时应用。照明弹熄灭后继续伞降、落地收拢；60 秒时间轴可查看完整过程。');
-    const layers=Section(this.tabs.modules,'粒子层');
-    this.layerSelect=Select(layers,'编辑层',[],null,key=>{this.selectedLayer=key;this.inspector.Show()});this.layerSelect.root.dataset.vfxLayer='true';
-    const presets=this.host.vfx.particles.Presets();this.addPreset=Select(layers,'新粒子层',presets,'FireTongue',()=>{});
-    ButtonRow(layers,[{label:'添加粒子层',onClick:()=>this.AddLayer(this.addPreset.Value())},{label:'删除自建层',onClick:()=>this.DeleteLayer()}]);
-    Note(layers,'生命周期曲线实时生效；初始尺寸、速度等发射参数在新粒子或重播时生效。');
-    this.inspectorBody=El('div');this.tabs.modules.appendChild(this.inspectorBody);
-    this.inspector=new ParticleInspector(this.inspectorBody,{Read:()=>this.ReadLayer(),Patch:patch=>this.EditLayer(patch)});
-    const storage=Section(this.tabs.presets,'保存与导入');
-    this.savedName=El('input');this.savedName.placeholder='预设名称';this.savedName.value='我的粒子预设';this.savedName.setAttribute('aria-label','预设名称');storage.appendChild(this.savedName);
-    this.savedSelect=Select(storage,'本机预设',[],null,()=>{});
-    ButtonRow(storage,[{label:'保存到浏览器',onClick:()=>this.SaveLocal()},{label:'载入选中预设',onClick:()=>this.LoadLocal()}]);
-    Note(storage,'本机保存用于下次继续编辑；下载 JSON 可交给 agent 或在别处导入。');
-    this.json=TextArea(storage,{rows:9,placeholder:'导出当前效果，或粘贴粒子预设 JSON 后导入。'});this.json.dataset.vfxPreset='true';
-    ButtonRow(storage,[{label:'生成 JSON',onClick:()=>{this.json.value=JSON.stringify(this.Export(),null,2);this.Status('已生成当前效果预设。')}},
-      {label:'导入 JSON',onClick:()=>this.Try(()=>this.Import(JSON.parse(this.json.value)))},{label:'下载 JSON',onClick:()=>this.Download()}]);
-    const file=El('input');file.type='file';file.accept='.json,application/json';file.setAttribute('aria-label','选择粒子预设文件');
-    file.addEventListener('change',async()=>{const chosen=file.files?.[0];if(!chosen)return;const text=await chosen.text();if(this.panel)this.Try(()=>this.Import(JSON.parse(text)));});storage.appendChild(file);
-    if(!this.host.standalone){ButtonRow(storage,[{label:'应用参数到当前关卡同名层',onClick:()=>this.ApplyToScene()}]);
-      Note(storage,'应用到关卡会更新已存在及后续生成的同名层；不会直接改写项目源文件。');}
-    this.facts=Facts(Section(body,'运行状态'));this.RefreshSaved();this.ShowTab(FALLING_SOIL_PRESETS[this.effectId]?'soil':'library');
+  // =========================================================================
+  // 1. 独立窗口三栏工作台 UI（左栏效果库/场景 + 中央视口/底部时间轴 + 右栏 Unity/UE 检查器）
+  // =========================================================================
+  BuildStandaloneUi(root) {
+    const shell = El('div', 'edPanel work vfxWorkbench');
+    shell.dataset.vfxEditor = 'modules';
+    root.appendChild(shell);
+    this.panel = { root: shell };
+
+    // 浮动瞬时状态提示（空时隐藏，仅载入体积数据或报错时显示）
+    this.message = El('div', 'vfxToast');
+    this.message.setAttribute('role', 'status');
+    this.message.dataset.vfxStatus = 'true';
+    this.message.hidden = true;
+    shell.appendChild(this.message);
+
+    // 侧栏折叠后的边缘恢复按钮
+    const restoreLeft = El('button', 'vfxEdgeRestore left', '效果库 ›');
+    restoreLeft.type = 'button';
+    restoreLeft.addEventListener('click', () => { document.body.classList.remove('vfxHideLeft'); this.host.previewStage?.Resize(); });
+    const restoreRight = El('button', 'vfxEdgeRestore right', '‹ 检查器');
+    restoreRight.type = 'button';
+    restoreRight.addEventListener('click', () => { document.body.classList.remove('vfxHideRight'); this.host.previewStage?.Resize(); });
+    shell.append(restoreLeft, restoreRight);
+
+    // --- 左栏：效果库 / 预设 + 固定底部测试场景与环境坞 ---
+    const left = El('aside', 'vfxLeft');
+    const leftTabs = El('div', 'vfxTabBar');
+    this.tabButtons = {};
+    this.tabs = {};
+    const MakeTabBtn = (parent, key, label, group) => {
+      const b = El('button', 'vfxTabBtn', label);
+      b.type = 'button';
+      b.dataset.vfxTab = key;
+      b.addEventListener('click', () => this.ShowTab(key));
+      parent.appendChild(b);
+      this.tabButtons[key] = { button: b, group };
+      return b;
+    };
+    MakeTabBtn(leftTabs, 'library', '效果库', 'left');
+    MakeTabBtn(leftTabs, 'presets', '预设', 'left');
+    const hideLeft = El('button', 'vfxPaneToggle', '«');
+    hideLeft.type = 'button'; hideLeft.title = '收起左栏';
+    hideLeft.addEventListener('click', () => { document.body.classList.add('vfxHideLeft'); this.host.previewStage?.Resize(); });
+    leftTabs.appendChild(hideLeft);
+    left.appendChild(leftTabs);
+
+    const leftMain = El('div', 'vfxLeftMain');
+    const libPane = El('div', 'vfxPane'); libPane.dataset.vfxPanel = 'library';
+    const presetsPane = El('div', 'vfxPane'); presetsPane.dataset.vfxPanel = 'presets';
+    this.tabs.library = libPane;
+    this.tabs.presets = presetsPane;
+    leftMain.append(libPane, presetsPane);
+    left.appendChild(leftMain);
+
+    this.BuildEffectLibrary(libPane, true);
+    const presetsScroll = El('div', 'vfxPaneScroll');
+    presetsPane.appendChild(presetsScroll);
+    this.BuildPresets(presetsScroll);
+
+    // 左栏底部常驻：测试场景与模拟环境坞（取代顶栏曝光条与冗余状态字）
+    const dock = El('div', 'vfxStageDock');
+    this.BuildStageDock(dock);
+    left.appendChild(dock);
+    shell.appendChild(left);
+
+    // --- 中央底部：UE/Unity 风格时间轴与播放控制条 ---
+    const timeline = El('section', 'vfxTimeline');
+    timeline.setAttribute('aria-label', '时间轴与播放控制');
+    this.BuildTimelineBar(timeline);
+    shell.appendChild(timeline);
+
+    // --- 右栏：Unity/UE 粒子检查器（粒子模块 | 落土参数） ---
+    const right = El('aside', 'vfxRight');
+    const rightTabs = El('div', 'vfxTabBar');
+    const hideRight = El('button', 'vfxPaneToggle', '»');
+    hideRight.type = 'button'; hideRight.title = '收起右栏';
+    hideRight.addEventListener('click', () => { document.body.classList.add('vfxHideRight'); this.host.previewStage?.Resize(); });
+    rightTabs.appendChild(hideRight);
+    MakeTabBtn(rightTabs, 'modules', '粒子模块', 'right');
+    MakeTabBtn(rightTabs, 'soil', '落土参数', 'right');
+    right.appendChild(rightTabs);
+
+    const modulesPane = El('div', 'vfxPane'); modulesPane.dataset.vfxPanel = 'modules';
+    const soilPane = El('div', 'vfxPane'); soilPane.dataset.vfxPanel = 'soil';
+    this.tabs.modules = modulesPane;
+    this.tabs.soil = soilPane;
+    right.append(modulesPane, soilPane);
+
+    this.BuildModulesPane(modulesPane);
+    const soilScroll = El('div', 'vfxPaneScroll');
+    soilPane.appendChild(soilScroll);
+    this.soil = new FallingSoilInspector(this, soilScroll);
+    shell.appendChild(right);
+
+    this.RefreshSaved();
+    this.ShowTab('library');
+    this.ShowTab(FALLING_SOIL_PRESETS[this.effectId] ? 'soil' : 'modules');
   }
-  ShowTab(tab){for(const [key,box]of Object.entries(this.tabs))box.hidden=key!==tab;if(tab==='modules')this.inspector.Show();if(tab==='soil')this.soil.Show();}
-  Status(message,error=false){if(!this.message)return;this.message.textContent=message;this.message.style.color=error?'#ffae98':'#c9d6c7';}
-  Try(run){try{return run()}catch(error){this.Status(error.message,true);return false}}
-  IsContinuous(){return !!SCENE_EFFECTS[this.effectId]||!!INSTANT_EFFECTS.find(effect=>effect.id===this.effectId)?.continuous;}
-  ApplyWind(){this.host.vfx.SetWind(this.wind);}
-  Key(entry){return entry.editorKey||(entry.profile?'channel:'+entry.profile:'preset:'+entry.preset);}
-  Effects(){return ALL_EFFECTS.map(({id,name,note,continuous})=>({id,name,note,continuous:!!continuous}));}
-  SelectLayer(key){if(!this.layerRecords.has(key))throw new Error('粒子层不存在：'+key);this.selectedLayer=key;this.layerSelect.Set(key);this.inspector.Show();return this.ReadLayer();}
-  SelectEffect(id){
-    if(!ALL_EFFECTS.some(effect=>effect.id===id))throw new Error('Unknown particle effect '+id);
-    this.banks.set(this.effectId,{patches:this.layerPatches,custom:this.customLayers});this.effectId=id;
+
+  /** 构建效果搜索 + 分类筛选 + 列表（独立窗口与游戏内共用）。 */
+  BuildEffectLibrary(container, fullHeight) {
+    const head = El('div', 'vfxLibHead');
+    const searchWrap = El('div', 'vfxSearchWrap');
+    const search = El('input', 'vfxSearch');
+    search.type = 'search';
+    search.placeholder = '搜索效果…';
+    search.setAttribute('aria-label', '搜索效果');
+    search.addEventListener('input', () => { this.searchQuery = search.value.trim().toLowerCase(); this.FilterEffects(); });
+    searchWrap.appendChild(search);
+    head.appendChild(searchWrap);
+
+    const catBar = El('div', 'vfxCatBar');
+    this.catButtons = new Map();
+    for (const cat of EFFECT_CATEGORIES) {
+      const chip = El('button', `vfxCatChip${cat.id === this.category ? ' on' : ''}`, cat.label);
+      chip.type = 'button';
+      chip.addEventListener('click', () => {
+        this.category = cat.id;
+        for (const [id, el] of this.catButtons) el.classList.toggle('on', id === cat.id);
+        this.FilterEffects();
+      });
+      catBar.appendChild(chip);
+      this.catButtons.set(cat.id, chip);
+    }
+    head.appendChild(catBar);
+    container.appendChild(head);
+
+    const wrap = El('div', fullHeight ? 'vfxLibListWrap' : '');
+    this.effectList = ListBox(wrap, { height: fullHeight ? 600 : 250, onPick: (id) => this.SelectEffect(id) });
+    container.appendChild(wrap);
+    this.FilterEffects();
+  }
+
+  FilterEffects() {
+    if (!this.effectList) return;
+    const q = this.searchQuery;
+    const list = ALL_EFFECTS.filter((effect) => {
+      if (this.category !== 'all' && CategoryOf(effect) !== this.category) return false;
+      if (q && !effect.name.toLowerCase().includes(q) && !effect.id.toLowerCase().includes(q)) return false;
+      return true;
+    });
+    this.effectList.Fill(list.map((effect) => ({ id: effect.id, name: effect.name, tail: effect.continuous ? '持续' : '瞬时', title: effect.note })));
+    this.effectList.Select(this.effectId);
+  }
+
+  /** 构建左栏底部的测试场景、光照、曝光、风场与种子坞（无冗余说明文字）。 */
+  BuildStageDock(dock) {
+    const titleBar = El('div', 'vfxDockTitle');
+    titleBar.appendChild(El('span', '', '测试场景'));
+    const tools = El('div', 'vfxDockTools');
+    let gridOn = true;
+    const gridBtn = El('button', 'vfxMiniBtn on', '米格');
+    gridBtn.type = 'button';
+    gridBtn.setAttribute('aria-pressed', 'true');
+    gridBtn.addEventListener('click', () => {
+      gridOn = !gridOn;
+      gridBtn.classList.toggle('on', gridOn);
+      gridBtn.setAttribute('aria-pressed', String(gridOn));
+      this.studio.SetGridVisible(gridOn);
+    });
+    const fitBtn = El('button', 'vfxMiniBtn', '适配');
+    fitBtn.type = 'button';
+    fitBtn.title = '适配镜头 (F)';
+    fitBtn.addEventListener('click', () => this.FrameEffect());
+    tools.append(gridBtn, fitBtn);
+    titleBar.appendChild(tools);
+    dock.appendChild(titleBar);
+
+    // 场地模式三段开关：测试场 | 纯网格 | 暗室
+    const stageApi = this.host.previewStage;
+    if (stageApi) {
+      const seg = El('div', 'vfxSeg');
+      const modes = [['range', '测试场'], ['grid', '纯网格'], ['dark', '暗室']];
+      const segBtns = new Map();
+      for (const [id, label] of modes) {
+        const b = El('button', `vfxSegBtn${stageApi.arenaMode === id ? ' on' : ''}`, label);
+        b.type = 'button';
+        b.dataset.vfxArena = id;
+        b.addEventListener('click', () => {
+          stageApi.SetArenaMode(id);
+          for (const [k, btn] of segBtns) btn.classList.toggle('on', k === id);
+        });
+        seg.appendChild(b);
+        segBtns.set(id, b);
+      }
+      dock.appendChild(seg);
+    }
+
+    const Row = (label, ctrl) => {
+      const r = El('div', 'vfxProp compact');
+      const l = El('div', 'vfxPropLabel', label);
+      const c = El('div', 'vfxPropCtrl');
+      if (ctrl) c.appendChild(ctrl);
+      r.append(l, c);
+      dock.appendChild(r);
+      return { row: r, label: l, ctrl: c };
+    };
+
+    const env = this.host.previewEnvironment;
+    if (env) {
+      this.envPresetSelect = CompactSelect(env.Options(), env.presetId, (value) => this.SetEnvironmentPreset(value), '环境预设');
+      this.envPresetSelect.root.dataset.vfxEnvPreset = 'true';
+      Row('环境', this.envPresetSelect.root);
+
+      this.environmentSelect = CompactSelect(env.LookOptions(), env.lookId, (value) => this.SetPreviewEnvironment(value), '预览昼夜');
+      this.environmentSelect.root.dataset.vfxEnvironment = 'true';
+      Row('昼夜', this.environmentSelect.root);
+    }
+
+    // 曝光 EV 归位到测试场景光照区（不再挤在窗口顶栏），点击读数一键归零
+    if (stageApi) {
+      const expRange = El('input');
+      expRange.type = 'range'; expRange.min = '-4'; expRange.max = '4'; expRange.step = '0.25'; expRange.value = String(stageApi.exposureEv || 0);
+      expRange.dataset.vfxExposure = 'true';
+      expRange.setAttribute('aria-label', '曝光补偿 EV');
+      const expVal = El('span', 'vfxPropVal resettable', '±0.0');
+      expVal.title = '点击归零 EV';
+      const SyncExp = () => {
+        const ev = Number(expRange.value);
+        stageApi.SetExposureEv(ev);
+        expVal.textContent = `${ev > 0 ? '+' : ev < 0 ? '' : '±'}${ev.toFixed(1)}`;
+        expRange.style.setProperty('--fill', `${((ev + 4) / 8) * 100}%`);
+      };
+      expRange.addEventListener('input', SyncExp);
+      expVal.addEventListener('click', () => { expRange.value = '0'; SyncExp(); });
+      SyncExp();
+      const { ctrl } = Row('曝光 EV');
+      ctrl.append(expRange, expVal);
+    }
+
+    // 照明弹镜头（仅选照明弹 / 信号弹时显示）
+    this.flareCameraSelect = CompactSelect([
+      { value: 'observer', label: '人眼 · 夜间观察' },
+      { value: 'follow', label: '燃烧体近景' },
+      { value: 'field', label: '夜间照明全景' },
+      { value: 'flight', label: '完整弹道' },
+      { value: 'ground', label: '地面与阴影' },
+    ], this.flareCamera, (value) => { this.flareCamera = value; this.FrameEffect(); }, '弹药镜头');
+    this.flareCameraSelect.root.dataset.flareCamera = 'true';
+    this.flareCameraRow = Row('镜头', this.flareCameraSelect.root).row;
+    this.flareCameraRow.hidden = !FLARE_EFFECTS[this.effectId];
+
+    // 整体缩放
+    const scaleRange = El('input');
+    scaleRange.type = 'range'; scaleRange.min = '0.25'; scaleRange.max = '3'; scaleRange.step = '0.05'; scaleRange.value = String(this.scale);
+    scaleRange.setAttribute('aria-label', '整体缩放');
+    const scaleVal = El('span', 'vfxPropVal resettable', '1.00×');
+    scaleVal.title = '点击重置缩放为 1.00';
+    const SyncScale = (replay) => {
+      this.scale = Number(scaleRange.value);
+      scaleVal.textContent = `${this.scale.toFixed(2)}×`;
+      scaleRange.style.setProperty('--fill', `${((this.scale - 0.25) / 2.75) * 100}%`);
+      if (replay) this.Play();
+    };
+    scaleRange.addEventListener('input', () => SyncScale(true));
+    scaleVal.addEventListener('click', () => { scaleRange.value = '1'; SyncScale(true); });
+    SyncScale(false);
+    this.scaleControl = { Set: (v) => { scaleRange.value = String(v); SyncScale(false); } };
+    const scaleRow = Row('缩放');
+    scaleRow.ctrl.append(scaleRange, scaleVal);
+
+    // 风场 X / Z 单行双轴
+    const windVec = El('div', 'vfxVec v2');
+    this.windInputs = {};
+    for (const [axis, cls] of [['x', 'ax'], ['z', 'az']]) {
+      const box = El('div', 'vfxAxis');
+      const tag = El('span', `vfxAxisTag ${cls}`, axis.toUpperCase());
+      const inp = El('input');
+      inp.type = 'number'; inp.min = '-4'; inp.max = '4'; inp.step = '0.1';
+      inp.value = String(Number(this.wind[axis].toFixed(2)));
+      inp.setAttribute('aria-label', `风 ${axis.toUpperCase()}`);
+      const SetWind = (v) => { this.wind[axis] = Math.max(-4, Math.min(4, v)); this.ApplyWind(); };
+      inp.addEventListener('change', () => { const n = Number(inp.value); if (Number.isFinite(n)) SetWind(n); });
+      BindScrub(tag, inp, SetWind, { min: -4, max: 4, step: 0.1 });
+      box.append(tag, inp);
+      windVec.appendChild(box);
+      this.windInputs[axis] = inp;
+    }
+    Row('风场', windVec);
+
+    // 随机种子 + 一键换种重播
+    const seedIn = El('input');
+    seedIn.type = 'number'; seedIn.min = '0'; seedIn.max = '4294967295'; seedIn.step = '1'; seedIn.value = String(this.seed);
+    seedIn.dataset.vfxSeed = 'true';
+    seedIn.setAttribute('aria-label', '预览随机种子');
+    seedIn.addEventListener('change', () => {
+      const value = Number(seedIn.value);
+      if (Number.isInteger(value) && value >= 0 && value <= 4294967295) { this.seed = value; this.Play(); }
+    });
+    const rndBtn = El('button', 'vfxMiniBtn', '换种');
+    rndBtn.type = 'button';
+    rndBtn.title = '随机新种子并重播';
+    rndBtn.addEventListener('click', () => {
+      this.seed = (Math.floor(Math.random() * 999999) + 1) >>> 0;
+      seedIn.value = String(this.seed);
+      this.Play();
+    });
+    this.seedInput = seedIn;
+    const seedRow = Row('种子');
+    seedRow.ctrl.append(seedIn, rndBtn);
+  }
+
+  /** 构建底部 UE/Unity 风格时间轴与播放控制栏。 */
+  BuildTimelineBar(bar) {
+    const top = El('div', 'vfxTlTop');
+    const transport = El('div', 'vfxTlTransport');
+    const MakeAct = (key, label, title, onClick) => {
+      const b = El('button', 'edBtn', label);
+      b.type = 'button';
+      b.dataset.vfxAction = key;
+      b.title = title;
+      b.addEventListener('click', onClick);
+      transport.appendChild(b);
+      return b;
+    };
+    MakeAct('play', '▶ 播放', '重播效果', () => this.Play());
+    this.pauseButton = MakeAct('pause', '⏸ 暂停', '暂停 / 继续 (Space)', () => this.TogglePause());
+    MakeAct('step', '⏭ 单帧', '推进 1 帧 (→) · 十帧 (Shift+→)', () => this.Step());
+    MakeAct('restart', '⏮ 归零', '归零到 0.00 s (Home)', () => this.Seek(0));
+    MakeAct('stop', '■ 停止', '清空并停止', () => this.Stop());
+    top.appendChild(transport);
+    top.appendChild(El('span', 'vfxTlSep'));
+
+    // 瞬时效果自动重播与间隔
+    const loopBox = El('div', 'vfxTlLoop');
+    this.loopToggle = Toggle(loopBox, '重播', this.loop, (on) => { this.loop = on; this.SyncLoopControls(); });
+    this.loopIntervalWrap = El('label', 'vfxTlInlineNum');
+    const intervalIn = El('input');
+    intervalIn.type = 'number'; intervalIn.min = '0.4'; intervalIn.max = '12'; intervalIn.step = '0.1';
+    intervalIn.value = String(this.loopInterval);
+    intervalIn.setAttribute('aria-label', '重播间隔秒');
+    intervalIn.addEventListener('change', () => {
+      const n = Number(intervalIn.value);
+      if (Number.isFinite(n) && n >= 0.4 && n <= 12) this.loopInterval = n;
+    });
+    this.loopIntervalWrap.append(intervalIn, document.createTextNode('s'));
+    loopBox.appendChild(this.loopIntervalWrap);
+    top.appendChild(loopBox);
+
+    // 右侧速度、总时长与实时紧凑计数徽章
+    const meta = El('div', 'vfxTlMeta');
+    const speedSel = CompactSelect([0.1, 0.25, 0.5, 1, 2].map((v) => ({ value: v, label: `${v}×` })), 1, (v) => { this.speed = Number(v); }, '播放速度');
+    this.timeLength = CompactSelect([{ value: 10, label: '10 s' }, { value: 30, label: '30 s' }, { value: 60, label: '60 s' }], 10, (v) => {
+      this.SetTimelineMax(Number(v));
+    }, '时间轴长度');
+
+    const pills = El('div', 'vfxStatPills');
+    const MakePill = (name) => {
+      const p = El('span', 'vfxStatPill');
+      const k = El('span', '', name);
+      const b = El('b', '', '0');
+      p.append(k, b);
+      pills.appendChild(p);
+      return { root: p, val: b };
+    };
+    this.statParticles = MakePill('粒子');
+    this.statLayers = MakePill('层');
+    this.statDropped = MakePill('丢弃'); this.statDropped.root.classList.add('warn'); this.statDropped.root.hidden = true;
+    this.statExtra = MakePill(''); this.statExtra.root.hidden = true;
+    meta.append(speedSel.root, this.timeLength.root, pills);
+    top.appendChild(meta);
+    bar.appendChild(top);
+
+    // 底部时间标尺与全宽进度滑杆
+    const track = El('div', 'vfxTlTrack');
+    const rulerWrap = El('div', 'vfxRulerWrap');
+    this.rulerTicks = El('div', 'vfxRulerTicks');
+    const range = El('input');
+    range.type = 'range'; range.min = '0'; range.max = '10'; range.step = String(1 / 60); range.value = '0';
+    range.dataset.vfxTime = 'true';
+    range.setAttribute('aria-label', '预览时间');
+    this.timeReadout = El('span', 'vfxTlTimeReadout', '0.00 s');
+    const SyncFill = (v) => {
+      const max = parseFloat(range.max) || 10;
+      const pct = Math.max(0, Math.min(1, v / max)) * 100;
+      range.style.setProperty('--fill', `${pct.toFixed(1)}%`);
+      this.timeReadout.textContent = `${v.toFixed(2)} s`;
+    };
+    range.addEventListener('input', () => {
+      const v = parseFloat(range.value);
+      SyncFill(v);
+      this.QueueSeek(v);
+    });
+    this.timeSlider = {
+      root: rulerWrap,
+      Set: (v) => { range.value = String(v); SyncFill(v); },
+      Value: () => parseFloat(range.value),
+    };
+    rulerWrap.append(this.rulerTicks, range);
+    track.append(rulerWrap, this.timeReadout);
+    bar.appendChild(track);
+    this.SetTimelineMax(10);
+    SyncFill(0);
+  }
+
+  SetTimelineMax(seconds) {
+    this.timelineMax = seconds;
+    const input = this.timeSlider?.root.querySelector('input');
+    if (input) input.max = String(seconds);
+    if (this.rulerTicks) {
+      this.rulerTicks.replaceChildren();
+      const count = 5;
+      for (let i = 0; i <= count; i += 1) {
+        const s = (seconds * i) / count;
+        this.rulerTicks.appendChild(El('span', '', `${s}s`));
+      }
+    }
+  }
+
+  SyncLoopControls() {
+    if (this.loopToggle) this.loopToggle.Set(this.loop);
+    if (this.loopIntervalWrap) {
+      const show = !this.IsContinuous() && !FALLING_SOIL_PRESETS[this.effectId] && !FLARE_EFFECTS[this.effectId] && this.loop;
+      this.loopIntervalWrap.hidden = !show;
+    }
+  }
+
+  /** 构建右栏（或模块页）的发射器层栈 + Unity/UE 模块检查器。 */
+  BuildModulesPane(container) {
+    const bar = El('div', 'vfxLayerBar');
+    // 顶部一行：发射器层标题 + 同步快捷下拉（既无重复感，又兼容 selectOption('[data-vfx-layer]')）
+    const selRow = El('div', 'vfxLayerSelectRow');
+    selRow.appendChild(El('span', '', '发射器层'));
+    this.layerSelect = CompactSelect([], null, (key) => { this.selectedLayer = key; this.RenderLayerStack(); this.inspector.Show(); }, '编辑层');
+    this.layerSelect.root.dataset.vfxLayer = 'true';
+    selRow.appendChild(this.layerSelect.root);
+    bar.appendChild(selRow);
+
+    // 直观的可点击发射器层栈（UE Niagara Stack 风格，实时显示每层存活粒子数）
+    this.layerListEl = El('div', 'vfxLayerList');
+    bar.appendChild(this.layerListEl);
+
+    // 新层预设选择 + 添加 / 删除自建层
+    const ctrlRow = El('div', 'vfxLayerControls');
+    const presets = this.host.vfx.particles.Presets();
+    this.addPreset = CompactSelect(presets, 'FireTongue', () => {}, '新粒子层');
+    const addBtn = El('button', 'edBtn', '添加粒子层');
+    addBtn.type = 'button';
+    addBtn.addEventListener('click', () => this.AddLayer(this.addPreset.Value()));
+    const delBtn = El('button', 'edBtn danger', '删除自建层');
+    delBtn.type = 'button';
+    delBtn.addEventListener('click', () => this.DeleteLayer());
+    ctrlRow.append(this.addPreset.root, addBtn, delBtn);
+    bar.appendChild(ctrlRow);
+    container.appendChild(bar);
+
+    const scroll = El('div', 'vfxPaneScroll');
+    this.inspectorBody = El('div');
+    scroll.appendChild(this.inspectorBody);
+    container.appendChild(scroll);
+    this.inspector = new ParticleInspector(this.inspectorBody, { Read: () => this.ReadLayer(), Patch: (patch) => this.EditLayer(patch) });
+  }
+
+  /** 构建预设导入导出页（零冗余说明文字）。 */
+  BuildPresets(container) {
+    const localBlock = El('div', 'vfxPresetBlock');
+    localBlock.appendChild(El('div', 'vfxPresetTitle', '本机预设'));
+    const saveRow = El('div', 'vfxPresetRow');
+    this.savedName = El('input');
+    this.savedName.type = 'text';
+    this.savedName.placeholder = '预设名称';
+    this.savedName.value = '我的粒子预设';
+    this.savedName.setAttribute('aria-label', '预设名称');
+    const saveBtn = El('button', 'edBtn', '保存到浏览器');
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', () => this.SaveLocal());
+    saveRow.append(this.savedName, saveBtn);
+    localBlock.appendChild(saveRow);
+
+    const loadRow = El('div', 'vfxPresetRow');
+    this.savedSelect = CompactSelect([], null, () => {}, '本机预设');
+    const loadBtn = El('button', 'edBtn', '载入选中预设');
+    loadBtn.type = 'button';
+    loadBtn.addEventListener('click', () => this.LoadLocal());
+    loadRow.append(this.savedSelect.root, loadBtn);
+    localBlock.appendChild(loadRow);
+    container.appendChild(localBlock);
+
+    const jsonBlock = El('div', 'vfxPresetBlock');
+    jsonBlock.appendChild(El('div', 'vfxPresetTitle', 'JSON 交换'));
+    const actions = El('div', 'vfxPresetActions');
+    for (const [label, fn] of [
+      ['生成 JSON', () => { this.json.value = JSON.stringify(this.Export(), null, 2); this.Status('已生成 JSON', false, true); }],
+      ['导入 JSON', () => this.Try(() => this.Import(JSON.parse(this.json.value)))],
+      ['下载 JSON', () => this.Download()],
+    ]) {
+      const b = El('button', 'edBtn', label);
+      b.type = 'button';
+      b.addEventListener('click', fn);
+      actions.appendChild(b);
+    }
+    jsonBlock.appendChild(actions);
+
+    const fileLabel = El('label', 'vfxFileLabel', '从文件导入 JSON…');
+    const file = El('input');
+    file.type = 'file'; file.accept = '.json,application/json';
+    file.setAttribute('aria-label', '选择粒子预设文件');
+    file.addEventListener('change', async () => {
+      const chosen = file.files?.[0];
+      if (!chosen) return;
+      const text = await chosen.text();
+      if (this.panel) this.Try(() => this.Import(JSON.parse(text)));
+    });
+    fileLabel.appendChild(file);
+    jsonBlock.appendChild(fileLabel);
+
+    this.json = TextArea(jsonBlock, { rows: 10, placeholder: '{ "kind": "TengxianParticleEffect", ... }' });
+    this.json.dataset.vfxPreset = 'true';
+    container.appendChild(jsonBlock);
+
+    if (!this.host.standalone) {
+      const sceneBlock = El('div', 'vfxPresetBlock');
+      const applyBtn = El('button', 'edBtn wide', '应用参数到当前关卡同名层');
+      applyBtn.type = 'button';
+      applyBtn.addEventListener('click', () => this.ApplyToScene());
+      sceneBlock.appendChild(applyBtn);
+      container.appendChild(sceneBlock);
+    }
+  }
+
+  // =========================================================================
+  // 2. 游戏内回归宿主模式（保留右侧单栏停靠与零说明文字升级，兼容全部既有回归测试）
+  // =========================================================================
+  BuildDockedUi(body) {
+    const transport = El('div', 'edPanelBar');
+    this.panel.root.insertBefore(transport, body);
+
+    const buttons = ButtonRow(transport, [
+      { label: '播放', onClick: () => this.Play() },
+      { label: '暂停', onClick: () => this.TogglePause() },
+      { label: '单帧', onClick: () => this.Step() },
+      { label: '归零', onClick: () => this.Seek(0) },
+      { label: '停止', onClick: () => this.Stop() },
+    ]);
+    ['play', 'pause', 'step', 'restart', 'stop'].forEach((key, i) => { buttons.children[i].dataset.vfxAction = key; });
+    this.pauseButton = buttons.children[1];
+
+    this.timeSlider = Slider(transport, { label: '时间', min: 0, max: 10, step: 1 / 60, value: 0, format: (v) => v.toFixed(2) + ' s', onInput: (value) => this.QueueSeek(value) });
+    this.timeSlider.root.querySelector('input').dataset.vfxTime = 'true';
+
+    const timingRow = El('div', 'vfxVec v2');
+    timingRow.style.margin = '4px 0';
+    this.timeLength = CompactSelect([{ value: 10, label: '10 秒' }, { value: 30, label: '30 秒' }, { value: 60, label: '60 秒' }], 10, (v) => this.SetTimelineMax(Number(v)), '时间轴长度');
+    const speedSel = CompactSelect([0.1, 0.25, 0.5, 1, 2].map((v) => ({ value: v, label: v + '×' })), 1, (v) => { this.speed = Number(v); }, '播放速度');
+    timingRow.append(this.timeLength.root, speedSel.root);
+    transport.appendChild(timingRow);
+
+    const env = this.host.previewEnvironment;
+    if (env) {
+      this.envPresetSelect = Select(transport, '环境预设', env.Options(), env.presetId, (value) => this.SetEnvironmentPreset(value));
+      this.envPresetSelect.root.dataset.vfxEnvPreset = 'true';
+      this.environmentSelect = Select(transport, '预览昼夜', env.LookOptions(), env.lookId, (value) => this.SetPreviewEnvironment(value));
+    } else {
+      this.environmentSelect = Select(transport, '预览昼夜', [
+        { value: 'original', label: '进入时环境' },
+        { value: 'day', label: '白天' },
+        { value: 'night', label: '夜晚' },
+      ], this.previewEnvironment || 'original', (value) => this.SetPreviewEnvironment(value));
+    }
+    this.environmentSelect.root.dataset.vfxEnvironment = 'true';
+
+    this.flareCameraSelect = Select(transport, '弹药镜头', [
+      { value: 'observer', label: '人眼 · 夜间观察' },
+      { value: 'follow', label: '燃烧体近景' },
+      { value: 'field', label: '夜间照明全景' },
+      { value: 'flight', label: '完整弹道' },
+      { value: 'ground', label: '地面与阴影' },
+    ], this.flareCamera, (value) => { this.flareCamera = value; this.FrameEffect(); });
+    this.flareCameraSelect.root.dataset.flareCamera = 'true';
+    this.flareCameraRow = this.flareCameraSelect.root.closest('.edRow');
+    if (this.flareCameraRow) this.flareCameraRow.hidden = !FLARE_EFFECTS[this.effectId];
+
+    this.message = El('div', 'edNote');
+    this.message.setAttribute('role', 'status');
+    this.message.dataset.vfxStatus = 'true';
+    transport.appendChild(this.message);
+
+    const tabBar = El('div', 'vfxTabBar');
+    tabBar.style.margin = '6px -22px -10px';
+    this.tabButtons = {};
+    this.tabs = {};
+    for (const [key, label] of [['library', '效果库'], ['modules', '粒子模块'], ['soil', '落土参数'], ['presets', '预设']]) {
+      const b = El('button', 'vfxTabBtn', label);
+      b.type = 'button';
+      b.dataset.vfxTab = key;
+      b.addEventListener('click', () => this.ShowTab(key));
+      tabBar.appendChild(b);
+      this.tabButtons[key] = { button: b, group: 'single' };
+      const box = El('div');
+      box.dataset.vfxPanel = key;
+      body.appendChild(box);
+      this.tabs[key] = box;
+    }
+    transport.appendChild(tabBar);
+
+    this.soil = new FallingSoilInspector(this, this.tabs.soil);
+    this.BuildEffectLibrary(this.tabs.library, false);
+
+    const envSec = Section(this.tabs.library, '规模与环境');
+    this.loopToggle = Toggle(envSec, '自动重播', this.loop, (on) => { this.loop = on; });
+    Slider(envSec, { label: '整体缩放', min: 0.25, max: 3, step: 0.05, value: this.scale, onInput: (value) => { this.scale = value; this.Play(); } });
+    Slider(envSec, { label: '重播间隔', min: 0.4, max: 12, step: 0.1, value: this.loopInterval, onInput: (value) => { this.loopInterval = value; } });
+    for (const axis of ['x', 'z']) Slider(envSec, { label: '风 ' + axis.toUpperCase(), min: -4, max: 4, step: 0.1, value: this.wind[axis], onInput: (value) => { this.wind[axis] = value; this.ApplyWind(); } });
+    const seed = El('input');
+    seed.type = 'number'; seed.min = '0'; seed.max = '4294967295'; seed.step = '1'; seed.value = String(this.seed);
+    seed.dataset.vfxSeed = 'true'; seed.setAttribute('aria-label', '预览随机种子');
+    seed.addEventListener('change', () => { const value = Number(seed.value); if (Number.isInteger(value) && value >= 0 && value <= 4294967295) { this.seed = value; this.Play(); } });
+    this.seedInput = seed;
+    envSec.appendChild(seed);
+    Toggle(envSec, '显示米格', true, (on) => this.studio.SetGridVisible(on));
+    ButtonRow(envSec, [{ label: '适配镜头', onClick: () => this.FrameEffect() }]);
+
+    this.BuildModulesPane(this.tabs.modules);
+    this.BuildPresets(this.tabs.presets);
+
+    this.facts = Facts(Section(body, '运行状态'));
+    this.RefreshSaved();
+    this.ShowTab(FALLING_SOIL_PRESETS[this.effectId] ? 'soil' : 'library');
+  }
+
+  ShowTab(tab) {
+    const target = this.tabButtons?.[tab];
+    if (this.host.standalone && target) {
+      const groupKeys = target.group === 'left' ? ['library', 'presets'] : ['modules', 'soil'];
+      for (const key of groupKeys) {
+        if (this.tabs[key]) this.tabs[key].hidden = key !== tab;
+        this.tabButtons[key]?.button.classList.toggle('on', key === tab);
+      }
+    } else {
+      for (const [key, box] of Object.entries(this.tabs)) {
+        box.hidden = key !== tab;
+        this.tabButtons?.[key]?.button.classList.toggle('on', key === tab);
+      }
+    }
+    if (tab === 'modules') { this.RenderLayerStack(); this.inspector?.Show(); }
+    if (tab === 'soil') this.soil?.Show();
+  }
+
+  Status(message, error = false, transient = false) {
+    if (!this.message) return;
+    clearTimeout(this.toastTimer);
+    this.message.textContent = message || '';
+    if (this.host.standalone) {
+      this.message.hidden = !message;
+      this.message.classList.toggle('error', !!error);
+      if (message && transient && !error) {
+        this.toastTimer = setTimeout(() => { if (this.message) { this.message.textContent = ''; this.message.hidden = true; } }, 2400);
+      }
+    } else {
+      this.message.style.color = error ? '#ffae98' : '#c9d6c7';
+    }
+  }
+
+  Try(run) { try { return run(); } catch (error) { this.Status(error.message, true); return false; } }
+  IsContinuous() { return !!SCENE_EFFECTS[this.effectId] || !!INSTANT_EFFECTS.find((effect) => effect.id === this.effectId)?.continuous; }
+  ApplyWind() { this.host.vfx.SetWind(this.wind); }
+  Key(entry) { return entry.editorKey || (entry.profile ? 'channel:' + entry.profile : 'preset:' + entry.preset); }
+  Effects() { return ALL_EFFECTS.map(({ id, name, note, continuous }) => ({ id, name, note, continuous: !!continuous })); }
+
+  SelectLayer(key) {
+    if (!this.layerRecords.has(key)) throw new Error('粒子层不存在：' + key);
+    this.selectedLayer = key;
+    this.layerSelect?.Set(key);
+    this.RenderLayerStack();
+    this.inspector?.Show();
+    return this.ReadLayer();
+  }
+
+  SelectEffect(id) {
+    if (!ALL_EFFECTS.some((effect) => effect.id === id)) throw new Error('Unknown particle effect ' + id);
+    this.banks.set(this.effectId, { patches: this.layerPatches, custom: this.customLayers });
+    this.effectId = id;
     this.effectList?.Select(id);
-    const bank=this.banks.get(id);this.layerPatches=bank?.patches||new Map();this.customLayers=bank?.custom||[];this.selectedLayer=null;
-    if(id==='Empty')this.loop=false;this.Play();this.FrameEffect();if(FALLING_SOIL_PRESETS[id])this.ShowTab('soil');
+    const bank = this.banks.get(id);
+    this.layerPatches = bank?.patches || new Map();
+    this.customLayers = bank?.custom || [];
+    this.selectedLayer = null;
+    if (id === 'Empty') this.loop = false;
+    this.SyncLoopControls();
+    this.Play();
+    this.FrameEffect();
+    if (FALLING_SOIL_PRESETS[id]) this.ShowTab('soil');
+    else if (this.host.standalone) this.ShowTab('modules');
   }
-  CaptureLayers(){
-    const api=this.host.vfx.particles;
-    for(const [id,entry]of api.systems){if(entry.editorKey?.startsWith('soil:'))continue;if(!entry.system.emitted&&!entry.editorKey&&!entry.name.startsWith('Burning/'))continue;
-      const key=this.Key(entry);this.layerRecords.set(key,{id,key,...api.Export(id),capacity:api.renderer.streams.get(entry.system)?.capacity});}
+
+  CaptureLayers() {
+    const api = this.host.vfx.particles;
+    for (const [id, entry] of api.systems) {
+      if (entry.editorKey?.startsWith('soil:')) continue;
+      if (!entry.system.emitted && !entry.editorKey && !entry.name.startsWith('Burning/')) continue;
+      const key = this.Key(entry);
+      this.layerRecords.set(key, { id, key, ...api.Export(id), capacity: api.renderer.streams.get(entry.system)?.capacity });
+    }
   }
-  RefreshLayers(force=false){
-    this.CaptureLayers();const options=[...this.layerRecords].map(([key,value])=>({value:key,label:(value.name?.startsWith('Burning/')?value.preset:value.profile||value.name)||key}));
-    const signature=options.map(p=>p.value).join('|');
-    if(force||signature!==this.layerSignature){this.layerSignature=signature;if(!this.layerRecords.has(this.selectedLayer))this.selectedLayer=options[0]?.value||null;
-      this.layerSelect?.Fill(options,this.selectedLayer);this.inspector?.Show();}
+
+  RenderLayerStack() {
+    if (!this.layerListEl) return;
+    const entriesById = new Map(this.host.vfx.particles.Inspect().entries.map((e) => [e.id, e]));
+    this.layerListEl.replaceChildren();
+    if (!this.layerRecords.size) {
+      this.layerListEl.appendChild(El('div', 'vfxEmptyState', '暂无粒子层'));
+      return;
+    }
+    for (const [key, value] of this.layerRecords) {
+      const label = (value.name?.startsWith('Burning/') ? value.preset : value.profile || value.name) || key;
+      const live = entriesById.get(value.id)?.particleCount ?? 0;
+      const off = value.modules?.renderer?.enabled === false;
+      const row = El('button', `vfxLayerRow${key === this.selectedLayer ? ' on' : ''}${off ? ' off' : ''}`);
+      row.type = 'button';
+      row.dataset.vfxLayerItem = key;
+      row.append(El('span', 'vfxLayerDot'), El('span', 'vfxLayerName', label), El('span', 'vfxLayerTag', String(live)));
+      row.addEventListener('click', () => this.SelectLayer(key));
+      this.layerListEl.appendChild(row);
+    }
   }
-  ReadLayer(){
-    const record=this.layerRecords.get(this.selectedLayer);if(!record)return null;
-    if(this.host.vfx.particles.systems.has(record.id))return {...record,...this.host.vfx.particles.Export(record.id)};
+
+  RefreshLayers(force = false) {
+    this.CaptureLayers();
+    const options = [...this.layerRecords].map(([key, value]) => ({
+      value: key,
+      label: (value.name?.startsWith('Burning/') ? value.preset : value.profile || value.name) || key,
+    }));
+    const signature = options.map((p) => p.value).join('|');
+    if (force || signature !== this.layerSignature) {
+      this.layerSignature = signature;
+      if (!this.layerRecords.has(this.selectedLayer)) this.selectedLayer = options[0]?.value || null;
+      this.layerSelect?.Fill(options, this.selectedLayer);
+      this.RenderLayerStack();
+      this.inspector?.Show();
+    } else if (this.layerListEl) {
+      // 只更新每层实时存活粒子数，不重建 DOM
+      const entriesById = new Map(this.host.vfx.particles.Inspect().entries.map((e) => [e.id, e]));
+      for (const row of this.layerListEl.children) {
+        const rec = this.layerRecords.get(row.dataset?.vfxLayerItem);
+        if (!rec) continue;
+        const tag = row.querySelector('.vfxLayerTag');
+        const live = String(entriesById.get(rec.id)?.particleCount ?? 0);
+        if (tag && tag.textContent !== live) tag.textContent = live;
+      }
+    }
+  }
+
+  ReadLayer() {
+    const record = this.layerRecords.get(this.selectedLayer);
+    if (!record) return null;
+    if (this.host.vfx.particles.systems.has(record.id)) return { ...record, ...this.host.vfx.particles.Export(record.id) };
     return record;
   }
-  EditLayer(patch){return this.Try(()=>{
-    const record=this.ReadLayer();if(!record)throw new Error('请先选择一个粒子层。');
-    const modules=MergeParticleModules(record.modules,patch),api=this.host.vfx.particles;
-    if(api.systems.has(record.id))api.Configure(record.id,patch);
-    const previous=this.layerPatches.get(this.selectedLayer)||{},next={...previous};for(const [key,value]of Object.entries(patch))next[key]={...next[key],...value};
-    this.layerPatches.set(this.selectedLayer,next);this.layerRecords.set(this.selectedLayer,{...record,modules});this.Status('参数已更新；发射参数可按“播放”重播查看。');return true;
-  });}
-  Stop(){
-    this.CaptureLayers();const vfx=this.host.vfx;
+
+  EditLayer(patch) {
+    return this.Try(() => {
+      const record = this.ReadLayer();
+      if (!record) throw new Error('请先选择一个粒子层。');
+      const modules = MergeParticleModules(record.modules, patch);
+      const api = this.host.vfx.particles;
+      if (api.systems.has(record.id)) api.Configure(record.id, patch);
+      const previous = this.layerPatches.get(this.selectedLayer) || {};
+      const next = { ...previous };
+      for (const [key, value] of Object.entries(patch)) next[key] = { ...next[key], ...value };
+      this.layerPatches.set(this.selectedLayer, next);
+      this.layerRecords.set(this.selectedLayer, { ...record, modules });
+      if (patch.renderer?.enabled !== undefined) this.RenderLayerStack();
+      return true;
+    });
+  }
+
+  Stop() {
+    this.CaptureLayers();
+    const vfx = this.host.vfx;
     this.flarePreview?.Reset();
     this.soil?.End();
-    if(this.handle)vfx.RemoveSceneEffect(this.handle);this.handle=0;
-    if(vfx.dust){vfx.dust.Dispose();vfx.dust=null;}
-    for(const id of this.sampleParticleIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.sampleParticleIds=[];
-    for(const id of this.customIds)if(vfx.particles.systems.has(id))vfx.particles.Remove(id);this.customIds=[];
-    vfx.ClearParticles();vfx.bloodEffects.Clear();if(this.savedLighting)this.host.lights.ResetEffectPreview();
-    this.playing=false;this.paused=false;this.loopTimer=0;this.UpdateFacts();
+    if (this.handle) vfx.RemoveSceneEffect(this.handle);
+    this.handle = 0;
+    if (vfx.dust) { vfx.dust.Dispose(); vfx.dust = null; }
+    for (const id of this.sampleParticleIds) if (vfx.particles.systems.has(id)) vfx.particles.Remove(id);
+    this.sampleParticleIds = [];
+    for (const id of this.customIds) if (vfx.particles.systems.has(id)) vfx.particles.Remove(id);
+    this.customIds = [];
+    vfx.ClearParticles();
+    vfx.bloodEffects.Clear();
+    if (this.savedLighting) this.host.lights.ResetEffectPreview();
+    this.playing = false;
+    this.paused = false;
+    this.loopTimer = 0;
+    this.UpdateFacts();
   }
-  Play(){
-    this.Stop();const vfx=this.host.vfx,api=vfx.particles;this.layerRecords.clear();
-    this.studio.pad.geometry=FLARE_EFFECTS[this.effectId]?this.flarePadGeometry:this.savedPadGeometry;
-    this.flareField.SetVisible(!!FLARE_EFFECTS[this.effectId]);
-    this.flareCameraSelect.root.closest('.edRow').hidden=!FLARE_EFFECTS[this.effectId];
-    if(FLARE_EFFECTS[this.effectId]&&this.previewEnvironment===null)this.SetPreviewEnvironment(FLARE_PREVIEW.environment);
-    vfx.time=0;vfx.shared.uTime.value=0;vfx.nextSourceId=1+(this.seed%65535);vfx.random=Mulberry32(this.seed);vfx.bloodEffects.random=vfx.random;
-    for(const [name,channel]of api.channels){if(!api.systems.has(channel.particleId))continue;api.Configure(channel.particleId,this.baseModules.get(name));const patch=this.layerPatches.get('channel:'+name);if(patch)api.Configure(channel.particleId,patch);}
-    api.presetOverrides.clear();for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))api.presetOverrides.set(key.slice(7),patch);
-    api.Restart();for(const channel of api.channels.values())if(api.systems.has(channel.particleId))channel.system.Play({restart:true});api.renderer.Flush();this.ApplyWind();this.previewTime=0;this.loopTimer=0;this.paused=false;
-    if(FALLING_SOIL_PRESETS[this.effectId])this.soil.Begin();
-    else if(SCENE_EFFECTS[this.effectId])this.handle=vfx.SceneEffect({x:0,y:.04,z:0},this.effectId,{scale:this.scale});
-    else if(FLARE_EFFECTS[this.effectId]){
-      this.flarePreview.rnd=Mulberry32(this.seed);
-      this.flarePreview.LaunchFlare({preset:this.effectId,from:{x:FLARE_EFFECTS[this.effectId].previewFromXM,z:0},at:{x:0,z:0},driftMS:Math.hypot(this.wind.x,this.wind.z),driftDirRad:Math.atan2(this.wind.x,this.wind.z)});
-      this.timeSlider.root.querySelector('input').max=60;this.timeLength.Set(60);
+
+  Play() {
+    this.Stop();
+    const vfx = this.host.vfx;
+    const api = vfx.particles;
+    this.layerRecords.clear();
+    const isFlare = !!FLARE_EFFECTS[this.effectId];
+    const isSoil = !!FALLING_SOIL_PRESETS[this.effectId];
+    this.studio.pad.geometry = isFlare ? this.flarePadGeometry : this.savedPadGeometry;
+    this.flareField.SetVisible(isFlare);
+    this.host.previewStage?.SetArenaEffect(this.effectId, { isFlare, isSoil });
+    if (this.flareCameraRow) this.flareCameraRow.hidden = !isFlare;
+    this.SyncLoopControls();
+    if (isFlare && this.previewEnvironment === null) this.SetPreviewEnvironment(FLARE_PREVIEW.environment);
+    vfx.time = 0; vfx.shared.uTime.value = 0;
+    vfx.nextSourceId = 1 + (this.seed % 65535);
+    vfx.random = Mulberry32(this.seed);
+    vfx.bloodEffects.random = vfx.random;
+    for (const [name, channel] of api.channels) {
+      if (!api.systems.has(channel.particleId)) continue;
+      api.Configure(channel.particleId, this.baseModules.get(name));
+      const patch = this.layerPatches.get('channel:' + name);
+      if (patch) api.Configure(channel.particleId, patch);
     }
-    else {const effect=INSTANT_EFFECTS.find(effect=>effect.id===this.effectId),result=effect?.run(vfx,this.scale);if(effect?.sourceHandle)this.handle=result;if(effect?.particleHandle)this.sampleParticleIds.push(result.id);}
-    for(const layer of this.customLayers){const definition=JSON.parse(JSON.stringify(layer.definition)),patch=this.layerPatches.get(layer.key);
-      if(patch)definition.modules=MergeParticleModules(definition.modules,patch);const created=api.Import(definition);api.Get(created.id).editorKey=layer.key;this.customIds.push(created.id);}
-    this.playing=true;this.Advance(0);this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();
-    if(api.Inspect().volumes.some(volume=>!volume.ready)){
-      const waiting='正在载入三维流体数据…';this.Status(waiting);
-      const selected=this.effectId;
-      api.Ready().then(()=>{if(this.panel&&this.host.vfx.particles===api&&this.message.textContent===waiting){this.Status('三维体积就绪');if(this.effectId===selected)this.FrameEffect();this.host.post?.NotifyCameraCut();}})
-        .catch(error=>{if(this.panel&&this.host.vfx.particles===api)this.Status('三维体积载入失败：'+error.message,true);});
+    api.presetOverrides.clear();
+    for (const [key, patch] of this.layerPatches) if (key.startsWith('preset:')) api.presetOverrides.set(key.slice(7), patch);
+    api.Restart();
+    for (const channel of api.channels.values()) if (api.systems.has(channel.particleId)) channel.system.Play({ restart: true });
+    api.renderer.Flush();
+    this.ApplyWind();
+    this.previewTime = 0;
+    this.loopTimer = 0;
+    this.paused = false;
+    if (isSoil) this.soil.Begin();
+    else if (SCENE_EFFECTS[this.effectId]) this.handle = vfx.SceneEffect({ x: 0, y: 0.04, z: 0 }, this.effectId, { scale: this.scale });
+    else if (isFlare) {
+      this.flarePreview.rnd = Mulberry32(this.seed);
+      this.flarePreview.LaunchFlare({ preset: this.effectId, from: { x: FLARE_EFFECTS[this.effectId].previewFromXM, z: 0 }, at: { x: 0, z: 0 }, driftMS: Math.hypot(this.wind.x, this.wind.z), driftDirRad: Math.atan2(this.wind.x, this.wind.z) });
+      this.SetTimelineMax(60);
+      this.timeLength?.Set(60);
+    } else {
+      const effect = INSTANT_EFFECTS.find((entry) => entry.id === this.effectId);
+      const result = effect?.run(vfx, this.scale);
+      if (effect?.sourceHandle) this.handle = result;
+      if (effect?.particleHandle) this.sampleParticleIds.push(result.id);
+    }
+    for (const layer of this.customLayers) {
+      const definition = JSON.parse(JSON.stringify(layer.definition));
+      const patch = this.layerPatches.get(layer.key);
+      if (patch) definition.modules = MergeParticleModules(definition.modules, patch);
+      const created = api.Import(definition);
+      api.Get(created.id).editorKey = layer.key;
+      this.customIds.push(created.id);
+    }
+    this.playing = true;
+    this.Advance(0);
+    this.host.post?.NotifyCameraCut();
+    this.RefreshLayers(true);
+    this.UpdateFacts();
+    if (api.Inspect().volumes.some((volume) => !volume.ready)) {
+      const waiting = '载入三维体积…';
+      this.Status(waiting);
+      const selected = this.effectId;
+      api.Ready().then(() => {
+        if (this.panel && this.host.vfx.particles === api && this.message.textContent === waiting) {
+          this.Status('');
+          if (this.effectId === selected) this.FrameEffect();
+          this.host.post?.NotifyCameraCut();
+        }
+      }).catch((error) => {
+        if (this.panel && this.host.vfx.particles === api) this.Status('三维体积载入失败：' + error.message, true);
+      });
     }
   }
-  Advance(dt){
-    let remaining=Math.max(0,dt);do{const step=Math.min(1/60,remaining);this.previewTime+=step;
-      this.flarePreview?.Update(step,dt);
-      if(FLARE_EFFECTS[this.effectId]&&this.flareCamera==='follow')this.TrackFlare();
-      this.host.vfx.Update(step,this.host.camera,this.previewTime);if(this.savedLighting)this.host.lights.Update(step,this.previewTime,this.host.camera.position);
+
+  Advance(dt) {
+    let remaining = Math.max(0, dt);
+    do {
+      const step = Math.min(1 / 60, remaining);
+      this.previewTime += step;
+      this.flarePreview?.Update(step, dt);
+      if (FLARE_EFFECTS[this.effectId] && this.flareCamera === 'follow') this.TrackFlare();
+      this.host.vfx.Update(step, this.host.camera, this.previewTime);
+      if (this.savedLighting) this.host.lights.Update(step, this.previewTime, this.host.camera.position);
       this.soil?.Update(this.previewTime);
-      remaining-=step;
-    }while(remaining>1e-9);
+      remaining -= step;
+    } while (remaining > 1e-9);
   }
-  TogglePause(){if(!this.playing){this.Play();return;}this.paused=!this.paused;this.UpdateFacts();}
-  Step(frames=1){if(!this.playing)this.Play();for(let i=0;i<Math.max(1,Math.min(600,frames|0));i++)this.Advance(1/60);this.loopTimer=this.previewTime;this.paused=true;this.RefreshLayers();this.UpdateFacts();}
-  Seek(seconds){if(!Number.isFinite(seconds)||seconds<0||seconds>120)throw new Error('预览时间必须为 0–120 秒。');
-    this.Play();const frames=Math.floor(seconds*60);for(let i=0;i<frames;i++)this.Advance(1/60);if(seconds-frames/60>1e-8)this.Advance(seconds-frames/60);
-    this.loopTimer=this.previewTime;this.paused=true;this.host.post?.NotifyCameraCut();this.RefreshLayers(true);this.UpdateFacts();return this.Inspect();}
-  QueueSeek(seconds){this.seekTarget=seconds;if(this.seekFrame)return;this.seekFrame=requestAnimationFrame(()=>{this.seekFrame=0;if(this.panel)this.Try(()=>this.Seek(this.seekTarget))});}
-  FrameEffect(){
+
+  TogglePause() { if (!this.playing) { this.Play(); return; } this.paused = !this.paused; this.UpdateFacts(); }
+
+  Step(frames = 1) {
+    if (!this.playing) this.Play();
+    for (let i = 0; i < Math.max(1, Math.min(600, frames | 0)); i += 1) this.Advance(1 / 60);
+    this.loopTimer = this.previewTime;
+    this.paused = true;
+    this.RefreshLayers();
+    this.UpdateFacts();
+  }
+
+  Seek(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 120) throw new Error('预览时间必须为 0–120 秒。');
+    this.Play();
+    const frames = Math.floor(seconds * 60);
+    for (let i = 0; i < frames; i += 1) this.Advance(1 / 60);
+    if (seconds - frames / 60 > 1e-8) this.Advance(seconds - frames / 60);
+    this.loopTimer = this.previewTime;
+    this.paused = true;
+    this.host.post?.NotifyCameraCut();
+    this.RefreshLayers(true);
+    this.UpdateFacts();
+    return this.Inspect();
+  }
+
+  QueueSeek(seconds) {
+    this.seekTarget = seconds;
+    if (this.seekFrame) return;
+    this.seekFrame = requestAnimationFrame(() => { this.seekFrame = 0; if (this.panel) this.Try(() => this.Seek(this.seekTarget)); });
+  }
+
+  FrameEffect() {
     this.flareCameraSelect?.Set(this.flareCamera);
-    // The studio inherits a map's clip range. A 100 m flight viewed from up to
-    // 320 m needs its own range; ordinary previews and studio exit restore it.
-    const camera=this.host.camera,baseFar=this.studio.saved?.far??camera.far;
-    camera.fov=FLARE_EFFECTS[this.effectId]&&this.flareCamera==='observer'?FLARE_PREVIEW.observerFov:this.savedStudioFov;
+    const camera = this.host.camera;
+    const baseFar = this.studio.saved?.far ?? camera.far;
+    camera.fov = FLARE_EFFECTS[this.effectId] && this.flareCamera === 'observer' ? FLARE_PREVIEW.observerFov : this.savedStudioFov;
     camera.updateProjectionMatrix();
-    const far=FLARE_EFFECTS[this.effectId]?Math.max(baseFar,FLARE_PREVIEW.farM):baseFar;
-    if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
-    if(FALLING_SOIL_PRESETS[this.effectId]){this.soil.Frame();return;}
-    if(FLARE_EFFECTS[this.effectId]){
-      this.studio.maxDistance=FLARE_PREVIEW.maxDistanceM;
-      if(this.flareCamera==='observer'){
-        this.FrameFlareView(FLARE_PREVIEW.observerEyeM,FLARE_PREVIEW.observerTargetYM,FLARE_PREVIEW.observerDistanceM);this.host.post?.NotifyCameraCut();return;
+    const far = FLARE_EFFECTS[this.effectId] ? Math.max(baseFar, FLARE_PREVIEW.farM) : baseFar;
+    if (camera.far !== far) { camera.far = far; camera.updateProjectionMatrix(); }
+    if (FALLING_SOIL_PRESETS[this.effectId]) { this.soil.Frame(); return; }
+    if (FLARE_EFFECTS[this.effectId]) {
+      this.studio.maxDistance = FLARE_PREVIEW.maxDistanceM;
+      if (this.flareCamera === 'observer') {
+        this.FrameFlareView(FLARE_PREVIEW.observerEyeM, FLARE_PREVIEW.observerTargetYM, FLARE_PREVIEW.observerDistanceM);
+        this.host.post?.NotifyCameraCut();
+        return;
       }
-      if(this.flareCamera==='ground'||this.flareCamera==='field'){
-        const field=this.flareCamera==='field',o=this.studio.orbit;
-        o.target.fromArray(field?FLARE_PREVIEW.fieldTarget:FLARE_PREVIEW.groundTarget);
-        o.dist=field?FLARE_PREVIEW.fieldDistanceM:FLARE_PREVIEW.groundDistanceM;
-        o.pitch=field?FLARE_PREVIEW.fieldPitch:FLARE_PREVIEW.groundPitch;o.yaw=FLARE_PREVIEW.fieldYaw;
-        this.studio.ApplyCamera();this.host.post?.NotifyCameraCut();return;
+      if (this.flareCamera === 'ground' || this.flareCamera === 'field') {
+        const field = this.flareCamera === 'field';
+        const o = this.studio.orbit;
+        o.target.fromArray(field ? FLARE_PREVIEW.fieldTarget : FLARE_PREVIEW.groundTarget);
+        o.dist = field ? FLARE_PREVIEW.fieldDistanceM : FLARE_PREVIEW.groundDistanceM;
+        o.pitch = field ? FLARE_PREVIEW.fieldPitch : FLARE_PREVIEW.groundPitch;
+        o.yaw = FLARE_PREVIEW.fieldYaw;
+        this.studio.ApplyCamera();
+        this.host.post?.NotifyCameraCut();
+        return;
       }
-      if(this.flareCamera==='follow'){this.studio.Frame(4,FLARE_PREVIEW.followDistanceM);this.TrackFlare();}
-      else this.FrameFlareView(FLARE_PREVIEW.overviewHeightM,FLARE_PREVIEW.overviewTargetY,FLARE_PREVIEW.overviewDistanceM);
-      this.host.post?.NotifyCameraCut();return;
+      if (this.flareCamera === 'follow') { this.studio.Frame(4, FLARE_PREVIEW.followDistanceM); this.TrackFlare(); }
+      else this.FrameFlareView(FLARE_PREVIEW.overviewHeightM, FLARE_PREVIEW.overviewTargetY, FLARE_PREVIEW.overviewDistanceM);
+      this.host.post?.NotifyCameraCut();
+      return;
     }
-    const id=this.effectId,small=/^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
-    let height=/^Bomb/.test(id)?(id==='BombHeavy'?42:28)*this.scale:/Explosion/.test(id)?(id==='ExplosionShell'?9:6)*this.scale:/Smoke|Plume/.test(id)?7:small?1.8:3.4*this.scale;
-    let center=null;
+    const id = this.effectId;
+    const small = /^(Muzzle|Impact|Blood|ShellCasings)/.test(id);
+    let height = /^Bomb/.test(id) ? (id === 'BombHeavy' ? 42 : 28) * this.scale : /Explosion/.test(id) ? (id === 'ExplosionShell' ? 9 : 6) * this.scale : /Smoke|Plume/.test(id) ? 7 : small ? 1.8 : 3.4 * this.scale;
+    let center = null;
     {
-      const api=this.host.vfx.particles,box=new THREE.Box3(),point=new THREE.Vector3();
-      for(const [particleId,{system}]of api.systems){
-        const m=system.modules;
-        if(m.renderer.mode!=='bakedVolume'||!m.renderer.enabled||!(system.particles.length||system.emitting&&m.emission.enabled))continue;
-        const asset=api.renderer.volumes.pools.get(m.renderer.volumeAsset)?.asset,anchor=asset?.metadata.anchor||[.5,0,.5];
-        const samples=api.GetParticles(particleId,{limit:256});
-        const records=system.particles.length?system.particles:[{size:EvaluateCurve(m.main.startSize,0),rotation:EvaluateCurve(m.main.startRotation,0)}];
-        for(let i=0;i<records.length;i++){
-          const p=records[i],sample=samples[i],t=sample?Math.max(0,Math.min(1,sample.age/p.life)):0;
-          const size=sample?.size??p.size,bounds=m.renderer.bounds.map((n,axis)=>n*(p.volume?.bounds[axis]??1));
-          const angle=p.rotation+m.renderer.volumeYaw+(m.rotationOverLifetime.enabled?IntegrateCurve(m.rotationOverLifetime.angularVelocity,t,p.seed)*p.life:0),c=Math.cos(angle),s=Math.sin(angle);
-          const origin=sample?.age<0?p.origin.map((n,axis)=>n+(m.main.simulationSpace==='local'?system.position[axis]:0)):sample?.position??system.position;
-          for(let corner=0;corner<8;corner++){
-            const x=((corner&1?1:0)-anchor[0])*bounds[0]*size,y=((corner&2?1:0)-anchor[1])*bounds[1]*size,z=((corner&4?1:0)-anchor[2])*bounds[2]*size;
-            point.set(x*c+z*s+origin[0],y+origin[1],-x*s+z*c+origin[2]);box.expandByPoint(point);
+      const api = this.host.vfx.particles;
+      const box = new THREE.Box3();
+      const point = new THREE.Vector3();
+      for (const [particleId, { system }] of api.systems) {
+        const m = system.modules;
+        if (m.renderer.mode !== 'bakedVolume' || !m.renderer.enabled || !(system.particles.length || (system.emitting && m.emission.enabled))) continue;
+        const asset = api.renderer.volumes.pools.get(m.renderer.volumeAsset)?.asset;
+        const anchor = asset?.metadata.anchor || [0.5, 0, 0.5];
+        const samples = api.GetParticles(particleId, { limit: 256 });
+        const records = system.particles.length ? system.particles : [{ size: EvaluateCurve(m.main.startSize, 0), rotation: EvaluateCurve(m.main.startRotation, 0) }];
+        for (let i = 0; i < records.length; i += 1) {
+          const p = records[i], sample = samples[i];
+          const t = sample ? Math.max(0, Math.min(1, sample.age / p.life)) : 0;
+          const size = sample?.size ?? p.size;
+          const bounds = m.renderer.bounds.map((n, axis) => n * (p.volume?.bounds[axis] ?? 1));
+          const angle = p.rotation + m.renderer.volumeYaw + (m.rotationOverLifetime.enabled ? IntegrateCurve(m.rotationOverLifetime.angularVelocity, t, p.seed) * p.life : 0);
+          const c = Math.cos(angle), s = Math.sin(angle);
+          const origin = sample?.age < 0 ? p.origin.map((n, axis) => n + (m.main.simulationSpace === 'local' ? system.position[axis] : 0)) : sample?.position ?? system.position;
+          for (let corner = 0; corner < 8; corner += 1) {
+            const x = ((corner & 1 ? 1 : 0) - anchor[0]) * bounds[0] * size;
+            const y = ((corner & 2 ? 1 : 0) - anchor[1]) * bounds[1] * size;
+            const z = ((corner & 4 ? 1 : 0) - anchor[2]) * bounds[2] * size;
+            point.set(x * c + z * s + origin[0], y + origin[1], -x * s + z * c + origin[2]);
+            box.expandByPoint(point);
           }
         }
       }
-      // Ground-aligned previews have no height but still need their full radius
-      // and an aim point on the surface. The old generic eye-height target cut
-      // water rings and incoming reticles along the bottom of the viewport.
-      if(box.isEmpty())for(const [particleId,{system}]of api.systems){
-        const stream=api.renderer.streams.get(system),shape=stream?.config.shape;
-        if(!['ring','marker'].includes(shape)||!system.modules.renderer.enabled)continue;
-        const samples=api.GetParticles(particleId,{limit:256});
-        for(let i=0;i<samples.length;i++){
-          const p=system.particles[i],sample=samples[i];if(!p.packed||sample.age<0)continue;
-          const radius=Math.max(p.packed.sizeStart,p.packed.sizeEnd)*(shape==='ring'?PARTICLE_SURFACE_ART.ringSupport:PARTICLE_SURFACE_ART.markerSupport);
-          const normal=new THREE.Vector3(p.packed.nx,p.packed.ny,p.packed.nz).normalize();
-          const tangent=new THREE.Vector3().crossVectors(Math.abs(normal.y)>.92?new THREE.Vector3(1,0,0):new THREE.Vector3(0,1,0),normal).normalize(),bitangent=new THREE.Vector3().crossVectors(normal,tangent);
-          for(let corner=0;corner<4;corner++){point.fromArray(sample.position).addScaledVector(tangent,(corner&1?1:-1)*radius).addScaledVector(bitangent,(corner&2?1:-1)*radius);box.expandByPoint(point);}
+      if (box.isEmpty()) {
+        for (const [particleId, { system }] of api.systems) {
+          const stream = api.renderer.streams.get(system);
+          const shape = stream?.config.shape;
+          if (!['ring', 'marker'].includes(shape) || !system.modules.renderer.enabled) continue;
+          const samples = api.GetParticles(particleId, { limit: 256 });
+          for (let i = 0; i < samples.length; i += 1) {
+            const p = system.particles[i], sample = samples[i];
+            if (!p.packed || sample.age < 0) continue;
+            const radius = Math.max(p.packed.sizeStart, p.packed.sizeEnd) * (shape === 'ring' ? PARTICLE_SURFACE_ART.ringSupport : PARTICLE_SURFACE_ART.markerSupport);
+            const normal = new THREE.Vector3(p.packed.nx, p.packed.ny, p.packed.nz).normalize();
+            const tangent = new THREE.Vector3().crossVectors(Math.abs(normal.y) > 0.92 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0), normal).normalize();
+            const bitangent = new THREE.Vector3().crossVectors(normal, tangent);
+            for (let corner = 0; corner < 4; corner += 1) {
+              point.fromArray(sample.position).addScaledVector(tangent, (corner & 1 ? 1 : -1) * radius).addScaledVector(bitangent, (corner & 2 ? 1 : -1) * radius);
+              box.expandByPoint(point);
+            }
+          }
         }
       }
-      if(!box.isEmpty()){box.getSize(point);height=Math.max(small?1.8:0,point.x,point.y,point.z);center=box.getCenter(new THREE.Vector3());}
+      if (!box.isEmpty()) { box.getSize(point); height = Math.max(small ? 1.8 : 0, point.x, point.y, point.z); center = box.getCenter(new THREE.Vector3()); }
     }
-    this.studio.maxDistance=Math.max(40,height*2.5);
-    this.studio.Frame(height,small?2.5:Math.max(4,height*2.2));
-    if(center){this.studio.orbit.target.copy(center);this.studio.ApplyCamera();}
+    this.studio.maxDistance = Math.max(40, height * 2.5);
+    const impactWall = this.host.standalone && /^Impact(Brick|Wood|Metal)/.test(id);
+    const waterBasin = this.host.standalone && id === 'ImpactWater';
+    this.studio.Frame(height, impactWall ? 3.5 : waterBasin ? 4.8 : small ? 2.5 : Math.max(4, height * 2.2));
+    if (waterBasin) {
+      this.studio.orbit.pitch = 0.44;
+      this.studio.orbit.target.set(0, 0.25, 0);
+      this.studio.ApplyCamera();
+    } else if (impactWall) {
+      this.studio.orbit.pitch = 0.14;
+      this.studio.orbit.target.set(0, 0.95, 0);
+      this.studio.ApplyCamera();
+    } else if (center) {
+      this.studio.orbit.target.copy(center);
+      this.studio.ApplyCamera();
+    }
     this.host.post?.NotifyCameraCut();
   }
-  FrameFlareView(eyeY,targetY,baseDistance){
-    const f=this.flarePreview?.flares[0],camera=this.host.camera,o=this.studio.orbit;
-    const canvas=this.host.renderer.domElement.getBoundingClientRect(),panel=this.panel?.root.getBoundingClientRect();
-    const availableRight=panel?.width>0&&panel.right>canvas.left?Math.min(canvas.right,panel.left):canvas.right;
-    const width=Math.max(1,availableRight-canvas.left),padding=Math.min(FLARE_PREVIEW.observerPaddingPx,width*.1);
-    const left=padding,right=Math.max(left+1,width-padding),center=canvas.width*.5;
-    const focal=canvas.height/(2*Math.tan(camera.fov*Math.PI/360)),poses=[];
-    if(f){
-      const end=f.landing?.t??f.outAt;
-      for(let i=0;i<=FLARE_PREVIEW.observerPathSamples;i++)poses.push(SampleFlarePosition(f,end*i/FLARE_PREVIEW.observerPathSamples));
-      for(const time of [0,f.ignitedAt,f.outAt,end])poses.push(SampleFlarePosition(f,time));
-    }else poses.push({x:0,y:targetY,z:0});
-    const height=targetY-eyeY;
-    const maxDistance=Math.sqrt(Math.max(0,FLARE_PREVIEW.maxDistanceM**2-height**2));
-    const Fit=distance=>{
-      const orbitDistance=Math.hypot(distance,height),cosine=distance/orbitDistance,sine=height/orbitDistance;
-      let minimum=-Infinity,maximum=Infinity;
-      for(const p of poses){
-        const depth=cosine*(p.z+distance)+sine*(p.y-eyeY);
-        if(depth<=camera.near)return {minimum:Infinity,maximum:-Infinity};
-        // Facing+Z gives screen-right in world-X. Fit the true perspective
-        // positions into the uncovered canvas, without changing its projection.
-        minimum=Math.max(minimum,p.x-(center-left)*depth/focal);
-        maximum=Math.min(maximum,p.x-(center-right)*depth/focal);
+
+  FrameFlareView(eyeY, targetY, baseDistance) {
+    const f = this.flarePreview?.flares[0];
+    const camera = this.host.camera;
+    const o = this.studio.orbit;
+    const canvas = this.host.renderer.domElement.getBoundingClientRect();
+    const panel = this.panel?.root.getBoundingClientRect();
+    const availableRight = !this.host.standalone && panel?.width > 0 && panel.right > canvas.left ? Math.min(canvas.right, panel.left) : canvas.right;
+    const width = Math.max(1, availableRight - canvas.left);
+    const padding = Math.min(FLARE_PREVIEW.observerPaddingPx, width * 0.1);
+    const left = padding;
+    const right = Math.max(left + 1, width - padding);
+    const center = canvas.width * 0.5;
+    const focal = canvas.height / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const poses = [];
+    if (f) {
+      const end = f.landing?.t ?? f.outAt;
+      for (let i = 0; i <= FLARE_PREVIEW.observerPathSamples; i += 1) poses.push(SampleFlarePosition(f, (end * i) / FLARE_PREVIEW.observerPathSamples));
+      for (const time of [0, f.ignitedAt, f.outAt, end]) poses.push(SampleFlarePosition(f, time));
+    } else poses.push({ x: 0, y: targetY, z: 0 });
+    const height = targetY - eyeY;
+    const maxDistance = Math.sqrt(Math.max(0, FLARE_PREVIEW.maxDistanceM ** 2 - height ** 2));
+    const Fit = (distance) => {
+      const orbitDistance = Math.hypot(distance, height), cosine = distance / orbitDistance, sine = height / orbitDistance;
+      let minimum = -Infinity, maximum = Infinity;
+      for (const p of poses) {
+        const depth = cosine * (p.z + distance) + sine * (p.y - eyeY);
+        if (depth <= camera.near) return { minimum: Infinity, maximum: -Infinity };
+        minimum = Math.max(minimum, p.x - ((center - left) * depth) / focal);
+        maximum = Math.min(maximum, p.x - ((center - right) * depth) / focal);
       }
-      return {minimum,maximum};
+      return { minimum, maximum };
     };
-    let distance=Math.min(baseDistance,maxDistance),fit=Fit(distance);
-    if(fit.minimum>fit.maximum){
-      let low=distance,high=maxDistance;
-      for(let i=0;i<24;i++){const mid=(low+high)*.5,trial=Fit(mid);if(trial.minimum<=trial.maximum)high=mid;else low=mid;}
-      distance=high;fit=Fit(distance);
+    let distance = Math.min(baseDistance, maxDistance), fit = Fit(distance);
+    if (fit.minimum > fit.maximum) {
+      let low = distance, high = maxDistance;
+      for (let i = 0; i < 24; i += 1) { const mid = (low + high) * 0.5, trial = Fit(mid); if (trial.minimum <= trial.maximum) high = mid; else low = mid; }
+      distance = high; fit = Fit(distance);
     }
-    const x=Number.isFinite(fit.minimum+fit.maximum)?(fit.minimum+fit.maximum)*.5:0;
-    o.target.set(x,targetY,0);o.dist=Math.hypot(distance,height);
-    o.pitch=Math.atan2(-height,distance);o.yaw=Math.PI;this.studio.ApplyCamera();
+    const x = Number.isFinite(fit.minimum + fit.maximum) ? (fit.minimum + fit.maximum) * 0.5 : 0;
+    o.target.set(x, targetY, 0);
+    o.dist = Math.hypot(distance, height);
+    o.pitch = Math.atan2(-height, distance);
+    o.yaw = Math.PI;
+    this.studio.ApplyCamera();
   }
-  TrackFlare(){
-    const f=this.flarePreview?.flares[0];if(!f)return;
-    const camera=this.host.camera,target=this.studio.orbit.target;
-    target.set(f.pos.x,f.pos.y+.8,f.pos.z);this.studio.ApplyCamera();
-    // Keep a low follow orbit above the preview floor during descent/landing.
-    // Preserve the requested pitch so seeking back aloft restores that orbit.
-    const minimumY=this.flarePreview.Ground(camera.position.x,camera.position.z)+FLARE_PREVIEW.observerEyeM;
-    if(camera.position.y<minimumY){camera.position.y=minimumY;camera.lookAt(target);}
+
+  TrackFlare() {
+    const f = this.flarePreview?.flares[0];
+    if (!f) return;
+    const camera = this.host.camera, target = this.studio.orbit.target;
+    target.set(f.pos.x, f.pos.y + 0.8, f.pos.z);
+    this.studio.ApplyCamera();
+    const minimumY = this.flarePreview.Ground(camera.position.x, camera.position.z) + FLARE_PREVIEW.observerEyeM;
+    if (camera.position.y < minimumY) { camera.position.y = minimumY; camera.lookAt(target); }
   }
-  SetNightPreview(on){
-    return this.SetPreviewEnvironment(on?'night':'original');
-  }
-  SetPreviewEnvironment(mode){
-    const env=this.host.previewEnvironment;
-    if(env){
-      // 独立窗口：mode 是预设里的 look id；'original' = 打开时的那一档。预设没有这一档就取第一档。
-      const looks=env.Looks().map(look=>look.id);
-      const look=mode==='original'?(this.initialLook??env.lookId):looks.includes(mode)?mode:looks[0];
-      if(!look||!env.SelectLook(look))return false;
-      this.previewEnvironment=mode==='original'?null:look;this.environmentSelect?.Set(look);
+
+  SetNightPreview(on) { return this.SetPreviewEnvironment(on ? 'night' : 'original'); }
+
+  SetPreviewEnvironment(mode) {
+    const env = this.host.previewEnvironment;
+    if (env) {
+      const looks = env.Looks().map((look) => look.id);
+      const look = mode === 'original' ? (this.initialLook ?? env.lookId) : looks.includes(mode) ? mode : looks[0];
+      if (!look || !env.SelectLook(look)) return false;
+      this.previewEnvironment = mode === 'original' ? null : look;
+      this.environmentSelect?.Set(look);
       this.host.post?.NotifyCameraCut();
       return true;
     }
-    if(!['original','day','night'].includes(mode))return false;
-    if(mode!=='original'){
-      const environment=this.host.game.GetEnvironmentState?.();
-      if(!environment||!this.host.game.ApplyEnvironment?.(mode==='night'?FLARE_PREVIEW.nightPreset:FLARE_PREVIEW.dayPreset))return false;
-      if(!this.nightSnapshot)this.nightSnapshot={environment};
-    }else if(this.nightSnapshot){this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);this.nightSnapshot=null;}
-    this.previewEnvironment=mode;this.environmentSelect?.Set(mode);
+    if (!['original', 'day', 'night'].includes(mode)) return false;
+    if (mode !== 'original') {
+      const environment = this.host.game.GetEnvironmentState?.();
+      if (!environment || !this.host.game.ApplyEnvironment?.(mode === 'night' ? FLARE_PREVIEW.nightPreset : FLARE_PREVIEW.dayPreset)) return false;
+      if (!this.nightSnapshot) this.nightSnapshot = { environment };
+    } else if (this.nightSnapshot) {
+      this.host.game.RestoreEnvironmentState(this.nightSnapshot.environment);
+      this.nightSnapshot = null;
+    }
+    this.previewEnvironment = mode;
+    this.environmentSelect?.Set(mode);
     this.host.post?.NotifyCameraCut();
     return true;
   }
-  /** 独立窗口：换一份环境预设（沿用当前那一档 look；新预设没有就取它的第一档）。 */
-  async SetEnvironmentPreset(id){
-    const env=this.host.previewEnvironment;if(!env)return false;
-    try{await env.Select(id,env.lookId);}catch(error){this.Status('环境预设读不到：'+error.message,true);return false;}
-    if(!this.panel)return false;
-    this.environmentSelect?.Fill(env.LookOptions(),env.lookId);this.envPresetSelect?.Set(id);
-    if(this.previewEnvironment!==null)this.previewEnvironment=env.lookId;
-    this.host.post?.NotifyCameraCut();return true;
-  }
-  AddLayer(preset){return this.Try(()=>{const api=this.host.vfx.particles,created=api.Create({preset,name:'自建 '+preset});const key='custom:'+(++this.customIndex);
-    api.Get(created.id).editorKey=key;this.customLayers.push({key,definition:api.Export(created.id)});this.customIds.push(created.id);this.selectedLayer=key;this.playing=true;this.RefreshLayers(true);return created;});}
-  DeleteLayer(){if(!this.selectedLayer?.startsWith('custom:')){this.Status('预置效果层可在 Renderer 中关闭显示；删除用于自建层。');return;}
-    const record=this.ReadLayer();if(record&&this.host.vfx.particles.systems.has(record.id))this.host.vfx.particles.Remove(record.id);
-    this.customLayers=this.customLayers.filter(layer=>layer.key!==this.selectedLayer);this.layerPatches.delete(this.selectedLayer);this.layerRecords.delete(this.selectedLayer);this.selectedLayer=null;this.RefreshLayers(true);}
-  Export(){return {version:1,kind:'TengxianParticleEffect',effect:this.effectId,seed:this.seed,scale:this.scale,wind:[this.wind.x,this.wind.z],
-    layers:Object.fromEntries(this.layerPatches),custom:JSON.parse(JSON.stringify(this.customLayers)),soil:this.soil?.Export()};}
-  Import(data){
-    if(data?.version!==1||data.kind!=='TengxianParticleEffect'||!ALL_EFFECTS.some(effect=>effect.id===data.effect))throw new Error('不是受支持的粒子效果预设。');
-    if(!Number.isInteger(data.seed)||data.seed<0||data.seed>4294967295||!Number.isFinite(data.scale)||data.scale<.25||data.scale>3)throw new Error('预设的种子或缩放无效。');
-    if(!Array.isArray(data.wind)||data.wind.length!==2||data.wind.some(n=>!Number.isFinite(n)||Math.abs(n)>4))throw new Error('预设风速无效。');
-    if(data.soil){if(data.soil.kind!=='TengxianFallingSoil'||data.soil.version!==1||data.soil.preset!==data.effect)throw new Error('落土预设无效。');NormalizeFallingSoil(data.soil.config,data.effect);NormalizeSoilPreview(data.soil.preview);}
-    const patches=new Map(Object.entries(data.layers||{}));for(const [key,patch]of patches){if(!/^(channel|preset|custom):[A-Za-z0-9_]+$/.test(key))throw new Error('粒子层标识无效。');MergeParticleModules(NormalizeParticleModules(),patch);}
-    const custom=data.custom||[];if(!Array.isArray(custom)||custom.length>24)throw new Error('最多支持 24 个自建粒子层。');
-    const api=this.host.vfx.particles;if(new Set(custom.map(layer=>layer.key)).size!==custom.length)throw new Error('自建层标识不能重复。');
-    for(const [key]of patches){if(key.startsWith('preset:')&&!api.Presets().includes(key.slice(7)))throw new Error('未知的粒子预设层。');if(key.startsWith('channel:')&&!api.profiles.has(key.slice(8)))throw new Error('未知的粒子通道层。');}
-    for(const layer of custom){if(!/^custom:\d+$/.test(layer.key)||!layer.definition)throw new Error('自建粒子层无效。');NormalizeParticleModules(layer.definition.modules);
-      if(layer.definition.profile?!api.profiles.has(layer.definition.profile):!api.Presets().includes(layer.definition.preset))throw new Error('缺少预设使用的渲染配置。');}
-    this.Stop();this.effectId=data.effect;this.seed=data.seed;this.scale=data.scale;this.wind.set(data.wind[0],0,data.wind[1]);this.layerPatches=patches;
-    if(data.soil)this.soil.Import(data.soil);
-    this.customLayers=JSON.parse(JSON.stringify(custom));this.customIndex=Math.max(0,...custom.map(layer=>Number(layer.key.slice(7))));this.effectList.Select(this.effectId);this.selectedLayer=null;this.Play();if(data.soil)this.ShowTab('soil');this.Status('预设已载入。');return this.Inspect();
-  }
-  ReadSaved(){try{return JSON.parse(localStorage.getItem('Tengxian.ParticleEffectPresets.v1')||'{}')}catch{return {}}}
-  RefreshSaved(){const saved=this.ReadSaved();this.savedSelect?.Fill(Object.keys(saved).map(value=>({value,label:value})));}
-  SaveLocal(){this.Try(()=>{const name=this.savedName.value.trim()||this.effectId,saved=this.ReadSaved();Object.defineProperty(saved,name,{value:this.Export(),enumerable:true,configurable:true,writable:true});localStorage.setItem('Tengxian.ParticleEffectPresets.v1',JSON.stringify(saved));this.RefreshSaved();this.savedSelect.Set(name);this.Status('已保存到此浏览器。');});}
-  LoadLocal(){this.Try(()=>{const data=this.ReadSaved()[this.savedSelect.Value()];if(!data)throw new Error('请选择已保存的预设。');this.Import(data);});}
-  Download(){const text=JSON.stringify(this.Export(),null,2);this.json.value=text;const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const link=El('a');link.href=url;link.download='Data_ParticleEffect_'+this.effectId+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-  ApplyToScene(){return this.Try(()=>{if(this.host.standalone){this.Status('独立窗口里没有关卡：请用「生成 JSON / 下载 JSON」交付参数。');return {changed:0};}
-    const target=this.savedParticleEffects;let changed=0;
-    if(this.soil?.selected){const config=this.soil.Config();for(const [id,e]of target.FallingSoil.entries)if(e.preset===this.effectId){target.FallingSoil.Configure(id,config);changed++;}
-      this.Status('已更新关卡中 '+changed+' 个同预设落土源。永久配置请使用导出的 soil 数据。');return {changed};}
-    for(const [id,entry]of target.systems){const key=this.Key(entry),patch=this.layerPatches.get(key);if(patch){target.Configure(id,patch);changed++;}}
-    for(const [key,patch]of this.layerPatches)if(key.startsWith('preset:'))target.presetOverrides.set(key.slice(7),patch);
-    this.Status('已更新关卡中的 '+changed+' 个同名粒子层；可退出预览查看。');return {changed};});}
-  Inspect(){return {effect:this.effectId,time:this.previewTime,paused:this.paused,playing:this.playing,seed:this.seed,selectedLayer:this.selectedLayer,flare:this.flarePreview?.State(),
-    soil:this.soil?.Inspect(),
-    layers:[...this.layerRecords].map(([key,value])=>({key,id:value.id,profile:value.profile,preset:value.preset})),particles:this.host.vfx.particles.Inspect()};}
-  UpdateFacts(){if(!this.facts)return;const entries=this.host.vfx.particles.Inspect().entries;
-    this.facts.Set('当前效果',ALL_EFFECTS.find(effect=>effect.id===this.effectId)?.name||this.effectId);
-    this.facts.Set('预览时间',this.previewTime.toFixed(2)+' s');this.facts.Set('存活粒子',entries.reduce((n,e)=>n+e.particleCount,0));
-    this.facts.Set('参与层数',this.layerRecords.size);this.facts.Set('丢弃',entries.reduce((n,e)=>n+e.dropped,0));this.facts.Set('随机种子',this.seed);
-    if(FLARE_EFFECTS[this.effectId]){const f=this.flarePreview?.flares[0];this.facts.Set('弹药阶段',f?.phase||'done');this.facts.Set('离地高度',f?f.agl.toFixed(1)+' m':'—');}
-    const soil=this.soil?.Inspect();if(soil){this.facts.Set('参与层数',['grains','clods','dust'].filter(layer=>this.soil.Config()[layer].enabled).length);this.facts.Set('细砂 / 土块 / 细尘',Object.values(soil.live).join(' / '));this.facts.Set('碰撞 / 二次起尘',soil.impacts+' / '+soil.grainImpacts);this.facts.Set('表面射线',soil.rays);}
-    this.timeSlider?.Set(this.previewTime);if(this.pauseButton)this.pauseButton.textContent=this.paused?'继续':'暂停';}
-  Update(dt){
-    const step=this.playing&&!this.paused?Math.max(0,Math.min(.1,dt||0))*this.speed:0;
-    if(!this.IsContinuous()&&this.playing&&!this.paused&&this.loop){this.loopTimer+=step;
-      const again=FALLING_SOIL_PRESETS[this.effectId]?this.previewTime>0&&!this.soil.Inspect()?.active:FLARE_EFFECTS[this.effectId]?this.previewTime>0&&!this.flarePreview.Active:this.loopTimer>=this.loopInterval;
-      if(again)this.Play();}
-    this.Advance(step);this.uiAge+=Math.max(0,dt||0);if(this.uiAge>.15||step===0){this.uiAge=0;this.RefreshLayers();this.UpdateFacts();}
+
+  async SetEnvironmentPreset(id) {
+    const env = this.host.previewEnvironment;
+    if (!env) return false;
+    try { await env.Select(id, env.lookId); } catch (error) { this.Status('环境预设读取失败：' + error.message, true); return false; }
+    if (!this.panel) return false;
+    this.environmentSelect?.Fill(env.LookOptions(), env.lookId);
+    this.envPresetSelect?.Set(id);
+    if (this.previewEnvironment !== null) this.previewEnvironment = env.lookId;
+    this.host.post?.NotifyCameraCut();
+    return true;
   }
 
+  AddLayer(preset) {
+    return this.Try(() => {
+      const api = this.host.vfx.particles;
+      const created = api.Create({ preset, name: '自建 ' + preset });
+      const key = 'custom:' + (++this.customIndex);
+      api.Get(created.id).editorKey = key;
+      this.customLayers.push({ key, definition: api.Export(created.id) });
+      this.customIds.push(created.id);
+      this.selectedLayer = key;
+      this.playing = true;
+      this.RefreshLayers(true);
+      return created;
+    });
+  }
+
+  DeleteLayer() {
+    if (!this.selectedLayer?.startsWith('custom:')) {
+      this.Status('预置层请在 Renderer 勾选隐藏；仅自建层可删除。', false, true);
+      return;
+    }
+    const record = this.ReadLayer();
+    if (record && this.host.vfx.particles.systems.has(record.id)) this.host.vfx.particles.Remove(record.id);
+    this.customLayers = this.customLayers.filter((layer) => layer.key !== this.selectedLayer);
+    this.layerPatches.delete(this.selectedLayer);
+    this.layerRecords.delete(this.selectedLayer);
+    this.selectedLayer = null;
+    this.RefreshLayers(true);
+  }
+
+  Export() {
+    return {
+      version: 1, kind: 'TengxianParticleEffect', effect: this.effectId, seed: this.seed, scale: this.scale,
+      wind: [this.wind.x, this.wind.z], layers: Object.fromEntries(this.layerPatches),
+      custom: JSON.parse(JSON.stringify(this.customLayers)), soil: this.soil?.Export(),
+    };
+  }
+
+  Import(data) {
+    if (data?.version !== 1 || data.kind !== 'TengxianParticleEffect' || !ALL_EFFECTS.some((effect) => effect.id === data.effect)) throw new Error('不是受支持的粒子效果预设。');
+    if (!Number.isInteger(data.seed) || data.seed < 0 || data.seed > 4294967295 || !Number.isFinite(data.scale) || data.scale < 0.25 || data.scale > 3) throw new Error('预设的种子或缩放无效。');
+    if (!Array.isArray(data.wind) || data.wind.length !== 2 || data.wind.some((n) => !Number.isFinite(n) || Math.abs(n) > 4)) throw new Error('预设风速无效。');
+    if (data.soil) { if (data.soil.kind !== 'TengxianFallingSoil' || data.soil.version !== 1 || data.soil.preset !== data.effect) throw new Error('落土预设无效。'); NormalizeFallingSoil(data.soil.config, data.effect); NormalizeSoilPreview(data.soil.preview); }
+    const patches = new Map(Object.entries(data.layers || {}));
+    for (const [key, patch] of patches) { if (!/^(channel|preset|custom):[A-Za-z0-9_]+$/.test(key)) throw new Error('粒子层标识无效。'); MergeParticleModules(NormalizeParticleModules(), patch); }
+    const custom = data.custom || [];
+    if (!Array.isArray(custom) || custom.length > 24) throw new Error('最多支持 24 个自建粒子层。');
+    const api = this.host.vfx.particles;
+    if (new Set(custom.map((layer) => layer.key)).size !== custom.length) throw new Error('自建层标识不能重复。');
+    for (const [key] of patches) {
+      if (key.startsWith('preset:') && !api.Presets().includes(key.slice(7))) throw new Error('未知的粒子预设层。');
+      if (key.startsWith('channel:') && !api.profiles.has(key.slice(8))) throw new Error('未知的粒子通道层。');
+    }
+    for (const layer of custom) {
+      if (!/^custom:\d+$/.test(layer.key) || !layer.definition) throw new Error('自建粒子层无效。');
+      NormalizeParticleModules(layer.definition.modules);
+      if (layer.definition.profile ? !api.profiles.has(layer.definition.profile) : !api.Presets().includes(layer.definition.preset)) throw new Error('缺少预设使用的渲染配置。');
+    }
+    this.Stop();
+    this.effectId = data.effect;
+    this.seed = data.seed;
+    this.scale = data.scale;
+    this.wind.set(data.wind[0], 0, data.wind[1]);
+    if (this.seedInput) this.seedInput.value = String(this.seed);
+    this.scaleControl?.Set(this.scale);
+    if (this.windInputs) { this.windInputs.x.value = String(this.wind.x); this.windInputs.z.value = String(this.wind.z); }
+    this.layerPatches = patches;
+    if (data.soil) this.soil.Import(data.soil);
+    this.customLayers = JSON.parse(JSON.stringify(custom));
+    this.customIndex = Math.max(0, ...custom.map((layer) => Number(layer.key.slice(7))));
+    this.effectList.Select(this.effectId);
+    this.selectedLayer = null;
+    this.Play();
+    if (data.soil) this.ShowTab('soil');
+    this.Status('预设已载入', false, true);
+    return this.Inspect();
+  }
+
+  ReadSaved() { try { return JSON.parse(localStorage.getItem('Tengxian.ParticleEffectPresets.v1') || '{}'); } catch { return {}; } }
+  RefreshSaved() { const saved = this.ReadSaved(); this.savedSelect?.Fill(Object.keys(saved).map((value) => ({ value, label: value }))); }
+
+  SaveLocal() {
+    this.Try(() => {
+      const name = this.savedName.value.trim() || this.effectId;
+      const saved = this.ReadSaved();
+      Object.defineProperty(saved, name, { value: this.Export(), enumerable: true, configurable: true, writable: true });
+      localStorage.setItem('Tengxian.ParticleEffectPresets.v1', JSON.stringify(saved));
+      this.RefreshSaved();
+      this.savedSelect.Set(name);
+      this.Status('已保存预设：' + name, false, true);
+    });
+  }
+
+  LoadLocal() {
+    this.Try(() => {
+      const data = this.ReadSaved()[this.savedSelect.Value()];
+      if (!data) throw new Error('请选择已保存的预设。');
+      this.Import(data);
+    });
+  }
+
+  Download() {
+    const text = JSON.stringify(this.Export(), null, 2);
+    this.json.value = text;
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = El('a');
+    link.href = url;
+    link.download = 'Data_ParticleEffect_' + this.effectId + '.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  ApplyToScene() {
+    return this.Try(() => {
+      if (this.host.standalone) { this.Status('独立窗口请通过 JSON 导出参数', false, true); return { changed: 0 }; }
+      const target = this.savedParticleEffects;
+      let changed = 0;
+      if (this.soil?.selected) {
+        const config = this.soil.Config();
+        for (const [id, e] of target.FallingSoil.entries) if (e.preset === this.effectId) { target.FallingSoil.Configure(id, config); changed += 1; }
+        this.Status('已更新关卡中 ' + changed + ' 个落土源', false, true);
+        return { changed };
+      }
+      for (const [id, entry] of target.systems) {
+        const key = this.Key(entry), patch = this.layerPatches.get(key);
+        if (patch) { target.Configure(id, patch); changed += 1; }
+      }
+      for (const [key, patch] of this.layerPatches) if (key.startsWith('preset:')) target.presetOverrides.set(key.slice(7), patch);
+      this.Status('已更新关卡中 ' + changed + ' 个同名粒子层', false, true);
+      return { changed };
+    });
+  }
+
+  Inspect() {
+    return {
+      effect: this.effectId, time: this.previewTime, paused: this.paused, playing: this.playing, seed: this.seed,
+      selectedLayer: this.selectedLayer, flare: this.flarePreview?.State(), soil: this.soil?.Inspect(),
+      layers: [...this.layerRecords].map(([key, value]) => ({ key, id: value.id, profile: value.profile, preset: value.preset })),
+      particles: this.host.vfx.particles.Inspect(),
+    };
+  }
+
+  UpdateFacts() {
+    const entries = this.host.vfx.particles.Inspect().entries;
+    const alive = entries.reduce((n, e) => n + e.particleCount, 0);
+    const dropped = entries.reduce((n, e) => n + e.dropped, 0);
+
+    if (this.statParticles) {
+      this.statParticles.val.textContent = String(alive);
+      const soil = this.soil?.Inspect();
+      this.statLayers.val.textContent = String(soil ? ['grains', 'clods', 'dust'].filter((l) => this.soil.Config()[l].enabled).length : this.layerRecords.size);
+      this.statDropped.root.hidden = dropped === 0;
+      if (dropped > 0) this.statDropped.val.textContent = String(dropped);
+      if (FLARE_EFFECTS[this.effectId]) {
+        const f = this.flarePreview?.flares[0];
+        this.statExtra.root.hidden = false;
+        this.statExtra.root.firstChild.textContent = f?.phase || 'done';
+        this.statExtra.val.textContent = f ? `${f.agl.toFixed(1)}m` : '—';
+      } else if (soil) {
+        this.statExtra.root.hidden = false;
+        this.statExtra.root.firstChild.textContent = '砂/块/尘';
+        this.statExtra.val.textContent = Object.values(soil.live).join('/');
+      } else {
+        this.statExtra.root.hidden = true;
+      }
+    }
+
+    if (this.facts) {
+      this.facts.Set('当前效果', ALL_EFFECTS.find((effect) => effect.id === this.effectId)?.name || this.effectId);
+      this.facts.Set('存活粒子', alive);
+      this.facts.Set('参与层数', this.layerRecords.size);
+      this.facts.Set('丢弃', dropped);
+      if (FLARE_EFFECTS[this.effectId]) {
+        const f = this.flarePreview?.flares[0];
+        this.facts.Set('弹药阶段', f?.phase || 'done');
+        this.facts.Set('离地高度', f ? f.agl.toFixed(1) + ' m' : '—');
+      }
+      const soil = this.soil?.Inspect();
+      if (soil) {
+        this.facts.Set('参与层数', ['grains', 'clods', 'dust'].filter((layer) => this.soil.Config()[layer].enabled).length);
+        this.facts.Set('细砂 / 土块 / 细尘', Object.values(soil.live).join(' / '));
+        this.facts.Set('碰撞 / 二次起尘', soil.impacts + ' / ' + soil.grainImpacts);
+      }
+    }
+
+    this.timeSlider?.Set(this.previewTime);
+    if (this.pauseButton) {
+      this.pauseButton.textContent = this.host.standalone ? (this.paused ? '▶ 继续' : '⏸ 暂停') : (this.paused ? '继续' : '暂停');
+    }
+  }
+
+  Update(dt) {
+    const step = this.playing && !this.paused ? Math.max(0, Math.min(0.1, dt || 0)) * this.speed : 0;
+    if (!this.IsContinuous() && this.playing && !this.paused && this.loop) {
+      this.loopTimer += step;
+      const again = FALLING_SOIL_PRESETS[this.effectId]
+        ? this.previewTime > 0 && !this.soil.Inspect()?.active
+        : FLARE_EFFECTS[this.effectId]
+        ? this.previewTime > 0 && !this.flarePreview.Active
+        : this.loopTimer >= this.loopInterval;
+      if (again) this.Play();
+    }
+    this.Advance(step);
+    this.uiAge += Math.max(0, dt || 0);
+    if (this.uiAge > 0.15 || step === 0) {
+      this.uiAge = 0;
+      this.RefreshLayers();
+      this.UpdateFacts();
+    }
+  }
 }
 
 export default VfxEditor;

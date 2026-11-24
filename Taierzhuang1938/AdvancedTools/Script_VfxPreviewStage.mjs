@@ -1,15 +1,16 @@
-// 特效预览台：渲染器 + 场景 + 轨道相机 + HDR 靶 + 输出变换（曝光 → ACES → sRGB），外加预览灯与天穹。
+// 特效预览台：渲染器 + 场景 + 轨道相机 + HDR 靶 + 输出变换（曝光 → ACES → sRGB），外加预览灯、测试场与天穹。
 //
 // 不是游戏的渲染管线：没有预通道、SSAO、体积雾、GI、泛光、调色。特效着色器输出的是线性 HDR，
 // 所以这里只做「把 HDR 显示出来」必须的那一步（Script_ToneMapCurves 的 ACES，与游戏同一条曲线）。
 // 曝光取环境预设里的 exposure（游戏自动曝光稳态时的增益就是它），再乘上用户的 EV 补偿。
-// 天穹用预设的天顶 / 地平线 / 地面色画一个渐变，只当背景参照。
+// 天穹用预设的天顶 / 地平线 / 地面色与太阳方向画一个大气渐变；暗室模式切换为低反差中性暗棚。
 
 import * as THREE from "three";
 import { TONEMAP_GLSL } from "../Script_ToneMapCurves.mjs";
 import { Studio } from "../Script_EditorStage.mjs";
 import { PreviewLights } from "./Script_VfxPreviewLights.mjs";
 import { PreviewMaterialLibrary } from "./Script_VfxPreviewSurfaces.mjs";
+import { VfxPreviewArena } from "./Script_VfxPreviewArena.mjs";
 
 const OUTPUT_VERT = /* glsl */`
 varying vec2 vUv;
@@ -30,11 +31,34 @@ void main() {
 `;
 
 const SKY_FRAG = /* glsl */`
-uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uGround;
+uniform vec3 uZenith;
+uniform vec3 uHorizon;
+uniform vec3 uGround;
+uniform vec3 uSunDir;
+uniform vec3 uSunTint;
+uniform float uSunGlow;
+uniform float uDarkMode;
 varying vec3 vDir;
 void main() {
-  float y = normalize(vDir).y;
-  vec3 sky = y >= 0.0 ? mix(uHorizon, uZenith, pow(clamp(y, 0.0, 1.0), 0.55)) : mix(uHorizon, uGround, clamp(-y * 4.0, 0.0, 1.0));
+  vec3 d = normalize(vDir);
+  float y = d.y;
+  if (uDarkMode > 0.5) {
+    vec3 darkZenith = vec3(0.011, 0.012, 0.015);
+    vec3 darkHorizon = vec3(0.025, 0.027, 0.030);
+    vec3 darkGround = vec3(0.009, 0.010, 0.012);
+    vec3 col = y >= 0.0
+      ? mix(darkHorizon, darkZenith, pow(clamp(y, 0.0, 1.0), 0.65))
+      : mix(darkHorizon, darkGround, clamp(-y * 3.5, 0.0, 1.0));
+    gl_FragColor = vec4(col, 1.0);
+    return;
+  }
+  vec3 sky = y >= 0.0
+    ? mix(uHorizon, uZenith, pow(clamp(y, 0.0, 1.0), 0.52))
+    : mix(uHorizon, uGround, clamp(-y * 4.5, 0.0, 1.0));
+  // 柔和太阳方向大气散射辉光，使户外天穹更有方向层次
+  float mu = max(dot(d, normalize(uSunDir)), 0.0);
+  float haze = pow(mu, 10.0) * 0.16 + pow(mu, 96.0) * 0.45;
+  sky += uSunTint * haze * uSunGlow * smoothstep(-0.08, 0.12, y);
   gl_FragColor = vec4(sky, 1.0);
 }
 `;
@@ -69,12 +93,22 @@ export class VfxPreviewStage {
     this.library = new PreviewMaterialLibrary();
     this.lights = new PreviewLights(this.scene, { quality, shadowMapSize: quality === "low" ? 1024 : 2048 });
     this.studio = new Studio({ scene: this.scene, camera: this.camera, library: this.library });
+    this.arena = new VfxPreviewArena(this.studio);
     this.exposure = 1;
     this.exposureEv = 0;
+    this.sunDirection = new THREE.Vector3(0.4, 0.8, 0.4).normalize();
 
     this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({
       vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false,
-      uniforms: { uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uGround: { value: new THREE.Color() } },
+      uniforms: {
+        uZenith: { value: new THREE.Color() },
+        uHorizon: { value: new THREE.Color() },
+        uGround: { value: new THREE.Color() },
+        uSunDir: { value: new THREE.Vector3(0.4, 0.8, 0.4).normalize() },
+        uSunTint: { value: new THREE.Color(1, 0.96, 0.88) },
+        uSunGlow: { value: 0.4 },
+        uDarkMode: { value: 0.0 },
+      },
     }));
     this.sky.name = "SkyDome"; // 摄影棚藏世界时按这个名字留下天穹（Script_EditorStage.WorldMask）
     this.sky.frustumCulled = false;
@@ -94,12 +128,19 @@ export class VfxPreviewStage {
     this.Resize();
     this._onResize = () => this.Resize();
     window.addEventListener("resize", this._onResize);
+    if (typeof ResizeObserver !== "undefined") {
+      this._resizeObserver = new ResizeObserver(() => this.Resize());
+      this._resizeObserver.observe(canvas);
+    }
   }
 
   Resize() {
     const rect = this.canvas.getBoundingClientRect();
     const width = Math.max(2, Math.round(rect.width || window.innerWidth));
     const height = Math.max(2, Math.round(rect.height || window.innerHeight));
+    if (this._w === width && this._h === height) return;
+    this._w = width;
+    this._h = height;
     this.renderer.setSize(width, height, false);
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     this.hdr.setSize(size.x, size.y);
@@ -107,7 +148,7 @@ export class VfxPreviewStage {
     this.camera.updateProjectionMatrix();
   }
 
-  /** 环境参数（与 SKY_PRESETS 同形）落到灯、天穹与曝光上。 */
+  /** 环境参数（与 SKY_PRESETS 同形）落到灯、天穹、测试场与曝光上。 */
   ApplyEnvironment(env, sunDirection, flareSceneScale) {
     const direction = new THREE.Vector3(sunDirection.x, sunDirection.y, sunDirection.z).normalize();
     this.lights.ApplyEnvironment(env, direction, flareSceneScale);
@@ -117,16 +158,34 @@ export class VfxPreviewStage {
     SkyColor(env.zenith, [0.38, 0.52, 0.72], u.uZenith.value);
     SkyColor(env.horizon, [0.68, 0.76, 0.86], u.uHorizon.value);
     SkyColor(env.ground, [0.30, 0.32, 0.34], u.uGround.value);
+    u.uSunDir.value.copy(direction);
+    u.uSunTint.value.setHex(env.lightColor ?? 0xfff2df);
+    u.uSunGlow.value = Math.min(1.8, Math.max(0.1, Number(env.glow) || (this.lights.sun.intensity > 0.6 ? 0.45 : 0.15)));
     this.sunDirection = direction;
+    this.arena.SyncEnvironment(u.uHorizon.value, this.OutputExposure);
   }
 
-  SetExposureEv(ev) { this.exposureEv = Number.isFinite(ev) ? ev : 0; }
+  SetArenaMode(mode) {
+    this.arena.SetMode(mode);
+    this.sky.material.uniforms.uDarkMode.value = mode === "dark" ? 1.0 : 0.0;
+    this.arena.SyncEnvironment(this.sky.material.uniforms.uHorizon.value, this.OutputExposure);
+  }
+
+  SetArenaEffect(effectId, flags) {
+    this.arena.SetEffect(effectId, flags);
+  }
+
+  SetExposureEv(ev) {
+    this.exposureEv = Number.isFinite(ev) ? ev : 0;
+    this.arena.SyncEnvironment(this.sky.material.uniforms.uHorizon.value, this.OutputExposure);
+  }
 
   get OutputExposure() { return this.exposure * Math.pow(2, this.exposureEv); }
 
   Render() {
     this.sky.position.copy(this.camera.position);
     this.sky.scale.setScalar(Math.min(1500, this.camera.far * 0.9));
+    this.arena.Update(this.studio.orbit.dist);
     this.lights.FollowView(this.studio.orbit.target, Math.max(20, Math.min(160, this.studio.orbit.dist * 3)));
     this.renderer.setRenderTarget(this.hdr);
     this.renderer.clear();
@@ -138,6 +197,8 @@ export class VfxPreviewStage {
 
   Dispose() {
     window.removeEventListener("resize", this._onResize);
+    this._resizeObserver?.disconnect();
+    this.arena.Dispose();
     this.studio.Dispose();
     this.hdr.dispose();
     this.renderer.dispose();

@@ -1,0 +1,542 @@
+/* 特效预览独立工作台（Tool_VfxPreview.html）：
+   沿用血战滕县高级工具视觉语言（冷灰暗底、旧金强调、橄榄灰细线、直角控件、等宽数字、衬线标题），
+   采用 左栏（效果库 / 场景环境）+ 中央视口 & 底部时间轴 + 右栏（Unity/UE 式粒子检查器）三栏工作台。 */
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #080908;
+  overflow: hidden;
+}
+#vfxPreviewPage [hidden] { display: none !important; }
+
+#vfxPreviewPage {
+  --vfx-bar-h: 42px;
+  --vfx-left-w: clamp(248px, 17.5vw, 286px);
+  --vfx-right-w: clamp(332px, 23.5vw, 392px);
+  --vfx-timeline-h: 78px;
+}
+#vfxPreviewPage.vfxHideLeft { --vfx-left-w: 0px; }
+#vfxPreviewPage.vfxHideRight { --vfx-right-w: 0px; }
+
+/* 顶栏保持纯粹：左标题 + 右返回控制中心，隐藏冗余状态字与曝光条 */
+#vfxPreviewPage #edRoot {
+  --ed-bar-h: var(--vfx-bar-h);
+}
+#vfxPreviewPage #edRoot .edMenuBar {
+  height: var(--vfx-bar-h);
+  padding: 0 8px 0 18px;
+  justify-content: space-between;
+}
+#vfxPreviewPage #edRoot .edMenuBrand {
+  font-size: 16px;
+  padding-right: 0;
+  margin-right: 0;
+}
+#vfxPreviewPage #edRoot .edMenuBrand::after { display: none; }
+#vfxPreviewPage #edRoot .edMenuStatus { display: none; }
+#vfxPreviewPage #edRoot .edMenuMainMenu {
+  font-size: 13px;
+  padding: 0 14px;
+}
+
+/* 3D 视口精确占据左栏、右栏、顶栏与底部时间轴之间的纯净区域 */
+#view {
+  position: fixed;
+  top: var(--vfx-bar-h);
+  left: var(--vfx-left-w);
+  right: var(--vfx-right-w);
+  bottom: var(--vfx-timeline-h);
+  width: calc(100% - var(--vfx-left-w) - var(--vfx-right-w));
+  height: calc(100% - var(--vfx-bar-h) - var(--vfx-timeline-h));
+  display: block;
+  outline: none;
+  cursor: grab;
+  background: #0a0b09;
+}
+#view:active { cursor: grabbing; }
+
+#vfxBootError {
+  position: fixed;
+  left: 24px;
+  bottom: 24px;
+  z-index: 60;
+  color: #ffae98;
+  font: 14px/1.5 var(--ui-font, sans-serif);
+}
+
+/* 覆盖通用 .edPanel.work 的单侧抽屉定位，改为整屏三栏工作台壳（视口区 pointer-events 穿透） */
+#vfxPreviewPage #edRoot .edPanel.work.vfxWorkbench {
+  position: fixed;
+  inset: var(--vfx-bar-h) 0 0 0;
+  width: auto;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
+  display: block;
+}
+#vfxPreviewPage #edRoot .edPanel.work.vfxWorkbench::before {
+  display: none;
+}
+
+/* --- 左栏：效果库 / 预设 + 固定底部场景环境坞 ------------------------------- */
+.vfxLeft {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--vfx-left-w);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--ed-panel);
+  border-right: 1px solid var(--ed-rule);
+  min-width: 0;
+  overflow: hidden;
+}
+#vfxPreviewPage.vfxHideLeft .vfxLeft { display: none; }
+
+/* --- 右栏：Unity/UE 式粒子检查器 ------------------------------------------- */
+.vfxRight {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--vfx-right-w);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--ed-panel-r);
+  border-left: 1px solid var(--ed-rule);
+  min-width: 0;
+  overflow: hidden;
+}
+#vfxPreviewPage.vfxHideRight .vfxRight { display: none; }
+
+/* --- 底部时间轴与播放控制栏（停靠于中央视口正下方）-------------------------- */
+.vfxTimeline {
+  position: absolute;
+  left: var(--vfx-left-w);
+  right: var(--vfx-right-w);
+  bottom: 0;
+  height: var(--vfx-timeline-h);
+  box-sizing: border-box;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 6px 12px 7px;
+  background: linear-gradient(180deg, #0d0e0bf5, #080907fa);
+  border-top: 1px solid var(--ed-rule);
+}
+
+/* 侧栏折叠/展开按钮（贴边极简小耳，仅折叠时在视口角显示） */
+.vfxPaneToggle {
+  cursor: pointer;
+  flex: none;
+  width: 28px;
+  height: 100%;
+  border: 0;
+  border-left: 1px solid var(--ed-rule-2);
+  background: transparent;
+  color: var(--ed-text-3);
+  font: 12px/1 var(--ui-mono);
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.vfxPaneToggle:hover { color: var(--ed-gold-hi); background: var(--ed-sel); }
+.vfxRight .vfxPaneToggle { border-left: 0; border-right: 1px solid var(--ed-rule-2); }
+
+.vfxEdgeRestore {
+  position: absolute;
+  top: 8px;
+  z-index: 4;
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px solid var(--ed-edge);
+  background: #0a0b09d9;
+  color: var(--ed-text-2);
+  font: 11px/1.3 var(--ui-font);
+  letter-spacing: 0.08em;
+  display: none;
+}
+.vfxEdgeRestore:hover { border-color: var(--ed-gold); color: var(--ed-gold-hi); }
+.vfxEdgeRestore.left { left: 8px; }
+.vfxEdgeRestore.right { right: 8px; }
+#vfxPreviewPage.vfxHideLeft .vfxEdgeRestore.left { display: block; }
+#vfxPreviewPage.vfxHideRight .vfxEdgeRestore.right { display: block; }
+
+/* 侧栏顶部标签条（效果库 / 预设，粒子模块 / 落土参数） */
+.vfxTabBar {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: 34px;
+  border-bottom: 1px solid var(--ed-rule);
+  background: #090a08d0;
+}
+.vfxTabBar .vfxTabBtn {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ed-text-3);
+  font: 400 12.5px/1 var(--ui-font);
+  letter-spacing: 0.14em;
+  padding: 0 8px;
+  transition: color 0.12s linear, background 0.12s linear, border-color 0.12s linear;
+}
+.vfxTabBar .vfxTabBtn:hover { color: var(--ed-text-hi); background: #d8d4c30d; }
+.vfxTabBar .vfxTabBtn.on {
+  color: var(--ed-gold-text);
+  border-bottom-color: var(--ed-gold);
+  background: var(--ed-sel);
+}
+
+/* 左栏上部内容区（效果库 / 预设） */
+.vfxLeftMain {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.vfxPane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.vfxPane[hidden] { display: none !important; }
+.vfxPaneScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 10px 14px;
+}
+
+/* 效果搜索框与分类筛选条 */
+.vfxLibHead {
+  flex: none;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--ed-rule-2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vfxSearchWrap { position: relative; }
+.vfxSearchWrap::before, .vfxSearchWrap::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  color: var(--ed-text-4);
+}
+.vfxSearchWrap::before {
+  top: 50%; left: 9px; width: 8px; height: 8px; margin-top: -5px;
+  border: 1px solid currentColor; border-radius: 50%;
+}
+.vfxSearchWrap::after {
+  top: 50%; left: 16px; width: 4px; margin-top: 3px;
+  border-top: 1px solid currentColor; transform: rotate(45deg);
+}
+.vfxSearch {
+  width: 100%;
+  height: 27px;
+  min-height: 27px !important;
+  padding: 2px 8px 2px 26px !important;
+  font-size: 12px !important;
+  background: var(--ed-field);
+  border: 1px solid var(--ed-edge);
+  color: var(--ed-text);
+  box-sizing: border-box;
+}
+.vfxSearch::placeholder { color: var(--ed-text-4); }
+
+.vfxCatBar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.vfxCatChip {
+  cursor: pointer;
+  padding: 2px 1px;
+  border: 1px solid var(--ed-rule-2);
+  background: transparent;
+  color: var(--ed-text-3);
+  font: 10.5px/1.45 var(--ui-font);
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+}
+.vfxCatChip:hover { color: var(--ed-text-hi); border-color: var(--ed-edge); }
+.vfxCatChip.on {
+  color: var(--ed-gold-text);
+  border-color: #cdb77b88;
+  background: var(--ed-sel-strong);
+}
+
+/* 独立窗口内效果列表撑满左栏上部剩余空间 */
+#vfxPreviewPage .vfxLibListWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+}
+#vfxPreviewPage .vfxLibListWrap .edList {
+  flex: 1 1 auto;
+  max-height: none !important;
+  min-height: 0;
+  border-color: var(--ed-rule-2);
+  background: #090a0888;
+}
+#vfxPreviewPage .vfxLibListWrap .edList .it {
+  min-height: 27px;
+  padding: 3px 9px 3px 9px;
+  font-size: 12px;
+}
+#vfxPreviewPage .vfxLibListWrap .edList .it .t {
+  font-size: 10.5px;
+  padding: 0 4px;
+  border: 1px solid var(--ed-rule-2);
+  color: var(--ed-text-4);
+}
+#vfxPreviewPage .vfxLibListWrap .edList .it.on .t {
+  border-color: #edca8355;
+  color: var(--ed-gold-text);
+}
+
+/* 左栏底部常驻：测试场景与模拟环境坞 */
+.vfxStageDock {
+  flex: none;
+  border-top: 1px solid var(--ed-rule);
+  background: linear-gradient(180deg, #0c0d0af0, #090a08fa);
+  padding: 7px 10px 9px;
+}
+.vfxDockTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--ed-text-3);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+}
+.vfxDockTools {
+  display: flex;
+  gap: 3px;
+}
+.vfxSeg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+.vfxSegBtn {
+  cursor: pointer;
+  height: 24px;
+  padding: 0 4px;
+  border: 1px solid var(--ed-rule-2);
+  background: #10120eb0;
+  color: var(--ed-text-3);
+  font: 11.5px/1 var(--ui-font);
+  letter-spacing: 0.06em;
+}
+.vfxSegBtn:hover { color: var(--ed-text-hi); border-color: var(--ed-edge); }
+.vfxSegBtn.on {
+  color: var(--ed-gold-text);
+  border-color: #cdb77b99;
+  background: var(--ed-sel-strong);
+}
+
+.vfxMiniBtn {
+  cursor: pointer;
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--ed-edge);
+  background: #131510aa;
+  color: var(--ed-text-2);
+  font: 11px/1 var(--ui-font);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.vfxMiniBtn:hover { color: var(--ed-gold-hi); border-color: #cdb77b88; background: var(--ed-sel); }
+.vfxMiniBtn.on { color: var(--ed-gold-text); border-color: var(--ed-gold); background: var(--ed-sel-strong); }
+
+/* --- 底部时间轴布局 --------------------------------------------------------- */
+.vfxTlTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+.vfxTlTransport {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.vfxTlTransport .edBtn {
+  min-height: 26px !important;
+  height: 26px;
+  padding: 0 9px !important;
+  font-size: 11.5px !important;
+  letter-spacing: 0.04em !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.vfxTlSep {
+  width: 1px;
+  height: 16px;
+  background: var(--ed-rule-2);
+  margin: 0 3px;
+  flex: none;
+}
+.vfxTlLoop {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.vfxTlLoop .edBtn {
+  min-height: 26px !important;
+  height: 26px;
+  padding: 0 8px !important;
+  font-size: 11.5px !important;
+}
+.vfxTlInlineNum {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ed-text-3);
+  font-size: 11px;
+}
+.vfxTlInlineNum input {
+  width: 48px !important;
+  min-height: 24px !important;
+  height: 24px;
+  padding: 1px 4px !important;
+  font-size: 11.5px !important;
+  text-align: right;
+}
+.vfxTlInlineNum[hidden] { display: none !important; }
+
+.vfxTlMeta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.vfxTlMeta select {
+  width: auto !important;
+  min-height: 24px !important;
+  height: 24px;
+  padding: 0 6px !important;
+  font-size: 11.5px !important;
+  background: #10120ecc !important;
+}
+.vfxStatPills {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.vfxStatPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--ed-rule-2);
+  background: #0a0b09aa;
+  color: var(--ed-text-3);
+  font: 11px/1 var(--ui-mono);
+  white-space: nowrap;
+}
+.vfxStatPill b { color: var(--ed-text-hi); font-weight: 600; }
+.vfxStatPill.warn b { color: var(--ed-gold-text); }
+.vfxStatPill[hidden] { display: none !important; }
+
+.vfxTlTrack {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vfxRulerWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 12px;
+}
+.vfxRulerTicks {
+  position: absolute;
+  inset: 0 4px auto 4px;
+  height: 12px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+  color: var(--ed-text-4);
+  font: 10px/1 var(--ui-mono);
+}
+.vfxRulerTicks span {
+  position: relative;
+}
+.vfxRulerTicks span::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 11px;
+  width: 1px;
+  height: 4px;
+  background: var(--ed-rule);
+}
+.vfxRulerWrap input[type="range"] {
+  width: 100%;
+  height: 20px !important;
+  display: block;
+}
+.vfxTlTimeReadout {
+  flex: none;
+  min-width: 78px;
+  text-align: right;
+  font: 600 12.5px/1 var(--ui-mono);
+  color: var(--ed-gold-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 浮动极简瞬时提示（仅加载三维体积或报错时出现，空时完全隐藏） */
+.vfxToast {
+  position: absolute;
+  top: 10px;
+  left: calc(var(--vfx-left-w) + 12px);
+  z-index: 5;
+  pointer-events: none;
+  padding: 5px 11px;
+  background: #0a0b09e2;
+  border: 1px solid var(--ed-rule);
+  border-left: 2px solid var(--ed-gold);
+  color: var(--ed-text);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  max-width: 420px;
+}
+.vfxToast.error {
+  border-left-color: var(--ed-bad);
+  color: #ffae98;
+}
+.vfxToast:empty, .vfxToast[hidden] { display: none !important; }
+
+/* 窄屏适配 */
+@media (max-width: 1120px) {
+  #vfxPreviewPage {
+    --vfx-left-w: 224px;
+    --vfx-right-w: 306px;
+  }
+  .vfxStatPills { display: none; }
+}
