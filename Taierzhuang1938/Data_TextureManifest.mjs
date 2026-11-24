@@ -944,7 +944,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "TerrainEastTrackRoad", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
-    toneClass: "drySoil", metersPerTile: 1.22, normalConvention: "terrain",
+    toneClass: "drySoil", metersPerTile: 1.47, normalConvention: "terrain",
     bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackRoad.json",
     source: { provider: "imagegen", date: "2026-11-23",
@@ -958,7 +958,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "TerrainEastTrackStubble", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
-    toneClass: "drySoil", metersPerTile: 1.29, normalConvention: "terrain",
+    toneClass: "drySoil", metersPerTile: 1.35, normalConvention: "terrain",
     bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackStubble.json",
     source: { provider: "imagegen", date: "2026-11-23",
@@ -972,7 +972,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "TerrainEastTrackCut", kind: "terrainLayer", tier: "level:TanketteAdvanceEastTrack",
-    toneClass: "rammedEarth", metersPerTile: 1.04, normalConvention: "terrain",
+    toneClass: "rammedEarth", metersPerTile: 1.16, normalConvention: "terrain",
     bake: "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackMaterials.py",
     bakeRecord: "_import/TextureBakes/Texture_TerrainEastTrackCut.json",
     source: { provider: "imagegen", date: "2026-11-23",

@@ -100,27 +100,34 @@ function FixedSceneCamera(host, poseForFrame) {
   };
 }
 
+const ROADSIDE_DUST_VOLUME = "EastTrackSoilBurst";
+
 function RoadsideSoil(vfx, { x, z }, y) {
   const range = (min,max) => ({ mode:"twoConstants", min, max });
   // Turn the existing ground-colliding soil emitter upward. Its solid clods
   // enter the normal/depth pass and receive the fog at their own position.
-  return vfx.FallingSoil({ preset: "SoilHeavyCrumble", config: {
-    emitter: { shape:"area", position:[x,y+.12,z], width:.70, length:.44, distribution:"uniform",
-      rotation:[Math.PI,0,-.25], clearance:.035, seed:411806 },
-    timing: { mode:"once", duration:.32, frequency:60, quantity:1.35, variation:.16,
-      intensity:[[0,1.48],[.38,1.08],[.83,.67],[1,0]] },
+  const debris = vfx.FallingSoil({ preset: "SoilHeavyCrumble", config: {
+    emitter: { shape:"area", position:[x,y+.065,z], width:.34, length:.32, distribution:"streams",
+      streams:4, streamWidth:.084, rotation:[Math.PI,0,-.29], clearance:.018, seed:411806 },
+    timing: { mode:"once", duration:.29, frequency:60, quantity:1.35, variation:.16,
+      intensity:[[0,1.55],[.38,1.21],[.83,.64],[1,0]] },
     motion: { wind:[.21,0,.12], turbulence:.032 },
-    grains: { amount:26, size:range(.004,.028), sizeBias:1.45, speed:range(1.55,7.0), spread:3,
-      gravity:1.11, drag:.61, life:range(.44,1.1), color:[.039,.031,.027,.95], shutter:.022, minPixel:.61,
-      trailOpacity:.89, impactDust:.005, deposit:false, maxParticles:760 },
-    clods: { amount:1.89, size:range(.030,.115), sizeBias:1.86, speed:range(1.10,6.8), spread:3,
-      gravity:1.02, drag:.29, life:range(.54,1.49), color:[.046,.035,.028,1], aspect:[1,.70,.86],
-      maxParticles:45, impactDust:.55, maxBounces:1, fragmentChance:.07 },
-    dust: { amount:3.35, size:range(.16,.36), speed:range(.45,3.25), spread:1.46, gravity:.25,
-      life:range(.65,1.75), color:[.086,.063,.051,.28], density:1.65, diffusion:2.29, sourceSpread:.21,
-      veil:false, aspect:1.42, fadeIn:.028, volumetric:true, impactAmount:.55, maxParticles:94 },
+    grains: { amount:28, size:range(.003,.027), sizeBias:1.69, speed:range(1.9,6.8), spread:2.85,
+      gravity:1.11, drag:.58, life:range(.44,1.1), color:[.045,.035,.029,.83], shutter:.007, minPixel:.36,
+      trailOpacity:.6, impactDust:.005, deposit:false, maxParticles:760 },
+    clods: { amount:1.58, size:range(.022,.105), sizeBias:1.94, speed:range(1.5,6.6), spread:3,
+      gravity:1.02, drag:.31, life:range(.54,1.49), color:[.046,.035,.028,1], aspect:[1,.70,.86],
+      maxParticles:42, impactDust:.55, maxBounces:1, fragmentChance:.07 },
+    dust: { amount:3.0, size:range(.23,.47), speed:range(.62,4.35), spread:1.46, gravity:.19,
+      life:range(.65,1.75), color:[.067,.051,.042,.33], density:1.86, diffusion:2.06, sourceSpread:.14,
+      veil:false, aspect:1.20, fadeIn:.024, volumetric:false, impactAmount:.66, maxParticles:86 },
     budget: { distance:48, fadeDistance:12, rayChecks:84, grainCollision:false },
   }}).id;
+  const plume = vfx.particles.VolumeBurst([x,y+.012,z], {
+    asset:ROADSIDE_DUST_VOLUME, life:1.38,
+    density:9.1, color:[1,1,1,.92], fadeIn:.059, seed:26067,
+  })?.id;
+  return { debris, plume };
 }
 
 function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
@@ -151,11 +158,13 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
       const ground = impact && battlefield.StaticGroundHeight(impact.x, impact.z);
       let untilImpact = .4;
       let impactAge = null;
-      let soilEmitter = null;
+      let soil = null;
       let figures = null;
       let disposed = false;
       const RemoveSoil = () => {
-        if (soilEmitter && vfx.particles.FallingSoil.entries.has(soilEmitter)) vfx.particles.FallingSoil.Remove(soilEmitter);
+        if (soil?.debris && vfx.particles.FallingSoil.entries.has(soil.debris)) vfx.particles.FallingSoil.Remove(soil.debris);
+        if (soil?.plume && vfx.particles.systems.has(soil.plume)) vfx.particles.Clear(soil.plume);
+        soil = null;
       };
       const runtime = {
         api: { SetCamera(next) {
@@ -173,7 +182,7 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
           terrainSet: battlefield.terrainLayers?.setName,
           smoke: vfx.smokeSources.size,
           ...(loadFigures ? { figures: figures?.ids || [] } : {}),
-          ...(impact ? { impactAge, soil: soilEmitter ? vfx.particles.FallingSoil.Inspect(soilEmitter) : null } : {}),
+          ...(impact ? { impactAge, soil: soil ? vfx.particles.FallingSoil.Inspect(soil.debris) : null } : {}),
         }) },
         Update(dt) {
           if (figures && !figures.root.parent) host.scene.add(figures.root);
@@ -181,7 +190,7 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
             untilImpact -= dt;
             if (untilImpact <= 0) {
               RemoveSoil();
-              soilEmitter = RoadsideSoil(vfx, impact, ground);
+              soil = RoadsideSoil(vfx, impact, ground);
               untilImpact += 12;
               impactAge = 0;
             }
@@ -208,6 +217,7 @@ function SceneryPreview(sceneId, extraPbrSets = [], soilMarker, loadFigures) {
             nearDofStrength: .72, nearDofMaxPx: 4.5 } : {}),
         }),
         Warmup: async () => {
+          if (impact) vfx.particles.renderer.volumes.Pool(ROADSIDE_DUST_VOLUME);
           const preparingFigures = loadFigures?.(host, layout.landmarks).then(loaded => {
             if (disposed) loaded.Dispose();
             else figures = loaded;

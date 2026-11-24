@@ -8,7 +8,7 @@
   "components": {
     "Sun": {
       "enabled": true,
-      "params": {"elevation": 31, "azimuth": 227, "color": "#efe6dc", "intensity": 1.77, "discIntensity": 0}
+      "params": {"elevation": 34, "azimuth": 296, "color": "#efe6dc", "intensity": 1.63, "discIntensity": 0}
     },
     "Ambient": {
       "enabled": true,
@@ -25,23 +25,24 @@
         "horizon": [0.365, 0.345, 0.351],
         "ground": [0.27, 0.24, 0.22],
         "glow": 0,
-        "smoke": 0.42,
-        "smokeHeight": 0.151,
-        "smokeColor": [0.301, 0.282, 0.29]
+        "smoke": 0.88,
+        "smokeHeight": 0.059,
+        "smokeColor": [0.375, 0.354, 0.368],
+        "hazeTint": [0.46, 0.46, 0.46]
       }
     },
     "Clouds": {
       "enabled": true,
       "params": {
-        "structure": 1,
-        "coverage": 0.875,
-        "scale": 0.84,
-        "softness": 0.96,
-        "warp": 1.09,
-        "underside": 0.61,
-        "fadeHeight": 0.168,
-        "shade": [0.235, 0.22, 0.231],
-        "gap": 0.91,
+        "structure": 0.79,
+        "coverage": 0.77,
+        "scale": 2.03,
+        "softness": 0.74,
+        "warp": 0.66,
+        "underside": 0.34,
+        "fadeHeight": 0.127,
+        "shade": [0.359, 0.339, 0.357],
+        "gap": 0.96,
         "silver": 0,
         "shapeScale": 0.96,
         "shapeCover": 0.61
@@ -55,11 +56,11 @@
         "rayleigh": 0.32,
         "ozone": 0.5,
         "groundAlbedo": 0.16,
-        "sunIrradiance": 2.5,
-        "skyTint": [0.61, 0.584, 0.602],
-        "skyFloor": [0.355, 0.335, 0.343],
+        "sunIrradiance": 1.18,
+        "skyTint": [0.48, 0.46, 0.47],
+        "skyFloor": [0.452, 0.431, 0.45],
         "artGlow": 0,
-        "aerialBlend": 0.17,
+        "aerialBlend": 0.09,
         "aerialGain": 0.15
       }
     },
@@ -69,8 +70,9 @@
         "density": 0.0204,
         "falloff": 7.7,
         "max": 0.86,
-        "skyColor": [0.223, 0.202, 0.203],
-        "groundColor": [0.22, 0.201, 0.196],
+        "skyScale": 0.43,
+        "skyColor": [0.134, 0.121, 0.123],
+        "groundColor": [0.245, 0.224, 0.217],
         "sunGain": 0.015,
         "desat": 0.43,
         "flatten": 0.056

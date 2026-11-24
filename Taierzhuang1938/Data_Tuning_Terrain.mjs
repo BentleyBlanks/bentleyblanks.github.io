@@ -25,6 +25,9 @@
  *   farTileM     远景平铺边长（米）。与 tileM 取**非整数倍**，两套网格永远对不齐。
  *   normalScale  法线强度（近景满强度，远处再乘 DISTANCE.normalFar）
  *   heightOffset 高度混合时整层抬高/压低（0..1 高度单位）。车道压实，草茬与翻土更「高」。
+ *
+ * 套装可设 wetness 缩放湿痕与积水覆盖率（缺省 1），也可用 trenchLooseLayer
+ * 指定沟沿松土复用的本套图层 ID。未指定时沿用通用松土贴图。
  */
 const MISSION_PLAIN = Object.freeze({
   textureSize: 1024,
@@ -80,18 +83,20 @@ export const TERRAIN_SETS = Object.freeze({
   }),
   EastTrack: Object.freeze({
     textureSize: 512,
-    version: "eastTrack20261123Ground",
+    version: "eastTrack20261124Ground2",
     albedoScale: .91,
+    wetness: .12,
+    trenchLooseLayer: "SpoilEarth",
     stubble: Object.freeze({ scaleM: 10.5, breakupScaleM: 1.37, threshold: Object.freeze([.31,.57]) }),
     layers: Object.freeze([
-      Object.freeze({ id: "FieldSoil", file: "EastTrackRoad", tileM: 1.14, farTileM: 7.6,
-        normalScale: 1.03, heightOffset: .005, tint: Object.freeze([.91,.89,.87]) }),
-      Object.freeze({ id: "CartTrack", file: "EastTrackRoad", tileM: 1.22, farTileM: 7.98,
-        normalScale: .98, heightOffset: -.075 }),
-      Object.freeze({ id: "DryStubble", file: "EastTrackStubble", tileM: 1.29, farTileM: 8.2,
-        normalScale: 1.06, heightOffset: .135 }),
-      Object.freeze({ id: "SpoilEarth", file: "EastTrackCut", tileM: 1.04, farTileM: 6.76,
-         normalScale: 1.18, heightOffset: .05 }),
+      Object.freeze({ id: "FieldSoil", file: "EastTrackRoad", tileM: 1.38, farTileM: 8.61,
+        normalScale: .94, heightOffset: .005, tint: Object.freeze([.91,.89,.87]) }),
+      Object.freeze({ id: "CartTrack", file: "EastTrackRoad", tileM: 1.47, farTileM: 9.24,
+        normalScale: .88, heightOffset: -.075 }),
+      Object.freeze({ id: "DryStubble", file: "EastTrackStubble", tileM: 1.35, farTileM: 8.54,
+        normalScale: 1.02, heightOffset: .09 }),
+      Object.freeze({ id: "SpoilEarth", file: "EastTrackCut", tileM: 1.16, farTileM: 7.42,
+         normalScale: 1.05, heightOffset: .05 }),
     ]),
   }),
 });

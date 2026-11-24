@@ -26,6 +26,8 @@ import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BuildTrenchEarth } from "./Script_TrenchEarth.mjs";
 import { TRENCH_APPEARANCE } from "./Data_TrenchAppearance.mjs";
 import { TRENCH_SURFACE } from "./Data_TrenchSurface.mjs";
+import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
+import { TerrainLayerUrls } from "./Script_Tuning_Terrain.mjs";
 import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Script_TrenchSurface.mjs";
 import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
@@ -222,8 +224,11 @@ export class FirstLevelWhiteboxField {
         const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
           .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
         const terrainSet = this.layout.ground.terrainLayers;
+        const looseLayerId = TERRAIN_SETS[terrainSet]?.trenchLooseLayer;
+        const looseLayer = looseLayerId && TerrainLayerUrls(terrainSet).find(layer => layer.id === looseLayerId);
         this.terrainLayers = await LoadTerrainLayers(terrainSet,
-          { anisotropy: this.library.anisotropy, extraLayers: trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer),VersionedLayer(TRENCH_SURFACE.looseLayer)] : [],
+          { anisotropy: this.library.anisotropy, extraLayers: trench
+              ? [VersionedLayer(TRENCH_SURFACE.stoneLayer), looseLayer || VersionedLayer(TRENCH_SURFACE.looseLayer)] : [],
             layerOverrides: trench && terrainSet === "MissionPlain"
               ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
         if (trench) {

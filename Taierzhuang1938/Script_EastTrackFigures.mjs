@@ -6,8 +6,8 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 
 const FIGURES = [
-  { id: "WoundedPosition", variant: 1, height: 1.66, color: 0x585247, care: "CareLieTreated", time: .62 },
-  { id: "AidPosition", variant: 4, height: 1.75, color: 0x59574d, care: "CareMedicPress", time: .74 },
+  { id: "WoundedPosition", variant: 1, height: 1.73, color: 0x585247, care: "CareLieTreated", time: .62 },
+  { id: "AidPosition", variant: 4, height: 1.81, color: 0x625a4d, care: "CareMedicPress", time: .74 },
   { id: "ForwardLookout", variant: 1, height: 1.68, color: 0x635749, clip: "CrouchIdle", time: .16 },
   { id: "ForwardLookoutRight", variant: 4, height: 1.67, color: 0x504d46, clip: "CrouchIdle", time: .42 },
   { id: "FieldSoldierLeft", variant: 1, height: 1.66, color: 0x645a4d, clip: "CrouchIdle", time: .58 },

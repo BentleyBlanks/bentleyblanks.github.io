@@ -138,12 +138,12 @@ def FoldedCanvas(mesh, material):
         v = j / rows
         for i in range(columns+1):
             u = i / columns
-            wave = sin(u*29.6 + v*3.4)*.046 + cos(u*57 - v*4)*.021
-            fray = (sin(u*83)*.029 + sin(u*181)*.017)*v**7
-            x = -.47 + 1.68*u - .12*v
-            y = .115 - .57*min(1,v/.27) + wave*(.22+v) + .18*v**2
-            hem = .37 + .28*u + .098*sin(18.2*u+1.13) + .043*sin(45*u)
-            z = 1.398 - hem*max(0,(v-.24)/.76) + fray
+            wave = sin(u*31.5 + v*3.4)*.028 + cos(u*59 - v*4)*.017
+            fray = (sin(u*103)*.023 + sin(u*181)*.012)*v**7
+            x = -.61 + 1.54*u - .15*v
+            y = .14 - .39*min(1,v/.25) + wave*(.22+v) + .046*v**2
+            hem = .43 + .14*u + .10*sin(17.0*u+1.1) + .047*sin(37*u)
+            z = 1.355 - hem*max(0,(v-.20)/.80) + fray
             vertices.append((x,y,z))
     for j in range(rows):
         for i in range(columns):
@@ -158,10 +158,10 @@ def FoldedCanvas(mesh, material):
 
 def GreyTimberShoring(mesh, materials):
     stem = PROJECT.parent / "tmp" / "TanketteAdvanceEastTrack" / "Materials" / "Texture_EastTrackWeatheredElm"
-    gray = TexturedWood(materials, "EastTrackWeatheredTimber", stem, (.35,.33,.31), .83)
+    gray = TexturedWood(materials, "EastTrackWeatheredTimber", stem, (.373,.347,.310), .70)
     sap = materials.Make("EastTrackCrossbeamEnd", (.379,.313,.246), finish="wood")
     iron = materials.Make("EastTrackOxidizedIron", (.116,.091,.066), metal=.35)
-    canvas = materials.Make("EastTrackDrapedCanvas", (.389,.359,.302), finish="cloth", double=True)
+    canvas = materials.Make("EastTrackDrapedCanvas", (.361,.331,.283), finish="cloth", double=True)
     rng = Random(76843)
     edge = -1.15
     widths = [.25,.13,.23,.19,.26,.146,.218,.20,.24,.18,.25]
@@ -169,28 +169,22 @@ def GreyTimberShoring(mesh, materials):
         x = edge + width/2
         edge += width
         base = rng.uniform(.005,.061)
-        face = rng.uniform(-.009,.077)
-        RoughBoard(mesh, gray, (x,face,base), (x+rng.uniform(-.036,.038),face+rng.uniform(-.023,.019),rng.uniform(1.09,1.22)),
-                   width*1.026, rng.uniform(.066,.111), rng)
+        face = rng.uniform(-.018,.081)
+        RoughBoard(mesh, gray, (x,face,base), (x+rng.uniform(-.036,.038),face+rng.uniform(-.023,.019),rng.uniform(1.04,1.23)),
+                   width*.996, rng.uniform(.069,.113), rng)
     for x in [-1.06, 1.04]:
         RoughBoard(mesh, gray, (x,.11,.01), (x+.025,.13,1.13), .18,.14,rng)
-    RoughBoard(mesh, gray, (.475,-.136,.01), (.224,-.209,1.45), .127,.09,rng)
-    path = [(-1.238,-.016,1.19),(-1.16,-.012,1.194),(-.89,.012,1.23),
-            (-.54,.008,1.218),(-.23,-.019,1.216),(.13,-.011,1.232),(.44,-.022,1.219),
-            (.76,.008,1.224),(1.08,-.013,1.208),(1.22,.003,1.232)]
-    Tube(mesh, gray, path, [.112,.139,.143,.13,.147,.134,.132,.149,.142,.114], 29,
-         aspect=.88, furrow=.19, phase=1.22, tile=(.85,1.12))
-    lowerRail = [(-1.23,-.137,1.013),(-.97,-.109,1.026),(-.59,-.124,1.011),
-                 (-.10,-.120,1.014),(.37,-.137,1.007),(.76,-.098,.986),(1.15,-.103,.992)]
-    Tube(mesh, gray, lowerRail, [.052,.073,.069,.077,.072,.062,.047], 14, aspect=.75,
-         furrow=.18, phase=.47, tile=(.43,1.21))
-    for end in (path[0], path[-1]):
+    RoughBoard(mesh, gray, (.479,-.132,.01), (.245,-.214,1.37), .117,.084,rng)
+    rail = [(-1.246,-.034,1.21),(1.193,-.058,1.231)]
+    RoughBoard(mesh, gray, *rail, .251,.273,rng)
+    RoughBoard(mesh, gray, (-1.179,-.087,.918),(1.108,-.078,.89), .112,.156,rng)
+    for end in rail:
         sign = -1 if end[0] < 0 else 1
-        for i in range(9):
-            theta = i * tau / 9
-            y, z = end[1]+.074*cos(theta), end[2]+.08*sin(theta)
-            Tube(mesh, sap, [(end[0]-sign*.037,y,z),(end[0]+sign*rng.uniform(.012,.064),y+rng.uniform(-.016,.016),z)],
-                 [.026,.005], 6, furrow=.16, tile=(.2,2.8))
+        for i in range(6):
+            theta = i * tau / 6
+            y, z = end[1]+.092*cos(theta), end[2]+.096*sin(theta)
+            Tube(mesh, sap, [(end[0]-sign*.037,y,z),(end[0]+sign*rng.uniform(.012,.045),y+rng.uniform(-.013,.013),z)],
+                 [.018,.004], 6, furrow=.12, tile=(.2,2.8))
     for x, y, z in [(-1.07,-.021,1.10), (1.05,-.024,1.07), (.267,-.254,1.20), (.388,-.205,.56)]:
         Tube(mesh, iron, [(x,y+.013,z),(x,y-.016,z)], [.016,.012], 8)
     FoldedCanvas(mesh, canvas)

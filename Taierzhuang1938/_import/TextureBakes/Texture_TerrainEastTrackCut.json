@@ -1,6 +1,6 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "name": "TerrainEastTrackCut",
   "preset": "rammedEarth",
   "source": {
@@ -23,11 +23,11 @@
   "heightSource": null,
   "params": {
     "mean": [
-      0.375,
-      0.327,
-      0.293
+      0.377,
+      0.332,
+      0.295
     ],
-    "contrast": 0.082,
+    "contrast": 0.096,
     "lumaRange": [
       0.32,
       0.52
@@ -40,18 +40,18 @@
       0.035,
       0.11
     ],
-    "reliefM": 0.01,
-    "rough": 0.94,
+    "reliefM": 0.0108,
+    "rough": 0.95,
     "roughVar": 0.065,
     "roughLumaK": 0.0,
-    "ao": 0.3,
+    "ao": 0.42,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": true,
     "flattenSigma": 0.14,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 1.04,
+    "tileM": 1.16,
     "size": 512,
     "dataSize": 256,
     "pack": "orh",
@@ -64,10 +64,10 @@
     "keepAlpha": false,
     "roughMin": 0.3,
     "baseQuality": 92,
-    "dataQuality": 93,
+    "dataQuality": 90,
     "dataLossless": false,
     "detailBalance": 0,
-    "heightFineWeight": 0.49,
+    "heightFineWeight": 0.55,
     "uvAtlasReason": null
   },
   "outputs": [
@@ -76,47 +76,47 @@
       "file": "Texture_TerrainEastTrackCutBase.webp",
       "width": 512,
       "height": 512,
-      "bytes": 140398,
-      "sha256": "f83316d496e7fe74ed3f1aae50b91a67e7d31c1597750bfd2cab7060984c61bb"
+      "bytes": 147550,
+      "sha256": "f24bbaa5557da80eac56338daa8a5fe64c9a8afff3ab8bf43b279e4425891898"
     },
     {
       "channel": "Normal",
       "file": "Texture_TerrainEastTrackCutNormal.webp",
       "width": 256,
       "height": 256,
-      "bytes": 44544,
-      "sha256": "b92b426d2b9fb87e22757bd08c0a8a9e938e0735d9e589b49e4ac8176197ec4f"
+      "bytes": 40630,
+      "sha256": "e1fc639ac8339515eb6a90ce2c2b7a1abc9b39408a352762c8ac8ce4bb85db17"
     },
     {
       "channel": "Orh",
       "file": "Texture_TerrainEastTrackCutOrh.webp",
       "width": 256,
       "height": 256,
-      "bytes": 31418,
-      "sha256": "60f59b38397ef44caf50968a567477977cd2fa4d92bd26876a67a95bffb7599c"
+      "bytes": 30098,
+      "sha256": "a07279e5898363bfca9ad18e7b0cafe9b1b95bafa1ac92a2a89632534cb33236"
     }
   ],
-  "totalBytes": 216360,
+  "totalBytes": 218278,
   "metrics": {
     "meanSrgb": [
-      0.375,
-      0.3274,
-      0.2932
+      0.377,
+      0.3324,
+      0.2952
     ],
-    "luma": 0.3319,
-    "lumaStd": 0.0828,
-    "sat": 0.2182,
-    "clipLow": 0.0003,
+    "luma": 0.3349,
+    "lumaStd": 0.097,
+    "sat": 0.2169,
+    "clipLow": 0.0012,
     "clipHigh": 0.0,
-    "lowFreq": 0.0127,
-    "seam": 0.0593,
-    "interior": 0.0626,
-    "seamRatio": 0.947,
-    "border": 0.966,
-    "swing": 0.0067,
-    "aoMean": 0.941,
-    "roughMean": 0.923,
-    "texelsPerMeter": 492.3
+    "lowFreq": 0.0147,
+    "seam": 0.0688,
+    "interior": 0.0734,
+    "seamRatio": 0.937,
+    "border": 0.967,
+    "swing": 0.0084,
+    "aoMean": 0.919,
+    "roughMean": 0.928,
+    "texelsPerMeter": 441.4
   },
   "gateProblems": []
 }

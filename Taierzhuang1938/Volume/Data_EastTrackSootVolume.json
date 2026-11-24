@@ -3,8 +3,8 @@
   "asset": "EastTrackSoot",
   "dimensions": [
     192,
-    80,
-    37
+    96,
+    32
   ],
   "atlasTiles": [
     3,
@@ -30,18 +30,18 @@
   ],
   "source": "authored",
   "file": "Volume_EastTrackSoot.bin.gz",
-  "gpuBytes": 3409920,
-  "compressedBytes": 410145,
+  "gpuBytes": 3538944,
+  "compressedBytes": 402272,
   "boundsM": [
     116,
     31,
     86
   ],
+  "sha256": "e1e719397e7a2818b616082086884c5e18342f71f1dd9a56e1fc8fa5f749d54d",
+  "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py",
   "anchorPositionM": [
     0,
     -0.24,
     -62
-  ],
-  "sha256": "2f272f220118d09b993f6ea1044219795dbefd59fccd6e91f836adda9e860b47",
-  "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py"
+  ]
 }

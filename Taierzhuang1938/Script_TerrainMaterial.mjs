@@ -224,6 +224,7 @@ uniform vec4 uTerrainWaterB;              // x,y 平地阈值  z 水线过渡  w
 uniform vec4 uTerrainWaterC;              // x 水面粗糙度 y 湿痕粗糙度倍率 z 湿土压暗 w 积水压暗
 uniform vec4 uTerrainWaterD;              // x 车道积水 y 车辙抬水位 z 沟底抬水位 w 车道底湿度
 uniform vec4 uTerrainWaterE;              // x 材质高度参与水线的比例 y 湿土饱和度增量 z 水线抖动幅度 w 抖动噪声 1/米
+uniform float uTerrainWetness;            // 该地形套装的湿痕与积水覆盖率
 uniform vec4 uTerrainMudBox;              // 前沿湿泥区 minX minZ maxX maxZ（Data_Tuning_Terrain.TERRAIN_MUD_ZONE）
 uniform vec4 uTerrainMudA;                // x 羽化 y 翻土底湿度 z 沟底积水倍率 w 沟底抬水位
 uniform vec4 uTerrainMudB;                // xyz 翻土线性倍率 w 车道底湿度
@@ -295,7 +296,8 @@ void TerrainWater(inout vec3 albedo, vec2 xz, vec3 geomN, float site, float lowR
   // Regional puddle gains can exceed one. Clamp coverage before interpolating
   // material channels; extrapolation made roughness negative and over-darkened soil.
   water = clamp(water, 0.0, 1.0);
-  wet = clamp(max(wet, water), 0.0, 1.0);
+  wet = clamp(max(wet, water), 0.0, 1.0) * uTerrainWetness;
+  water *= uTerrainWetness;
   gTerrainWet = wet; gTerrainWater = water;
   albedo *= (1.0 - uTerrainWaterC.z * wet) * (1.0 - uTerrainWaterC.w * water);
   // 湿土更「饱和」（表面那层散射掉的白光没了，Lagarde 2013 湿表面）：保亮度拉开色度。
@@ -628,6 +630,7 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
       value: new THREE.Vector3(TERRAIN_DISTANCE.contrastFadeStart, TERRAIN_DISTANCE.contrastFadeEnd, TERRAIN_DISTANCE.contrastFar),
     },
     uTerrainAlbedoScale: { value: set.albedoScale ?? 1 },
+    uTerrainWetness: { value: set.wetness ?? 1 },
     uTerrainTint: { value: layers.map((l) => new THREE.Vector3(...(l.tint || [1, 1, 1]))) },
     // 全场共用一份，调试入口直接改它的 value（不重编译）
     uTerrainDebug: TERRAIN_DEBUG_UNIFORM,
@@ -636,7 +639,7 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
     ...(trails ? TerrainTrailUniforms : {}),
   };
   const patch = MakePatch({
-    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}:boundedWet1`,
+    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}:boundedWet2`,
     uniforms: (shaderUniforms) => { Object.assign(shaderUniforms, uniforms); },
     vertex: [
       ["#include <common>", GLSL_VERTEX_COMMON],

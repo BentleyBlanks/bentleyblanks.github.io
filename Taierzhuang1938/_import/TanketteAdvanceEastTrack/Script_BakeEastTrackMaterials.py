@@ -18,8 +18,8 @@ def MixedRoad(work, old):
     photo = np.asarray(Image.open(HERE / "Source_BattleLoam.webp").convert("RGB").resize((size,size)), dtype=np.float32)
     compacted = np.asarray(Image.open(old).convert("RGB").resize((size,size)), dtype=np.float32)
     y, x = np.meshgrid(np.arange(size)/size, np.arange(size)/size, indexing="ij")
-    patch = .71 + .22 * np.sin(8*np.pi*x+4*np.pi*y) * np.cos(6*np.pi*y-2*np.pi*x)
-    direction = .44 + .37 * np.cos(4*np.pi*x+6*np.pi*y) * np.sin(6*np.pi*x-2*np.pi*y)
+    patch = .80 + .134 * np.sin(8*np.pi*x+4*np.pi*y) * np.cos(6*np.pi*y-2*np.pi*x)
+    direction = .49 + .39 * np.cos(4*np.pi*x+6*np.pi*y) * np.sin(6*np.pi*x-2*np.pi*y)
     turn = np.roll(np.rot90(photo), (231, 119), axis=(0,1))
     textured = photo * direction[:,:,None] + turn * (1-direction[:,:,None])
     road = textured * patch[:,:,None] + compacted * (1-patch[:,:,None])
@@ -60,23 +60,24 @@ def Main():
     # Each terrain row emits standard Base, Normal and AO/roughness/height slices.
     recipes = [
         ("TerrainEastTrackRoad", road, textures, "drySoil",
-         1.22, ".418,.374,.336", .076, .0078, .88, "orh"),
+         1.47, ".413,.373,.333", .091, .0088, .92, "orh"),
         ("TerrainEastTrackStubble", sources / "Source_RootedSod.webp", textures, "drySoil",
-         1.29, ".383,.344,.295", .097, .015, .95, "orh"),
+         1.35, ".370,.335,.300", .104, .013, .95, "orh"),
         ("TerrainEastTrackCut", sources / "Source_CutLoess.webp", textures, "rammedEarth",
-         1.04, ".375,.327,.293", .082, .010, .94, "orh"),
+         1.16, ".377,.332,.295", .096, .0108, .95, "orh"),
         ("EastTrackWeatheredElm", HERE / "Source_WeatheredElm.webp", work, "weatheredWood",
-         1.06, ".348,.316,.277", .089, .005, .93, "orm"),
+         1.06, ".373,.347,.310", .094, .0038, .94, "orm"),
     ]
     for name, source, output, preset, tile, mean, contrast, relief, rough, pack in recipes:
         terrain = pack == "orh"
         args = ParseArgs([
             "--name", name, "--source", str(source), "--preset", preset, "--out", str(output),
             "--tile-m", str(tile), "--mean", mean, "--contrast", str(contrast), "--relief-m", str(relief),
-            "--rough", str(rough), "--rough-var", ".065", "--ao", ".30",
+            "--rough", str(rough), "--rough-var", ".065", "--ao", ".42" if terrain else ".30",
             "--pack", pack, "--normal-convention", "terrain" if terrain else "gl",
             "--size", "512" if terrain else "1024", "--data-size", "256" if terrain else "512", "--base-quality", "92",
-            "--data-quality", "93", "--height-fine-weight", ".49", "--row-flatten", "on" if terrain else "off",
+            "--data-quality", "90", "--height-fine-weight", ".55" if terrain else ".49",
+            "--row-flatten", "on" if terrain else "off",
             "--seamless", "blend" if terrain else "weld", "--flatten-sigma", ".14",
             *(["--no-record"] if not terrain else []),
         ])

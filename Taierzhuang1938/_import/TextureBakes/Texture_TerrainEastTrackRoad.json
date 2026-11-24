@@ -1,33 +1,33 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "name": "TerrainEastTrackRoad",
   "preset": "drySoil",
   "source": {
     "path": "C:/Users/Bentl/.codex/worktrees/113b/bentleyblanks.github.io/tmp/TanketteAdvanceEastTrack/Materials/Source_MixedEastTrackRoad.png",
-    "sha256": "b20eb338c2f3e2bef43a5a08f0511250e4b7fa03a43261c93bb25d817fd83358",
+    "sha256": "270a52876a36dac5a8fcd3b4abdbf50889afc0db2a4638059a19ecada1c0a083",
     "metrics": {
       "meanSrgb": [
-        0.387,
-        0.3472,
-        0.3042
+        0.3805,
+        0.3432,
+        0.305
       ],
-      "luma": 0.3461,
-      "lumaStd": 0.0458,
-      "sat": 0.2139,
+      "luma": 0.3429,
+      "lumaStd": 0.047,
+      "sat": 0.1983,
       "clipLow": 0.0,
       "clipHigh": 0.0,
-      "lowFreq": 0.0113
+      "lowFreq": 0.0121
     }
   },
   "heightSource": null,
   "params": {
     "mean": [
-      0.418,
-      0.374,
-      0.336
+      0.413,
+      0.373,
+      0.333
     ],
-    "contrast": 0.076,
+    "contrast": 0.091,
     "lumaRange": [
       0.28,
       0.46
@@ -40,18 +40,18 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.0078,
-    "rough": 0.88,
+    "reliefM": 0.0088,
+    "rough": 0.92,
     "roughVar": 0.065,
     "roughLumaK": 0.0,
-    "ao": 0.3,
+    "ao": 0.42,
     "metal": 0.0,
     "seamless": "blend",
     "rowFlatten": true,
     "flattenSigma": 0.14,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 1.22,
+    "tileM": 1.47,
     "size": 512,
     "dataSize": 256,
     "pack": "orh",
@@ -64,10 +64,10 @@
     "keepAlpha": false,
     "roughMin": 0.3,
     "baseQuality": 92,
-    "dataQuality": 93,
+    "dataQuality": 90,
     "dataLossless": false,
     "detailBalance": 0,
-    "heightFineWeight": 0.49,
+    "heightFineWeight": 0.55,
     "uvAtlasReason": null
   },
   "outputs": [
@@ -76,47 +76,47 @@
       "file": "Texture_TerrainEastTrackRoadBase.webp",
       "width": 512,
       "height": 512,
-      "bytes": 118084,
-      "sha256": "cde4bb9d572b181d76065bbdb0ddf397a00c638aa340c3be98aa7d1e81d1fda3"
+      "bytes": 125596,
+      "sha256": "274ec09c6c2d323d1fbe5238d72cc545314dcc2893c53a3a4ec10dd7a2b295d2"
     },
     {
       "channel": "Normal",
       "file": "Texture_TerrainEastTrackRoadNormal.webp",
       "width": 256,
       "height": 256,
-      "bytes": 39922,
-      "sha256": "674ad780e50ba7439c1c5eb910d4e28fb06933ebad1d27aaaecb58da7fb22d6a"
+      "bytes": 35212,
+      "sha256": "9412be827e4f7c59599b068003a46d4d1ab7e66769c9be44d47470cbee2102ba"
     },
     {
       "channel": "Orh",
       "file": "Texture_TerrainEastTrackRoadOrh.webp",
       "width": 256,
       "height": 256,
-      "bytes": 32752,
-      "sha256": "68abf4697ef9e10c3a745374db65447b203703cf3bdb04881e3b61f83bd4a24e"
+      "bytes": 31718,
+      "sha256": "212943df335682bc81710d26af4d82e1de78363992fa0ae95f60a251ed8aff54"
     }
   ],
-  "totalBytes": 190758,
+  "totalBytes": 192526,
   "metrics": {
     "meanSrgb": [
-      0.4177,
-      0.3747,
-      0.3358
+      0.4128,
+      0.3737,
+      0.3327
     ],
-    "luma": 0.3761,
-    "lumaStd": 0.0761,
-    "sat": 0.196,
-    "clipLow": 0.0,
+    "luma": 0.3731,
+    "lumaStd": 0.091,
+    "sat": 0.194,
+    "clipLow": 0.0002,
     "clipHigh": 0.0,
-    "lowFreq": 0.01,
-    "seam": 0.0506,
-    "interior": 0.0517,
-    "seamRatio": 0.978,
-    "border": 0.926,
+    "lowFreq": 0.0126,
+    "seam": 0.0612,
+    "interior": 0.0617,
+    "seamRatio": 0.992,
+    "border": 0.904,
     "swing": 0.0034,
-    "aoMean": 0.937,
-    "roughMean": 0.866,
-    "texelsPerMeter": 419.7
+    "aoMean": 0.913,
+    "roughMean": 0.902,
+    "texelsPerMeter": 348.3
   },
   "gateProblems": []
 }
