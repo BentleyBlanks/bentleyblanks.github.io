@@ -1746,6 +1746,20 @@ async function Boot() {
         if (body) { body.ReconcileTo(player.position.x, player.position.y, player.position.z); const r = body.Move(dx, -0.006, dz); player.position.set(r.x, r.y, r.z); }
       } else ai.StepBody(entity, dx, dz, 0.001);
     },
+    BodyAnchor: (target, { yaw = 0, side = 0, reverse = false } = {}) => {
+      if (!target?.position) return null;
+      const skin = ai?.view?.skins?.get(target);
+      const chest = skin?.H?.("Spine2") || skin?.H?.("Spine1") || target.actor?.characterRig?.bones?.chest || null;
+      if (!chest) return null;
+      chest.updateWorldMatrix(true, false);
+      const p = chest.getWorldPosition(new THREE.Vector3());
+      // 胸口骨往上约 10 cm 为锁骨／肩窝，上撩落在肋腹；朝玩家一侧偏 8 cm 贴近衣面。
+      return {
+        x: p.x + Math.cos(yaw) * side + Math.sin(yaw) * 0.08,
+        y: p.y + (reverse ? -0.02 : 0.10),
+        z: p.z - Math.sin(yaw) * side + Math.cos(yaw) * 0.08,
+      };
+    },
     Damage: (target, attacker, amount, kind, contact = {}) => {
       const delta = new THREE.Vector3().subVectors(target.position, attacker.position); delta.y = 0; delta.normalize();
       if (target === player) player.TakeHit(kind === "qte" ? amount : amount * COMBAT.player.meleeScale, "torso", delta, { from: attacker.position.clone(), melee: true });
@@ -1801,8 +1815,11 @@ async function Boot() {
         }
         const died = target.TakeHit(amount, "torso", delta,
           { kind: bladed ? "blade" : "thrust", mode: bladed ? "slash" : "thrust",
-            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone(), sweep: sweepDir });
-        vfx?.Blood(at, delta, died ? 1 : 0.5);
+            weaponId: attackerWeapon?.id || null, shapeId, point: at.clone(), sweep: sweepDir,
+            radiusM: bladed ? 0.15 : 0.09, ageS: bladed ? 1.8 : 0 });
+        const bloodOut = delta.clone().negate().setY(0.18).normalize();
+        vfx?.Blood(at, delta, died ? 1 : 0.65);
+        if (bladed) vfx?.BloodBurst?.(at, bloodOut, died ? 1.85 : 1.15);
         if (attacker === player) {
           ConfirmHit(died);
           // 这是砍出去的击杀回执，不是玩家受伤：只认统一白刃伤害链里由玩家
@@ -1812,16 +1829,49 @@ async function Boot() {
       }
     },
     Event: (event, actor, target) => {
+      const ClearLodgeSpurt = () => {
+        if (meleeCombat._lodgeSpurt) { vfx?.RemoveBloodSpurt?.(meleeCombat._lodgeSpurt); meleeCombat._lodgeSpurt = 0; }
+      };
+      const AttachWoundSpurt = (who, worldAt, worldDir, opts) => {
+        if (!vfx?.BloodSpurt || !who) return 0;
+        const skin = ai?.view?.skins?.get(who);
+        const bone = skin?.H?.("Spine2") || skin?.H?.("Spine1") || who.actor?.characterRig?.bones?.chest || who.actor?.root || null;
+        if (!bone) return 0;
+        bone.updateWorldMatrix(true, false);
+        const localOff = bone.worldToLocal(worldAt.clone());
+        return vfx.BloodSpurt(bone, localOff, worldDir, { worldDirection: true, ...opts });
+      };
       if (event.kind === "struggle") {
         audio.Play("heartbeat", {volume:.3 + (1-event.progress)*.4, pitch:1+(1-event.progress)*.25});
         if (event.progress < .3) audio.Play("hurt", {volume:.2, pitch:.85});
         return;
       }
-      // 卡刀拔出来那一下（白刃实验场的卡刀玩法）：再带一蓬血，从刀口往拔刀方向甩出去。
+      if (event.kind === "lodgeRelease" || event.kind === "cancel") ClearLodgeSpurt();
+      // 卡刀入肉：在刀口实际落点染出宽刀口血迹，并在伤口处挂持续渗血／滴血发射器。
+      if (event.kind === "lodge" && target?.position && actor?.position) {
+        ClearLodgeSpurt();
+        const at = event.anchor ? new THREE.Vector3(event.anchor.x, event.anchor.y, event.anchor.z)
+          : target.position.clone().add(new THREE.Vector3(0, 1.32, 0));
+        const into = new THREE.Vector3().subVectors(target.position, actor.position).setY(0).normalize();
+        const away = event.pullDir ? new THREE.Vector3(event.pullDir.x, event.pullDir.y, event.pullDir.z).normalize()
+          : into.clone().negate().setY(0.18).normalize();
+        target.actor?.AddBulletWound?.("torso", into, { point: at.clone(), radiusM: 0.16, ageS: 2.0 });
+        const slashStep = new THREE.Vector3(-into.z, -0.35, into.x).normalize().multiplyScalar(0.085);
+        target.actor?.AddBulletWound?.("torso", into, { point: at.clone().add(slashStep), radiusM: 0.13, ageS: 1.8 });
+        vfx?.BloodBurst?.(at, away, 1.35);
+        meleeCombat._lodgeSpurt = AttachWoundSpurt(target, at, away, { seconds: 3.6, rate: 28, speed: [0.55, 1.75], spread: 0.48, decals: 6 });
+      }
+      // 卡刀拔出来那一下（白刃实验场的卡刀玩法）：从刀口位置沿拔刀反方向猛甩出一蓬血，并留下后续渗血。
       if (event.kind === "yank" && target?.position && actor?.position) {
-        const at = target.position.clone(); at.y += 1.05;
-        const away = new THREE.Vector3().subVectors(actor.position, target.position); away.y = 0; away.normalize();
-        vfx?.Blood(at, away, 0.8);
+        ClearLodgeSpurt();
+        const at = event.anchor ? new THREE.Vector3(event.anchor.x, event.anchor.y, event.anchor.z)
+          : target.position.clone().add(new THREE.Vector3(0, 1.08, 0));
+        const pull = event.pullDir ? new THREE.Vector3(event.pullDir.x, event.pullDir.y, event.pullDir.z).normalize()
+          : new THREE.Vector3().subVectors(actor.position, target.position).setY(0.15).normalize();
+        target.actor?.AddBulletWound?.("torso", pull.clone().negate(), { point: at.clone(), radiusM: 0.17, ageS: 2.2 });
+        vfx?.Blood(at, pull, 0.95);
+        vfx?.BloodBurst?.(at, pull, 1.95);
+        AttachWoundSpurt(target, at, pull, { seconds: 1.9, rate: 22, speed: [0.7, 2.1], spread: 0.52, decals: 5 });
       }
       if (meleeCombat?.EnhancedFeel && actor === player) {
         const side = Math.sign(event.sweep || -1) || -1;
@@ -1835,6 +1885,20 @@ async function Boot() {
         if (event.kind === "light" || event.kind === "heavy") {
           const k = event.kind === "heavy" ? 1.35 : 1;
           player?.shake?.Impulse({ pitch: MELEE_FEEL.swingKickPitchRad * k, roll: side * MELEE_FEEL.swingKickRollRad * k });
+        } else if (event.kind === "lodge") {
+          FlinchTarget(1.3, "flesh");
+          firePunch = Math.max(firePunch, MELEE_FEEL.fleshFovPunch);
+          player?.shake?.Impulse({ pitch: MELEE_FEEL.fleshKickPitchRad, roll: side * MELEE_FEEL.fleshKickRollRad });
+          audio.Play("bayonetStabBody", { volume: 0.92, pitch: 0.88 });
+          audio.Play("hitGrunt", { volume: 0.86, pitch: 0.95 });
+        } else if (event.kind === "yank") {
+          FlinchTarget(1.65, "rip");
+          firePunch = Math.max(firePunch, MELEE_FEEL.ripFovPunch * 0.9);
+          player?.shake?.Impulse({ pitch: -MELEE_FEEL.ripKickPitchRad * 0.85, roll: -side * MELEE_FEEL.ripKickRollRad * 0.9 });
+          audio.Play("bayonetTwist", { volume: 0.88, pitch: 0.92 });
+          audio.Play("clothRip", { volume: 0.86, pitch: 0.94 });
+          audio.Play("dadaoSwing", { volume: 0.72, pitch: 1.12 });
+          audio.Play("hitGrunt", { volume: 0.88, pitch: 0.90 });
         } else if (event.kind === "environment" && event.point) {
           const pt = new THREE.Vector3(event.point.x, event.point.y, event.point.z);
           const n = new THREE.Vector3().subVectors(player.position, pt).setY(0.35).normalize();

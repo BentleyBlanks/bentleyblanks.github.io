@@ -749,7 +749,7 @@ export class Soldier extends SoldierFieldAccessors {
    */
   TakeHit(damage, part, direction, info = {}) {
     const mult = part === "head" ? 3.2 : part === "torso" ? 1.0 : 0.6;
-    if (damage > 0 && ["bullet", "hmg"].includes(info.kind || "bullet"))
+    if (damage > 0 && ["bullet", "hmg", "blade", "thrust"].includes(info.kind || "bullet"))
       this.actor?.AddBulletWound?.(part, direction, info);
     // Corpses keep their hitbox damage history; further hits never emit another death event.
     if (!this.alive) {
@@ -1244,7 +1244,8 @@ export class AiDirector {
       rig.hitReaction?.Reset?.();
       rig.meleeAnimation?.Restore?.();
     }
-    s.actor.wounds?.Clear?.();
+    s.actor.woundBlood?.Clear?.();
+    s.actor.skinWounds?.Clear?.();
     s.state = STATE.IDLE;
     s.health = 100;
     s.deadTime = 0;

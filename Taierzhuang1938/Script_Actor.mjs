@@ -2188,12 +2188,13 @@ export class Actor {
     this.woundBlood ||= new CharacterWounds(this.characterRig.root);
     const shape = this.characterRig.GetHitboxes().find(h => info.shapeId ? h.id === info.shapeId
       : part === "arm" ? /Arm|forearm/.test(h.id) : part === "leg" ? /thigh|calf/.test(h.id) : h.part === part);
-    let point = info.shapeId && this.root.visible ? info.point : null;
+    let point = info.point && this.root.visible ? info.point : null;
     if (!point && shape) {
       point = shape.center?.clone() || shape.start?.clone()?.lerp(shape.end, .5);
       if (point && direction) point.addScaledVector(direction, -BLOOD_WOUND.surfaceBiasM);
     }
-    this.woundBlood.Add({ part, shapeId: info.shapeId || shape?.id, point, direction });
+    this.woundBlood.Add({ part, shapeId: info.shapeId || shape?.id, point, direction, radiusM: info.radiusM, ageS: info.ageS });
+    this.skinWounds?.Add?.({ part, shapeId: info.shapeId || shape?.id, point, direction, radiusM: info.radiusM, ageS: info.ageS });
   }
 
   Update(dt, state = {}) {

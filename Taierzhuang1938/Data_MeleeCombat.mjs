@@ -144,9 +144,9 @@ export const MELEE_LODGE = Object.freeze({
   // 刀吃进去的那一点（2026-11-23 第四轮，用户：「固定在某一个点，例如肩膀，可以转视角，但刀砍的位置不动」）：
   // 对方脚下往上 anchorShoulderM（上撩的几刀落在腰腹 anchorTorsoM），朝刀来的那一侧偏 anchorSideM。
   // 第一人称整副手臂连刀锁在这一点上（世界空间），视角随便转，直到 F 拔出来。对方被钉在原地发抖。
-  anchorShoulderM: 1.38, anchorTorsoM: 1.1, anchorSideM: 0.16, tremorRad: 0.05,
+  anchorShoulderM: 1.12, anchorTorsoM: 0.96, anchorSideM: 0.13, tremorRad: 0.05,
   // 拔刀动作时长；对方随即踉跄 reelS 秒：往后倒退、左右打晃。
-  yankS: 0.36, yankRepelM: 0.22, reelS: 2.4, reelSpeedMps: 0.55, reelSwayRad: 0.34, reelCycleS: 0.8,
+  yankS: 0.46, yankRepelM: 0.22, reelS: 2.4, reelSpeedMps: 0.55, reelSwayRad: 0.34, reelCycleS: 0.8,
   // 补刀：F 对 finishReachM 内踉跄中的对手自动转身补一刀（起手按 finishWindupScale 缩短）。
   // 起手到接触段里自动转身、以 finishLungeMps 抢步跟进到离刀尖 finishStandoffM 的距离。
   finishReachM: 2.1, finishWindupScale: 0.55, finishTurnRate: 9, finishLungeMps: 4.5, finishStandoffM: 0.4,

@@ -270,14 +270,27 @@ export class MeleeCombatDirector {
     f.lodge = { target, clip: f.clip, n: Clamp(this.AttackTime(f) + L.pressInN, 0, 1), ...stroke,
       progress: 0, held: !!this.held.has("KeyF"), direction: f.attack.direction?.id || null, serial: ++this.serial };
     const lodge = f.lodge;
-    // 刀吃进去的那一点（世界坐标）：肩膀（上撩落在腰腹），偏向刀来的那一侧（玩家视角的左右）。
+    // 刀吃进去的那一点（世界坐标）：优先读对手当前骨架胸肩高度，避免对手拼刺微蹲时卡点头顶上方。
     const dir = f.attack.direction, sweep = dir ? dir.sweep : -1, yaw = e.yaw || 0;
     const side = -Math.sign(sweep || -1) * L.anchorSideM;
-    lodge.anchor = { x: target.position.x + Math.cos(yaw) * side, y: (target.position.y || 0) + (dir?.reverse ? L.anchorTorsoM : L.anchorShoulderM),
-      z: target.position.z - Math.sin(yaw) * side };
+    const liveAnchor = this.host.BodyAnchor?.(target, { yaw, side, reverse: !!dir?.reverse });
+    lodge.anchor = liveAnchor || {
+      x: target.position.x + Math.cos(yaw) * side,
+      y: (target.position.y || 0) + (dir?.reverse ? L.anchorTorsoM : L.anchorShoulderM),
+      z: target.position.z - Math.sin(yaw) * side,
+    };
+    // 拔刀方向（世界空间）：与砍入方向相反（顺着刀来的 angleDeg 退回）并带向玩家拉出的后撤分量。
+    const pullRad = (dir ? dir.angleDeg : 45) * Math.PI / 180;
+    const pullR = Math.cos(pullRad), pullU = Math.sin(pullRad), pullB = 0.65;
+    const px = Math.cos(yaw) * pullR + Math.sin(yaw) * pullB;
+    const py = pullU;
+    const pz = -Math.sin(yaw) * pullR + Math.cos(yaw) * pullB;
+    const plen = Math.hypot(px, py, pz) || 1;
+    lodge.pullDir = { x: px / plen, y: py / plen, z: pz / plen };
+    lodge.sweep = sweep;
     this.SetState(f, "lodged", Infinity, lodge.clip); f.lodge = lodge;
     this.SetState(tf, "lodged", Infinity, "Hit"); tf.lodgedBy = e; tf.buffer = null;
-    this.stats.lodges++; this.Log("lodge", e, target);
+    this.stats.lodges++; this.Log("lodge", e, target, { anchor: { ...lodge.anchor }, pullDir: { ...lodge.pullDir }, sweep });
   }
   StepLodge(f, dt) {
     const e = f.entity, lodge = f.lodge, target = lodge?.target, tf = target && this.Fighter(target);
@@ -296,7 +309,7 @@ export class MeleeCombatDirector {
     tf.reelBy = e; tf.reelYaw = Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z);
     tf.reelSide = this.serial % 2 ? 1 : -1;
     tf.nextThink = Math.max(tf.nextThink, this.time + L.reelS);
-    this.stats.yanks++; this.Log("yank", e, target);
+    this.stats.yanks++; this.Log("yank", e, target, { anchor: { ...lodge.anchor }, pullDir: lodge.pullDir ? { ...lodge.pullDir } : null, sweep: lodge.sweep || -1 });
   }
   ReleaseLodge(f, reason) {
     const target = f.lodge?.target, tf = target && this.fighters.get(target);
@@ -1396,12 +1409,16 @@ export class MeleeCombatDirector {
     }
     if (f.attack?.finisher) result.finisher = true;
     if ((f.state === "lodged" || f.state === "yank") && f.lodge && f.entity === this.Player()) {
-      // 第一人称：刀定在砍进去那一帧，拔刀时顺着刀路往回抽、回到架势。
-      const L0 = f.lodge, p = f.state === "yank" ? Smooth(f.t / f.duration) : 0;
-      const weight = L0.split ? this.RollWeight(L0.n, ...L0.split) * (1 - p) : 0;
-      Object.assign(result, { clip: `${f.weapon}${L0.clip}`, action: L0.clip, animationNormalized: L0.n * (1 - p),
-        strokeSplit: L0.split, strokeReverse: L0.reverse, swingRoll: L0.roll * weight, swingMirror: L0.mirror ? weight : 0, weaponYawOffset: 0,
-        lodge: { progress: L0.progress, held: L0.held, yank: p, anchor: L0.anchor, serial: L0.serial, strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
+      // 第一人称：刀定在砍进去那一帧，拔刀时先沿反方向连惯性抽出，再回架势（镜像挥砍后半段再翻回右侧，避开 scale.x=0 奇点）。
+      const L0 = f.lodge, yankRaw = f.state === "yank" ? Clamp(f.t / Math.max(f.duration, 1e-3), 0, 1) : 0;
+      const p = Smooth(yankRaw);
+      const w0 = L0.split ? this.RollWeight(L0.n, ...L0.split) : 0;
+      const unrollU = yankRaw <= 0.46 ? 0 : Smooth((yankRaw - 0.46) / 0.54);
+      const unmirrorU = yankRaw <= 0.72 ? 0 : Smooth((yankRaw - 0.72) / 0.28);
+      Object.assign(result, { clip: `${f.weapon}${L0.clip}`, action: L0.clip, animationNormalized: L0.n * (1 - unrollU),
+        strokeSplit: L0.split, strokeReverse: L0.reverse, swingRoll: L0.roll * w0 * (1 - unrollU), swingMirror: L0.mirror ? w0 * (1 - unmirrorU) : 0, weaponYawOffset: 0,
+        lodge: { hardLock: true, progress: L0.progress, held: L0.held, yank: p, yankRaw, anchor: L0.anchor, pullDir: L0.pullDir, serial: L0.serial,
+          strain: f.state === "yank" ? 1 - p : Math.max(L0.progress, L0.held ? 0.6 : 0.25) } });
     } else if (f.state === "lodged") {
       Object.assign(result, { clip: `${f.weapon}Hit`, action: "Hit", animationNormalized: 0.32 + Math.sin(this.time * 41) * 0.02 });
     } else if ((f.state === "cleave" || f.state === "rip") && f.cleave && f.entity === this.Player()) {

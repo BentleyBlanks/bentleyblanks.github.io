@@ -15,6 +15,15 @@ function Region(name) {
   if (limb) return limb;
   const n = name.toLowerCase();
   if (/head|neck/.test(n)) return "head";
+  // Mixamo / XBot 65-bone names (used by all 16 formal characters).
+  if (/^left(forearm|hand)/.test(n)) return "forearmL";
+  if (/^right(forearm|hand)/.test(n)) return "forearmR";
+  if (/^left(arm|shoulder)/.test(n)) return "upperArmL";
+  if (/^right(arm|shoulder)/.test(n)) return "upperArmR";
+  if (/^left(leg|foot|toe)/.test(n)) return "calfL";
+  if (/^right(leg|foot|toe)/.test(n)) return "calfR";
+  if (/^leftupleg/.test(n)) return "thighL";
+  if (/^rightupleg/.test(n)) return "thighR";
   return "torso";
 }
 function Matches(region, part, shapeId) {
@@ -229,6 +238,11 @@ export class CharacterWounds {
       if(child)target.lerp(child.getWorldPosition(new THREE.Vector3()),.35);
       if(direction)target.addScaledVector(new THREE.Vector3().copy(direction).normalize(),-C.surfaceBiasM);
     }
+    const sampleTarget = target.clone();
+    if (direction) {
+      const dirN = new THREE.Vector3().copy(direction);
+      if (dirN.lengthSq() > 1e-6) sampleTarget.addScaledVector(dirN.normalize(), -0.07);
+    }
     let selected=null, best=Infinity, cloth=null, clothDistance=Infinity;
     for(const mesh of meshes) {
       mesh.skeleton.update();
@@ -240,7 +254,7 @@ export class CharacterWounds {
       for(let sample=0;sample<ids.length;sample+=stride) {
         const i=ids[sample];
         mesh.getVertexPosition(i,posed).applyMatrix4(mesh.matrixWorld);
-        const distance=posed.distanceToSquared(target);
+        const distance=posed.distanceToSquared(sampleTarget);
         if(distance<best){best=distance;selected={mesh,index:i};}
         if(isCloth&&distance<clothDistance){clothDistance=distance;cloth={mesh,index:i};}
       }

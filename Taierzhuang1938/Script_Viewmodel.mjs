@@ -3360,6 +3360,7 @@ export class Viewmodel {
     this._StepFlash(step);
     this._StepDebris(step);
     if (this.riggedArms) {
+      this.armAnchor.position.set(0, 0, 0);
       this.armAnchor.quaternion.identity();
       if (!this.weapon) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
       else this.riggedArms.SetPoseState({ ads: Clamp01(ads), adsGrip: Clamp01(this.adsGrip), sprint: Clamp01(sprintValue),
@@ -3373,11 +3374,15 @@ export class Viewmodel {
         if(this.boltOpen&&!this.action)this.handRight.group.position.copy(this.gripContactRight.position);
       }
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
+      if (this.pendingLodge) this._LockLodgeToWorld(this.pendingLodge);
+      this._StabilizeMeleeArms();
       const throwTrack = this._ThrowTrack();
       if(throwTrack) this._ApplyGrenadeThrow(throwTrack);
       else if (this.timedGrenadePose) this._ApplyTimedGrenadePose(this.timedGrenadePose);
       if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
       if(throwTrack) this._ReleaseThrow(this.action.t,this.action.power,false);
+    } else if (this.pendingLodge) {
+      this._LockLodgeToWorld(this.pendingLodge);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
     this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
@@ -3615,6 +3620,7 @@ export class Viewmodel {
   /** 把所有会被动画改动的东西恢复到静止姿态。 */
   _ResetAnimatedParts() {
     this.meleeVideoFrame = null;
+    this.pendingLodge = null;
     this.boltCycleState = null;
     if (this.riggedArms) this.riggedArms.videoBody = null;
     if (this.riggedArms) this.riggedArms.reloadBodyOffset = null;
@@ -4654,25 +4660,175 @@ export class Viewmodel {
   }
 
   /**
-   * 卡刀：整副手臂连刀锁在对方身上那一点（世界空间），视角怎么转刀尖都扎在那儿。
-   * 每帧在刀架父节点的局部空间里算：从相机原点看，刀尖（往回 5%，吃进肉里那一截）的方向转到 anchor 的方向，
-   * 绕相机原点整副手臂一起转过去。不能在世界空间里转再换算回来 —— 视图模型根节点带非等比缩放
-   *（窄 FOV 的深度压缩，见文件头），世界里的旋转换回局部就成了切变；而局部空间里对齐的是方向，
-   * 透视投影只认方向，画面上刀尖就落在 anchor 上。拔刀（yank）那一段按进度松回原姿态。
+   * 拖拽挥砍滚转（actionPivot.rotation.z ±45°）与抬臂偏移会把挂在 recoilPivot 下的 armAnchor
+   * （双肩与大臂）连带甩到镜头眼前，在近裁面切出一大块灰蓝袖筒；反向抵消滚转与上抬，让肩膀始终稳在胸口高度。
+   */
+  _StabilizeMeleeArms() {
+    if (!this.riggedArms) return;
+    const roll = this.actionPivot.rotation.z;
+    const sx = this.actionPivot.scale.x;
+    const ax = this.actionPivot.position.x, ay = this.actionPivot.position.y;
+    const hardLock = !!this.lodgeLock?.hardLock;
+    if (Math.abs(roll) < 1e-4 && ay <= 1e-4 && !hardLock) return;
+    const mirrorSign = sx < 0 ? -1 : 1;
+    // R_z(roll) * S(sx,1,1) * R_z(phi): sx<0 时反射会反转旋转方向，故取 -mirrorSign * roll 抵消。
+    this.armAnchor.rotation.set(0, 0, -mirrorSign * roll);
+    const cx = ax * 0.55;
+    const cy = Math.max(0, ay) + (hardLock ? 0.035 : 0);
+    if (Math.abs(cx) > 1e-4 || Math.abs(cy) > 1e-4) {
+      const c = Math.cos(roll), s = Math.sin(roll);
+      const safeSx = Math.abs(sx) < 0.2 ? mirrorSign * 0.2 : sx;
+      this.armAnchor.position.set((-cx * c - cy * s) / safeSx, cx * s - cy * c, 0);
+    }
+    if (hardLock && this.riggedArms.videoBody) {
+      // 卡刀期间把双肩拉回正常胸廓深度（Blender 劈砍帧会把肩往前顶到 z=-0.22 贴近镜头），
+      // 并将双肘极点朝下朝外展开，杜绝灰蓝袖筒横在视野中央遮挡敌人与刀口。
+      this.riggedArms.videoBody.authoredElbows = false;
+      const shR = this.riggedArms.videoBody.shoulders?.right;
+      const shL = this.riggedArms.videoBody.shoulders?.left;
+      if (shR) { shR[0] = Math.max(shR[0], 0.22); shR[1] = Math.min(shR[1], -0.29); shR[2] = Math.max(shR[2], 0.04); }
+      if (shL) { shL[0] = Math.min(shL[0], -0.22); shL[1] = Math.min(shL[1], -0.29); shL[2] = Math.max(shL[2], 0.04); }
+      if (this.riggedArms.videoBody.elbowPoles) {
+        this.riggedArms.videoBody.elbowPoles.right = [0.68, -0.70, 0.22];
+        this.riggedArms.videoBody.elbowPoles.left = [-0.68, -0.70, 0.22];
+      }
+    }
+    this.armAnchor.updateWorldMatrix(true, false);
+  }
+
+  /**
+   * 卡刀世界空间硬锁（hardLock）与吃肉／顺杆软锁：
+   * - hardLock（卡刀·拔刀）：在 _ApplyMeleeVideo 之后运行；先将 fovRig 切为等比缩放 (cx,cx,cx)
+   *   消除视角旋转时的非等比切变，首帧把刀尖（0.95*muzzle）贴进 anchor 并记录 weaponMount 的世界位姿，
+   *   卡刀期间把刀刚性钉死在世界坐标里（视角怎么转刀都不动）；长按 F 时沿反方向微微吃力拉出并伴随微颤，
+   *   拔出瞬间沿反砍方向 pullDir 爆发抽出并带 ~0.30 m 惯性过冲与手腕反冲，随后平滑回收到持刀架势。
+   * - 软锁（吃肉顿刀／磕枪顺刃）：保持相机原点方向对齐，确保刀口贴着目标锚点。
    */
   _LockLodgeToWorld(lodge) {
-    const camera = this.root.parent, pivot = this.actionPivot, parent = pivot.parent;
-    if (!camera || !parent || !lodge.anchor || !this.rig?.muzzle) return;
-    parent.updateWorldMatrix(true, false); pivot.updateMatrixWorld(true);
-    const v = this._lockV ||= { c: new THREE.Vector3(), tip: new THREE.Vector3(), to: new THREE.Vector3(), q: new THREE.Quaternion(), i: new THREE.Quaternion() };
-    const c = parent.worldToLocal(camera.getWorldPosition(v.c));
-    const tip = parent.worldToLocal(this.rig.group.localToWorld(v.tip.copy(this.rig.muzzle).multiplyScalar(0.95))).sub(c).normalize();
-    const to = parent.worldToLocal(v.to.set(lodge.anchor.x, lodge.anchor.y, lodge.anchor.z)).sub(c).normalize();
-    const R = v.q.setFromUnitVectors(tip, to);
-    if (lodge.yank > 0) R.slerp(v.i, Math.min(1, lodge.yank));
-    pivot.position.sub(c).applyQuaternion(R).add(c);
-    pivot.quaternion.premultiply(R);
-    this.lodgeLock = { serial: lodge.serial };
+    const camera = this.root.parent;
+    if (!camera || !lodge.anchor || !this.rig?.muzzle) return;
+    if (!lodge.hardLock) {
+      const pivot = this.actionPivot, parent = pivot.parent;
+      if (!parent) return;
+      parent.updateWorldMatrix(true, false); pivot.updateMatrixWorld(true);
+      const v = this._lockV ||= { c: new THREE.Vector3(), tip: new THREE.Vector3(), to: new THREE.Vector3(), q: new THREE.Quaternion(), i: new THREE.Quaternion() };
+      const c = parent.worldToLocal(camera.getWorldPosition(v.c));
+      const tip = parent.worldToLocal(this.rig.group.localToWorld(v.tip.copy(this.rig.muzzle).multiplyScalar(0.95))).sub(c).normalize();
+      const to = parent.worldToLocal(v.to.set(lodge.anchor.x, lodge.anchor.y, lodge.anchor.z)).sub(c).normalize();
+      const R = v.q.setFromUnitVectors(tip, to);
+      if (lodge.yank > 0) R.slerp(v.i, Math.min(1, lodge.yank));
+      pivot.position.sub(c).applyQuaternion(R).add(c);
+      pivot.quaternion.premultiply(R);
+      this.lodgeLock = { serial: lodge.serial, hardLock: false };
+      return;
+    }
+
+    const mount = this.weaponMount, parent = mount.parent;
+    if (!parent) return;
+    const yankRaw = lodge.yankRaw ?? lodge.yank ?? 0;
+    // 拔刀后半段把 fovRig 从等比 (cx,cx,cx) 平滑还回非等比 compensation，避免画面突跳。
+    const cx = this.compensation.x;
+    const fovReturn = yankRaw <= 0.46 ? 0 : Ease.InOut(Clamp01((yankRaw - 0.46) / 0.54));
+    this.fovRig.scale.set(cx, Mix(cx, this.compensation.y, fovReturn), Mix(cx, this.compensation.z, fovReturn));
+    this.root.updateWorldMatrix(true, true);
+
+    const w = this._lockW ||= {
+      anchor: new THREE.Vector3(), tip: new THREE.Vector3(), grip: new THREE.Vector3(),
+      delta: new THREE.Vector3(), targetPos: new THREE.Vector3(), targetQuat: new THREE.Quaternion(),
+      readyPos: new THREE.Vector3(), readyQuat: new THREE.Quaternion(),
+      localPos: new THREE.Vector3(), localQuat: new THREE.Quaternion(), localScale: new THREE.Vector3(),
+      matWorld: new THREE.Matrix4(), matInv: new THREE.Matrix4(), matLocal: new THREE.Matrix4(),
+      pull: new THREE.Vector3(), axis: new THREE.Vector3(), sideA: new THREE.Vector3(), sideB: new THREE.Vector3(),
+      camFwd: new THREE.Vector3(), kickQ: new THREE.Quaternion(),
+    };
+    w.anchor.set(lodge.anchor.x, lodge.anchor.y, lodge.anchor.z);
+
+    if (!this.lodgeLock || this.lodgeLock.serial !== lodge.serial || !this.lodgeLock.hardLock) {
+      // 首帧：先绕相机原点把刀尖射线对准 anchor，再沿射线把刀尖（0.95*muzzle）真实嵌进敌人躯干的 anchor，
+      // 这样八个来向都自然贴住伤口且 aimRad≈0，同时把 weaponMount 的完整世界位姿（含镜像符号）锁存下来。
+      const camPos = camera.getWorldPosition(w.camFwd);
+      this.rig.group.localToWorld(w.tip.copy(this.rig.muzzle).multiplyScalar(0.95));
+      w.axis.subVectors(w.tip, camPos).normalize();
+      w.pull.subVectors(w.anchor, camPos).normalize();
+      w.kickQ.setFromUnitVectors(w.axis, w.pull);
+      const worldPos = new THREE.Vector3(), worldQuat = new THREE.Quaternion(), worldScale = new THREE.Vector3();
+      mount.matrixWorld.decompose(worldPos, worldQuat, worldScale);
+      worldPos.sub(camPos).applyQuaternion(w.kickQ).add(camPos);
+      worldQuat.premultiply(w.kickQ);
+      // 计算旋转后刀尖的新世界坐标，并将整把刀沿世界空间贴进 anchor（限制最大臂展不拉脱肩膀）。
+      const tipAfterRot = w.tip.clone().sub(camPos).applyQuaternion(w.kickQ).add(camPos);
+      w.delta.subVectors(w.anchor, tipAfterRot);
+      const maxPullOut = Math.max(0.15, 0.76 - worldPos.distanceTo(camPos));
+      if (w.delta.dot(w.pull) > maxPullOut) w.delta.copy(w.pull).multiplyScalar(maxPullOut);
+      worldPos.add(w.delta);
+      // 拔刀反方向：65% 砍入轨迹反方向 + 35% 刀身中轴（刀尖→刀柄），顺着刀口往外抽不横刮。
+      const finalTip = tipAfterRot.add(w.delta);
+      const bladeBack = worldPos.clone().sub(finalTip).normalize();
+      const pullDir = new THREE.Vector3();
+      if (lodge.pullDir) pullDir.set(lodge.pullDir.x, lodge.pullDir.y, lodge.pullDir.z).normalize();
+      else pullDir.copy(bladeBack);
+      pullDir.multiplyScalar(0.65).addScaledVector(bladeBack, 0.35).normalize();
+      camera.getWorldDirection(w.camFwd);
+      const kickAxis = new THREE.Vector3().crossVectors(pullDir, w.camFwd);
+      if (kickAxis.lengthSq() < 1e-4) kickAxis.set(0, 1, 0);
+      else kickAxis.normalize();
+      this.lodgeLock = {
+        serial: lodge.serial, hardLock: true,
+        worldPos, worldQuat, worldScale,
+        anchor0: w.anchor.clone(), pullDir, kickAxis,
+      };
+    }
+
+    const lock = this.lodgeLock;
+    // 0.72 以后镜像开始翻回正面，此时世界锁权重已降为 0，交还给烘焙收招动画避开 scale.x=0 奇点。
+    if (yankRaw >= 0.72) return;
+
+    w.readyPos.copy(mount.position);
+    w.readyQuat.copy(mount.quaternion);
+    w.delta.subVectors(w.anchor, lock.anchor0);
+    w.targetPos.copy(lock.worldPos).add(w.delta);
+    w.targetQuat.copy(lock.worldQuat);
+
+    let blend = 1;
+    if (yankRaw <= 0) {
+      // 卡刀中：刀身纹丝不动锁死在世界坐标里；按住 F 时沿反方向蓄力拉出 4.5 cm + 细微咬肉震颤。
+      const strain = lodge.strain || 0;
+      const holdPull = (lodge.progress || 0) * 0.045;
+      w.targetPos.addScaledVector(lock.pullDir, holdPull);
+      // 垂直于拔刀方向的正交微颤（幅度 ≤ 3.5 mm），既显吃力又不破坏世界锁点。
+      w.sideA.copy(lock.kickAxis);
+      w.sideB.crossVectors(lock.pullDir, w.sideA).normalize();
+      const amp = 0.001 + strain * 0.0028;
+      w.targetPos.addScaledVector(w.sideA, Math.sin(this.elapsed * 53) * amp);
+      w.targetPos.addScaledVector(w.sideB, Math.cos(this.elapsed * 67 + 1.1) * amp);
+    } else if (yankRaw <= 0.46) {
+      // 拔刀第一段（0 → 0.46）：沿反砍方向骤然抽出并带 0.30 m 惯性过冲 + 脱肉刹那手腕反冲甩动。
+      const u = Clamp01(yankRaw / 0.46);
+      const burst = 1 - Math.pow(1 - u, 3);
+      const pullDist = 0.045 + 0.30 * burst;
+      w.targetPos.addScaledVector(lock.pullDir, pullDist);
+      const kickRad = 0.24 * Math.sin(u * Math.PI * 0.68);
+      w.kickQ.setFromAxisAngle(lock.kickAxis, kickRad);
+      w.targetQuat.premultiply(w.kickQ);
+    } else {
+      // 拔刀第二段（0.46 → 0.72）：惯性余势稍回落，同时平滑过渡回架势动画（零跳变）。
+      const u2 = Clamp01((yankRaw - 0.46) / 0.26);
+      const smooth = u2 * u2 * (3 - 2 * u2);
+      const pullDist = Mix(0.345, 0.26, smooth);
+      w.targetPos.addScaledVector(lock.pullDir, pullDist);
+      const kickRad = 0.24 * Math.sin(Math.PI * 0.68) * (1 - smooth);
+      w.kickQ.setFromAxisAngle(lock.kickAxis, kickRad);
+      w.targetQuat.premultiply(w.kickQ);
+      blend = 1 - smooth;
+    }
+
+    w.matWorld.compose(w.targetPos, w.targetQuat, lock.worldScale);
+    w.matInv.copy(parent.matrixWorld).invert();
+    w.matLocal.multiplyMatrices(w.matInv, w.matWorld);
+    w.matLocal.decompose(w.localPos, w.localQuat, w.localScale);
+    mount.position.lerpVectors(w.readyPos, w.localPos, blend);
+    mount.quaternion.slerpQuaternions(w.readyQuat, w.localQuat, blend);
+    mount.updateWorldMatrix(true, true);
   }
 
   /** Source channels are baked in Blender; existing grip/arm IK follows the animated weapon. */
@@ -4727,15 +4883,20 @@ export class Viewmodel {
       this.actionPivot.position.z += rebound * 0.048;
       this.actionPivot.position.y += rebound * 0.022 + Math.sin(this.elapsed * 67) * 0.003 * (1 - (pose.normalized || 0));
     }
-    // 卡刀（及吃肉锁点、顺杆锁点共用世界锚点）：整副手臂连刀锁在世界目标点上。
+    // 卡刀（及吃肉锁点、顺杆锁点共用世界锚点）：把锁定请求延迟到 _ApplyMeleeVideo 之后执行。
     if (pose.lodge) {
-      const { strain = 0, pulse = 0, yank = 0 } = pose.lodge;
-      const shake = (0.002 + strain * 0.006 + pulse * 0.006) * (1 - yank);
-      this.actionPivot.position.x += Math.sin(this.elapsed * 47) * shake;
-      this.actionPivot.position.y += Math.sin(this.elapsed * 61 + 1.3) * shake - strain * 0.012;
-      this.actionPivot.position.z += strain * 0.045 + pulse * 0.02 + Math.sin(Math.PI * yank) * 0.09;
-      this._LockLodgeToWorld(pose.lodge);
-    } else this.lodgeLock = null;
+      this.pendingLodge = pose.lodge;
+      if (!pose.lodge.hardLock) {
+        const { strain = 0, pulse = 0, yank = 0 } = pose.lodge;
+        const shake = (0.002 + strain * 0.006 + pulse * 0.006) * (1 - yank);
+        this.actionPivot.position.x += Math.sin(this.elapsed * 47) * shake;
+        this.actionPivot.position.y += Math.sin(this.elapsed * 61 + 1.3) * shake - strain * 0.012;
+        this.actionPivot.position.z += strain * 0.045 + pulse * 0.02 + Math.sin(Math.PI * yank) * 0.09;
+      }
+    } else {
+      this.pendingLodge = null;
+      this.lodgeLock = null;
+    }
     if (pose.state === "qte") {
       const struggle = 1 - pose.progress;
       this.actionPivot.position.z += struggle * 0.12;

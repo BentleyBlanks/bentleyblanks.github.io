@@ -26,6 +26,7 @@ import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
 import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
+import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 import { DeathFallLocal } from "./Script_HitReactionLayer.mjs";
@@ -925,6 +926,8 @@ export class XBotSkin {
     this.last3C = null;
     this.meleeFlinch = null;
     this.inMelee = false;
+    this.wounds = new CharacterWounds(this.model);
+    if (this.actor) this.actor.skinWounds = this.wounds;
   }
 
   /** Trigger a short physical recoil on upper body/head/arms so hits read clearly even during Mixamo clips. */
@@ -958,6 +961,7 @@ export class XBotSkin {
     this.deathFall = null;
     this.holdLocal = null;
     this.meleeFlinch = null;
+    this.wounds?.Clear();
     this.rifleOnLeft = null;
     this._EndRifleSwap();
     this.rifleShown = null;
@@ -1166,6 +1170,7 @@ export class XBotSkin {
       this.hair.maxLod = HAIR_QUALITY[view.post?.quality || 'high'];
       this.hair.Update(dt, view.camera, view.renderer);
     }
+    this.wounds?.Update(dt);
   }
 
   /** 这一帧最后看到的姿势（IK、枪都摆完之后）：下一次换动作从它淡过去。 */
@@ -2488,6 +2493,8 @@ export class XBotSkin {
     this._RestoreWeaponVisualOrigin();
     this._EndRifleSwap();
     this.mixer.stopAllAction();
+    this.wounds?.Clear();
+    if (this.actor?.skinWounds === this.wounds) this.actor.skinWounds = null;
     this.hair?.Dispose();
     this.container.removeFromParent();
     for (const mesh of this.hidden) mesh.visible = true;
