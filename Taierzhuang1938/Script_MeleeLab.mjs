@@ -30,6 +30,22 @@ const ImpactName = id => (
   : id === 'pofeng' ? T('range.melee.impact.pofeng')
   : T('range.melee.impact.classic')
 );
+const ImpactDesc = id => (
+  id === 'lodge' ? T('range.melee.desc.lodge')
+  : id === 'cleave' ? T('range.melee.desc.cleave')
+  : id === 'slide' ? T('range.melee.desc.slide')
+  : id === 'crush' ? T('range.melee.desc.crush')
+  : id === 'pofeng' ? T('range.melee.desc.pofeng')
+  : T('range.melee.desc.classic')
+);
+const IdleGuide = id => (
+  id === 'lodge' ? T('range.melee.guide.idle.lodge')
+  : id === 'cleave' ? T('range.melee.guide.idle.cleave')
+  : id === 'slide' ? T('range.melee.guide.idle.slide')
+  : id === 'crush' ? T('range.melee.guide.idle.crush')
+  : id === 'pofeng' ? T('range.melee.guide.idle.pofeng')
+  : T('range.melee.guide.idle.classic')
+);
 /** 面板只列一对一（没有友军）的项目；多打一与敌友对练只给取证口。 */
 export const MELEE_LAB_SCENARIOS = MELEE_SCENARIOS.filter(s => s.enemies === 1 && !s.allies);
 export class MeleeLab {
@@ -52,6 +68,7 @@ export class MeleeLab {
         <p class="siLabel">${T('range.melee.controlLabel')}</p><div class="siButtons">${controlButtons}</div>
         <p class="siLabel mlFollowLabel"></p><input type="range" class="siRange mlFollow" min="0" max="100" step="5" aria-label="${T('range.melee.followAria')}">
         <p class="siLabel">${T('range.melee.impactLabel')}</p>${impactRows.join('')}
+        <div class="mlModeCard"></div>
         <h3>${T('range.melee.group.scenario')}</h3>
         <select class="siSelect mlScenario" aria-label="${T('range.melee.scenarioAria')}">${MELEE_LAB_SCENARIOS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select>
         <div class="siButtons"><button type="button" class="siBtn siFire mlStart">${T('range.melee.btnStart')}</button><button type="button" class="siBtn mlPause">${T('range.melee.btnPause')}</button></div>
@@ -61,6 +78,14 @@ export class MeleeLab {
         <div class="siRead mlMeters"></div>
       </div>`;
     document.body.append(this.root);
+    this.guide=document.createElement('aside'); this.guide.className='mlGuideHud';
+    this.guide.innerHTML='<div class="mlGuideTop"><b class="mlGuideMode"></b><span class="mlGuideMeta"></span></div><div class="mlGuideStep"></div><div class="mlGuideBar" hidden><i></i></div>';
+    document.body.append(this.guide);
+    this.guideMode=this.guide.querySelector('.mlGuideMode');
+    this.guideMeta=this.guide.querySelector('.mlGuideMeta');
+    this.guideStep=this.guide.querySelector('.mlGuideStep');
+    this.guideBar=this.guide.querySelector('.mlGuideBar');
+    this.guideFill=this.guide.querySelector('.mlGuideBar i');
     this.select=this.root.querySelector('.mlScenario');
     this.currentScenario=this.select.value;
     const Click=(selector,action)=>{for(const el of this.root.querySelectorAll(selector))el.onclick=(e)=>{action(el,e);e.currentTarget.blur();host.Focus?.();};};
@@ -91,10 +116,12 @@ export class MeleeLab {
   Update(snapshot) {
     if(!snapshot)return;
     this.root.hidden=!!snapshot.menu;
+    this.guide.hidden=!!snapshot.menu;
     if(this.currentScenario!==snapshot.scenario && MELEE_LAB_SCENARIOS.some(s=>s.id===snapshot.scenario)){this.currentScenario=snapshot.scenario;this.select.value=snapshot.scenario;}
     const variant=snapshot.variant||{control:'classic',impact:'classic'};
     for(const el of this.root.querySelectorAll('.mlControl'))this.Flag(el,'active',el.dataset.control===variant.control);
     for(const el of this.root.querySelectorAll('.mlImpact'))this.Flag(el,'active',el.dataset.impact===variant.impact);
+    this.Put('.mlModeCard',ImpactDesc(variant.impact));
     const drag=variant.control==='drag';
     const follow=Math.round((snapshot.viewFollow??0.5)*100);
     if(document.activeElement!==this.follow&&+this.follow.value!==follow)this.follow.value=String(follow);
@@ -124,6 +151,42 @@ export class MeleeLab {
     if(snapshot.slide)meters.push(T('range.melee.readSlide',{progress:Math.round(snapshot.slide.progress*100),ready:snapshot.slide.ready?T('range.melee.readSlideReady'):''}));
     if(snapshot.finishTarget!=null&&!snapshot.enemyGuard?.crushed)meters.push(T('range.melee.readFinish'));
     this.Put('.mlMeters',meters.join('\n'));
+    this.UpdateGuide(snapshot,variant,enemy);
   }
-  Dispose(){this.root.remove();document.body.classList.remove('meleeLabActive');}
+  UpdateGuide(snapshot,variant,enemy) {
+    this.Put(this.guideMode,ImpactName(variant.impact));
+    let step='',meta='',barPct=null,tone='';
+    if(!enemy||!enemy.alive){
+      step=T('range.melee.guide.down');
+    }else if(snapshot.cleave){
+      const pct=Math.round(snapshot.cleave.progress*100);
+      step=T('range.melee.guide.cleave'); meta=T('range.melee.bar.cleave',{percent:pct}); barPct=pct; tone='hot';
+    }else if(snapshot.slide){
+      const pct=Math.round(snapshot.slide.progress*100);
+      step=snapshot.slide.ready?T('range.melee.guide.slideReady'):T('range.melee.guide.slide');
+      meta=T('range.melee.bar.slide',{percent:pct}); barPct=pct; tone=snapshot.slide.ready?'hot':'active';
+    }else if(snapshot.lodge){
+      const pct=Math.round(snapshot.lodge.progress*100);
+      step=T('range.melee.guide.lodge'); meta=T('range.melee.bar.lodge',{percent:pct}); barPct=pct; tone='active';
+    }else if(snapshot.enemyGuard?.crushed){
+      step=T('range.melee.guide.crushed'); meta=T('range.melee.bar.guard',{percent:0}); barPct=0; tone='hot';
+    }else if(snapshot.finishTarget!=null){
+      step=T('range.melee.guide.finish'); tone='hot';
+    }else{
+      if(snapshot.enemyGuard){
+        const gp=Math.round(snapshot.enemyGuard.guardPoise);
+        meta=T('range.melee.bar.guard',{percent:gp}); barPct=gp;
+      }
+      if(snapshot.paused)step=T('range.melee.guide.paused');
+      else if(enemy.distance>2.25)step=T('range.melee.guide.approach',{distance:enemy.distance.toFixed(1)});
+      else step=IdleGuide(variant.impact);
+    }
+    this.Put(this.guideMeta,meta);
+    this.Put(this.guideStep,step);
+    this.Flag(this.guide,'active',tone==='active');
+    this.Flag(this.guide,'hot',tone==='hot');
+    this.guideBar.hidden=barPct===null;
+    if(barPct!==null)this.guideFill.style.width=`${Math.max(0,Math.min(100,barPct))}%`;
+  }
+  Dispose(){this.root.remove();this.guide?.remove();document.body.classList.remove('meleeLabActive');}
 }

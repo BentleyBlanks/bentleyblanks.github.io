@@ -95,11 +95,7 @@ export class RangeField {
     sink.SetSector("Range");
 
     if (this.levelId === MELEE_QTE_LEVEL_ID) {
-      // 灰色开阔战斗白盒：地面不加抬高台阶，边界与距离刻线走合批。2026-11-23 起只剩一对一：
-      // 六组遭遇的隔墙、门槛与标牌撤了。
-      for (let d = 1; d <= 10; d++) {
-        sink.Add("Stone", PlaceGeometry(MakeBox(18, 0.015, 0.025, 1, `MeleeLine${d}`), { x: 1400, y: 0.009, z: 1468 - d }));
-      }
+      // 开阔战斗白盒：地面不加抬高台阶与距离刻线，只留四面矮墙围栏。
       for (const [x,z,w,d] of [[1387,1461,0.5,38],[1413,1461,0.5,38],[1400,1442,26,0.5],[1400,1480,26,0.5]]) {
         sink.Add("Stone", PlaceGeometry(MakeBox(w, 1.2, d, 1, "MeleeBoundary"), { x, y: 0.6, z }));
         sink.Solid(x,0.6,z,w/2,0.6,d/2,"wall");

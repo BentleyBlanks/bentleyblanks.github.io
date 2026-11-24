@@ -195,6 +195,13 @@ export class MeleeAnimationPlayer {
       parent.matrixWorld.decompose(vp,qp,vs);qp.invert();bone.quaternion.copy(qp.multiply(qd));
       bone.updateMatrix();bone.updateWorldMatrix(false,false);
     }
+    // Reset unauthored child bones (L Toe0 / R Toe0) to their neutral bind pose so the
+    // underlying mixer clip (e.g. AdvanceFire) does not leak periodic toe lifts through _Mirror.
+    for(const r of this.allBones) {
+      if(r.index>=0)continue;
+      r.bone.position.copy(r.localPosition);r.bone.quaternion.copy(r.localRotation);r.bone.scale.copy(r.localScale);
+      r.bone.updateMatrix();
+    }
     this.propWeight=0;
     this.root.updateWorldMatrix(true,true);this.applied=true;this.lastClip=pose.clip;
   }

@@ -1147,6 +1147,20 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .shellImpactLab .siSelect{display:block;width:100%;box-sizing:border-box;margin:6px 0;background:#13140b66;color:#deddd2;border:1px solid #c1bdab40;padding:6px 8px;font:inherit;border-radius:0}
 .shellImpactLab .siSelect:focus-visible{outline:1px solid #edca83;outline-offset:2px}
 .shellImpactLab .siRead+.siRead{margin-top:6px}
+.shellImpactLab .mlModeCard{margin:8px 0 2px;padding:7px 9px;white-space:pre-line;font-size:11.5px;line-height:1.5;color:#ede9d7;background:linear-gradient(90deg,#d8d4c31e,#13140b44);border:1px solid #cdb77b55;border-left:2px solid #edca83}
+.mlGuideHud{position:fixed;left:50%;bottom:54px;transform:translateX(-50%);z-index:36;pointer-events:none;min-width:340px;max-width:min(620px,calc(100vw - 360px));padding:9px 16px 10px;background:linear-gradient(180deg,rgba(18,21,19,.88),rgba(11,13,12,.86));border:1px solid #c1bdab45;border-top:2px solid #d9bb7b;box-shadow:0 8px 28px #0008;font:12.5px/1.45 var(--ui-font,system-ui,sans-serif);color:#ece9dc;text-align:center}
+.mlGuideHud[hidden]{display:none}
+.mlGuideHud.active{border-color:#edca8399;border-top-color:#edca83}
+.mlGuideHud.hot{border-color:#e06a4a;border-top-color:#ff7e52;background:linear-gradient(180deg,rgba(44,18,14,.92),rgba(20,12,11,.9))}
+.mlGuideTop{display:flex;justify-content:center;align-items:baseline;gap:12px;margin-bottom:3px;font-size:11px;letter-spacing:.08em}
+.mlGuideMode{color:#edca83;font-weight:700}
+.mlGuideMeta{color:#cfc9b4;font-variant-numeric:tabular-nums}
+.mlGuideStep{font-size:13.5px;font-weight:600;color:#f7f4e8;letter-spacing:.02em}
+.mlGuideHud.hot .mlGuideStep{color:#ffd8a8}
+.mlGuideBar{height:5px;margin-top:7px;background:#ffffff18;overflow:hidden}
+.mlGuideBar[hidden]{display:none}
+.mlGuideBar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#cfa95f,#f3d48c);transition:width 60ms linear}
+.mlGuideHud.hot .mlGuideBar i{background:linear-gradient(90deg,#d94f34,#ff965a)}
 /* 人物战场反应测试场（?reactions=1）：沿用 .shellImpactLab 的整套样式，只补方位九宫格与距离一排。 */
 .battleReactionLab .brCompass{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
 .battleReactionLab .brCompass .siBtn{padding:6px 2px}

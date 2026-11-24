@@ -923,6 +923,54 @@ export class XBotSkin {
     this.lastFireSeq = null;
     this.prevFiring = false;
     this.last3C = null;
+    this.meleeFlinch = null;
+    this.inMelee = false;
+  }
+
+  /** Trigger a short physical recoil on upper body/head/arms so hits read clearly even during Mixamo clips. */
+  ApplyMeleeFlinch(dirX = 0, dirZ = 1, strength = 1, kind = "flesh") {
+    const len = Math.hypot(dirX, dirZ) || 1;
+    this.meleeFlinch = {
+      dx: dirX / len,
+      dz: dirZ / len,
+      strength: THREE.MathUtils.clamp(strength, 0.35, 2.2),
+      kind,
+      t: 0,
+      dur: kind === "crush" ? 0.44 : kind === "rip" ? 0.38 : 0.28,
+    };
+  }
+
+  /** Instant state reset for in-place actor reuse (avoids tearing down XBotSkin / HairGroom shaders). */
+  ResetState() {
+    this.mixer.stopAllAction();
+    this.blendActions.clear();
+    this.blendWeights.clear();
+    this.current = null;
+    this.pick = null;
+    this.pickKey = null;
+    this.blend = null;
+    this.shownValid = false;
+    this.baseValid = false;
+    this.preOverlayValid = false;
+    this.downHold = false;
+    this.prevDown = false;
+    this.corpseSettled = false;
+    this.deathFall = null;
+    this.holdLocal = null;
+    this.meleeFlinch = null;
+    this.rifleOnLeft = null;
+    this._EndRifleSwap();
+    this.rifleShown = null;
+    this.ikR = 0;
+    this.ikL = 0;
+    this.lastMount = null;
+    this.contact = null;
+    this.attachScan = -1;
+    for (const a of this.attachments) {
+      a.written = null; a.wWritten = null; a.intended = null; a.wIntended = null;
+      a.weaponBlend = null; a.weaponMode = null; a.weaponLocal = null;
+      a.looseDrop = null; a.handRel = null; a.unheldT = 0;
+    }
   }
 
   get visible() { return this.container.visible; }
@@ -1097,7 +1145,15 @@ export class XBotSkin {
       this._ApplyFootLock(dt, footMode, stance, teleported);
       this.container.updateMatrixWorld(true);
     }
-    this._Reanchor(pick.mode === "hold" ? this.pick || pick : pick, dt);
+    this.inMelee = !!intent.melee;
+    if (this.meleeFlinch && !intent.down) {
+      this._ApplyMeleeFlinch(dt);
+      this.container.updateMatrixWorld(true);
+    }
+    // Always pass the actual pose mode into _Reanchor: when _Play falls back to _Mirror while a
+    // Mixamo clip is still loading, this.current.mirror is true and this.pick is { mode: "mirror" }.
+    const reanchorPick = this.current?.mirror ? this.pick : (pick.mode === "hold" ? this.pick || pick : pick);
+    this._Reanchor(reanchorPick, dt);
     this._Remember(intent);
     // 倒地动作在画面里放到最后一帧、过渡也淡完：尸体定住了，SoldierView 之后不再推它。
     // 倒地动作没读到、照原身体换算（mirror）的：原身体倒完了，这一帧换算的就是最后的姿势
@@ -2048,7 +2104,11 @@ export class XBotSkin {
       a.rifleDrop = null; a.rifleTrackLast = null;
       // 两只手都握着时哪只算主手：上一帧那只还握着就不换（两边离枪差不多远时一帧左一帧右，枪在两只手之间来回淡）
       const prevSide = a.weaponMode === "handR" ? "R" : a.weaponMode === "handL" ? "L" : null;
-      const side = prevSide && srcGap[prevSide] <= XBOT_GRIP.heldM ? prevSide : srcGap.R <= srcGap.L ? "R" : "L";
+      // When the rifle is mounted on the right-hand socket and right palm is holding it,
+      // anchor on RightHand (0.04 m lever arm) rather than flipping to LeftHand (0.36 m away).
+      const preferRight = w.parent === actor.riggedWeaponMount && srcGap.R <= XBOT_GRIP.heldM;
+      const side = preferRight ? "R"
+        : (prevSide && srcGap[prevSide] <= XBOT_GRIP.heldM ? prevSide : srcGap.R <= srcGap.L ? "R" : "L");
       const held = srcGap[side] <= XBOT_GRIP.heldM;
       if (!held && !this.down && a.handRel && (a.unheldT = (a.unheldT || 0) + Math.max(dt, 0)) < XBOT_GRIP.releaseS) {
         // 原身体刚松手（没倒地）：先当还握着（XBOT_GRIP.releaseS）
@@ -2086,7 +2146,8 @@ export class XBotSkin {
       const off = OffsetFrom(a.weaponLocal, local);
       const deg = THREE.MathUtils.radToDeg(2 * Math.acos(Math.min(1, Math.abs(off.q.w))));
       const metres = new THREE.Vector3().setFromMatrixPosition(a.weaponLocal).distanceTo(new THREE.Vector3().setFromMatrixPosition(local)) * frame.getMaxScaleOnAxis();
-      a.weaponBlend = { off, t: 0, dur: XBOT_GRIP.blendS + 0.35 * deg / 180 + 0.4 * Math.min(metres, 1) };
+      const dur = XBOT_GRIP.blendS + 0.35 * deg / 180 + 0.4 * Math.min(metres, 1);
+      a.weaponBlend = { off, t: 0, dur: this.inMelee ? Math.min(dur, 0.08) : dur };
     }
     a.weaponMode = mode;
     if (a.weaponBlend) {
@@ -2231,9 +2292,42 @@ export class XBotSkin {
     const ang = s.q.angleTo(q), maxA = THREE.MathUtils.degToRad(XBOT_GRIP.relDegPerS) * step;
     if (ang > 1e-6) s.q.slerp(q, Math.min(ang * k, maxA) / ang);
     const d = s.p.distanceTo(p);
-    if (d > 1e-6) s.p.lerp(p, Math.min(d * k, XBOT_GRIP.relMps * step) / d);
+    // hand.matrixWorld is in Mixamo cm scale (~0.01), so convert world m/s into hand-local units.
+    const handScale = hand.matrixWorld.getMaxScaleOnAxis() || 1;
+    const maxLocalStep = (XBOT_GRIP.relMps * step) / handScale;
+    if (d > 1e-6) s.p.lerp(p, Math.min(1, Math.min(d * k, maxLocalStep) / d));
     s.sc.copy(sc);
     return new THREE.Matrix4().copy(hand.matrixWorld).multiply(new THREE.Matrix4().compose(s.p, s.q, s.sc));
+  }
+
+  /** Upper-body physical flinch impulse for melee hits/blocks/crushes on XBotSkin. */
+  _ApplyMeleeFlinch(dt) {
+    const f = this.meleeFlinch;
+    if (!f) return;
+    f.t += Math.max(dt, 0);
+    if (f.t >= f.dur) { this.meleeFlinch = null; return; }
+    const u = f.t / f.dur;
+    // Fast snap-back (peaks at u ≈ 0.16) followed by damped spring recovery with subtle overshoot.
+    const env = Math.sin(Math.min(1, u / 0.16) * Math.PI * 0.5) * Math.exp(-3.4 * Math.max(0, u - 0.12)) * (1 - u);
+    const amp = env * f.strength;
+    if (amp < 1e-4) return;
+    // Pitch back around horizontal axis perpendicular to hit direction + twist torso around Y.
+    const pitchAxis = _aimRight.set(f.dz, 0, -f.dx).normalize();
+    const twistSign = f.kind === "block" ? -1 : 1;
+    const bones = [
+      ["Spine1", 0.22, 0.14],
+      ["Spine2", 0.30, 0.22],
+      ["Head", 0.36, 0.18],
+      ["RightShoulder", 0.18, 0.12],
+      ["LeftShoulder", 0.18, -0.10],
+    ];
+    for (const [name, pScale, yScale] of bones) {
+      const bone = this.H(name);
+      if (!bone) continue;
+      _aimQ.setFromAxisAngle(pitchAxis, -pScale * amp);
+      _aimQ.premultiply(_aimQ2.setFromAxisAngle(_up, twistSign * yScale * amp));
+      RotateBoneWorld(bone, _aimQ);
+    }
   }
 
   /** 原身体某只手与枪的相对位姿，搬到 X Bot 同一只手上（两套骨手的初始朝向差按换算的修正量补）。 */

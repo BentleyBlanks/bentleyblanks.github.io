@@ -123,11 +123,13 @@ export const MELEE_CRUSH = Object.freeze({
   finishReachM: 2.25, finishDamage: 125, finishWindupScale: 0.5,
 });
 export const MELEE_FEEL = Object.freeze({
-  // 大刀挥空、磕铁、砍肉三档第一人称体感（仅实验场新交互模式启用，不动正片 classic）。
-  swingKickPitchRad: 0.011, swingKickRollRad: 0.018,
-  clashKickPitchRad: -0.020, clashKickRollRad: 0.034, clashFovPunch: 0.55,
-  fleshKickPitchRad: 0.024, fleshKickRollRad: 0.030, fleshFovPunch: 0.78,
-  ripKickPitchRad: 0.032, ripKickRollRad: 0.048, ripFovPunch: 1.0,
+  // 大刀挥空、磕铁、砍肉、拉豁／破防第一人称体感与顿帧（仅实验场新交互模式启用，不动正片 classic）。
+  swingKickPitchRad: 0.015, swingKickRollRad: 0.024,
+  clashKickPitchRad: -0.028, clashKickRollRad: 0.048, clashFovPunch: 0.72,
+  fleshKickPitchRad: 0.034, fleshKickRollRad: 0.044, fleshFovPunch: 0.92,
+  ripKickPitchRad: 0.046, ripKickRollRad: 0.068, ripFovPunch: 1.15,
+  hitstopBlockS: 0.055, hitstopSlideS: 0.045, hitstopFleshS: 0.075,
+  hitstopRipS: 0.095, hitstopCrushS: 0.105, hitstopScale: 0.08,
 });
 export const MELEE_LODGE = Object.freeze({
   weapons: Object.freeze(["Dadao"]),

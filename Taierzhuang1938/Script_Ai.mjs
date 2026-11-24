@@ -1218,6 +1218,61 @@ export class AiDirector {
   }
 
   /**
+   * 原地复用一名未断肢士兵（含复活）：清零血量/受击/死亡态并瞬移到新点位，
+   * 保留既有 Actor、XBotSkin 与 HairGroom 着色器，避免实验场切换玩法时重编整套材质。
+   */
+  ResetSoldier(s, { x, z, yaw = 0 } = {}) {
+    if (!s || !s.actor || s.actor.disposed || !s.actor.characterRig) return false;
+    if (s.gore?.severed?.size || s.actor.goreWeaponHold) return false;
+    const y = this.ctx.battlefield.GroundHeight(x, z);
+    const wasDown = !s.alive || !!s.actor.ragdollState || !s.body;
+    if (s.corpse) { this.ctx.physics?.RemoveBody(s.corpse); s.corpse = null; }
+    const rig = s.actor.characterRig;
+    if (wasDown) {
+      s.actor.ragdollState = null;
+      if (s.actor.body) {
+        s.actor.body.position.set(0, rig.attachBodyY ?? 0, 0);
+        s.actor.body.rotation.set(0, 0, 0);
+        s.actor.body.quaternion.identity();
+      }
+      rig.ClearDeathPose();
+      if (s.actor.weaponGroup && s.actor.riggedWeaponMount && s.actor.weaponGroup.parent !== s.actor.riggedWeaponMount) {
+        s.actor._MountRiggedWeapon(s.actor.weaponGroup);
+      }
+    } else {
+      rig.hitReaction?.Restore?.();
+      rig.hitReaction?.Reset?.();
+      rig.meleeAnimation?.Restore?.();
+    }
+    s.actor.wounds?.Clear?.();
+    s.state = STATE.IDLE;
+    s.health = 100;
+    s.deadTime = 0;
+    s.hurt = 0;
+    s.hurtTimer = 0;
+    s.suppression = 0;
+    s.corpseSettled = false;
+    s.corpseTiltX = 0;
+    s.corpseTiltZ = 0;
+    s.deathPush = null;
+    s.meleeCombat = null;
+    s.yaw = yaw;
+    s.position.set(x, y, z);
+    s.goal.copy(s.position);
+    s.velocity.set(0, 0, 0);
+    if (!s.body && this.ctx.physics) {
+      const cap = s.childCapsules?.[0] || CAPSULE[0];
+      s.body = this.ctx.physics.MakeCharacter({ radius: cap.radius, height: cap.height, position: s.position });
+    } else {
+      s.body?.Teleport?.(x, y, z);
+    }
+    s.actor.root.visible = true;
+    this.view.Place(s);
+    this.view.skins.get(s)?.ResetState?.();
+    return true;
+  }
+
+  /**
    * 阵亡事件。票池 = 兵力池，所以「谁死了扣谁的票」必须由这一条统一发。
    * 装配层（Script_Main）挂 ctx.onSoldierDeath(side, soldier) 收。
    */

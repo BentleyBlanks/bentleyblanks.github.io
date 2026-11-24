@@ -1057,6 +1057,23 @@ export class LugouCharacterRig {
     return this;
   }
 
+  /** Reset death pose state cleanly so a non-dismembered character rig can be reused in-place. */
+  ClearDeathPose() {
+    this.deathClipState = null; this.deathPose = null; this.deathDuration = 0;
+    this.deathFloorLift = undefined; this.deathContactRotation = null;
+    this.deathSettlePoints = null; this.deathSettleCalls = 0; this.deathSettleT = NaN;
+    this.root.position.set(0, -(this.attachBodyY ?? this.actor?.body?.position?.y ?? 0), 0);
+    this.root.rotation.set(0, MODEL_FORWARD_YAW, 0);
+    this.infantryFloorOffset = 0;
+    this.mixer.stopAllAction();
+    this.currentAction = null; this.currentId = null; this.currentPlaybackId = null;
+    this.meleeAnimation?.Restore();
+    this.hitReaction?.Restore();
+    this.hitReaction?.Reset?.();
+    this.locomotion.Restore(); this.locomotion.ResetContacts();
+    this.Play(POSE_CLIPS.standIdle);
+  }
+
   /**
    * @param {{id:string, clip?:THREE.AnimationClip|null, playbackRate?:number}|null} choice
    *   方向死亡选择（Script_HitReactionLayer.ChooseHitDeath）：致死命中按冲量方向与部位挑的倒地动作。

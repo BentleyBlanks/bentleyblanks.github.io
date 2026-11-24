@@ -1825,60 +1825,96 @@ async function Boot() {
       }
       if (meleeCombat?.EnhancedFeel && actor === player) {
         const side = Math.sign(event.sweep || -1) || -1;
+        const FlinchTarget = (strength, kind) => {
+          if (!target) return;
+          const skin = ai?.view?.skins?.get(target);
+          if (!skin?.ApplyMeleeFlinch) return;
+          const dx = target.position.x - player.position.x, dz = target.position.z - player.position.z;
+          skin.ApplyMeleeFlinch(dx + side * (-dz) * 0.35, dz + side * dx * 0.35, strength, kind);
+        };
         if (event.kind === "light" || event.kind === "heavy") {
           const k = event.kind === "heavy" ? 1.35 : 1;
           player?.shake?.Impulse({ pitch: MELEE_FEEL.swingKickPitchRad * k, roll: side * MELEE_FEEL.swingKickRollRad * k });
         } else if (event.kind === "environment" && event.point) {
           const pt = new THREE.Vector3(event.point.x, event.point.y, event.point.z);
           const n = new THREE.Vector3().subVectors(player.position, pt).setY(0.35).normalize();
-          vfx?.BladeSparks(pt, n, { intensity: 0.9 });
+          vfx?.BladeSparks(pt, n, { intensity: 1.05 });
           player?.shake?.Impulse({ pitch: MELEE_FEEL.clashKickPitchRad, roll: -side * MELEE_FEEL.clashKickRollRad });
-          audio.Play("impactMetal", { position: pt, volume: 0.6 });
+          audio.Play("impactMetal", { volume: 0.82, pitch: 0.96 });
         } else if (event.kind === "cleave") {
+          const at = event.anchor ? new THREE.Vector3(event.anchor.x, event.anchor.y, event.anchor.z)
+            : (target?.position ? target.position.clone().add(new THREE.Vector3(0, 1.25, 0)) : null);
+          const dir = target?.position ? new THREE.Vector3().subVectors(target.position, player.position).setY(0.22).normalize() : new THREE.Vector3(0, 0, -1);
+          if (at) vfx?.BloodBurst(at, dir, 1.35);
+          FlinchTarget(1.25, "flesh");
           firePunch = Math.max(firePunch, MELEE_FEEL.fleshFovPunch);
           player?.shake?.Impulse({ pitch: MELEE_FEEL.fleshKickPitchRad, roll: side * MELEE_FEEL.fleshKickRollRad });
+          audio.Play("bayonetStabBody", { volume: 0.90, pitch: 0.90 });
+          audio.Play("bayonetTwist", { volume: 0.78, pitch: 0.94 });
+          audio.Play("hitGrunt", { volume: 0.85, pitch: 0.96 });
         } else if (event.kind === "rip" || event.kind === "slideSlash" || event.kind === "crushFinish") {
           const at = event.anchor ? new THREE.Vector3(event.anchor.x, event.anchor.y, event.anchor.z)
             : (target?.position ? target.position.clone().add(new THREE.Vector3(0, 1.25, 0)) : null);
-          const dir = event.tangent ? new THREE.Vector3(event.tangent.x, 0.18, event.tangent.z).normalize()
-            : (target?.position ? new THREE.Vector3().subVectors(target.position, player.position).setY(0.15).normalize() : new THREE.Vector3(0, 0, -1));
-          if (at) {
-            vfx?.BloodBurst(at, dir, 1.85);
-            audio.Play("goreSever", { position: at, volume: 0.72 });
-            audio.Play("clothRip", { position: at, volume: 0.55 });
-          }
+          const dir = event.tangent ? new THREE.Vector3(event.tangent.x, 0.22, event.tangent.z).normalize()
+            : (target?.position ? new THREE.Vector3().subVectors(target.position, player.position).setY(0.18).normalize() : new THREE.Vector3(0, 0, -1));
+          if (at) vfx?.BloodBurst(at, dir, 2.25);
+          FlinchTarget(1.85, "rip");
           firePunch = Math.max(firePunch, MELEE_FEEL.ripFovPunch);
           player?.shake?.Impulse({ pitch: MELEE_FEEL.ripKickPitchRad, roll: side * MELEE_FEEL.ripKickRollRad });
+          audio.Play("goreSever", { volume: 0.96, pitch: 0.92 });
+          audio.Play("clothRip", { volume: 0.82, pitch: 0.96 });
+          audio.Play("hitGrunt", { volume: 0.88, pitch: 0.88 });
+          if (target?.side === "ija") hud.MeleeKillBlood();
         } else if ((event.kind === "guardBlock" || event.kind === "guardCrush") && event.point && target) {
           const pt = new THREE.Vector3(event.point.x, event.point.y, event.point.z);
           const n = new THREE.Vector3().subVectors(player.position, target.position).setY(0.28).normalize();
           const into = n.clone().negate();
-          const crushK = event.kind === "guardCrush" ? 1.5 : (event.heavy ? 1.15 : 0.9);
+          const crushK = event.kind === "guardCrush" ? 1.65 : (event.heavy ? 1.25 : 1.0);
           vfx?.BladeSparks(pt, n, { intensity: crushK, splinters: true });
           target.actor?.ReceiveHit?.({
             kind: "blade", mode: "slash", part: "torso", shapeId: "forearmR",
-            damage: event.kind === "guardCrush" ? 90 : (event.heavy ? 68 : 46),
-            rawDamage: event.kind === "guardCrush" ? 90 : (event.heavy ? 68 : 46),
+            damage: event.kind === "guardCrush" ? 95 : (event.heavy ? 70 : 48),
+            rawDamage: event.kind === "guardCrush" ? 95 : (event.heavy ? 70 : 48),
             direction: into, point: pt,
           });
+          FlinchTarget(event.kind === "guardCrush" ? 1.75 : (event.heavy ? 1.15 : 0.85), event.kind === "guardCrush" ? "crush" : "block");
           firePunch = Math.max(firePunch, MELEE_FEEL.clashFovPunch * Math.min(1.4, crushK));
           player?.shake?.Impulse({ pitch: MELEE_FEEL.clashKickPitchRad * Math.min(1.4, crushK), roll: -side * MELEE_FEEL.clashKickRollRad * Math.min(1.4, crushK) });
-          audio.Play("impactWood", { position: pt, volume: 0.72 });
-          if (event.kind === "guardCrush") audio.Play("impactMetal", { position: pt, volume: 0.85, pitch: 0.86 });
+          audio.Play("impactWood", { volume: event.kind === "guardCrush" ? 0.98 : 0.86, pitch: event.kind === "guardCrush" ? 0.84 : 0.96 });
+          audio.Play("impactMetal", { volume: event.kind === "guardCrush" ? 1.0 : 0.90, pitch: event.kind === "guardCrush" ? 0.78 : 1.06 });
+          if (event.kind === "guardCrush") audio.Play("hitGrunt", { volume: 0.86, pitch: 0.92 });
         } else if ((event.kind === "slideStart" || event.kind === "slideGrind") && event.point) {
           const pt = new THREE.Vector3(event.point.x, event.point.y, event.point.z);
           const n = target?.position ? new THREE.Vector3().subVectors(player.position, target.position).setY(0.35).normalize() : new THREE.Vector3(0, 1, 0);
-          vfx?.BladeSparks(pt, n, { intensity: event.kind === "slideStart" ? 0.95 : 0.55 });
-          const k = event.kind === "slideStart" ? 0.85 : 0.35;
+          vfx?.BladeSparks(pt, n, { intensity: event.kind === "slideStart" ? 1.15 : 0.72 });
+          if (event.kind === "slideStart") FlinchTarget(0.85, "block");
+          const k = event.kind === "slideStart" ? 0.95 : 0.42;
           player?.shake?.Impulse({ pitch: MELEE_FEEL.clashKickPitchRad * k, roll: MELEE_FEEL.clashKickRollRad * k });
-          audio.Play("impactMetal", { position: pt, volume: event.kind === "slideStart" ? 0.78 : 0.62, pitch: 0.94 + (event.progress || 0) * 0.36 });
+          const pitch = 0.92 + (event.progress || 0) * 0.46;
+          audio.Play("impactMetal", { volume: event.kind === "slideStart" ? 0.92 : 0.76, pitch });
+          audio.Play("bayonetTwist", { volume: event.kind === "slideStart" ? 0.65 : 0.72, pitch: pitch * 1.08 });
+        } else if (event.kind === "hit" && target) {
+          FlinchTarget(1.1, "flesh");
+          firePunch = Math.max(firePunch, MELEE_FEEL.fleshFovPunch * 0.75);
+          player?.shake?.Impulse({ pitch: MELEE_FEEL.fleshKickPitchRad * 0.8, roll: side * MELEE_FEEL.fleshKickRollRad * 0.8 });
+          audio.Play("bayonetStabBody", { volume: 0.82 });
+          audio.Play("hitGrunt", { volume: 0.80 });
         }
       }
       const sound = ["light", "heavy"].includes(event.kind) ? "dadaoSwing"
         : ["parry","weaponBeat","weaponClash","bodyObstruction","tooClose","chamber","guardBlock","guardCrush","slideStart","slideBreak"].includes(event.kind) ? "bayonetHit"
-        : ["hit","yank","rip","slideSlash","crushFinish"].includes(event.kind) ? "dadaoHit"
+        : ["hit","cleave","yank","rip","slideSlash","crushFinish"].includes(event.kind) ? "dadaoHit"
         : ["push","environment","lodgeTimeout"].includes(event.kind) ? "bodyFall" : null;
-      if (sound) audio.Play(sound, { position: (target || actor)?.position?.clone?.(), volume: 0.65 });
+      if (sound) {
+        const enhancedSelf = !!(meleeCombat?.EnhancedFeel && actor === player);
+        const pitch = sound === "dadaoSwing" && event.kind === "heavy" ? 0.86
+          : sound === "dadaoHit" && ["rip", "slideSlash", "crushFinish"].includes(event.kind) ? 0.85
+          : sound === "bayonetHit" && event.kind === "guardCrush" ? 0.80 : 1;
+        const opts = enhancedSelf
+          ? { volume: sound === "dadaoSwing" ? 0.86 : 0.98, pitch }
+          : { position: (target || actor)?.position?.clone?.(), volume: 0.65, pitch };
+        audio.Play(sound, opts);
+      }
     },
   }, { assist: params.get("qteAssist") || "tap" });
   ai.ctx.meleeCombat = meleeCombat;

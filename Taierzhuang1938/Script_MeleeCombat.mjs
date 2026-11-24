@@ -1,7 +1,7 @@
 // 通用白刃规则：玩家、敌军、友军同一状态机。纯 Node 可跑，宿主负责物理与伤害。
 import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_QTE_RULES as Q, MELEE_SQUAD as G,
   MELEE_VARIANTS as V, MELEE_LODGE as L, MELEE_DRAG as D,
-  MELEE_CLEAVE as C, MELEE_SLIDE as S0, MELEE_CRUSH as K } from "./Data_MeleeCombat.mjs";
+  MELEE_CLEAVE as C, MELEE_SLIDE as S0, MELEE_CRUSH as K, MELEE_FEEL as F } from "./Data_MeleeCombat.mjs";
 import { MeleeQteDirector } from "./Script_MeleeQte.mjs";
 import { T } from "./Script_Text.mjs";
 const Smooth = (x) => { const t = Math.max(0, Math.min(1, x)); return t * t * (3 - 2 * t); };
@@ -41,7 +41,7 @@ const CellKeyAt = (cx, cz) => (cx + 4096) * 8192 + (cz + 4096);
 const CellKey = (x, z) => CellKeyAt(Math.floor(x / CELL_M), Math.floor(z / CELL_M));
 export class MeleeCombatDirector {
   constructor(host = {}, options = {}) {
-    this.host = host; this.time = 0; this.fighters = new Map(); this.events = [];
+    this.host = host; this.time = 0; this.hitstop = 0; this.fighters = new Map(); this.events = [];
     this.serial = 0; this.held = new Set(); this.enabled = true;
     // 近邻网格与两个复用的查询数组（Near 返回的就是它们，别存下来）
     this.indexCells = new Map(); this.indexRank = new Map(); this.indexAt = -1;
@@ -99,7 +99,8 @@ export class MeleeCombatDirector {
   CanUse() { return Alive(this.Player()) && !!this.Weapon(this.Player()) && this.host.CanUse?.() !== false; }
   CanChangeWeapon() { const f = this.Fighter(this.Player()); return !this.Active && (!f?.weapon || this.Idle(f)); }
   get Active() { return this.qte.Active; }
-  get TimeScale() { return 1; }
+  get TimeScale() { return this.hitstop > 0 ? F.hitstopScale : 1; }
+  TriggerHitstop(sec) { if (this.EnhancedFeel && sec > 0) this.hitstop = Math.max(this.hitstop || 0, sec); }
   get Blocking() {
     return this.Active || ["fall", "down", "rise", "lodged", "yank", "cleave", "rip", "sliding", "slideSlash"].includes(this.Fighter(this.Player())?.state);
   }
@@ -366,6 +367,7 @@ export class MeleeCombatDirector {
     this.UpdateCleaveAnchor(cleave, e, target);
     this.SetState(f, "cleave", C.windowS, cleave.clip); f.cleave = cleave;
     this.SetState(tf, "cleaved", C.windowS + 0.12, "Hit"); tf.cleavedBy = e; tf.buffer = null;
+    this.TriggerHitstop(F.hitstopFleshS);
     this.stats.cleaves++; this.Log("cleave", e, target, { sweep, anchor: { ...cleave.anchor } });
   }
   StepCleave(f, _dt) {
@@ -401,6 +403,7 @@ export class MeleeCombatDirector {
     } else {
       this.Move(target, tx * C.wrenchSideM * 0.65, tz * C.wrenchSideM * 0.65);
     }
+    this.TriggerHitstop(F.hitstopRipS);
     this.stats.rips++;
     this.Log("rip", e, target, { sweep: cleave.sweep, tangent: { x: tx, z: tz }, anchor: { ...cleave.anchor } });
     return true;
@@ -431,6 +434,7 @@ export class MeleeCombatDirector {
     this.UpdateSlideAnchor(slide, e, target);
     this.SetState(f, "sliding", S0.windowS, "ParryRight"); f.slide = slide;
     this.SetState(tf, "sliding", S0.windowS + 0.1, "WeaponClash"); tf.slideBy = e; tf.buffer = null;
+    this.TriggerHitstop(F.hitstopSlideS);
     this.stats.slides++;
     this.Log("slideStart", e, target, { reason, point: { ...slide.anchor } });
     return true;
@@ -478,6 +482,7 @@ export class MeleeCombatDirector {
       this.Repel(target, e, S0.slashRepelM);
       this.Stagger(target, e, "Hit", R.staggerS + 0.3, S0.slashPoise);
     }
+    this.TriggerHitstop(F.hitstopRipS);
     this.stats.slideSlashes++;
     this.Log("slideSlash", e, target, { progress: +slide.progress.toFixed(2), point: { ...slide.anchor } });
     return true;
@@ -516,6 +521,7 @@ export class MeleeCombatDirector {
       tf.crushSide = sweep >= 0 ? 1 : -1;
       tf.nextThink = Math.max(tf.nextThink, this.time + K.crushedS);
       this.SetState(f, "guardBounce", K.crushRecoveryS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+      this.TriggerHitstop(F.hitstopCrushS);
       this.stats.guardCrushes++;
       this.Log("guardCrush", e, target, { point, sweep });
       return;
@@ -524,6 +530,7 @@ export class MeleeCombatDirector {
     this.SetState(tf, "stagger", K.enemyBraceS, "Deflected");
     tf.nextThink = Math.max(tf.nextThink, this.time + K.enemyBraceS + 0.14);
     this.SetState(f, "guardBounce", K.bounceS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+    this.TriggerHitstop(F.hitstopBlockS);
     this.stats.guardBlocks++;
     this.Log("guardBlock", e, target, { point, guardPoise: tf.guardPoise, heavy, sweep });
   }
@@ -553,7 +560,7 @@ export class MeleeCombatDirector {
       const slideTarget = this.Closest(entity, S0.catchReachM, S0.facingDot);
       const tf = slideTarget ? this.Fighter(slideTarget) : null;
       if (slideTarget && tf?.weapon === "Bayonet" && Facing(slideTarget, entity) >= S0.facingDot
-        && (tf.state === "attack" || tf.state === "charge" || (tf.state === "idle" && Distance(entity, slideTarget) <= 1.75))) {
+        && (tf.state === "attack" || tf.state === "charge" || (tf.state === "idle" && Distance(entity, slideTarget) <= S0.catchReachM))) {
         f.stamina -= R.parryCost;
         return this.BeginSlide(f, slideTarget, tf.state === "attack" ? "parryCatch" : "beatCatch");
       }
@@ -1276,6 +1283,7 @@ export class MeleeCombatDirector {
   }
   Update(dt) {
     if (!Number.isFinite(dt) || dt <= 0 || !this.enabled) return;
+    if (this.hitstop > 0) this.hitstop = Math.max(0, this.hitstop - dt);
     // 拖拽挥砍与吃肉拉豁／顺杆前压：记录最近 windowS 秒的鼠标位移。
     const m = this.mouse, frame = m.pending, pf = this.fighters.get(this.Player());
     m.strokes.push({ t: this.time + dt, dt, x: frame.x, y: frame.y });
@@ -1523,5 +1531,5 @@ export class MeleeCombatDirector {
     if (f?.slide) this.ReleaseSlide(f, "release");
     if (f && !this.Active) this.SetState(f, "idle");
   }
-  Reset() { this.Cancel(); this.fighters.clear(); this.events.length = 0; this.time = 0; for (const key of Object.keys(this.stats)) this.stats[key] = 0; }
+  Reset() { this.Cancel(); this.fighters.clear(); this.events.length = 0; this.time = 0; this.hitstop = 0; for (const key of Object.keys(this.stats)) this.stats[key] = 0; }
 }

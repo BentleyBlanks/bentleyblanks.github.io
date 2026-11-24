@@ -34,6 +34,48 @@ let meleeVariant = { control: urlParams.get("meleeControl") || "classic", impact
 /** 拖拽挥砍时视角跟鼠标的比例（面板滑条；网址 ?meleeViewFollow=0.5 也能指定）。 */
 let meleeViewFollow = urlParams.has("meleeViewFollow") ? +urlParams.get("meleeViewFollow") : MELEE_DRAG.viewFollow;
 
+function PlannedTargets(spec) {
+  const centerZ = spec.kind === "observe" ? 1463 : 1467;
+  const separation = spec.kind === "bind" ? 1.04 : 3.3;
+  const total = spec.enemies + (spec.allies || 0);
+  const plan = [];
+  for (let i = 0; i < total; i++) {
+    const ally = i >= spec.enemies;
+    const offset = spec.enemies === 1 ? 0 : (i - (spec.enemies - 1) / 2) * 1.65;
+    plan.push({
+      slot: i,
+      id: ally ? `Friend${i}` : `Enemy${i + 1}`,
+      side: ally ? "nra" : "ija",
+      weapon: ally && spec.allyWeapon === "Dadao" ? "Dadao" : ally ? "HanYang" : "Type38",
+      x: 1400 + (ally ? 0 : offset),
+      z: ally ? centerZ : centerZ - separation,
+      yaw: ally ? 0 : Math.PI,
+    });
+  }
+  return plan;
+}
+
+function CanReuseTargets(plan) {
+  if (meleeTargets.length !== plan.length || ctx.ai.soldiers.length !== plan.length) return false;
+  for (let i = 0; i < plan.length; i++) {
+    const s = meleeTargets[i]?.soldier, p = plan[i];
+    if (!s || s.side !== p.side || s.weaponId !== p.weapon) return false;
+    if (!s.actor || s.actor.disposed || !s.actor.characterRig) return false;
+    if (s.gore?.severed?.size || s.actor.goreWeaponHold) return false;
+  }
+  return true;
+}
+
+/** Reuse the existing Soldier + XBotSkin + HairGroom in-place so switching modes avoids WebGL shader stalls. */
+function ResetSoldierInPlace(s, p, spec) {
+  if (!ctx.ai.ResetSoldier(s, { x: p.x, z: p.z, yaw: p.yaw })) return false;
+  s.dummy = true;
+  s.bayonetFixed = true;
+  s.meleeTraining = { kind: spec.kind, slot: p.slot, passive: false };
+  s.holdZone = null;
+  return true;
+}
+
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
   meleeScenario = spec.id; meleePaused = false; meleePreview = null;
@@ -41,8 +83,6 @@ function StartMeleeScenario(id) {
   ctx.meleeCombat.Reset(); pendingGround = null;
   meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
   meleeViewFollow = ctx.meleeCombat.SetViewFollow(meleeViewFollow);
-  for (const soldier of [...ctx.ai.soldiers]) ctx.ai.Remove(soldier);
-  meleeTargets.length = 0;
   ctx.player.Spawn(1400, spec.kind === "observe" ? 1470 : 1467, 0);
   ctx.player.spawnGrace = 0;
   ctx.ApplyDebugOptions();
@@ -52,22 +92,33 @@ function StartMeleeScenario(id) {
   ctx.currentWeapon = ctx.SlotWeaponId(ctx.state.activeSlot);
   ctx.state.ammo = ctx.state.mags[ctx.state.activeSlot]?.ammo || 0;
   ctx.state.clips = ctx.state.mags[ctx.state.activeSlot]?.clips || 0;
-  ctx.viewmodel.Equip(ctx.currentWeapon, ctx.SlotWeaponVariant(ctx.state.activeSlot));
+  // Avoid rebuilding the FPS weapon + arms rig when the active weapon did not change.
+  if (ctx.viewmodel.weaponId !== ctx.currentWeapon || !ctx.viewmodel.rig) {
+    ctx.viewmodel.Equip(ctx.currentWeapon, ctx.SlotWeaponVariant(ctx.state.activeSlot));
+  } else {
+    ctx.viewmodel._ResetAnimatedParts?.();
+  }
   ctx.state.bayonetFixed = true; ctx.meleeStance=true; ctx.SyncBayonet();
   ctx.hud.SetWeaponName(ctx.WeaponName(ctx.currentWeapon));
-  const centerZ = spec.kind === "observe" ? 1463 : 1467;
-  const separation = spec.kind === "bind" ? 1.04 : 3.3;
-  for (let i = 0; i < spec.enemies + (spec.allies || 0); i++) {
-    const ally = i >= spec.enemies;
-    const offset = spec.enemies === 1 ? 0 : (i - (spec.enemies - 1) / 2) * 1.65;
-    const soldier = ctx.ai.Spawn(ally ? "nra" : "ija", 1400 + (ally ? 0 : offset), ally ? centerZ : centerZ - separation, {
-      weapon: ally && spec.allyWeapon === "Dadao" ? "Dadao" : ally ? "HanYang" : "Type38", squadId: `Melee_${spec.id}_${i}`,
-    });
-    if (!soldier) continue;
-    soldier.dummy = true; soldier.bayonetFixed = true; soldier.yaw = ally ? 0 : Math.PI;
-    soldier.meleeTraining = { kind: spec.kind, slot: i, passive: false };
-    soldier.holdZone = null; soldier.goal.copy(soldier.position);
-    meleeTargets.push({ soldier, id: ally ? `Friend${i}` : `Enemy${i + 1}` });
+  const plan = PlannedTargets(spec);
+  if (CanReuseTargets(plan)) {
+    for (let i = 0; i < plan.length; i++) {
+      meleeTargets[i].id = plan[i].id;
+      ResetSoldierInPlace(meleeTargets[i].soldier, plan[i], spec);
+    }
+  } else {
+    for (const soldier of [...ctx.ai.soldiers]) ctx.ai.Remove(soldier);
+    meleeTargets.length = 0;
+    for (const p of plan) {
+      const soldier = ctx.ai.Spawn(p.side, p.x, p.z, {
+        weapon: p.weapon, squadId: `Melee_${spec.id}_${p.slot}`,
+      });
+      if (!soldier) continue;
+      soldier.dummy = true; soldier.bayonetFixed = true; soldier.yaw = p.yaw;
+      soldier.meleeTraining = { kind: spec.kind, slot: p.slot, passive: false };
+      soldier.holdZone = null; soldier.goal.copy(soldier.position);
+      meleeTargets.push({ soldier, id: p.id });
+    }
   }
   SkinEnemies();
   ctx.state.deathTimer = 0; ctx.state.pendingRespawn = false; ctx.state.playerAliveLast = true;
@@ -76,6 +127,7 @@ function StartMeleeScenario(id) {
   ctx.hud?.SetMeleeQte(null);
   ctx.hud?.SetCinematicPrompt(null);
   ctx.hud?.SetCinematicBeat(false);
+  meleeLab?.Update(MeleeSnapshot());
 }
 
 function MeleePreviewPose(entity, pose) {
@@ -192,7 +244,7 @@ export function CreateMeleeLab(host) {
       if(WEAPONS[ctx.currentWeapon]?.bayonet && ctx.state.bayonetFixed)prompts.push({keys:"V",label:ctx.meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
       return prompts;
     },
-    // 面板每 6 帧刷新一次。
-    UpdatePanel(frame) { if (frame % 6 === 0) meleeLab?.Update(MeleeSnapshot()); },
+    // 面板与底部引导条每 2 帧刷新一次，保证压杆／咬肉／护枪进度条顺滑响应。
+    UpdatePanel(frame) { if (frame % 2 === 0) meleeLab?.Update(MeleeSnapshot()); },
   };
 }
