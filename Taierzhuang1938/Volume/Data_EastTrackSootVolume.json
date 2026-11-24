@@ -31,13 +31,13 @@
   "source": "authored",
   "file": "Volume_EastTrackSoot.bin.gz",
   "gpuBytes": 3538944,
-  "compressedBytes": 402272,
+  "compressedBytes": 308316,
   "boundsM": [
     116,
     31,
     86
   ],
-  "sha256": "e1e719397e7a2818b616082086884c5e18342f71f1dd9a56e1fc8fa5f749d54d",
+  "sha256": "2b6671cdc115a1893964383449cceeb6d5f494c3bb137deba5db47e7ab494de1",
   "generator": "_import/TanketteAdvanceEastTrack/Script_BakeEastTrackSmoke.py",
   "anchorPositionM": [
     0,

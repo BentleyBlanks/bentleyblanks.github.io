@@ -7,7 +7,7 @@ export const PARTICLE_VOLUME_ASSETS=Object.freeze({
  DitchFireSmoke:{url:'./Volume/Volume_DitchFireSmoke.bin.gz?v=2026112401',albedo:[.061,.057,.054],
    source:'authored',frameCount:12,description:'Rolling fire plume above the left bank of the sunken road'},
  EastSmokeBank:{url:'./Volume/Volume_EastSmokeBank.bin.gz?v=2026112309',albedo:[.103,.108,.111],source:"authored",description:'Advecting soot bank and wind shear over east Gengjiazhuang'},
- EastTrackSoot:{url:'./Volume/Volume_EastTrackSoot.bin.gz?v=2026112407',albedo:[.094,.087,.084],
+ EastTrackSoot:{url:'./Volume/Volume_EastTrackSoot.bin.gz?v=2026112408',albedo:[.094,.087,.084],
    source:'authored',description:'Layered windblown soot for the east track'},
  EastTrackSoilBurst:{url:'./Volume/Volume_EastTrackSoilBurst.bin.gz?v=2026112402',albedo:[.077,.061,.050],
    bounds:[1.87,2.32,1.61],source:'authored',description:'Grounded core of the east track soil spray'},

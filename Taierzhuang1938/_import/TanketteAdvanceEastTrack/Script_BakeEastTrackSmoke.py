@@ -121,8 +121,9 @@ def MakeFrames():
         outlets = Nodes((x+roll*1.25,y+curl*.88,z+roll*1.8),OUTLETS)*(.77+.31*roll+.35*curl+.18*fine)
         distant = .022*np.exp(-.5*(((z+80+roll*4)/12)**2 + ((y-1.04-curl*.25)/.94)**2))
         density = np.clip(suspended+outlets+distant,0,1)*rim
-        levels = np.rint(np.sqrt(density)*63)
-        yield np.uint8(np.rint(levels*(255/63)))
+        # Keep all six frames and the spatial grid within the Pages asset budget.
+        levels = np.rint(np.sqrt(density)*39)
+        yield np.uint8(np.rint(levels*(255/39)))
 
 
 def MakeBurstFrames():
