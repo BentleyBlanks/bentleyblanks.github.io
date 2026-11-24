@@ -276,12 +276,70 @@ try {
       && rendered.shadow.min < 128 && rendered.shadow.max === 255);
     await Channel("beauty");
     Check("切回完整材质恢复同一画面", (await ReadPixels()).hash === rendered.beauty.hash);
+
+    const SampleTimber = () => page.evaluate(async () => {
+      const { Raycaster, Vector3 } = await import("three");
+      const stage = window.WeaponInspection.scene;
+      stage.Draw();
+      const copy = document.createElement("canvas");
+      copy.width = stage.canvas.width;
+      copy.height = stage.canvas.height;
+      const context = copy.getContext("2d");
+      context.drawImage(stage.canvas, 0, 0);
+      const pixels = context.getImageData(0, 0, copy.width, copy.height).data;
+      const model = stage.model.body.children[0], meshes = [];
+      model.traverse(object => { if (object.isMesh) meshes.push(object); });
+      const ray = new Raycaster();
+      return [
+        ["MainWood_", -.045, .16],
+        ["MainWood_", -.006, -.055],
+        ["MainWood_", .022, -.43],
+        ["UpperWood_", .045, -.40],
+        ["FrontWood_", .023, -.75],
+      ].map(([part, y, z]) => {
+        const values = [];
+        for (const dy of [-.002, 0, .002]) for (const dz of [-.012, -.006, 0, .006, .012]) {
+          const point = model.localToWorld(new Vector3(0, y + dy, z + dz)).project(stage.camera);
+          ray.setFromCamera(point, stage.camera);
+          const hit = ray.intersectObjects(meshes, false)[0];
+          if (!hit?.object.userData.hanYang173RPart?.startsWith(part)) continue;
+          const x = Math.floor((.5 + .5 * point.x) * copy.width);
+          const row = Math.floor((.5 - .5 * point.y) * copy.height);
+          const offset = (row * copy.width + x) * 4;
+          if (pixels[offset + 3] >= 250) values.push(pixels.slice(offset, offset + 3));
+        }
+        return [0, 1, 2].map(component => {
+          const sorted = values.map(value => value[component]).sort((a, b) => a - b);
+          return sorted.length >= 5 ? sorted[Math.floor(sorted.length / 2)] : null;
+        });
+      });
+    });
+    const timber = { albedo: [], roughness: [], reflection: [] };
+    for (const yaw of [0, Math.PI]) {
+      await page.evaluate(angle => window.WeaponInspection.scene.SetView(angle, .10), yaw);
+      for (const channel of Object.keys(timber)) {
+        await Channel(channel);
+        timber[channel].push(...await SampleTimber());
+      }
+    }
+    const SpreadOf = (rows, index) => Math.max(...rows.map(row => row[index])) - Math.min(...rows.map(row => row[index]));
+    Check("两侧五处木面的底色都在同一棕色范围",
+      timber.albedo.every(([r, g, b]) => r >= 40 && r <= 90 && r > g && g > b)
+      && [0, 1, 2].every(index => SpreadOf(timber.albedo, index) < 14), JSON.stringify(timber.albedo));
+    Check("木面粗糙度接近，前木反射不过亮",
+      timber.roughness.every(([r, g, b]) => r >= 105 && r <= 190 && r === g && g === b)
+      && SpreadOf(timber.roughness, 0) < 24
+      && timber.reflection.every(([r, g, b]) => r > 3 && g > 3 && b > 3 && Math.max(r, g, b) < 62)
+      && SpreadOf(timber.reflection, 2) < 28, JSON.stringify([timber.roughness, timber.reflection]));
+    await page.evaluate(([yaw, pitch]) => window.WeaponInspection.scene.SetView(yaw, pitch), beforeChannels);
+
     await Channel("ao");
     await Inspect("ZhongZheng");
     const packedAo = await ReadPixels();
-    Check("换模型保留通道，AO 分别读取打包贴图与无遮蔽默认值",
+    Check("换模型保留 AO，汉阳造同时显示接触遮蔽与无遮挡区域",
       await activeChannel.getAttribute("data-channel") === "ao" && packedAo.chromatic === 0 && packedAo.max < 255
-      && packedAo.count > 2500 && rendered.ao.min === 255);
+      && packedAo.count > 2500 && rendered.ao.chromatic === 0 && rendered.ao.min < 255 && rendered.ao.max === 255,
+      JSON.stringify({ hanYang: [rendered.ao.min, rendered.ao.max], zhongZheng: [packedAo.min, packedAo.max] }));
     await Channel("beauty");
     await page.locator("#gridToggle").click();
 

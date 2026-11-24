@@ -2,6 +2,45 @@
 import numpy as np
 
 
+def ShapeFrontBandFace(streams, bounds):
+    """Fit the visible end profile and fade into the surrounding cosmetic mesh."""
+    low, high = bounds
+    height = high[1] - low[1]
+    fade = high[2] - low[2]
+    points = streams['POSITION'].astype(np.float64)
+    endWeight = np.clip((high[2] + fade - points[:, 2]) / fade, 0., 1.)
+    blend = endWeight * endWeight * (3. - 2. * endWeight)
+    blendSlope = -6. * endWeight * (1. - endWeight) / fade
+    level = (points[:, 1] - low[1]) / height
+    heel = np.clip(level / .25, 0., 1.)
+    flat = 1. - heel * heel * (3. - 2. * heel)
+    drop = .68 * level * flat
+    widthScale = 1. - .163 * blend
+    heightScale = 1. - .68 * blend * (flat - level * 24. * heel * (1. - heel))
+    widthSlope = -.163 * points[:, 0] * blendSlope
+    heightSlope = -height * drop * blendSlope
+    points[:, 0] *= widthScale
+    points[:, 1] -= height * drop * blend
+    result = {**streams, 'POSITION': points.astype('<f4')}
+    if 'NORMAL' not in streams:
+        return result
+    normal = streams['NORMAL'].astype(np.float64)
+    normal[:, 0] /= widthScale
+    normal[:, 1] /= heightScale
+    normal[:, 2] -= widthSlope * normal[:, 0] + heightSlope * normal[:, 1]
+    normal /= np.linalg.norm(normal, axis=1)[:, None]
+    result['NORMAL'] = normal.astype('<f4')
+    if 'TANGENT' in streams:
+        tangent = streams['TANGENT'].copy()
+        direction = tangent[:, :3].astype(np.float64)
+        direction[:, 0] = widthScale * direction[:, 0] + widthSlope * direction[:, 2]
+        direction[:, 1] = heightScale * direction[:, 1] + heightSlope * direction[:, 2]
+        direction -= np.sum(direction * normal, axis=1)[:, None] * normal
+        tangent[:, :3] = direction / np.linalg.norm(direction, axis=1)[:, None]
+        result['TANGENT'] = tangent
+    return result
+
+
 def FollowFrontBandOutline(streams, bandBounds):
     """Carry the existing outer band curve into the end of the visible timber."""
     low, high = bandBounds
@@ -18,7 +57,7 @@ def FollowFrontBandOutline(streams, bandBounds):
     points[selected,2] += blend*h*h*bow
     shaped = {**streams, 'POSITION':points.astype('<f4')}
     if 'NORMAL' not in streams:
-        return shaped
+        return ShapeFrontBandFace(shaped, bandBounds)
     slope = 4.*blend*h*bow/height
     scale = 1.-.08*blend*h*h-6.*t*(1.-t)*h*h*bow/width
     assert np.all(scale > 0.)
@@ -36,7 +75,7 @@ def FollowFrontBandOutline(streams, bandBounds):
         v -= np.sum(v*n,axis=1)[:,None]*n
         tangents[selected,:3] = v/np.linalg.norm(v,axis=1)[:,None]
         shaped['TANGENT'] = tangents
-    return shaped
+    return ShapeFrontBandFace(shaped, bandBounds)
 
 
 def ShapeStockEnd(name, streams, bounds):
@@ -55,6 +94,12 @@ def ShapeStockEnd(name, streams, bounds):
     falloff = 1.-t*t*(3.-2.*t)
     bow = .40*(.46*side**2+.38*side**6)-.92*level*(1.-level)
     points[selected,2] -= width*bow*falloff
+    insetSlope = 1.
+    if name.startswith('MainWood_'):
+        # Seat the cosmetic wood end under the backplate's visible surface.
+        inset = np.clip((points[selected,2] - low[2] + .41*depth) / (.84*depth), 0., 1.)
+        points[selected,2] -= .13*depth * inset**2 * (3.-2.*inset)
+        insetSlope -= (.13/.84) * 6.*inset*(1.-inset)
     result = {**streams, 'POSITION':points.astype('<f4')}
     if 'NORMAL' not in streams:
         return result
@@ -62,6 +107,9 @@ def ShapeStockEnd(name, streams, bounds):
     dy = .92*width/height*(1.-2.*level)*falloff
     dy *= (source[:,1]>=low[1]) & (source[:,1]<=high[1])
     dz = 1.-width*bow*6.*t*(1.-t)/(2.77*depth)
+    dx *= insetSlope
+    dy *= insetSlope
+    dz *= insetSlope
     assert dz.min() > .6
     normals = streams['NORMAL'].copy()
     n = normals[selected].astype(np.float64)
@@ -86,6 +134,7 @@ def ShapeBandProfile(name, streams):
     if not front and name != 'RearBand_ControlledCrown':
         return streams
     points = streams['POSITION'].astype(np.float64)
+    bounds = points.min(axis=0), points.max(axis=0)
     height = np.ptp(points[:, 1])
     width = np.ptp(points[:, 2])
     h = 2 * (points[:, 1] - points[:, 1].min()) / height - 1
@@ -101,18 +150,17 @@ def ShapeBandProfile(name, streams):
         scale, offset, slope = .85, 0., 0.
     points[:, 2] = anchor + (points[:, 2] - anchor) * scale + offset
     shaped = {**streams, 'POSITION': points.astype('<f4')}
-    if 'NORMAL' not in streams:
-        return shaped
-    normal = streams['NORMAL'].astype(np.float64)
-    normal[:, 2] /= scale
-    normal[:, 1] -= slope * normal[:, 2]
-    normal /= np.linalg.norm(normal, axis=1)[:, None]
-    shaped['NORMAL'] = normal.astype('<f4')
-    if 'TANGENT' not in streams:
-        return shaped
-    tangent = streams['TANGENT'].copy()
-    direction = tangent[:, :3].astype(np.float64)
-    direction[:, 2] = slope * direction[:, 1] + scale * direction[:, 2]
-    direction -= np.sum(direction * normal, axis=1)[:, None] * normal
-    tangent[:, :3] = direction / np.linalg.norm(direction, axis=1)[:, None]
-    return {**shaped, 'TANGENT': tangent}
+    if 'NORMAL' in streams:
+        normal = streams['NORMAL'].astype(np.float64)
+        normal[:, 2] /= scale
+        normal[:, 1] -= slope * normal[:, 2]
+        normal /= np.linalg.norm(normal, axis=1)[:, None]
+        shaped['NORMAL'] = normal.astype('<f4')
+    if 'TANGENT' in streams:
+        tangent = streams['TANGENT'].copy()
+        direction = tangent[:, :3].astype(np.float64)
+        direction[:, 2] = slope * direction[:, 1] + scale * direction[:, 2]
+        direction -= np.sum(direction * normal, axis=1)[:, None] * normal
+        tangent[:, :3] = direction / np.linalg.norm(direction, axis=1)[:, None]
+        shaped['TANGENT'] = tangent
+    return ShapeFrontBandFace(shaped, bounds) if front else shaped

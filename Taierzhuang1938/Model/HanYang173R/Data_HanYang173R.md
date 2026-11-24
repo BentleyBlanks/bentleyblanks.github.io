@@ -162,6 +162,12 @@ The side photograph shows the band rib narrowing above a darker lower margin. A 
 
 The three rear-band details use eight revised images. The other 126 embedded images retain their R24 bytes. All index and vertex streams outside the solid lower face also retain their R24 bytes. The game and published model use the native base-colour workflow introduced in R24.
 
+### R26 inspection bench finish
+
+The three timber atlases share an object-space walnut stain and grain field. Local dents and abrasion vary the pigment, normal and roughness. The fore-end's satin lobe and the stock's localized oil mask carry the sheen. The inspector checks Albedo, Roughness and Reflection on both sides of the game GLB.
+
+The front band has a taller outline and a flatter lower turn, based on the published front-band photograph. The wood end follows the visible shell. The assembled end is an estimate informed by the side photograph. At the butt, the wood sits beneath the backplate surface. See the `FrontSeam` and `ButtCap` views in the Blender review. [Xu Jilin, Chinese National Geography gallery](https://www.dili360.com/ch/mag/detail/62.htm) · [Steven Lu, side photograph](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.

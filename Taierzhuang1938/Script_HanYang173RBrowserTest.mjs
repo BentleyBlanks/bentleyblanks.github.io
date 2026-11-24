@@ -33,14 +33,14 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261124R25');assert.equal(evidence.identity.triangles,77396);
+ assert.equal(evidence.identity.version,'173R-20261125R26');assert.equal(evidence.identity.triangles,77396);
  assert.equal(evidence.identity.worldTriangles,77396);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  const timber=evidence.identity.materials.filter(material=>/^(MainWood_|FrontWood_|UpperWood_)/.test(material.part));
- assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-(material.part.startsWith('FrontWood_')?.54:material.part.startsWith('UpperWood_')?.17:.24))<1e-5),'game preserves the distinct authored timber reflectances');
+ assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-.17)<1e-5),'game preserves the shared walnut reflectance');
  const oil=timber.find(material=>material.part.startsWith('MainWood_'));
- assert(oil.filmMap&&Math.abs(oil.coat-.34)<1e-5&&Math.abs(oil.coatRough-.18)<1e-5&&['','srgb-linear'].includes(oil.filmSpace),'the game binds the linear crest-finish mask and both physical factors');
+ assert(oil.filmMap&&Math.abs(oil.coat-.20)<1e-5&&Math.abs(oil.coatRough-.33)<1e-5&&['','srgb-linear'].includes(oil.filmSpace),'the game binds the linear crest-finish mask and both physical factors');
  const foreOil=timber.find(material=>material.part.startsWith('FrontWood_'));
- assert(foreOil.filmMap&&Math.abs(foreOil.coat-.72)<1e-5&&Math.abs(foreOil.coatRough-.245)<1e-5&&['','srgb-linear'].includes(foreOil.filmSpace),'front film has its own linear wear mask and broad reflection');
+ assert(foreOil.filmMap&&Math.abs(foreOil.coat-.20)<1e-5&&Math.abs(foreOil.coatRough-.36)<1e-5&&['','srgb-linear'].includes(foreOil.filmSpace),'front film has its own linear wear mask and broad reflection');
  assert(timber.filter(material=>material!==oil&&material!==foreOil).every(material=>!material.filmMap&&material.coat===0));
  for(const m of evidence.identity.materials){
   assert.equal(m.authored,true,m.part);assert.equal(m.materialClass,'authored',m.part);assert.equal(m.skin,false,m.part);

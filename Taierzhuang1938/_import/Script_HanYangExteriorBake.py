@@ -20,7 +20,7 @@ detailMaps = np.load(revision/'Data_DetailUv.npz', allow_pickle=False)
 contactFields = np.load(revision/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(revision/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261124R25'
+version = '173R-20261125R26'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling;
@@ -209,7 +209,7 @@ for node in doc['nodes']:
     frontFilm=name.startswith('FrontWood_')
     targets=[context.texture((size,size),4) for role in range(4 if oiledStock or frontFilm else 3)]; frame=context.framebuffer(targets);frame.use();frame.clear();context.viewport=(0,0,size,size)
     program['wood']=wood;program['foreEnd']=name.startswith('FrontWood_');program['knob']=name=='HandleSphere';program['buttCap']=name.startswith('ButtCap_');program['worn']=1.0 if name.startswith(('Handle','RearSmall','MiddleSide','SideWood','FrontBand','RearBand')) else .16
-    program['handguard']=name.startswith('UpperWood_');program['stock']=oiledStock
+    program['handguard']=name.startswith('UpperWood_')
     program['longShell']=name.startswith('LongOuterSteel_')
     program['underTrim']=name=='FrontSideBoss_LowRoundedExterior'
     across=Attribute('POSITION')[:,0];program['acrossRange']=(float(across.min()),float(across.max()))
@@ -228,7 +228,8 @@ for node in doc['nodes']:
         tex.use(unit);program[uniform]=unit
     vao.render()
     material=doc['materials'][prim['material']];pbr=material['pbrMetallicRoughness']; slots=[pbr['baseColorTexture'],pbr['metallicRoughnessTexture'],material['normalTexture']]
-    if wood:material.setdefault('extensions',{})['KHR_materials_specular']={'specularFactor':.54 if name.startswith('FrontWood_') else .17 if name.startswith('UpperWood_') else .24}
+    if wood:
+        material.setdefault('extensions',{})['KHR_materials_specular']={'specularFactor':.17}
     if name in contactFields:
         material['occlusionTexture']={**pbr['metallicRoughnessTexture'],'strength':.85}
     for channel,(role,slot) in enumerate(zip(['BaseColor','ORM','Normal'],slots)):
@@ -268,7 +269,11 @@ for frontFilm,material,imageName,content,rawDigest,coverage in sorted(filmPayloa
     doc['images'].append({'name':imageName,'mimeType':'image/webp','bufferView':NewView(content)})
     doc['textures'].append({'sampler':0,'extensions':{'EXT_texture_webp':{'source':imageIndex}}})
     report['texturePayloads'].append({'name':imageName,'mimeType':'image/webp','sha256':hashlib.sha256(content).hexdigest(),'sourceSha256':rawDigest,'islandCoverage':round(coverage,6),'rebake':True})
-    material['extensions']['KHR_materials_clearcoat']={'clearcoatFactor':.72 if frontFilm else .34,'clearcoatTexture':{'index':textureIndex},'clearcoatRoughnessFactor':.245 if frontFilm else .18}
+    material['extensions']['KHR_materials_clearcoat']={
+        'clearcoatFactor': .20,
+        'clearcoatTexture': {'index':textureIndex},
+        'clearcoatRoughnessFactor': .36 if frontFilm else .33,
+    }
 used=sorted({a['bufferView'] for a in doc['accessors']}|{i['bufferView'] for i in doc['images']});lookup={};views=[];payload=bytearray()
 for index in used:
     lookup[index]=len(views);data=blocks[index];views.append(dict(doc['bufferViews'][index],byteOffset=len(payload),byteLength=len(data)));payload.extend(data);payload.extend(bytes((-len(payload))%4))
@@ -297,7 +302,7 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R25: tapered rear-band relief, patinated heel and solid display trim with a hanging worn loop. Portable calibrated base colour and prior wood finish retained.'
+report['rebake']='R26: unified walnut finish with restrained satin reflection, shaped front band silhouette and seated stock trim.'
 report['exteriorFinish']['ringPresentation']=ringPresentation
 report['exteriorFinish']['frontTrimPresentation']='Underside silhouette, rigid display pose estimated from the Lu profile photograph.'
 report['exteriorFinish']['closedFittings']={name:{'before':before,'after':faces.size//3} for name,(_,faces,before) in closedFittings.items()}

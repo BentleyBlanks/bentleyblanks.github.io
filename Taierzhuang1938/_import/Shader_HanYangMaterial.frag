@@ -2,7 +2,7 @@
 in vec3 point,faceNormal;
 in vec4 basis;
 in float visibility,woodExposure;
-uniform bool wood,band,guard,disk,knob,buttCap,foreEnd,handguard,stock,longShell,underTrim;
+uniform bool wood,band,guard,disk,knob,buttCap,foreEnd,handguard,longShell,underTrim;
 uniform float seed,worn;
 uniform vec2 alongRange;
 uniform int steelFamily,finishGroup,trimFinish;
@@ -37,23 +37,6 @@ float flecks(vec2 coord){
 }
 float strokeDistance(vec2 p,vec2 start,vec2 end){
  vec2 line=end-start;return length(p-start-line*clamp(dot(p-start,line)/dot(line,line),0.,1.));
-}
-vec2 wornFibre(vec2 surface,float seedValue){
- vec2 field=surface*vec2(53.,76.)+seedValue;
- vec2 cell=floor(field),inside=fract(field);
- vec2 anchor=.24+.52*vec2(hash21(cell+.71),hash21(cell+5.38));
- float angle=mix(-1.24,1.38,hash21(cell+11.4));
- vec2 axis=vec2(cos(angle),sin(angle)),delta=(inside-anchor)/vec2(53.,76.);
- float axial=dot(delta,axis)/mix(.0008,.0038,hash21(cell+7.39));
- float curve=dot(delta,vec2(-axis.y,axis.x))+.00024*(axial*axial-.5);
- float trans=curve/mix(.00018,.00064,hash21(cell+13.8));
- float mask=1.-smoothstep(.42,1.,abs(axial)+abs(trans)*(.61+.39*abs(axial)));
- float cluster=softNoise(surface*vec2(13.,21.)+seedValue);
- float visibleCell=smoothstep(.47,.78,.64*hash21(cell+9.6)+.36*cluster);
- float fibres=softNoise(surface*vec2(2200.,3100.)+3.4);
- float tear=mask*visibleCell*(.70+.30*fibres);
- float edge=tear*smoothstep(-.30,.70,trans);
- return vec2(tear,edge);
 }
 struct WearSample{vec3 marks;float freshness;};
 WearSample stockPatina(vec2 position,float sidePhase){
@@ -150,16 +133,6 @@ vec2 crestFibreWear(vec2 face){
  chip=max(chip,compressedFibre(face,vec2(0.25758,0.12360),vec2(0.25652,0.19720),vec2(0.25539,0.23800),0.026,0.42,0.06));
  return chip;
 }
-float neckPore(vec2 surface){
- vec2 plane=surface*vec2(365.,935.);
- plane.y+=.42*softNoise(surface*vec2(41.,125.)+2.54);
- vec2 cell=floor(plane),delta=fract(plane)-.5;
- delta-=(vec2(hash21(cell+3.71),hash21(cell+.89))-.5)*.47;
- delta.y+=delta.x*(.34*hash21(cell+2.15)-.17);
- vec2 radius=vec2(.26+.17*hash21(cell+1.89),.20+.12*hash21(cell+5.26));
- float hollow=1.-smoothstep(.32,1.12,length(delta/radius));
- return hollow*smoothstep(.26,.74,hash21(cell+7.41))*(.56+.44*softNoise(surface*vec2(63.,189.)));
-}
 #endif
 vec2 observedForeWear(vec2 face){
  vec2 bed=compressedFibre(face,vec2(.2794,.6006),vec2(.2812,.5033),vec2(.2828,.3965),.043,.90,.18);
@@ -224,321 +197,109 @@ void main(){
  float rough,metal;
  vec3 visible;
  if(wood){
-  vec3 weights=pow(abs(normal),vec3(3));weights/=max(weights.x+weights.y+weights.z,.0001);
-  vec2 swatch=vec2(.14+.024*seed,.267+.081*seed);
-  layer(p,normal,along,up,vec2(1.12,1.69),swatch,weights.y,color,surface,gradient);
-  layer(p,normal,along,across,vec2(1.12,1.69),swatch+vec2(0,.088),weights.z,color,surface,gradient);
-  layer(p,normal,across,up,vec2(2.9,2.3),swatch+vec2(.32,.22),weights.x,color,surface,gradient);
+  // The three pieces share a stain and a grain field in author space. The atlas
+  // boundaries only change where the samples are stored.
+  vec3 weights=pow(abs(normal),vec3(3));
+  weights/=max(weights.x+weights.y+weights.z,.0001);
+  const vec2 swatch=vec2(.171,.407);
   float drift=.0018*sin(p.x*22.+p.y*34.)+.00075*sin(p.x*65.+p.z*52.);
-  vec3 fibresPoint=p+vec3(0.,drift,drift)+vec3(0.,.046,.073)*p.x;
-  layer(fibresPoint,normal,along,up,vec2(2.95,9.8),swatch+.31,weights.y,fineColor,fineSurface,fineGradient);
-  layer(fibresPoint,normal,along,across,vec2(2.95,9.8),swatch+.40,weights.z,fineColor,fineSurface,fineGradient);
-  layer(p,normal,across,up,vec2(6.9,9.1),swatch+.27,weights.x,fineColor,fineSurface,fineGradient);
-  surface.x=mix(surface.x,fineSurface.x,.32);gradient=mix(gradient,fineGradient,.67);
-  float wrist=patch(p,vec3(.019,0,.008),vec3(.097,.055,.036));
-  float comb=patch(p,vec3(-.146,0,.004),vec3(.12,.036,.024));
-  float fore=patch(p,vec3(.408,0,.014),vec3(.17,.048,.030));
-  float contact=clamp(.76*wrist+.44*comb+.52*fore,0.,1.);
-  float radial=fibresPoint.z+11.*p.y*p.y+.15*p.y;
-  float branch=.00043*softNoise(vec2(p.x*74.,radial*320.))+.00019*softNoise(vec2(p.x*240.,radial*780.));
-  float stripe=softNoise(vec2(p.x*132.,(radial+branch)*2870.))*.52+softNoise(vec2(p.x*322.,(radial-branch)*5360.))*.48;
-  float openPore=smoothstep(.49,.76,1.-stripe)*smoothstep(.37,.66,1.-luma(fineColor));
-  float polishField=softNoise(vec2(p.x*9.,radial*68.)+seed*.31);
-  float rubbedWood=smoothstep(.33,.85,.53*polishField+.27*contact+.20*luma(color));
-  float figure=smoothstep(.36,.64,luma(color));
-  float fibre=smoothstep(.36,.62,luma(fineColor));
-  float amber=smoothstep(.30,.79,.28*figure+.33*fibre+.33*stripe+.12*rubbedWood);
-  vec3 wearRgb=vec3(0),wearSlope=vec3(0);float wearRough=0.;
+  vec3 grainPoint=p+vec3(0.,drift,drift)+vec3(0.,.046,.073)*p.x;
+  layer(grainPoint,normal,along,up,vec2(2.95,9.8),swatch,weights.y,color,surface,gradient);
+  layer(grainPoint,normal,along,across,vec2(2.95,9.8),swatch+vec2(0,.088),weights.z,color,surface,gradient);
+  layer(p,normal,across,up,vec2(6.9,9.1),swatch+vec2(.32,.22),weights.x,color,surface,gradient);
+  vec3 wearRgb=vec3(0.),wearSlope=vec3(0.);
+  float wearRough=0.;
   for(int plane=0;plane<3;plane++){
    vec3 axisU=plane==1?up:across,axisV=plane==0?up:along;
-   vec2 grainUv=vec2(dot(fibresPoint,axisU),dot(fibresPoint,axisV))*vec2(7.3,4.9)+swatch+vec2(.191,.097)*float(plane);
+   vec2 grainUv=vec2(dot(grainPoint,axisU),dot(grainPoint,axisV))*vec2(7.3,4.9)+swatch+vec2(.191,.097)*float(plane);
    wearRgb+=weights[plane]*textureLod(wearColor,grainUv,0.).rgb;
    wearRough+=weights[plane]*textureLod(wearSurface,grainUv,0.).r;
-   vec3 bump=textureLod(wearNormal,grainUv,0.).rgb*2.-1.;vec3 slope=(bump.x*axisU+bump.y*axisV)/max(.32,bump.z);
-   wearSlope+=weights[plane]*(slope-normal*dot(slope,normal));
+   vec3 sampleNormal=textureLod(wearNormal,grainUv,0.).rgb*2.-1.;
+   vec3 slope=(sampleNormal.x*axisU+sampleNormal.y*axisV)/max(.32,sampleNormal.z);
+   wearSlope+=weights[plane]*(slope-normal*dot(normal,slope));
   }
-  float openGrain=1.-smoothstep(.15,.233,luma(wearRgb));
-  float timberValue=clamp((luma(wearRgb)-.203)*4.8,-.37,.43);
-  visible=vec3(.302,.171,.104)*(1.+timberValue+.22*(amber-.5))+.36*(wearRgb-vec3(.26,.188,.129));
-  visible.r=.272+.38*max(0.,visible.r-.222)-.013*openGrain;
-  float sheltered=smoothstep(.28,.88,abs(normal.y))*(1.-.44*contact);
-  float stain=sheltered*(.46+.54*smoothstep(.23,.76,openGrain+.17*(1.-stripe)));
-  vec3 darkOil=vec3(.182,.124,.085)*(1.+.80*timberValue+.28*(fibre-.5));
-  visible=mix(visible,darkOil,vec3(.29,.68,.58)*stain);
-  visible.r=max(visible.r,.282-.009*openGrain);
-  float sideGrain=smoothstep(.36,.88,abs(normal.y));
-  float annual=softNoise(vec2(p.x*29.,(radial+branch)*845.));
-  float darkFibre=smoothstep(.42,.72,.52*annual+.28*(1.-stripe)+.20*openGrain);
-  float rubbedStock=1.-smoothstep(.18,.35,abs(p.x-.16));
-  float oil=sideGrain*(.24+.76*darkFibre)*(1.-rubbedStock);
-  visible*=mix(vec3(1.),vec3(.50,.66,.73),oil);
-  visible+=sideGrain*(1.-darkFibre)*vec3(.001,.024,.007);
-  vec2 fibres=vec2(p.x*27.,(radial+branch+.00057*sin(31.*p.x+1.6*annual))*1650.);
-  float strand=.64*softNoise(fibres)+.36*softNoise(fibres*vec2(2.3,2.1)+1.7);
-  float pores=smoothstep(.49,.77,.51*strand+.28*openGrain+.21*annual);
-  float sideStain=sideGrain*(.16+.63*pores+.14*annual);
-  vec3 walnut=visible*vec3(.63,.77,.86)+vec3(.013,.007,.003)*(1.-pores);
-  visible=mix(visible,walnut,sideStain);
-  visible+=sideGrain*(1.-pores)*(.38+.62*timberValue)*vec3(.013,.018,.008);
-  float handledTimber=sideGrain*rubbedStock;
-  visible.r=mix(visible.r,max(visible.r,.284-.011*pores),.90*handledTimber);
-  visible.g+=.013*handledTimber;
-  rough=clamp(.54+1.55*(surface.x-.55)+.47*(wearRough-.52)+.054*openPore-.17*rubbedWood,.34,.79);
-  rough=clamp(rough+.07*pores-.045*sideGrain*(1.-pores),.32,.80);
-  float poreSlope=softNoise(fibres+vec2(0.,.14))-softNoise(fibres-vec2(0.,.14));
-  metal=0.;gradient=(1.25*gradient+1.25*wearSlope)*(1.-.32*rubbedWood)
-      +sideGrain*(up-normal*dot(up,normal))*.21*poreSlope;
-  float driftGrain=p.z+8.*p.y*p.y-.14*p.x+.0019*softNoise(vec2(p.x*31.,p.z*82.));
-  vec2 ribbons=vec2(p.x*30.,driftGrain*1010.);
-  float split=.56*softNoise(ribbons+vec2(.0,1.2*annual))+.29*softNoise(ribbons*vec2(2.7,1.9))+.15*openGrain;
-  float longPore=smoothstep(.39,.70,split);
-  float shortFibre=smoothstep(.51,.74,.46*softNoise(vec2(p.x*295.,driftGrain*3700.))+.32*(1.-split)+.22*fibre);
-  float fibrePhase=softNoise(vec2(p.x*109.,radial*4330.)+2.4*strand);
-  float showing=sideGrain*(1.-.48*contact);
-  float oldOil=showing*(.32+.59*longPore+.09*(1.-shortFibre));
-  vec3 smoked=visible*vec3(.54,.56,.65)+vec3(.010,.012,.014);
-  visible=mix(visible,smoked,oldOil);
-  visible+=showing*shortFibre*(1.-longPore)*vec3(.042,.024,.005);
-  float rubbedFlank=smoothstep(.10,.89,normal.y)*rubbedStock;
-  float agedFlank=rubbedFlank*(.48+.52*longPore);
-  visible=mix(visible,visible*vec3(.43,.51,.63)+vec3(.005,.004,.003),agedFlank);
-  visible+=showing*(fibrePhase-.5)*vec3(.038,.029,.018);
-  visible*=mix(vec3(1.),vec3(.64,.69,.73),rubbedFlank);
-  rough=clamp(rough-.15*oldOil+.045*longPore,.29,.78);
-  gradient+=showing*(up-normal*dot(up,normal))*.23*(softNoise(ribbons+vec2(0,.16))-softNoise(ribbons-vec2(0,.16)));
-  float handPolish=smoothstep(.25,.95,-normal.y)*rubbedStock;
-  visible.r=mix(visible.r,max(visible.r,.286-.010*pores),.97*handPolish);
-  visible.g+=.012*handPolish;
-  float cavityOil=1.-woodExposure;
-  visible*=1.-.13*cavityOil;rough=clamp(rough+.046*cavityOil,.29,.82);
-  float crestWood=(1.-smoothstep(-.06,.080,p.x))*smoothstep(.13,.83,normal.z);
-  float intactOil=crestWood*(.66+.26*(1.-shortFibre)+.08*rubbedWood);
-  vec3 darkTimber=visible*vec3(.51,.52,.52)+vec3(.006,.004,.002);
-  visible=mix(visible,darkTimber,intactOil);
-  float satinRough=clamp(.285+.11*openGrain+.05*(1.-rubbedWood)+.055*(wearRough-.5),.27,.47);
-  rough=mix(rough,satinRough,intactOil);
-  gradient*=1.-.63*intactOil;
-  float crestSheen=crestWood*(.68+.32*polishField)*(1.-.30*openGrain);
-  finishMask.r=clamp(crestSheen,0.,1.);
-  if(handguard){
-   float wane=.48*figure+.32*longPore+.20*polishField;
-   float oldCoat=smoothstep(.15,.70,normal.z)*(.41+.54*wane)+sideGrain*(.43+.26*wane);
-   float widthNoise=softNoise(vec2(p.x*47.,radial*415.));
-   vec3 underFinish=mix(visible,vec3(luma(visible))*.82,.63);
-   visible=mix(visible,underFinish*vec3(.48,.64,.74),clamp(oldCoat,0.,.94));
-   rough=clamp(rough-.056*oldCoat+.028*(widthNoise-.5),.31,.82);
-   gradient*=1.-.24*oldCoat;
-   float oldFlank=sideGrain*(.55+.34*wane);
-   float oldTone=.093+.19*timberValue+.045*(fibre-.5)+.034*(fibrePhase-.5);
-   vec3 retained=visible*vec3(.70,.78,.80);
-   vec3 stainBody=mix(retained,vec3(1.,1.035,.96)*max(.047,oldTone),.38);
-   visible=mix(visible,stainBody,oldFlank*.87);
-   float weatherDetail=textureLod(wearColor,vec2(p.z+.21*p.y,p.x)*vec2(17.8,11.1)+swatch,0.).g;
-   visible*=mix(vec3(1.),vec3(.81,.84,.84)*clamp(1.+1.52*(weatherDetail-.19),.78,1.22),oldFlank);
-   visible=linearToDisplay(displayToLinear(visible)*vec3(.75,.78,.73));
-   rough=clamp(rough+.060*oldFlank,.31,.84);
-  }
-  float foreFlank=stock?sideGrain*smoothstep(.245,.319,p.x)*(1.-smoothstep(.565,.603,p.x)):0.;
-  if(foreFlank>0.){
-   vec2 grainPlane=vec2(p.x,p.z+.28*p.y);
-   vec2 swab=vec2(grainPlane.y*7.1,grainPlane.x*3.4)+vec2(.23,.19);
-   vec3 weather=textureLod(wearColor,swab,0.).rgb;
-   float dry=clamp((luma(weather)-.153)*8.8,0.,1.);
-   float handling=foreFlank*(.65+.22*softNoise(grainPlane*vec2(9.,52.))+.10*(1.-pores));
-   float grainBed=softNoise(grainPlane*vec2(122.,480.)+.47*softNoise(grainPlane*vec2(23.,91.)));
-   float dust=softNoise(grainPlane*vec2(810.,1030.)+.73*grainBed);
-   float lifted=.183+.114*dry+.135*(grainBed-.5)+.062*(polishField-.5)+.058*(stripe-.5)+.075*(dust-.5);
-   vec3 exposedWood=vec3(1.12,1.00,.87)*lifted;
-   visible=mix(visible,exposedWood,handling*.87);
-   vec2 tear=wornFibre(grainPlane,2.7+float(p.y<0.)*4.);
-   visible=mix(visible,vec3(.435,.374,.295),tear.x*.63*foreFlank);
-   float rubbedRough=textureLod(wearSurface,swab,0.).r;
-   rough=clamp(mix(rough,.45+.14*openGrain+.35*(rubbedRough-.54),handling)+.075*tear.x,.33,.81);
-   vec3 wornDetail=textureLod(wearNormal,swab,0.).rgb*2.-1.;
-   vec3 wornSlope=(up+.28*across)*wornDetail.x+along*wornDetail.y;
-   gradient=mix(gradient,.88*(wornSlope-normal*dot(wornSlope,normal)),.56*handling);
-   vec2 stepAt=vec2(.00017,0.);
-   vec2 dent=vec2(wornFibre(grainPlane+stepAt,2.7+float(p.y<0.)*4.).x-wornFibre(grainPlane-stepAt,2.7+float(p.y<0.)*4.).x,
-                  wornFibre(grainPlane+stepAt.yx,2.7+float(p.y<0.)*4.).x-wornFibre(grainPlane-stepAt.yx,2.7+float(p.y<0.)*4.).x);
-   vec3 wearSlopeField=along*dent.x+up*dent.y;
-   gradient+=.39*foreFlank*(wearSlopeField-normal*dot(wearSlopeField,normal));
-  }
-  if(stock&&p.x<.012){
-   float flank=sideGrain*(1.-smoothstep(-.15,-.065,p.x));
-   float wearReach=sideGrain*(1.-smoothstep(-.110,.012,p.x));
-   float protectedTop=smoothstep(.20,.77,normal.z);
-   wearReach*=1.-.87*protectedTop;
-   vec2 face=vec2(p.x,p.z+.20*p.y)*vec2(121.,136.);
-   float torn=flecks(face+vec2(8.,13.))*smoothstep(.52,.74,softNoise(face*.39));
-   float poreTint=flank*(.48+.42*softNoise(vec2(p.x*26.,p.z*92.)));
-   vec3 darkPatina=mix(visible,vec3(luma(visible)),.25)*vec3(.71,.78,.79);
-   visible=mix(visible,darkPatina,poreTint);
-   visible=mix(visible,vec3(.35,.284,.185),.57*torn*flank);
-   rough=clamp(rough-.05*poreTint+.14*torn,.29,.81);
-   vec2 slope=vec2(flecks(face+vec2(8.10,13.))-flecks(face+vec2(7.90,13.)),flecks(face+vec2(8.,13.10))-flecks(face+vec2(8.,12.90)));
-   vec3 direction=along*slope.x+up*slope.y;
-   gradient+=.19*flank*smoothstep(.52,.74,softNoise(face*.39))*(direction-normal*dot(direction,normal));
-   vec2 grainPlane=vec2(p.x,p.z+.20*p.y);
-   float phase=8.26+float(p.y<0.)*7.;
-   vec2 chip=wornFibre(grainPlane,phase);
-   float haze=smoothstep(.25,.83,softNoise(grainPlane*vec2(18.,32.)+4.91))*.36;
-   float shade=.152+.028*(polishField-.5)+.055*timberValue;
-   visible=mix(visible,mix(vec3(shade)*vec3(1.22,1.06,.82),vec3(luma(visible))*.94,.18),flank*(.45+haze));
-   float weatherSpecimen=luma(textureLod(wearColor,vec2(grainPlane.y,grainPlane.x)*vec2(23.,14.4)+swatch,0.).rgb);
-   visible*=mix(vec3(1.),vec3(1.01,1.015,.89),flank)*(1.+flank*clamp(2.15*(weatherSpecimen-.20)+.17*(fibrePhase-.5),-.23,.24));
-   visible=mix(visible,vec3(.555,.466,.335),flank*(.59*chip.x+.35*chip.y));
-   rough=clamp(rough+.038*haze+.12*chip.x*flank,.29,.82);
-   vec2 stepAt=vec2(.00015,0.);
-   vec2 nick=vec2(wornFibre(grainPlane+stepAt,phase).x-wornFibre(grainPlane-stepAt,phase).x,
-                  wornFibre(grainPlane+stepAt.yx,phase).x-wornFibre(grainPlane-stepAt.yx,phase).x);
-   vec3 chipSlopeField=along*nick.x+up*nick.y;
-   gradient+=.46*flank*(chipSlopeField-normal*dot(chipSlopeField,normal));
-   WearSample wear=stockPatina(grainPlane,phase+.54);
-   vec3 ageing=wear.marks;
-   float handlingPatch=softNoise(grainPlane*vec2(15.,28.)+.35*polishField+phase);
-   float smoothFilm=flank*(.35+.45*smoothstep(.24,.73,handlingPatch));
-   vec2 transverse=vec2(grainPlane.x+.055*grainPlane.y,grainPlane.y-.058*grainPlane.x);
-   float poresTone=softNoise(transverse*vec2(877.,1340.)+phase)-.5;
-   float stainBody=.112+.18*(handlingPatch-.5)+.43*(weatherSpecimen-.20)+.057*poresTone;
-   visible=mix(visible,vec3(1.13,1.10,.83)*clamp(stainBody,.057,.249),smoothFilm*.65);
-   float sidePolish=smoothstep(-.123,-.075,p.x)*(1.-smoothstep(-.027,.012,p.x))*sideGrain*(1.-.55*protectedTop);
-   float mellow=.179+.064*(handlingPatch-.5)+.28*(weatherSpecimen-.20)+.028*poresTone;
-   visible=mix(visible,vec3(1.03,1.,.93)*mellow,.40*sidePolish);
-   rough=clamp(rough-.075*sidePolish*(.55+.45*polishField),.30,.83);
-   float fresh=wear.freshness;
-   float openLip=smoothstep(.22,.66,ageing.y)*smoothstep(.35,.73,fresh);
-   vec3 tipTint=mix(vec3(.408,.348,.255),vec3(.598,.536,.390),fresh);
-   visible=mix(visible,tipTint,wearReach*(.62*ageing.x+.32*ageing.y));
-   visible=mix(visible,vec3(.693,.629,.486),wearReach*openLip*.68);
-   visible=mix(visible,vec3(.343,.315,.239),wearReach*(.76+.13*sidePolish)*ageing.z);
-   rough=clamp(rough-.036*smoothFilm+wearReach*(.130*ageing.x+.070*ageing.z),.30,.83);
-   vec3 nickU=stockPatina(grainPlane+stepAt,phase+.54).marks-stockPatina(grainPlane-stepAt,phase+.54).marks;
-   vec3 nickV=stockPatina(grainPlane+stepAt.yx,phase+.54).marks-stockPatina(grainPlane-stepAt.yx,phase+.54).marks;
-   vec3 cuts=along*(nickU.x+.57*nickU.z)+up*(nickV.x+.57*nickV.z);
-   gradient=gradient*(1.-.31*smoothFilm)+.54*wearReach*(cuts-normal*dot(cuts,normal));
-  }
+  float radial=grainPoint.z+8.*p.y*p.y+.067*p.y;
+  vec2 grain=vec2(p.x,radial);
+  float figure=softNoise(grain*vec2(25.,340.));
+  vec2 threads=vec2(p.x*70.,(radial+.00064*figure)*1450.);
+  float fibre=softNoise(threads);
+  float pores=smoothstep(.39,.76,.60*(1.-fibre)+.40*(1.-figure));
+  float contact=clamp(.61*patch(p,vec3(.018,0,.003),vec3(.106,.064,.044))
+                     +.49*patch(p,vec3(.422,0,.013),vec3(.29,.052,.049)),0.,1.);
+  float polish=smoothstep(.18,.91,.56*contact+.44*softNoise(grain*vec2(10.,73.)));
+  float stain=1.+.14*(figure-.5)+.22*(fibre-.5)-.075*pores-.06*(1.-woodExposure);
+  vec3 pigment=mix(color*vec3(.377,.377,.381),wearRgb*.91,.58)*stain;
+  visible=linearToDisplay(displayToLinear(pigment)*vec3(1.46,1.07,.66));
+  rough=clamp(.583+.53*(surface.x-.55)+.17*(wearRough-.89)+.079*pores-.069*polish,.46,.73);
+  if(handguard)rough+=.017;
+  metal=0.;
+  float fibreSlope=softNoise(threads+vec2(0.,.16))-softNoise(threads-vec2(0.,.16));
+  gradient=(1.36*gradient+1.08*wearSlope)*(1.-.28*polish)+.17*fibreSlope*(up-normal*normal.z);
 #ifdef STOCK_CREST_WEAR
-  if(stock){
-   float gripRegion=smoothstep(-.155,-.073,p.x)*(1.-smoothstep(.183,.257,p.x));
-   float lowerTurn=gripRegion*smoothstep(.07,.86,-normal.z);
-   float upperTurn=gripRegion*smoothstep(.17,.84,normal.z);
-   vec2 rings=(p.yz+vec2(.034,.085))*vec2(.84,1.);
-   float ringDepth=length(rings)+.024*p.x+.00064*sin(p.x*23.);
-   vec2 continuousGrain=vec2(p.x,ringDepth);
-   float ribbons=softNoise(continuousGrain*vec2(67.,1370.)+seed);
-   float pores=neckPore(continuousGrain);
-   vec3 radialAxis=vec3(.024+.01472*cos(p.x*23.),normalize(rings)*vec2(.84,1.));
-   float stepAt=.00014;
-   vec2 poreSlope=vec2(neckPore(continuousGrain+vec2(stepAt,0.))-neckPore(continuousGrain-vec2(stepAt,0.)),
-                       neckPore(continuousGrain+vec2(0.,stepAt))-neckPore(continuousGrain-vec2(0.,stepAt)));
-   vec3 fibreSlope=poreSlope.x*along+poreSlope.y*radialAxis;
-   fibreSlope-=normal*dot(fibreSlope,normal);
-   float turning=max(lowerTurn,upperTurn);
-   float oldStain=clamp(.140+.085*(ribbons-.5)+.080*timberValue-.039*pores,.064,.224);
-   vec3 continuousTone=oldStain*vec3(1.21,1.01,.81);
-   visible=mix(visible,continuousTone,.76*lowerTurn+.59*upperTurn);
-   rough=mix(rough,.50+.12*pores+.057*(1.-ribbons),.56*lowerTurn);
-   rough=mix(rough,.327+.19*pores+.045*(1.-ribbons),.66*upperTurn);
-   gradient+=turning*(.32+.24*upperTurn)*fibreSlope;
-   finishMask.r=max(finishMask.r,upperTurn*(.64+.21*rubbedWood)*(1.-.81*pores));
+  {
+   float face=smoothstep(.25,.77,abs(normal.y));
+   float crest=(1.-smoothstep(-.055,.090,p.x))*smoothstep(.31,.90,normal.z);
+   finishMask.r=crest*(.60+.30*polish)*(1.-.44*pores);
+   rough=mix(rough,.462+.098*pores,.52*crest);
+   gradient*=1.-.43*crest;
+   vec2 detail=vec2(p.x,p.z+.20*p.y);
+   if(p.x<.012){
+    float phase=8.80+float(p.y<0.)*7.;
+    float reach=face*(1.-smoothstep(-.11,.012,p.x))*(1.-.85*crest);
+    WearSample wear=stockPatina(detail,phase);
+    vec3 cuts=wear.marks;
+    visible=mix(visible,visible*vec3(1.65,1.62,1.58),reach*(.55*cuts.x+.34*cuts.y+.30*cuts.z));
+    rough=mix(rough,.71,reach*(.63*cuts.x+.27*cuts.z));
+    vec2 stepAt=vec2(.00015,0.);
+    vec3 sx=stockPatina(detail+stepAt,phase).marks-stockPatina(detail-stepAt,phase).marks;
+    vec3 sy=stockPatina(detail+stepAt.yx,phase).marks-stockPatina(detail-stepAt.yx,phase).marks;
+    vec3 nick=along*(sx.x+.52*sx.z)+up*(sy.x+.52*sy.z);
+    gradient+=.46*reach*(nick-normal*dot(nick,normal));
+   }
    if(p.x<-.025 && normal.z>.06){
-    vec2 face=(p.xy+vec2(.2455,0.))/vec2(.3192,.025);
-    vec2 scar=crestFibreWear(face);
-    float exposure=smoothstep(.06,.65,normal.z);
-    scar*=exposure;
-    vec2 sampling=vec2(.00018)/vec2(.3192,.025);
-    vec2 relief=vec2(1.,-.64);
-    vec2 slope=vec2(dot(relief,crestFibreWear(face+vec2(sampling.x,0.))-crestFibreWear(face-vec2(sampling.x,0.))),
-                    dot(relief,crestFibreWear(face+vec2(0.,sampling.y))-crestFibreWear(face-vec2(0.,sampling.y))));
-    vec3 indentation=slope.x*along+slope.y*across;
-    gradient+=exposure*(indentation-normal*dot(indentation,normal))*.93;
-    float splinter=smoothstep(-.147,-.078,p.x);
-    vec3 bed=mix(visible*.62,vec3(.265,.255,.218)*(.75+.40*ribbons),splinter*.64);
-    visible=mix(visible,bed,scar.x*.93);
-    visible=mix(visible,vec3(.465,.435,.35)*(.79+.36*stripe),scar.y*(.47+.47*splinter));
-    rough=mix(rough,.72,clamp(.85*scar.x+.72*scar.y,0.,1.));
+    vec2 facePos=(p.xy+vec2(.2455,0.))/vec2(.3192,.025);
+    vec2 scar=crestFibreWear(facePos)*smoothstep(.06,.65,normal.z);
+    vec2 stepAt=vec2(.00018)/vec2(.3192,.025);
+    const vec2 relief=vec2(1.,-.64);
+    vec3 slope=along*dot(relief,crestFibreWear(facePos+vec2(stepAt.x,0.))-crestFibreWear(facePos-vec2(stepAt.x,0.)))
+               +across*dot(relief,crestFibreWear(facePos+vec2(0.,stepAt.y))-crestFibreWear(facePos-vec2(0.,stepAt.y)));
+    gradient+=.64*smoothstep(.06,.65,normal.z)*(slope-normal*dot(slope,normal));
+    visible*=1.-.27*scar.x;
+    visible=mix(visible,visible*1.52,.64*scar.y);
+    rough=mix(rough,.73,clamp(.86*scar.x+.60*scar.y,0.,1.));
     finishMask.r*=1.-clamp(1.45*scar.x+scar.y,0.,1.);
    }
    if(p.x>-.115 && p.x<-.068 && normal.y>.14){
-    float face=smoothstep(.14,.72,normal.y);
-    vec2 stamp=stockImpressionSurface(p.xz)*face;
+    float flank=smoothstep(.14,.72,normal.y);
+    vec2 stamp=stockImpressionSurface(p.xz)*flank;
     float lip=stamp.y*(.48+.52*softNoise(p.xz*vec2(440.,690.)));
-    visible=mix(visible,visible*vec3(.40,.49,.48),.88*stamp.x);
-    visible=mix(visible,vec3(.30,.269,.216)*(.77+.28*ribbons),.45*lip);
-    rough=mix(rough,.64+.065*pores,.76*stamp.x);
-    rough=mix(rough,.36,.57*lip);
-    float stepSize=.00021;
-    vec2 relief=vec2(1.,-.32);
-    float alongSlope=dot(relief,stockImpressionSurface(p.xz+vec2(stepSize,0.))-stockImpressionSurface(p.xz-vec2(stepSize,0.)));
-    float upSlope=dot(relief,stockImpressionSurface(p.xz+vec2(0.,stepSize))-stockImpressionSurface(p.xz-vec2(0.,stepSize)));
-    vec3 reliefSlope=along*alongSlope+up*upSlope;
-    gradient+=1.12*face*(reliefSlope-normal*dot(reliefSlope,normal));
+    visible*=1.-.52*stamp.x+.15*lip;
+    rough=mix(rough,.65+.04*pores,.76*stamp.x);
+    vec2 stepAt=vec2(.00021,0.);
+    const vec2 relief=vec2(1.,-.32);
+    vec3 slope=along*dot(relief,stockImpressionSurface(p.xz+stepAt)-stockImpressionSurface(p.xz-stepAt))
+               +up*dot(relief,stockImpressionSurface(p.xz+stepAt.yx)-stockImpressionSurface(p.xz-stepAt.yx));
+    gradient+=.91*flank*(slope-normal*dot(slope,normal));
    }
   }
 #endif
   if(foreEnd){
-   float section=(p.x-alongRange.x)/(alongRange.y-alongRange.x);
-   float level=(p.z-heightRange.x)/(heightRange.y-heightRange.x);
-   vec2 face=vec2(section,level);
+   vec2 dimensions=vec2(alongRange.y-alongRange.x,heightRange.y-heightRange.x);
+   vec2 face=(p.xz-vec2(alongRange.x,heightRange.x))/dimensions;
    float reverseSide=float(p.y<0.);
-   float sideMask=smoothstep(.28,.86,abs(normal.y));
-   float rubbed=smoothstep(.23,.79,abs(normal.y))*(.42+.52*polishField)*(1.-.42*openGrain);
-   visible=mix(visible,visible*vec3(.73,.86,.99)+vec3(.005,.006,.007),sideMask*.78);
-   rough=clamp((rough-.135*rubbed)*mix(1.,.67,smoothstep(.24,.82,abs(normal.y))*(.78+.22*polishField)),.245,.81);gradient*=1.-.23*rubbed;
-   vec2 impression=foreEndImpressions(face,reverseSide)*sideMask;
-   float hollow=impression.x;
-   vec2 stepAt=.00019/vec2(alongRange.y-alongRange.x,heightRange.y-heightRange.x);
-   const vec2 reliefSign=vec2(1.,-.65);
-   vec2 slope=vec2(dot(reliefSign,foreEndImpressions(face+vec2(stepAt.x,0.),reverseSide)-foreEndImpressions(face-vec2(stepAt.x,0.),reverseSide)),
-                   dot(reliefSign,foreEndImpressions(face+vec2(0.,stepAt.y),reverseSide)-foreEndImpressions(face-vec2(0.,stepAt.y),reverseSide)));
-   vec3 dentSlope=along*slope.x+up*slope.y;
-   gradient+=.83*sideMask*(dentSlope-normal*dot(dentSlope,normal));
-   visible*=1.-.31*hollow;rough=mix(rough,.70,.76*hollow);
-   float contactZone=smoothstep(.23,.78,abs(normal.y))*smoothstep(.045,.27,level)*(1.-smoothstep(.86,.985,level));
-   float woodFace=contactZone*(.79+.18*polishField);
-   vec3 filled=mix(visible,vec3(luma(visible))*vec3(1.12,.998,.88),.64);
-   visible=mix(visible,filled,woodFace);
-   vec2 panelUv=vec2(p.z+.34*p.y,p.x)*vec2(11.5,7.8)+vec2(.41,.23)+.12*swatch;
-   vec3 panelScan=textureLod(wearColor,panelUv,0.).rgb;
-   float poresField=softNoise(vec2(p.x*290.,radial*1210.)+.62*openGrain);
-   float grainWash=softNoise(vec2(p.x*61.,radial*173.)+seed);
-   float rawFibre=smoothstep(.37,.69,.35*openGrain+.23*openPore+.22*poresField+.20*(1.-smoothstep(.15,.24,luma(panelScan))));
-   float neckWear=smoothstep(.025,.11,section)*(1.-smoothstep(.93,.995,section));
-   float interrupted=smoothstep(.37,.69,.46*grainWash+.27*poresField+.27*openGrain);
-   float filmCoverage=woodFace*neckWear*(1.-.87*rawFibre)*(1.-.75*interrupted)*(1.-smoothstep(.035,.43,hollow))*(.79+.21*woodExposure);
-   finishMask.r=clamp(filmCoverage,0.,1.);
-   rough=clamp(mix(rough,.40+.18*rawFibre,.42*filmCoverage)+.18*sideMask*interrupted+.13*rawFibre*sideMask,.25,.80);
-   vec3 scanNormal=textureLod(wearNormal,panelUv,0.).rgb*2.-1.;
-   vec3 grainSlope=(up+.34*across)*scanNormal.x+along*scanNormal.y;
-   gradient=gradient*(1.-.30*filmCoverage)+sideMask*(.21+.62*interrupted)*(grainSlope-normal*dot(grainSlope,normal));
-   if(reverseSide<.5){
-    float faceWear=sideMask*neckWear*smoothstep(.12,.34,level)*(1.-smoothstep(.78,.95,level));
-    vec2 strandUv=vec2(p.x*176.,radial*1270.)+.39*panelScan.r+seed;
-    float threads=softNoise(strandUv);
-    float brokenFinish=smoothstep(.30,.72,.46*threads+.32*interrupted+.22*grainWash);
-    float exposed=faceWear*brokenFinish*(1.-hollow);
-    vec3 paleFibres=mix(vec3(.31,.294,.265),vec3(.398,.382,.348),threads);
-    visible=mix(visible,paleFibres,.48*exposed);
-    rough=clamp(rough+.080*exposed-.037*faceWear*(1.-brokenFinish),.24,.82);
-    float fibreEdge=smoothstep(.42,.68,threads+.14*(grainWash-.5));
-    finishMask.r*=1.-.34*exposed*fibreEdge;
-    visible*=1.-.34*hollow;
-    float lip=impression.y*(1.-.69*hollow);
-    vec3 tornGrain=mix(vec3(.305,.270,.209),vec3(.560,.495,.368),threads);
-    visible=mix(visible,tornGrain,.78*lip);
-    finishMask.r*=1.-.80*lip;
-    rough=mix(rough,.67,.66*lip);
-    rough=mix(rough,.73,.48*hollow);
-    float lifted=softNoise(strandUv+vec2(0.,.26))-softNoise(strandUv-vec2(0.,.26));
-    gradient+=faceWear*(1.-.59*hollow)*(.40*(grainSlope-normal*dot(grainSlope,normal))+.46*lifted*(up-normal*normal.z));
-    float rubbedPanel=sideMask*neckWear*smoothstep(.055,.27,level)*(1.-smoothstep(.81,.98,level));
-    float scoured=smoothstep(.26,.74,.47*threads+.31*grainWash+.22*poresField);
-    float rawFace=rubbedPanel*(1.-.89*hollow)*(1.-.73*lip);
-    vec3 substrate=displayToLinear(visible);
-    vec3 faded=vec3(luma(substrate))*vec3(.995,1.,1.012);
-    substrate=mix(substrate,faded,.61*rawFace);
-    visible=linearToDisplay(substrate*mix(1.,mix(2.6,9.4,scoured),rawFace));
-   }
+   float flank=smoothstep(.28,.86,abs(normal.y));
+   vec2 cuts=foreEndImpressions(face,reverseSide)*flank;
+   vec2 stepAt=.00019/dimensions;
+   const vec2 relief=vec2(1.,-.65);
+   vec3 slope=along*dot(relief,foreEndImpressions(face+vec2(stepAt.x,0.),reverseSide)-foreEndImpressions(face-vec2(stepAt.x,0.),reverseSide))
+              +up*dot(relief,foreEndImpressions(face+vec2(0.,stepAt.y),reverseSide)-foreEndImpressions(face-vec2(0.,stepAt.y),reverseSide));
+   float margin=smoothstep(.025,.11,face.x)*(1.-smoothstep(.93,.995,face.x));
+   float wornFace=flank*margin*smoothstep(.09,.28,face.y)*(1.-smoothstep(.81,.98,face.y));
+   float rubbed=wornFace*(.58+.25*polish)*(1.-.43*pores);
+   finishMask.r=rubbed*(1.-smoothstep(.035,.43,cuts.x))*(1.-.77*cuts.y);
+   visible*=1.+.095*wornFace-.33*cuts.x+.34*cuts.y;
+   rough=clamp(rough-.067*rubbed+cuts.x*(.77-rough)*.85+.083*cuts.y,.43,.77);
+   gradient+=.64*flank*(slope-normal*dot(slope,normal));
   }
  }else{
   vec3 weights=pow(abs(normal),vec3(4));weights/=max(weights.x+weights.y+weights.z,.0001);
