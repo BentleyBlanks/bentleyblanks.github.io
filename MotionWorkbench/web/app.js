@@ -507,6 +507,14 @@ function renderTaskList() {
       })
       .join("");
 
+    const schItems = (appState.schedule?.items || []).filter(
+      (x) => x.taskId === task.id && (x.status === "pending" || x.status === "running")
+    );
+    const schBadgeHtml = schItems.length
+      ? `<span class="mwCoverSchBadge" title="已加入定时队列">定时 ${escapeHtml(appState.schedule?.runTime || "06:00")} · ${schItems
+          .map((x) => (x.kind === "stage4_mocap" ? "提骨" : "H3"))
+          .join("+")}</span>`
+      : "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = `mwActionCard ${task.id === appState.selectedTaskId ? "active" : ""}`;
@@ -515,6 +523,7 @@ function renderTaskList() {
         ${coverUrl ? `<img src="${coverUrl}" alt="${escapeHtml(task.title)}">` : `<span class="mwCoverPlaceholder">待生成封面</span>`}
         <span class="mwCoverBeat">${escapeHtml(task.beatCode || "")}</span>
         <span class="mwCoverTag ${coverTag.cls}">${coverTag.text}</span>
+        ${schBadgeHtml}
       </div>
       <div class="mwCardInfo">
         <div class="mwCardHead">
@@ -1702,7 +1711,7 @@ function renderScheduleUI() {
     row.className = `mwSchItem ${isRun ? "isRun" : ""} ${isErr ? "isErr" : ""}`;
     const kindLabel =
       it.kind === "stage4_mocap"
-        ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}`
+        ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}${it.fallbackToModal ? " → Modal兜底" : ""}`
         : `H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
     const stText = isRun ? "运行中" : isDone ? "已完成" : isErr ? "失败" : `待 ${runTime}`;
     row.innerHTML = `
@@ -1722,7 +1731,7 @@ function renderScheduleUI() {
         try {
           const res = await api(`/api/schedule/items/${encodeURIComponent(it.id)}`, { method: "DELETE" });
           appState.schedule = res.schedule;
-          renderScheduleUI();
+          renderAll();
         } catch (err) {
           toast(err.message, 3500);
         }
@@ -2418,7 +2427,8 @@ $("#btnStage3QueueSch").onclick = async () => {
       }),
     });
     appState.schedule = res.schedule;
-    renderScheduleUI();
+    renderAll();
+    setScheduleDrawer(true);
     toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（MiniMax-H3）` : "该动作已在定时队列中");
   } catch (err) {
     toast(err.message, 4000);
@@ -2438,7 +2448,8 @@ $("#btnStage4QueueSch").onclick = async () => {
       }),
     });
     appState.schedule = res.schedule;
-    renderScheduleUI();
+    renderAll();
+    setScheduleDrawer(true);
     toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（Colab 提骨）` : "该动作已在定时队列中");
   } catch (err) {
     toast(err.message, 4000);

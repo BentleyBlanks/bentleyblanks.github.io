@@ -2231,4 +2231,22 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 }
 .mwSchItemMsg { font-size: 11.5px; color: #9d998b; line-height: 1.4; word-break: break-word; }
 .mwSchItem.isErr .mwSchItemMsg { color: #efa69b; }
-.mwSchFoot { margin-top: 4px; }
+.mwSchFootSticky {
+  flex: none;
+  padding: 12px 20px;
+  border-top: 1px solid var(--rule);
+  background: #0d0f0b;
+}
+.mwCoverSchBadge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 2;
+  padding: 2px 7px;
+  border-radius: 2px;
+  background: #1d180ce8;
+  border: 1px solid var(--gold);
+  color: var(--gold-hi);
+  font: 700 10.5px var(--ui-mono);
+  letter-spacing: 0.03em;
+}
