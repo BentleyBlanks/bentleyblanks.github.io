@@ -1128,6 +1128,45 @@ async function handleApi(req, res, urlObj) {
       const takeId = `take_${Date.now().toString(36)}`;
       const takeNum = task.stage3.takes.length + 1;
       const outPath = path.join(WORKSPACE_DIR, "tasks", task.id, "videos", `${task.id}_h3_take${takeNum}.mp4`);
+      const nowMs = Date.now();
+      const appendTakeLog = (entry, rawLine) => {
+        const line = String(rawLine || "").trim();
+        if (!line) return;
+        const ts = new Date().toTimeString().slice(0, 8);
+        const formatted = /^\[\d\d:\d\d:\d\d\]/.test(line) ? line : `[${ts}] ${line}`;
+        entry.logs = entry.logs || [];
+        if (entry.logs[entry.logs.length - 1] !== formatted) {
+          entry.logs.push(formatted);
+          if (entry.logs.length > 160) entry.logs.splice(0, entry.logs.length - 160);
+        }
+        entry.updatedAt = Date.now();
+      };
+      const updateH3Progress = (entry, text) => {
+        const s = String(text || "");
+        const prev = Number(entry.progress || 5);
+        let next = prev;
+        if (/排队|等待上一条|申请.*GPU|colab new/i.test(s)) next = Math.max(next, 8);
+        else if (/已分配|复用热机|上传首帧|上传尾帧/i.test(s)) next = Math.max(next, 16);
+        else if (/下载|aria2|safetensors|权重/i.test(s)) {
+          const mPct = /\((\d{1,3})%\)/.exec(s);
+          if (mPct) {
+            const dlPct = Math.max(0, Math.min(100, Number(mPct[1])));
+            next = Math.max(next, Math.round(20 + dlPct * 0.36));
+          } else {
+            next = Math.max(next, 24);
+          }
+        } else if (/ComfyUI|推理|采样|denois|sampler|加载模型|FL2V/i.test(s)) {
+          const mStep = /(\d+)\s*\/\s*(\d+)/.exec(s);
+          if (mStep && Number(mStep[2]) > 0 && Number(mStep[2]) <= 100) {
+            const r = Math.max(0, Math.min(1, Number(mStep[1]) / Number(mStep[2])));
+            next = Math.max(next, Math.round(58 + r * 28));
+          } else {
+            next = Math.max(next, 62);
+          }
+        } else if (/超分|RealESRGAN|upscale|1080p/i.test(s)) next = Math.max(next, 88);
+        else if (/回传|下载成片|download/i.test(s)) next = Math.max(next, 94);
+        entry.progress = Math.min(99, next);
+      };
       const takeEntry = {
         id: takeId,
         label: `Take #${takeNum} · MiniMax-H3 (G4 96G) ${resolution} ${duration}s`,
@@ -1135,11 +1174,15 @@ async function handleApi(req, res, urlObj) {
         resolution,
         duration,
         status: "running",
+        progress: 6,
         progressText: "正在通过 Colab CLI 启动 96G G4…",
-        createdAt: Date.now(),
+        logs: [],
+        createdAt: nowMs,
+        updatedAt: nowMs,
       };
+      appendTakeLog(takeEntry, `[MiniMax-H3] 提交任务 ${task.beatCode} · ${resolution} · ${duration}s · ${startShot && endShot ? "首尾帧 FL2V" : startShot ? "首帧 I2V" : "文生视频 T2V"}`);
       task.stage3.takes.unshift(takeEntry);
-      task.updatedAt = Date.now();
+      task.updatedAt = nowMs;
       await saveTasks();
 
       runColabMiniMaxH3Job({
@@ -1152,14 +1195,23 @@ async function handleApi(req, res, urlObj) {
         outMp4Path: outPath,
         onProgress: (msg) => {
           takeEntry.progressText = msg;
+          updateH3Progress(takeEntry, msg);
+          appendTakeLog(takeEntry, `[MiniMax-H3] ${msg}`);
         },
-        onLog: (line) => pushSystemLog(line),
+        onLog: (line) => {
+          updateH3Progress(takeEntry, line);
+          appendTakeLog(takeEntry, line);
+          pushSystemLog(line);
+        },
       })
         .then(async (resH3) => {
           takeEntry.status = "succeeded";
+          takeEntry.progress = 100;
           takeEntry.localPath = resH3.localPath;
           takeEntry.sizeBytes = resH3.sizeBytes;
           takeEntry.progressText = "MiniMax-H3 成片已回传本地";
+          takeEntry.finishedAt = Date.now();
+          appendTakeLog(takeEntry, `[完成] MiniMax-H3 成片已回传本地 (${Math.round((resH3.sizeBytes || 0) / 1024)} KB)`);
           task.stage3.selectedTakeId = takeEntry.id;
           task.updatedAt = Date.now();
           await saveTasks();
@@ -1168,6 +1220,8 @@ async function handleApi(req, res, urlObj) {
           takeEntry.status = "failed";
           takeEntry.error = err.message;
           takeEntry.progressText = `失败: ${err.message}`;
+          takeEntry.finishedAt = Date.now();
+          appendTakeLog(takeEntry, `[失败] ${err.message}`);
           task.updatedAt = Date.now();
           await saveTasks();
         });
@@ -1235,6 +1289,35 @@ async function handleApi(req, res, urlObj) {
     const takeId = `take_${Date.now().toString(36)}`;
     const takeNum = task.stage3.takes.length + 1;
     const outPath = path.join(WORKSPACE_DIR, "tasks", task.id, "videos", `${task.id}_take${takeNum}.mp4`);
+    const nowMs = Date.now();
+    const appendSeedanceLog = (entry, rawLine) => {
+      const line = String(rawLine || "").trim();
+      if (!line) return;
+      const ts = new Date().toTimeString().slice(0, 8);
+      const formatted = /^\[\d\d:\d\d:\d\d\]/.test(line) ? line : `[${ts}] ${line}`;
+      entry.logs = entry.logs || [];
+      if (entry.logs[entry.logs.length - 1] !== formatted) {
+        entry.logs.push(formatted);
+        if (entry.logs.length > 160) entry.logs.splice(0, entry.logs.length - 160);
+      }
+      entry.updatedAt = Date.now();
+    };
+    const updateSeedanceProgress = (entry, msg) => {
+      const s = String(msg || "");
+      const prev = Number(entry.progress || 8);
+      let next = prev;
+      const mPct = /(\d{1,3})%/.exec(s);
+      if (mPct) {
+        next = Math.max(next, Math.min(95, Number(mPct[1])));
+      } else if (/下载|download/i.test(s)) {
+        next = Math.max(next, 88);
+      } else if (/渲染|生成中|running|processing/i.test(s)) {
+        next = Math.max(next, 48);
+      } else if (/已受理|submitId|排队|queued/i.test(s)) {
+        next = Math.max(next, 22);
+      }
+      entry.progress = Math.min(98, next);
+    };
     const takeEntry = {
       id: takeId,
       nodeId: body.nodeId,
@@ -1243,11 +1326,15 @@ async function handleApi(req, res, urlObj) {
       resolution: body.resolution || "480p",
       duration: Number(body.duration || 10),
       status: "running",
+      progress: 10,
       progressText: "已提交即梦云端生成...",
-      createdAt: Date.now(),
+      logs: [],
+      createdAt: nowMs,
+      updatedAt: nowMs,
     };
+    appendSeedanceLog(takeEntry, `[Seedance] 已提交即梦画布节点 ${body.nodeId || "—"} · ${takeEntry.model} · ${takeEntry.resolution} · ${takeEntry.duration}s`);
     task.stage3.takes.unshift(takeEntry);
-    task.updatedAt = Date.now();
+    task.updatedAt = nowMs;
     await saveTasks();
 
     runAndDownloadNode({
@@ -1259,16 +1346,21 @@ async function handleApi(req, res, urlObj) {
       outputPath: outPath,
       onProgress: (msg) => {
         takeEntry.progressText = msg;
+        updateSeedanceProgress(takeEntry, msg);
+        appendSeedanceLog(takeEntry, `[Seedance] ${msg}`);
       },
     })
       .then(async (resDl) => {
         takeEntry.status = "succeeded";
+        takeEntry.progress = 100;
         takeEntry.localPath = resDl.localPath;
         takeEntry.sizeBytes = resDl.sizeBytes;
         takeEntry.sha256 = resDl.sha256;
         takeEntry.resourceId = resDl.resourceId;
         takeEntry.mediaMeta = resDl.mediaMeta;
         takeEntry.progressText = "成片已下载到本地";
+        takeEntry.finishedAt = Date.now();
+        appendSeedanceLog(takeEntry, `[完成] 成片已下载到本地 (${Math.round((resDl.sizeBytes || 0) / 1024)} KB)`);
         task.stage3.selectedTakeId = takeEntry.id;
         task.updatedAt = Date.now();
         await saveTasks();
@@ -1277,6 +1369,8 @@ async function handleApi(req, res, urlObj) {
         takeEntry.status = "failed";
         takeEntry.error = err.message;
         takeEntry.progressText = `失败: ${err.message}`;
+        takeEntry.finishedAt = Date.now();
+        appendSeedanceLog(takeEntry, `[失败] ${err.message}`);
         task.updatedAt = Date.now();
         await saveTasks();
       });

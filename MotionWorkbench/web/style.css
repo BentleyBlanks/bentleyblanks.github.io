@@ -1169,9 +1169,20 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 .mwHeroPlayer video { width: 100%; height: 100%; object-fit: contain; display: block; }
 .mwHeroPlayer .mwPlaceholder { width: 100%; height: 100%; border: 0; }
+.mwHeroPlayer .mwS3StatusCard {
+  width: min(860px, calc(100% - 28px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+}
+.mwProgActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
 .mwVideoBadge {
   position: absolute;
   left: 10px;
@@ -1206,7 +1217,24 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
 }
 .mwTakeTile:hover { border-color: #ae925699; }
 .mwTakeTile.selected { border-color: var(--gold); box-shadow: 0 0 0 1px #edca8344; }
+.mwTakeTile.viewing { border-color: var(--gold-hi); box-shadow: 0 0 0 1px #ffe0a166; background: #191811; }
 .mwTakeTile.isFailed { border-color: #c8645a66; }
+.mwTakeTile.isFailed.viewing { border-color: #e48377; box-shadow: 0 0 0 1px #e4837766; }
+.mwTakeMiniProg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: #c1bdab22;
+  overflow: hidden;
+}
+.mwTakeMiniProg > i {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+  transition: width 0.25s linear;
+}
 .mwTakeThumb {
   position: relative;
   flex: 1;

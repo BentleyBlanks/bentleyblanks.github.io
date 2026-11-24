@@ -236,6 +236,62 @@
                   </label>
                 </div>
               </div>
+
+              <!-- Stage 03 实时视频生成状态控制台（点击下方任意生成中的抽卡记录即可点进查看） -->
+              <div id="s3ProgressCard" class="mwProgCard mwS3StatusCard hidden" role="status" aria-live="polite">
+                <div class="mwProgTopBar">
+                  <div class="mwProgMeta">
+                    <span id="s3ProgSpec" class="mwProgPill">—</span>
+                    <span id="s3ProgTakeLabel" class="mwProgSub mwMono">—</span>
+                    <span id="s3ProgElapsed" class="mwProgSub mwMono">已用时 00:00</span>
+                  </div>
+                  <div class="mwProgActions">
+                    <button id="btnS3BackToVideo" class="mwLinkBtn hidden" type="button">← 返回定稿视频</button>
+                    <button id="btnS3OpenSys" class="mwLinkBtn" type="button">硬件与日志 ↗</button>
+                  </div>
+                </div>
+                <div class="mwProgHero">
+                  <div class="mwProgHeroLeft">
+                    <span class="mwSpinner" aria-hidden="true"></span>
+                    <div class="mwProgTitles">
+                      <div id="s3LiveText" class="mwProgHeadline">准备生成视频</div>
+                      <div id="s3LiveHint" class="mwProgNote">—</div>
+                    </div>
+                  </div>
+                  <strong id="s3LivePct" class="mwProgPct mwMono">0%</strong>
+                </div>
+                <div class="mwTrack mwTrackProg"><div id="s3LiveFill" class="mwTrackFill" style="width:0%"></div></div>
+                <div id="s3Milestones" class="mwPipeGrid"></div>
+                <div class="mwTermBox">
+                  <div class="mwTermHead">
+                    <span id="s3TermCount" class="mwMono">实时生成日志 · 0 行</span>
+                    <button id="btnCopyS3Logs" class="mwLinkBtn" type="button">复制日志</button>
+                  </div>
+                  <div id="s3ProgLogs" class="mwTermBody"></div>
+                </div>
+              </div>
+
+              <!-- Stage 03 抽卡失败诊断卡（点击失败的抽卡记录即可查看完整原因与原始日志） -->
+              <div id="s3FailCard" class="mwFailCard mwS3StatusCard hidden">
+                <div class="mwFailHead">
+                  <span class="mwFailBadge">视频生成失败</span>
+                  <span id="s3FailTakeLabel" class="mwMono mwFailJob">—</span>
+                </div>
+                <div id="s3FailTitle" class="mwFailTitle">—</div>
+                <div id="s3FailHint" class="mwFailHint">—</div>
+                <div class="mwFailActions">
+                  <button id="btnS3FailColabLogin" class="mwBtnCta hidden" type="button">去登录 Colab</button>
+                  <button id="btnS3RetryFromFail" class="mwBtn mwPrimary" type="button">重新抽 1 条视频</button>
+                  <button id="btnS3DeleteFromFail" class="mwBtn" type="button">删除此失败记录</button>
+                  <button id="btnS3FailBackToVideo" class="mwBtn hidden" type="button">返回定稿视频</button>
+                  <button id="btnS3FailOpenLogs" class="mwBtn" type="button">全局运行日志</button>
+                </div>
+                <details id="s3FailLogWrap" class="mwFailDetails" open>
+                  <summary>原始错误与执行日志</summary>
+                  <pre id="s3FailLogPre" class="mwFailPre"></pre>
+                </details>
+              </div>
+
               <video id="s3MainVideo" class="hidden" controls muted loop playsinline></video>
               <div id="s3MainCap" class="mwVideoBadge hidden"></div>
             </div>

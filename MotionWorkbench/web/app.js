@@ -15,6 +15,7 @@ const appState = {
   host: null,
   routeFilter: "mocap", // "mocap" | "all" | "mixamo"
   selectedTaskId: null,
+  inspectedTakeByTask: {},
   activeStage: 5,
   s6Tab: "brief",
   sysTab: "overview",
@@ -811,19 +812,176 @@ function renderTaskDetail() {
   // Stage 03 · 视频生成
   const takes = task.stage3?.takes || [];
   const selectedTake =
-    takes.find((t) => t.id === task.stage3.selectedTakeId) ||
+    takes.find((t) => t.id === task.stage3.selectedTakeId && t.status === "succeeded") ||
     takes.find((t) => t.status === "succeeded") ||
     null;
 
-  const hasHero = Boolean(selectedTake?.url);
-  $("#s3PlayerEmpty").classList.toggle("hidden", hasHero);
-  $("#s3MainVideo").classList.toggle("hidden", !hasHero);
-  $("#s3MainCap").classList.toggle("hidden", !hasHero);
-  if (hasHero) {
-    setVideoSrcIfChanged($("#s3MainVideo"), selectedTake.url);
-    $("#s3MainCap").textContent = `${selectedTake.label} · ${fmtSize(selectedTake.sizeBytes)}`;
+  const inspectedId = appState.inspectedTakeByTask[task.id];
+  const viewedTake =
+    takes.find((t) => t.id === inspectedId) ||
+    selectedTake ||
+    takes.find((t) => t.status === "running") ||
+    takes[0] ||
+    null;
+
+  function formatTakeLogHtml(line) {
+    const raw = String(line || "");
+    const safe = escapeHtml(raw);
+    let cls = "";
+    if (/ERROR|失败|Traceback|RuntimeError|Service Unavailable|503|超时/i.test(raw)) cls = "isErr";
+    else if (/自动切换|重试|暂不可用|warn|排队/i.test(raw)) cls = "isWarn";
+    else if (/已分配|复用热机|完成|就绪|回传|已下载|\[完成\]/i.test(raw)) cls = "isOk";
+    let html = safe
+      .replace(/^(\[\d\d:\d\d:\d\d\])/i, '<span class="lgCmd">$1</span>')
+      .replace(/(\[MiniMax-H3[^\]]*\]|\[Colab CLI[^\]]*\])/i, '<span class="lgTag">$1</span>')
+      .replace(/(\[Seedance[^\]]*\]|\[Dreamina[^\]]*\])/i, '<span class="lgTagBlue">$1</span>');
+    return `<div class="mwLogLine ${cls}">${html}</div>`;
+  }
+
+  function inferTakeProgress(tk) {
+    if (typeof tk?.progress === "number" && tk.progress > 0) return Math.max(0, Math.min(100, Math.round(tk.progress)));
+    const txt = String(tk?.progressText || "");
+    const mPct = /(\d{1,3})%/.exec(txt);
+    if (mPct) return Math.max(5, Math.min(98, Number(mPct[1])));
+    if (/回传|下载成片|download/i.test(txt)) return 92;
+    if (/超分|RealESRGAN|1080p/i.test(txt)) return 86;
+    if (/推理|ComfyUI|采样|FL2V|渲染|生成中/i.test(txt)) return 52;
+    if (/权重|aria2|safetensors/i.test(txt)) return 28;
+    if (/上传|已受理|submitId/i.test(txt)) return 20;
+    return 10;
+  }
+
+  const showS3Video = Boolean(viewedTake?.status === "succeeded" && viewedTake?.url);
+  const showS3Prog = Boolean(viewedTake?.status === "running");
+  const showS3Fail = Boolean(viewedTake?.status === "failed");
+  const showS3Empty = !showS3Video && !showS3Prog && !showS3Fail;
+
+  $("#s3PlayerEmpty").classList.toggle("hidden", !showS3Empty);
+  $("#s3ProgressCard").classList.toggle("hidden", !showS3Prog);
+  $("#s3FailCard").classList.toggle("hidden", !showS3Fail);
+  $("#s3MainVideo").classList.toggle("hidden", !showS3Video);
+  $("#s3MainCap").classList.toggle("hidden", !showS3Video);
+
+  if (showS3Video) {
+    setVideoSrcIfChanged($("#s3MainVideo"), viewedTake.url);
+    $("#s3MainCap").textContent = `${viewedTake.label} · ${fmtSize(viewedTake.sizeBytes)}`;
   } else {
     setVideoSrcIfChanged($("#s3MainVideo"), "");
+  }
+
+  if (showS3Prog && viewedTake) {
+    const isH3 = viewedTake.model === "minimax_h3_colab";
+    const pct = inferTakeProgress(viewedTake);
+    const engineTag = isH3
+      ? `MiniMax-H3 · Colab 96G G4 · ${viewedTake.resolution || "720p"}`
+      : `${viewedTake.model || "Seedance"} · 即梦画布 · ${viewedTake.resolution || "720p"}`;
+    $("#s3ProgSpec").textContent = engineTag;
+    $("#s3ProgTakeLabel").textContent = `${viewedTake.label}${viewedTake.nodeId ? ` · ${viewedTake.nodeId}` : ""}`;
+
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - Number(viewedTake.createdAt || Date.now())) / 1000));
+    const mm = String(Math.floor(elapsedSec / 60)).padStart(2, "0");
+    const ss = String(elapsedSec % 60).padStart(2, "0");
+    $("#s3ProgElapsed").textContent = `已用时 ${mm}:${ss}`;
+
+    const rawMsg = String(viewedTake.progressText || "云端生成中").replace(/…+$/, "");
+    $("#s3LiveText").textContent = rawMsg;
+    $("#s3LiveHint").textContent = isH3
+      ? "首轮冷启需机房光纤拉取 44~61GB 权重（约 2~3 分钟），后续热机复用直跑 FL2V 推理"
+      : "已交由即梦云端集群渲染，每 2.5 秒自动同步进度，完成后自动拉回本地";
+    $("#s3LivePct").textContent = `${pct}%`;
+    $("#s3LiveFill").style.width = `${pct}%`;
+
+    const backBtn = $("#btnS3BackToVideo");
+    if (backBtn) {
+      backBtn.classList.toggle("hidden", !selectedTake?.url);
+      backBtn.onclick = () => {
+        if (selectedTake) {
+          appState.inspectedTakeByTask[task.id] = selectedTake.id;
+          renderAll();
+        }
+      };
+    }
+
+    const activeIdx = isH3
+      ? pct < 16 ? 0 : pct < 56 ? 1 : pct < 86 ? 2 : 3
+      : pct < 18 ? 0 : pct < 40 ? 1 : pct < 84 ? 2 : 3;
+    const stageDefs = isH3
+      ? [
+          { title: "申请 96G G4", doneSub: "G4 运行时已就绪", curSub: "排队分配 / 复用热机", waitSub: "等待分配" },
+          { title: "权重与首尾帧", doneSub: "模型与分镜就绪", curSub: "光纤直拉权重 / 上传分镜", waitSub: "等待 GPU 就绪" },
+          { title: "FL2V 推理", doneSub: "视频采样完成", curSub: "ComfyUI 首尾帧生成中", waitSub: "等待权重就绪" },
+          { title: "超分与回传", doneSub: "MP4 已落盘本地", curSub: viewedTake.resolution === "1080p" ? "RealESRGAN 2x 超分 + 回传" : "打包回传本地", waitSub: "等待推理完成" },
+        ]
+      : [
+          { title: "提交分镜引用", doneSub: "分镜与参数已上传", curSub: "托管分镜至即梦画布", waitSub: "等待提交" },
+          { title: "云端队列受理", doneSub: "已进入渲染队列", curSub: "等待即梦集群分配算力", waitSub: "等待受理" },
+          { title: "Seedance 渲染", doneSub: "云端成片已生成", curSub: `${viewedTake.resolution || "720p"} · ${viewedTake.duration || 8}s 渲染中`, waitSub: "等待排班" },
+          { title: "下载到本地", doneSub: "MP4 已落盘本地", curSub: "拉取成片至本地工作区", waitSub: "等待渲染完成" },
+        ];
+    $("#s3Milestones").innerHTML = stageDefs
+      .map((d, i) => {
+        const st = i < activeIdx ? "done" : i === activeIdx ? "current" : "pending";
+        const mk = i < activeIdx ? "✓" : i === activeIdx ? "●" : `${i + 1}`;
+        const sub = st === "done" ? d.doneSub : st === "current" ? d.curSub : d.waitSub;
+        return `
+          <div class="mwPipeTile" data-state="${st}">
+            <div class="mwPipeTileHead"><span class="mwPipeIdx">${mk}</span><span>${d.title}</span></div>
+            <div class="mwPipeTileSub">${escapeHtml(sub)}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    const takeLogs = Array.isArray(viewedTake.logs) && viewedTake.logs.length
+      ? viewedTake.logs
+      : [viewedTake.progressText || "已提交云端，等待返回详细执行日志…"];
+    $("#s3TermCount").textContent = `实时生成日志 · ${takeLogs.length} 行`;
+    const termEl = $("#s3ProgLogs");
+    termEl.innerHTML = takeLogs.slice(-50).map(formatTakeLogHtml).join("");
+    termEl.scrollTop = termEl.scrollHeight;
+    $("#btnCopyS3Logs").onclick = async () => {
+      await navigator.clipboard.writeText(takeLogs.join("\n"));
+      toast("已复制当前抽卡日志");
+    };
+  }
+
+  if (showS3Fail && viewedTake) {
+    const errRaw = [viewedTake.error || "", viewedTake.progressText || "", ...(viewedTake.logs || [])].join("\n");
+    const isColabAuth = /未授权|authorization code|accounts\.google\.com\/o\/oauth2|去登录 Colab/i.test(errRaw);
+    const cleanTitle = String(viewedTake.error || viewedTake.progressText || "视频生成失败")
+      .replace(/^失败[：:]\s*/, "")
+      .split(/\r?\n/)[0]
+      .slice(0, 140);
+    $("#s3FailTakeLabel").textContent = viewedTake.label;
+    $("#s3FailTitle").textContent = cleanTitle;
+    $("#s3FailHint").textContent = isColabAuth
+      ? "Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成授权后重试。"
+      : /超时|timed out|timeout/i.test(errRaw)
+      ? "云端算力排队或网络超时，可直接点击「重新抽 1 条视频」或在右侧切换引擎/分辨率后重试。"
+      : "可查看下方原始执行日志排查具体报错，或直接删除此失败记录并重新抽卡。";
+    $("#btnS3FailColabLogin").classList.toggle("hidden", !isColabAuth);
+    const failBackBtn = $("#btnS3FailBackToVideo");
+    if (failBackBtn) {
+      failBackBtn.classList.toggle("hidden", !selectedTake?.url);
+      failBackBtn.onclick = () => {
+        if (selectedTake) {
+          appState.inspectedTakeByTask[task.id] = selectedTake.id;
+          renderAll();
+        }
+      };
+    }
+    $("#btnS3DeleteFromFail").onclick = async () => {
+      try {
+        const res = await api(`/api/tasks/${task.id}/stage3/takes/${viewedTake.id}`, { method: "DELETE" });
+        delete appState.inspectedTakeByTask[task.id];
+        replaceTask(res.task);
+        toast("已删除该条失败记录");
+      } catch (err) {
+        toast(err.message, 3500);
+      }
+    };
+    const rawLogs = (viewedTake.logs && viewedTake.logs.length ? viewedTake.logs : [viewedTake.error || viewedTake.progressText || "无详细日志"]).join("\n");
+    $("#s3FailLogPre").textContent = rawLogs;
   }
 
   const mPreset = task.stage3?.modelPreset || "seedance_2.5_flash";
@@ -863,23 +1021,26 @@ function renderTaskDetail() {
   }
   for (const tk of takes) {
     const sel = tk.id === task.stage3.selectedTakeId && tk.status === "succeeded";
+    const isViewing = viewedTake && tk.id === viewedTake.id;
     const isRun = tk.status === "running";
     const isErr = tk.status === "failed";
+    const tkPct = isRun ? inferTakeProgress(tk) : 0;
     const tile = document.createElement("div");
-    tile.className = `mwTakeTile ${sel ? "selected" : ""} ${isErr ? "isFailed" : ""}`;
+    tile.className = `mwTakeTile ${sel ? "selected" : ""} ${isViewing ? "viewing" : ""} ${isErr ? "isFailed" : ""}`;
+    tile.title = isRun ? "点击在主视口查看实时生成状态与日志" : isErr ? "点击查看失败诊断与原始日志" : "点击播放并设为当前定稿视频";
 
     const badgeHtml = sel
       ? `<span class="mwTakeStateBadge sel">当前定稿</span>`
       : isRun
-      ? `<span class="mwTakeStateBadge run">生成中</span>`
+      ? `<span class="mwTakeStateBadge run">${isViewing ? "查看中 · " : ""}生成中 ${tkPct}%</span>`
       : isErr
-      ? `<span class="mwTakeStateBadge err">失败</span>`
+      ? `<span class="mwTakeStateBadge err">${isViewing ? "查看中 · " : ""}失败</span>`
       : `<span class="mwTakeStateBadge">成片</span>`;
 
     const thumbInner = tk.url
       ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>`
       : isRun
-      ? `<span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span><span class="mwTakeThumbMsg">${escapeHtml(tk.progressText || "云端生成中…")}</span>`
+      ? `<span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span><span class="mwTakeThumbMsg">${escapeHtml(tk.progressText || "云端生成中…")}</span><div class="mwTakeMiniProg"><i style="width:${tkPct}%"></i></div>`
       : `<span class="mwTakeThumbMsg">${escapeHtml(tk.error || tk.progressText || "生成失败")}</span>`;
 
     tile.innerHTML = `
@@ -890,7 +1051,7 @@ function renderTaskDetail() {
       </div>
       <div class="mwTakeMeta">
         <span class="mwTakeMetaTitle" title="${escapeHtml(tk.label)}">${escapeHtml(tk.label)}</span>
-        <span class="mwMono">${fmtSize(tk.sizeBytes) || (isRun ? "…" : "")}</span>
+        <span class="mwMono">${fmtSize(tk.sizeBytes) || (isRun ? `${tkPct}%` : "")}</span>
       </div>
     `;
     const delBtn = tile.querySelector(".mwTakeDelBtn");
@@ -899,6 +1060,7 @@ function renderTaskDetail() {
         ev.stopPropagation();
         try {
           const res = await api(`/api/tasks/${task.id}/stage3/takes/${tk.id}`, { method: "DELETE" });
+          if (appState.inspectedTakeByTask[task.id] === tk.id) delete appState.inspectedTakeByTask[task.id];
           replaceTask(res.task);
           toast("已移除该条抽卡记录");
         } catch (err) {
@@ -906,19 +1068,18 @@ function renderTaskDetail() {
         }
       };
     }
-    if (tk.status === "succeeded") {
-      tile.onclick = async () => {
+    tile.onclick = async () => {
+      appState.inspectedTakeByTask[task.id] = tk.id;
+      if (tk.status === "succeeded") {
         const res = await api(`/api/tasks/${task.id}`, {
           method: "PATCH",
           body: JSON.stringify({ selectedTakeId: tk.id }),
         });
         replaceTask(res.task);
-      };
-    } else if (isErr) {
-      tile.onclick = () => toast(tk.error || tk.progressText || "该次抽卡失败，可点右上角 ✕ 移除", 5000);
-    } else if (isRun) {
-      tile.onclick = () => toast(tk.progressText || "正在生成视频…", 3500);
-    }
+      } else {
+        renderAll();
+      }
+    };
     s3Box.appendChild(tile);
   }
 
@@ -1647,6 +1808,9 @@ async function triggerSeedanceFromStoryboard() {
         method: "POST",
         body: JSON.stringify({ model, resolution, duration, ratio: "16:9" }),
       });
+      if (res.task?.stage3?.takes?.[0]?.id) {
+        appState.inspectedTakeByTask[task.id] = res.task.stage3.takes[0].id;
+      }
       replaceTask(res.task);
       gotoStage(3);
       return;
@@ -1670,6 +1834,9 @@ async function triggerSeedanceFromStoryboard() {
             creditCeiling: q.quote.maxCredits,
           }),
         });
+        if (res.task?.stage3?.takes?.[0]?.id) {
+          appState.inspectedTakeByTask[task.id] = res.task.stage3.takes[0].id;
+        }
         replaceTask(res.task);
         gotoStage(3);
         toast("已送入 Seedance 生成");
@@ -2061,6 +2228,14 @@ $("#topBusyPill").onclick = () => {
   if (stg >= 1 && stg <= 6) appState.activeStage = stg;
   renderAll();
 };
+$("#btnS3OpenSys").onclick = () => setSystemDrawer(true, "logs");
+$("#btnS3FailColabLogin").onclick = () => {
+  setSystemDrawer(true, "overview");
+  $("#btnColabLogin")?.click();
+};
+$("#btnS3RetryFromFail").onclick = () => $("#btnStage3Gen")?.click();
+$("#btnS3FailOpenLogs").onclick = () => setSystemDrawer(true, "logs");
+
 $("#btnS4FixColabLogin").onclick = () => {
   setSystemDrawer(true, "overview");
   $("#btnColabLogin")?.click();
