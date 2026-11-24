@@ -1,6 +1,12 @@
 # Dots Type38 511 runtime integration
 
-## 当前外观：前段漆木与旧钢 · 2026-11-24
+## 栓尾盘与中箍挂环 · 2026-11-24
+
+后视采用同件实物照片，在手柄、木托和前景共用的固定机位下核对盘面所占画幅。盘缘向外展开，左下凸耳有更清楚的收角。中央凹圈的边唇由网格成形，点纹用法线和粗糙度表现。按 640 × 480 后视照片人工勾出的可见盘缘计算，网页模型的投影交并比由 0.722 升至 0.921。这个数值只描述该照片中的外轮廓。[实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)
+
+中箍下方沿用原挂环和贴图坐标，调整其悬垂姿态，在底弧增加 372 个三角面，并为磨亮的弧面另烘粗糙度。近景为 **72,460** 三角，普通 NPC 为 **67,852** 三角，共 45 部件、116 张图。两件木料沿用前版漆木分层，整枪仅保留刻度。[中箍与挂环近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+## 前段漆木与旧钢 · 2026-11-24
 
 以[同件实物完整侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)与[中箍闪光近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)交叉核对：近照的亮斑不能作为整段钢的底色。保留中箍旁磨亮的钢面，向前过渡到暗色旧钢；调整相邻前木的棕色，让全枪侧面仍读作漆木，而不是一条银色长杆。两张照片独立取景、用相邻材质选灯，随后锁定照明比较钢面；不修改游戏灯光、曝光或形状。
 

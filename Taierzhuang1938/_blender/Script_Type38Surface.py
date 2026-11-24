@@ -257,23 +257,94 @@ def ShapeWindowTrim(doc, views, primitive):
                 accessor[key]=stat(data,axis=0).tolist()
 
 
+def PoseDisplayLoop(doc, views, primitive):
+    attrs = primitive['attributes']
+    # Add samples only on the long, straight span. Its two end rows alone
+    # cannot carry a curved silhouette, regardless of the baked normal map.
+    widths = {'POSITION':3, 'NORMAL':3, 'TANGENT':4, 'TEXCOORD_0':2}
+    channels = {slot:list(Attribute(doc,views,attrs[slot],width)) for slot,width in widths.items()}
+    positions = channels['POSITION']
+    pending = Attribute(doc,views,primitive['indices'],3).tolist()
+    faces, edgeCenters = [], {}
+    while pending:
+        tri = pending.pop()
+        extent = [abs(positions[tri[i]][0]-positions[tri[(i+1)%3]][0]) for i in range(3)]
+        i = np.argmax(extent)
+        if extent[i] < .0055:
+            faces.append(tri)
+            continue
+        first,second,third = tri[i], tri[(i+1)%3], tri[(i+2)%3]
+        edge = tuple(sorted((first,second)))
+        if edge not in edgeCenters:
+            edgeCenters[edge] = len(positions)
+            for data in channels.values():
+                data.append((data[first]+data[second])*.5)
+        mid = edgeCenters[edge]
+        pending.extend(((first,mid,third),(mid,second,third)))
+    points = np.asarray(positions)
+    crown = points[points[:,1] > np.quantile(points[:,1], .88)].mean(axis=0)
+    angle = np.deg2rad(-46)
+    co, si = np.cos(angle), np.sin(angle)
+    yaw = np.array([[co,0,si],[0,1,0],[-si,0,co]])
+    shape = yaw @ np.array([[.51,0,0],[0,1.64,0],[0,.95,.88]])
+    lift = np.array([0,.0048,-.0026])
+    local = points-crown
+    span = np.max(np.abs(local[:,0]))
+    x = local[:,0]/span
+    arc = (1-x*x)**2
+    depth = np.clip(-local[:,1]/.008,0,1)
+    blend = depth**2*(3-2*depth)
+    sag = .0037
+    jacobian = np.broadcast_to(shape,(len(points),3,3)).copy()
+    jacobian[:,1,0] += sag*blend*4*x*(1-x*x)/span
+    jacobian[:,1,1] += sag*arc*6*depth*(1-depth)/.008
+    for slot,data in channels.items():
+        values = np.asarray(data).copy()
+        if slot == 'POSITION':
+            values[:,:3] = local @ shape.T + crown + lift
+            values[:,1] -= sag*arc*blend
+        elif slot in ('NORMAL','TANGENT'):
+            basis = np.linalg.inv(jacobian).transpose(0,2,1) if slot == 'NORMAL' else jacobian
+            values[:,:3] = np.einsum('nij,nj->ni',basis,values[:,:3])
+            if slot == 'TANGENT':
+                smooth = Attribute(doc,views,attrs['NORMAL'],3)
+                values[:,:3] -= smooth*np.sum(values[:,:3]*smooth,axis=1,keepdims=True)
+            values[:,:3] /= np.linalg.norm(values[:,:3],axis=1,keepdims=True)
+        accessor = doc['accessors'][attrs[slot]]
+        accessor['count'] = len(values)
+        views[accessor['bufferView']] = values.tobytes()
+        for key,stat in [('min',np.min),('max',np.max)]:
+            if key in accessor:
+                accessor[key] = stat(values,axis=0).tolist()
+    indices = np.asarray(faces,'<u2').reshape(-1)
+    accessor = doc['accessors'][primitive['indices']]
+    assert accessor['componentType']==5123 and len(points)<=65536
+    accessor['count'] = len(indices)
+    views[accessor['bufferView']] = indices.tobytes()
+    for key,stat in [('min',np.min),('max',np.max)]:
+        if key in accessor:
+            accessor[key] = [int(stat(indices))]
+    return len(faces)
+
+
 def RearOutline(angle):
     delta = (np.rad2deg(angle)-190+180)%360-180
-    return PchipInterpolator([-180,-40,-29,-19,-8,2,13,20,28,39,180],
-                             [0,0,.013,.104,.257,.282,.243,.140,.035,0,0])(delta)
+    return PchipInterpolator([-180,-40,-29,-19,-9,-3,5,13,20,28,39,180],
+                             [0,0,.006,.060,.227,.270,.283,.248,.145,.036,0,0])(delta)
 
 
 def RearFace(side, up):
-    vertical = (up-.0423)/.014
-    horizontal = side/.014
+    vertical = (up-.0423)/.0166
+    horizontal = side/.0166
     radius = np.hypot(vertical,horizontal)
     angle = np.arctan2(vertical,horizontal)
-    rows = (radius-.25)*8.75
+    # The central rows compress toward the rim of the small dished center.
+    rows = (np.sqrt(np.maximum(radius,.16))-.49)*13.7
     row = np.rint(rows)
-    count = np.maximum(12,np.rint(np.maximum(.25+row/8.75,.22)*58))
+    count = np.maximum(12,np.rint((.49+row/13.7)**2*62))
     around = angle*count/(2*np.pi) + (row%2)*.5
-    footprint = ((rows-row)/.50)**2 + ((around-np.rint(around))/.49)**2
-    beads = np.maximum(0,1-footprint)**1.08 * Ramp(.22,.26,radius)*(1-Ramp(.92,.98,radius/(1+RearOutline(angle))))
+    footprint = (np.abs((rows-row)/.52)**1.4 + np.abs((around-np.rint(around))/.51)**1.4)**(1/1.4)
+    beads = np.maximum(0,1-footprint**1.3) * Ramp(.235,.31,radius)*(1-Ramp(.94,1.0,radius/(1+RearOutline(angle))))
     center = .76*np.exp(-(radius/.15)**2)
     ring = .55*np.exp(-((radius-.201)/.027)**2)
     return beads,center+ring,radius
@@ -283,15 +354,16 @@ def ShapeRearMedallion(doc, views, primitive):
     attrs = primitive['attributes']
     source = Attribute(doc, views, attrs['POSITION'], 3)
     centerX,centerY = (source.max(axis=0)[:2]+source.min(axis=0)[:2])*.5
-    radius = np.ptp(source[:,0])*.5
+    baseRadius = np.ptp(source[:,0])*.5
+    radius = baseRadius*1.19
     contact = source[:,2].min()
     rim = source[:,2].max()-.00062
     segments = 72
     angles = np.arange(segments+1)*2*np.pi/segments
     direction = np.column_stack((np.cos(angles),np.sin(angles)))
     ear = RearOutline(angles)
-    crown = [(0.045,.029),(.10,.028),(.143,.045),(.175,.071),(.201,.065),
-             (.225,.041),(.285,.037),(.43,.034),(.62,.027),(.79,.018),(.93,.006),(.975,0)]
+    crown = [(0.045,.028),(.10,.030),(.143,.051),(.175,.099),(.201,.106),
+             (.225,.092),(.285,.081),(.43,.072),(.62,.056),(.79,.037),(.93,.012),(.975,0)]
     positions,texcoords,indices = [],[],[]
     def Ring(xy,depth,chart):
         first = len(positions)
@@ -319,13 +391,14 @@ def ShapeRearMedallion(doc, views, primitive):
                 (.26,.937,.69),(.39,.901,.30),(.57,.90,0),(.83,.89,0),(1,.87,0)]
     sideRings = []
     for advance,scale,tab in shoulder:
-        xy = direction*scale*(1+tab*ear[:,None])
+        shoulderScale = 1+(baseRadius/radius-1)*Ramp(.11,.83,advance)
+        xy = direction*scale*shoulderScale*(1+tab*ear[:,None])
         axial = rim+(contact-rim)*advance-radius*.035*xy[:,1]**2*(1-advance)
         chart = np.column_stack((.75+.23*advance*np.ones_like(angles),.025+.83*angles/(2*np.pi)))
         sideRings.append(Ring(xy,axial,chart))
     for inner,outer in zip(sideRings,sideRings[1:]):
         Connect(inner,outer)
-    back = Ring(direction*.87,contact,direction*.030+np.array([.804,.936]))
+    back = Ring(direction*.87*baseRadius/radius,contact,direction*.030+np.array([.804,.936]))
     backCenter = len(positions)
     positions.append((centerX,centerY,contact))
     texcoords.append((.804,.936))
@@ -387,9 +460,9 @@ def MedallionRelief(doc, views, primitive, field, valid, padded):
     frameB = np.cross(frameN,frameT)*np.sign(tangents[selected,3].mean(axis=1,keepdims=True))
     side,up = field[rows,cols,0],field[rows,cols,1]
     def Height(side,up):
-        beads,center,radius = RearFace(side,up)
-        boss = (1-Ramp(.19,.36,radius))*(1-np.exp(-(radius/.113)**2))
-        return .00023*beads + .00097*center + .00066*boss + .0095*(1-np.minimum(radius,1.3)**2)
+        beads,_,radius = RearFace(side,up)
+        lip = Ramp(.085,.177,radius)*(1-Ramp(.202,.294,radius))
+        return .00034*beads + .00165*lip + .0115*(1-np.minimum(radius,1.3)**2)
     step = .000045
     gradX = (Height(side+step,up)-Height(side-step,up))/(2*step)
     gradY = (Height(side,up+step)-Height(side,up-step))/(2*step)
@@ -505,6 +578,9 @@ def Build(cache):
         height, width = orm.shape[:2]
         handle = part == 'Exterior_HandleOval08'
         disk = part == 'T38_440D2_IndependentVisibleRecess'
+        loop = part == 'Exterior_RetainedImportedBody74'
+        if loop:
+            loopTriangles = PoseDisplayLoop(doc, views, primitive)
         if handle:
             ShapeHandle(doc, views, primitive)
         if disk:
@@ -745,6 +821,13 @@ def Build(cache):
                 rough = 143+16*flow+13*stain-26*edge
                 metal = 207+19*edge-9*oxidation
             relief = .025*grainSteel + .024*brush
+            if loop:
+                lowerArc = 1-Ramp(.0022,.0062,up)
+                wear = np.clip(lowerArc*(.82+.19*stain+.14*grainSteel)+.19*edge,0,1)
+                color = Blend(Tint([62,54,47],[99,87,74],.48+.18*flow),
+                              Tint([129,124,119],[195,189,183],.58+.17*flow),wear)
+                rough = 134-60*wear+9*stain+4*brush
+                metal = 208+39*wear-8*oxidation
             if disk:
                 face = Ramp(.18,.69,normalLength)*Ramp(-.0547,-.0519,length)
                 beads,center,radius = RearFace(side,up)
@@ -753,7 +836,7 @@ def Build(cache):
                 diskColor = Tint([132,123,110],[232,224,207],.25+.63*wear+.25*center+.06*flow)
                 diskColor = Blend(diskColor,np.array([154,145,133],dtype='f'),centerPlate*.60)
                 color = Blend(color,diskColor,face)
-                rough += (168-68*wear-57*center-17*centerPlate+7*stain-rough)*face
+                rough += (154-73*wear-53*center-15*centerPlate+9*stain-rough)*face
                 metal += (218+30*wear+9*center+9*centerPlate+4*flow-metal)*face
                 relief += face*(1.48*beads + .78*center)
             if part == 'Exterior_FoldedFrame12':
@@ -825,15 +908,16 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_SatinSteel13'
+    doc['asset']['extras']['version'] = 'Type38_ExteriorProfile14'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
-    assert triangles == 72088
+    assert triangles == 72088+loopTriangles-924 and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
     digest = WriteGlb(folder/'Model_Type38_511.glb', doc, views)
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
+    manifest['exteriorTriangleDeltas']['Exterior_RetainedImportedBody74'] = manifest['exteriorTriangleDeltas'].get('Exterior_RetainedImportedBody74',0)+loopTriangles-924
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=15, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=16, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):

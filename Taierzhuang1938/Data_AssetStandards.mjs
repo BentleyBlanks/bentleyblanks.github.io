@@ -119,7 +119,7 @@ function PreserveSourceRows(pack, records, runtimeTexture) {
 
 export const EXTERNAL_GLB_STANDARDS = Object.freeze([
   Object.freeze({id:'Type38_511',name:'三八式511（当前手持与世界模型）',pack:'Type38_511/Model_Type38_511.glb',
-    sourceTriangles:473796,actualTriangles:72088,npcTriangles:67480,targetTriangles:80000,policy:'target',
+    sourceTriangles:473796,actualTriangles:72460,npcTriangles:67852,targetTriangles:80000,policy:'target',
     sourceTexture:'用户提供Dots 511工程；高模及作者程序材质留OneDrive',
     runtimeTexture:'45部件、116张内嵌图；木料与金属分区重做颜色和粗糙度，保留打包数据通道',
     note:'2026-11-23 重建后视可见的栓尾盘凸耳与中央凹部，区分托尾漆色；8万面上限，普通NPC共用材质及原照门LOD。'}),
