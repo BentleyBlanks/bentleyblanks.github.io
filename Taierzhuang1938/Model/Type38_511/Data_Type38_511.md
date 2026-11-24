@@ -1,5 +1,15 @@
 # Dots Type38 511 runtime integration
 
+## 当前交付版 v16
+
+游戏使用 `511-polished-grip-16`。近景 72,460 三角，普通 NPC 67,852 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+
+| 用途 | 入口 |
+| --- | --- |
+| 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
+| 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
+| 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
 ## 栓柄钢面的双视角对照 · 2026-11-24
 
 以前版上线模型为基线。后视沿用已校对的相机和闪光，另用同一件实物的侧斜照核对柄头。侧斜机位按外轮廓配准，边缘偏差中位数约 0.9 像素（640 × 480），取景只包含这件金属外观。每组对照的前后两版共用光照。后视下，实物柄颈和柄头的亮部面积分别约 31% 和 19%，前版约 26% 和 21%，新版约 30% 和 20%。侧斜照中，柄头最亮一带的长宽比约为 2∶1，前版约为 1.1∶1，新版约为 2∶1。[实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [实物侧斜视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)
