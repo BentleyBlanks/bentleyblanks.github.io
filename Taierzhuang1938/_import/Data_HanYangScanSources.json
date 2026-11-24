@@ -1,0 +1,114 @@
+[
+  {
+    "asset": "black_walnut_veneer_02",
+    "role": "Diffuse",
+    "file": "black_walnut_veneer_02_diff_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_diff_2k.jpg",
+    "sha256": "ac4cd64753a55684efe4ccaf6f81b465e237a8a885fffb95377cc371924c0f88",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "black_walnut_veneer_02",
+    "role": "Rough",
+    "file": "black_walnut_veneer_02_rough_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_rough_2k.jpg",
+    "sha256": "172832f6fa42e539e35b04f321c067b61962da7aebe106fcd7934b84aa5dc204",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "black_walnut_veneer_02",
+    "role": "nor_gl",
+    "file": "black_walnut_veneer_02_nor_gl_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_nor_gl_2k.jpg",
+    "sha256": "125a46a42525157cb2cf277b712c9933a76518d5a729b43caafce1aebd96bbbb",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "metal_plate_02",
+    "role": "Diffuse",
+    "file": "metal_plate_02_diff_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_diff_2k.jpg",
+    "sha256": "2bf77bbcf18c862bf1e1501d1953ce9d511e80df6305b46e2f38b788bd37b581",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "metal_plate_02",
+    "role": "Rough",
+    "file": "metal_plate_02_rough_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_rough_2k.jpg",
+    "sha256": "7abccc92dfebe4c6fd21b57b4de659a3b8be7747434af39306fcff2059927734",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "metal_plate_02",
+    "role": "nor_gl",
+    "file": "metal_plate_02_nor_gl_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_nor_gl_2k.jpg",
+    "sha256": "1da6ddb0f455d53636754b3b629942e6aec2f77fafaf6a53cee102ec107854c1",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "metal_plate_02",
+    "role": "Metal",
+    "file": "metal_plate_02_metal_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_metal_2k.jpg",
+    "sha256": "baa5ae89329b75727030fe69835c53c67cca0cc23b1505b38961d06f149556df",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "fine_grained_wood",
+    "role": "Diffuse",
+    "file": "fine_grained_wood_col_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_col_2k.jpg",
+    "sha256": "d97b1ab2c5206ac43bc0c42f21878da14f4d02497fd21396399406c03f3755a9",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "fine_grained_wood",
+    "role": "Rough",
+    "file": "fine_grained_wood_rough_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_rough_2k.jpg",
+    "sha256": "7e8f5fc146ae7accd3b9deb2a173c1cf253707ccdee5070ce16cefd4ee68f1b7",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "fine_grained_wood",
+    "role": "nor_gl",
+    "file": "fine_grained_wood_nor_gl_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_nor_gl_2k.jpg",
+    "sha256": "c76fcd29434978227db5a35b5b0238da1bee0fb5fa8cdfc6819a76c7ef723f3c",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "rusty_metal_04",
+    "role": "Diffuse",
+    "file": "rusty_metal_04_diff_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_diff_2k.jpg",
+    "sha256": "dc17baa7c113af0a8db59a7166dbebd1d8bc842e69b1f07b89d9e90531ebbd22",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "rusty_metal_04",
+    "role": "Rough",
+    "file": "rusty_metal_04_rough_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_rough_2k.jpg",
+    "sha256": "b59cb33b478c70404b14294e39979c7a12db25e8f7fac3688cf665fcb0fdd19d",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "rusty_metal_04",
+    "role": "nor_gl",
+    "file": "rusty_metal_04_nor_gl_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_nor_gl_2k.jpg",
+    "sha256": "b230568d198778afbf3d104d2951e2e2306ddb276bc1ed2f441b9040c58af537",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "rusty_metal_04",
+    "role": "Metal",
+    "file": "rusty_metal_04_metal_2k.jpg",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_metal_2k.jpg",
+    "sha256": "9085f395c40ce3860353d77c2a55a4e9b5b370abc5756784330ed3e890654097",
+    "license": "CC0-1.0"
+  }
+]

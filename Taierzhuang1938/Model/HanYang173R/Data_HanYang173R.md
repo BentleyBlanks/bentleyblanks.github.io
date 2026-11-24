@@ -5,11 +5,11 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **64,266 triangles, 44 parts, 132 embedded images**. The 2026-11-13 revision reconstructs nine visible mechanism parts from reference photographs. `Data_GameGeometry.json` records the current hash, per-part geometry comparisons and image payloads.
-- All 44 parts receive the R2 reference finish. Three wooden parts share a 2048-pixel repeating PBR tile. Steel keeps its fitted UV atlases. Tangent frames and bake/export UV coverage are checked.
-- The front sight crown, trigger and selected contact parts retain their original geometry. The receiver inlet is relieved by at most 0.152 mm. The handguard band follows timber and barrel profiles. The nine mechanism reconstructions carry explicit reference scope. Other simplified parts keep sampled bidirectional vertex-to-surface errors below 0.5 mm.
+- Game geometry: **77,396 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
+- R3 uses a unique atlas for each of the three wood pieces and keeps the grain lengthwise on the sides and samples the caps in the same object-space coordinates. Base colour, roughness/metalness and tangent-space normals are baked from a continuous object-space finish into the final UVs. The steel is darker in protected regions; age and wear vary across its surface rather than following the mesh triangles.
+- The exterior revisions shape the wood shoulder and nose, the two band profiles and the rounded rear outline. The surface-distance record compares digital meshes. The historical photographs supply visual references.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
-- GPU publication uses BC7 and the explicit path rules. Main-stock images 57–59 permit up to 4096 pixels. R2 uses a 2048-pixel tile over 6 cm, giving 34.13 baked pixels/mm. Other images follow their existing 2048-pixel maximum.
+- GPU publication uses the existing BC7 path rules. Main-stock images 57–59 are 4096 square; the other two wood sets are 2048 square. Embedded source maps are lossless WebP. All output atlases clamp at their boundaries.
 
 Source packages and source Blender projects remain outside Git:
 
@@ -17,7 +17,175 @@ Source packages and source Blender projects remain outside Git:
 
 `DotsDelivery/` contains the original three packages; all 605 supplied SHA256 entries were verified. `Game60k/Scene_HanYang173RGame60k.blend` is the editable reduced source. Preserve [Dots' material-source statement](Data_DotsMaterialSources.txt); it includes unresolved historical input provenance and does not assert that the whole package is CC0.
 
-## Photo-reference material revision R2, 2026-11-13
+## Exterior photo comparison: R3, 2026-11-22
+
+The primary visual reference is [Te Papa, DM000453](https://collections.tepapa.govt.nz/object/58119): several views of **one** catalogued wood-and-steel specimen, not a composite of different variants. [The National Museum of China](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) provides an independent silhouette check, not a source for close-up detail. No museum photographs are baked into the asset. Both pre-existing reference texture inputs are verified by digest during the bake.
+
+| Feedback | Photographic evidence | Change and limit |
+| --- | --- | --- |
+| Figs. 1–2: seams and reflections | Te Papa [side](https://media.tepapa.govt.nz/collection/131447/preview), [receiver](https://media.tepapa.govt.nz/collection/131366/preview) and [band](https://media.tepapa.govt.nz/collection/131438/preview) | Rolled exposed edges catch narrow highlights while broad panels retain flat normals. Preserved the separation of wood and steel. Front wood now fills the visible opening. The photograph guides the profile, not the radius of a bevel. |
+| Fig. 4: angular flank | Same side and receiver views | Reconstructed the exterior side shading from the wood surface rather than from individual triangle slopes. Preserved the intentional shoulder and the seam between wood pieces. |
+| Figs. 3 and 5: grip metal | Receiver and [alternate view](https://media.tepapa.govt.nz/collection/131367/preview); [patina detail](https://media.tepapa.govt.nz/collection/131440/preview) | Reworked the guard rim and shading. Kept the broad steel face distinct from its rounded return; roughness is spatially varied. The original wear pattern is not known on faces outside the photographs. |
+| Fig. 6: stretched wood grain | Receiver and band close-ups show longitudinal fibres with irregular dark/light streaks | Replaced the repeating cylindrical UVs with independent clamped atlases. Grain and tangent normals are sampled from the same surface coordinates across chart seams, not scaled to fit the UV island. No individual scratch or concealed surface is claimed as an exact match. |
+
+### R4: follow-up to the marked photo review
+
+The rear end of the upper **visible wood** now blends into the side profile rather than rising as a block. Only this local shoulder and the already documented nose depart appreciably from the R2 silhouette. The end of the wood and the metal band have actual rounded mesh edges. Steel at the edge is smoother, not painted white: the narrow glint changes with light direction while the broad face stays darker. The side disk remains metal but is less conspicuous. Timber uses irregular lengthwise ribbons and patches of polish instead of concentric arcs; its metal channel stays zero. The band close-up guides surface treatment, not the identity or dimensions of that band.
+
+### R5: material authoring
+
+R5 changes the surface only. The authored game mesh, UVs, tangents and all attachment coordinates are unchanged from R4. The finish is built from Poly Haven's [Black Walnut Veneer 02](https://polyhaven.com/a/black_walnut_veneer_02) and [Metal Plate 02](https://polyhaven.com/a/metal_plate_02), both [CC0](https://polyhaven.com/license); the wood species is an artistic material choice, not an identification of the museum specimen. Albedo, roughness and OpenGL normal are independent inputs. Only steel uses the source metal mask. Lengthwise wood figure and smaller pore detail use different scales; grip polish modifies roughness without cutting pigment into the normal. Oxide and exposed steel use different metallic responses; brighter edge reflections are not painted into the wood. No museum pixels are used in the bake.
+
+The seven source hashes are pinned in `_import/Data_HanYangScanSources.json`. Raw files live in the external revision's `SurfaceScans/`, not in the game. The two generated R2 inputs are historical and listed separately in `materialMatch.previousSourceAssets`. The earlier provenance limitations for the underlying Dots delivery remain unchanged.
+
+### R6: metal-only reference pass
+
+Te Papa 131438 shows a dull brown crown, a straighter reflective side, discontinuous pale wear, pitting and a faint impression. R6 separates those areas rather than polishing the entire circumference. A worn relief on one visible side suggests the photographed impression without assigning the specimen's identifying digits to this game prop. The long steel, contact-polished parts, guard and smaller fittings have different wear distributions. Roughness and normal detail carry the highlights; the photographs are not projected into the asset. The underlying silhouette and wood finish are unchanged. The two specimens' band details and viewing angles are not asserted to be identical.
+
+### R7: steel and timber under the same lights
+
+The two bands use an interrupted patch of exposed metal near the shoulder, a darker crown and a less polished flank. Fine plate texture is sampled continuously along the part rather than restarting at a fixed interval. Longer steel surfaces, the guard and handled items carry a separate dark finish and contact polish. The timber combines walnut figure with the independently scanned colour, roughness and normal of Rob Tuytel’s CC0 [Fine Grained Wood](https://polyhaven.com/a/fine_grained_wood). The grain runs down the length of the timber; its fine pores and broken fibres do not repeat the broad shape of the veneer. An independent glTF specular factor reduces the milky reflection without making wood metallic. No mesh, atlas, camera or studio exposure change is needed to obtain the revised finish. Local review pairs `Before_*` (R6) with `After_*` (R7); the corresponding museum images are qualitative exterior references, not calibrated material samples.
+
+### R8: compare like with like
+
+The raised wood behind the band is visible in the user's Figure 4. The [Hubei Military and Civilian War of Resistance Museum](https://www.hbjmkz.com/07147.html) describes the wooden-handguard variant, while [Historical Photographs of China, JM04-178](https://exam2019.sec.sjtu.edu.cn/visual/JM04-178) identifies earlier sleeved examples in a 1937 photograph. Preserve the user's visible wood; do not use the early Te Papa specimen as a shape template in that region. Its large colour photographs remain useful evidence of the *surfaces*, not calibrated reflectance measurements. No physical dimensions are inferred from these photographs.
+
+R8 maps narrow dark fibres into the timber's pigment, roughness and tangent normal together. The crown and the exposed rim have broken patina rather than a continuous polished strip. The long steel uses longitudinal abrasion with less contrast than the band shoulder. The mesh, UVs, lighting and exposure remain unchanged. The local R7/R8 studio pair uses identical lights and cameras. New views `ForeWood` and `UnderWood` inspect the actual regions in user Figures 4 and 6 rather than extrapolating from the band.
+
+The independent colour, metal mask, roughness and OpenGL normal from Poly Haven's CC0 [Rusty Metal 04](https://polyhaven.com/a/rusty_metal_04) supply small irregularities at the transitions between film and exposed steel. The swatch is not used as the colour of the entire object. These four source hashes are pinned alongside the original ten in the scan manifest.
+
+### R9: grain, crown marks and contact
+
+The flank combines irregular crossing fibres and dark oil with a warmer rubbed grip surface. Two sparse irregular depressions break up the band's dark crown; they are visual interpretations, not measured corrosion. The baked red channel of the existing ORM maps now records local obstruction between eight fixed exterior parts. Blender traces 32 cosine-weighted directions per unique vertex/normal, excludes the surface itself and attenuates hits by distance. Free and moving parts never imprint permanent contact shadows. The game consumes this as glTF occlusion at strength 0.85 with its existing shared sampler; the studio does not multiply AO into base colour. Camera, exposure, topology, triangles and UVs are unchanged.
+
+### R10: separate the crest, impression and knob highlights
+
+Only the two band finishes and the knob have new texture content. The upper band has scattered dull oxide across its crest; the impressed wall breaks the reflection without a solid ink fill. The shoulder remains distinct from the quieter flank. On the round knob a broad worn area contains finer roughness variations; its tangent-space normal no longer inherits the pronounced streaks from the flat steel scan. R9 wood, guard, fixed-contact field, UVs, mesh and runtime multipliers are retained. No highlight is painted as a light source. The worn mark is an interpretation rather than a claim about a particular rifle's serial number.
+
+The local review pairs R9/R10 in broad and raking light under unchanged studio settings. Registration DM000453 is the main surface reference; the [1911 Revolution Museum's Qing-period entry](https://www.1911museum.cn/view_2854.html) independently identifies metal and wood, not a calibrated finish for this particular game prop. Different specimens, lighting and unseen surfaces preclude an exact all-sides historical match.
+
+### R11: repair the dark wedge at the butt-cap joint
+
+At the top of the wood/steel joint, an opaque black wedge survived neutral albedo, zero metalness on the wood, unplugged normal maps and hiding the cap. A ray through it hit the wood, not an opening. On that face two corner normals pointed against the third. The baker now repairs the strongly opposing corners on 52 main-stock and nine upper-timber triangles, splitting only when another face needs the original frame. Flipping the tangent handedness along with the normal preserves the bitangent. All triangles retain their ordered spatial and UV coordinates. The mesh test compares an expanded per-corner digest to R10 rather than assuming vertex indices must remain identical across a shading split.
+
+The fixed cap participates in the same inter-part contact bake as the stock. Its broad face uses a dedicated end-facing steel and patina projection rather than the old generic longitudinal pattern. No reference photo is baked into the asset; the actual reverse face of the museum specimen is not established by its side photograph.
+
+For the top of the stock, see the bottom (rifle) example in Steven Lu's **Butt stock comparison** on [Arms of China](https://armsofchina.com/firearm/hanyang88/#:~:text=Butt%20stock%20comparison). This is a separate specimen, not another view of Te Papa DM000453. Its continuous dark satin top contrasts with the drier sides. The game model varies top-surface stain, roughness and fibre-normal strength together; there is no painted highlight. Use the dedicated `Review_StockTop` camera to compare the finish. The collector photograph is not bundled or sampled in the bake.
+
+### R12: distinguish lighting from the finish on the stock
+
+The top-of-stock photograph by Steven Lu in the R11 reference shows a narrow reflection above dark directional grain. Its light source and exposure are unknown. A controlled studio study compared material variants under both the broad studio and a narrow strip light. R12 retains the main stock's R11 substrate (including its pore normal and zero metalness) and supplies the oil reflection as standard `KHR_materials_clearcoat` on this part alone. One 1024-square linear red-channel mask fades the film off the top surface and varies it with the existing grain and wear. The relatively smooth coat has no independent normal map; its reflection responds to scene lighting, not a bright line painted into the colour texture. The upper handguard and all steel retain their R11 materials.
+
+Use `Review_StockTop` to inspect the finish; the review script renders both `After_StockTop` and `After_StockTopStrip` for a second lighting condition with the same geometry and view. The front timber between the bands uses its own worn finish and sparse irregular depressions based on the bottom long rifle in the same contributor's **Length comparison**. Pigment, roughness and tangent-space normals describe each indentation; no individual mark is copied from the photograph. `Review_ForeEndFinish` and its raking-light render inspect this area separately from the upper wooden handguard. The museum / period references still cannot establish the exact finish of faces that they do not show.
+
+### R13: distinguish the two exterior band finishes
+
+The bottom long rifle in Steven Lu's **Length comparison** on [Arms of China](https://armsofchina.com/firearm/hanyang88/#:~:text=Length%20comparison) shows a broad continuous reflection on the front band. The knob and side disc identify the photographed face of the rear band: the narrow ridge with an adjacent dark return belongs on the knob side. R13 preserves its stamped surface treatment as an artistic detail drawn from Te Papa DM000453, not an identifying mark observed on the Lu specimen. A tangent-space profile and local roughness variation carry the reflection. The opposite flank has a more restrained roll, not a claimed second photographic match. These photographs constrain appearance, not a measured section.
+
+Use `Review_FrontBandSide` and `Review_RearBandReverse` to inspect these faces, and the paired `RearBandReverseRaking` render for the narrow source. R13 changes six maps (two complete PBR sets). The R12 wood/oil-film mask, other fittings, positions, normals, UVs and game triangle count are retained.
+
+### R14: continuous reflections on the exposed steel
+
+Steven Lu's bottom long rifle in **Length comparison** and Te Papa's receiver close-up show broad areas of toned steel with continuous longitudinal reflections. R13 instead put large pale patches across the curved steel. R14 separates the round exposed surfaces from the adjacent housings and side disc. Fine lengthwise marks affect roughness and tangent normals without drawing a permanent highlight into the base colour. Small oxide and end-wear variations remain. No operating or geometry data changed. The six revised material sets are the only texture changes; hashes of the remaining 115 images are checked against R13.
+
+The local `Review_MidSteel` camera frames the transition. The paired `After_MidSteel` and `After_MidSteelRaking` renders share geometry, view and exposure. Compare R13/R14 in the same fixture; do not infer absolute reflectance from photographs of different objects under unknown lighting.
+
+### R15: midsection and timber colour separation
+
+The R14 exposed cylinder and its adjacent housings still looked pale under the broad studio source. A BlenderMCP isolation study kept geometry, view and exposure fixed and compared material variants under both broad and raking light. Increasing roughness alone flattened the material without adequately darkening the broad area. R15 instead adjusts linear reflectance and metallic response between protected and rubbed areas. These changes apply only to the exposed midsection and its two adjacent housings. The dark-game check remains independent of the studio photographs.
+
+The side-on **Length comparison** from Steven Lu also shows less warm colour on the upper handguard than on the lower timber. R15 gives the upper piece its own desaturated aged finish; the stock's side has sparse broken-fibre wear, independent of the crest. The existing oil-film mask and fore-end maps remain byte-identical. No reference photograph is used as a game texture. Use `Review_StockFlank`, `Review_ForeWood` and `Review_MidSteel` to check the changes. Position, UV, triangle and tangent-frame gates remain unchanged; 118 texture payloads are locked to R14.
+
+### R16: compare the wood pieces on the same rifle
+
+For the broad timber flank the relevant comparison is across the wooden seam on the bottom rifle in Steven Lu's **Length comparison**, not between two differently lit specimen photographs. In R15 the model's lower piece was nearly as dark as the upper piece. R16 brings out the worn lower wood without brightening the whole stock: a separate old-wood swatch supplies local pigment, roughness and directional normals. The upper handguard remains stained and muted. Irregular, tapered broken fibres on the flank affect its normal, colour and roughness together. They are not repeated stamps and do not copy a collector specimen's identifying marks.
+
+Use `Review_ForeWood` and `Review_StockFlank` with the broad and raking renders to inspect the two areas. Five wood payloads change: base/ORM/normal for the stock and base/ORM for the upper piece, whose dielectric specular factor is now 0.17. The remaining 128 images, including its normal map and the stock oil-film mask, and the previous geometry tests are unchanged. Photographic lighting is not calibrated; compare tone hierarchy and highlights qualitatively rather than asserting exact reflectance.
+
+### R17: distinguish exposed chips from fine stock grain
+
+The aligned side patch from Steven Lu's **Length comparison** has a few larger broken fibres and longer, irregular cross-grain grazes among fainter marks. R16 mostly showed near-equal small specks over its grain. R17 varies the length, width, orientation, cluster density and exposed lip of unrepeated local marks. The worn lip, newly exposed fibre and dark intact oil are separate pigment, roughness and tangent-normal signals; no stain, serial or specimen-specific carving was traced from the reference. Only three textures for the main stock change. The upper/lower forearm hierarchy, all steel and the top film mask remain as in R16.
+
+The local review compares the same R16 and R17 flank cameras in studio and raking light. Matched-resolution quadrilateral samples exclude the specimen marking and background. Counting small connected bright patches describes the rendered **appearance**, not the physical number of scratches or their dimensions. The model and the independently photographed specimen were not lit by the same rig.
+
+### R18: allow wear to continue down the narrowing flank
+
+R17 reproduced small exposed chips but biased elongated marks toward oblique strokes. Its wear mask also ended before the flank narrowed, leaving a bare patch adjacent to worn wood. The new material biases a subset of longer chips across the grain while leaving the short fibres multidirectional. Along the taper it increases the frequency smoothly, fades the wear and protects the existing top finish. Colour, roughness and tangent normal share each mark's shape. Only the stock's three base PBR images change; all other 130 image payloads and the original geometric tests are retained.
+
+The local **FlankDirection** plate uses two separately registered patches of Steven Lu's long-rifle side photograph, excluding background and specimen markings. Sample grids, bright-region thresholds and orientation criteria are identical across the compared versions. These are checks on visible texture organization, not counts of physical damage. See **FlankDirectionLighting** for a check under different illumination.
+
+### R19: exterior strap fittings
+
+Steven Lu's **Length comparison** (bottom long rifle) shows the band and stock rings at an oblique rest, not both fully open in side view. R19 uses rigid display transforms on just these two exterior nodes. The angles are an interpretation of that photograph; they are not measured intrinsic dimensions. Both rings now have continuous shaded edges across UV splits. The band-side strip and the two ring/base pairs have their own worn-steel colour, roughness and tangent normals, with a quieter protected base and a rubbed outer arc.
+
+The two bases each had 18 triangles but open bevel boundaries. Completing the shells from their existing exterior vertices gives 76 and 68 triangles, respectively: 108 more across the whole prop. Tests require each geometric edge of the welded shell to have two opposite uses, with no zero-area UV faces. Local geometry and UV corner digests for all other parts, the two rigid transforms, wood maps, and 118 unrelated texture payloads are checked independently. `ringPresentation` describes pose-only displacement; `surfaceComparisons` remains a local-space comparison against digital sources, not measurements of the historical specimen.
+
+Use `Review_BandTrim`, `Review_StockTrim` and `Review_BandStrip` for the small fittings. The source scene is packed and saved before rendering the review views. `Review/Data_RenderReceipt.json` is written only after the full set finishes and ties each rendered PNG to the imported GLB.
+
+### R20: interrupted film on the fore-end
+
+The front timber of the bottom long rifle in Steven Lu's **Length comparison** has a broad reflection interrupted by exposed fibres and irregular depressions. A matched material-and-light study on R19 confirmed that the appearance depends strongly on source direction. R20 retains dielectric wood, not metallic silver pigment. A separate 1024-square red-channel mask drives its clearcoat, fading at the ends, underside, exposed pores and deeper impressions. Base colour, roughness and normal describe the worn substrate. The adjacent length of exterior steel is darker and rougher, with a restrained rubbed edge; it should not become as pale as the worn timber in side light. The original stock-crest mask remains image 132; the new mask is appended as image 133, preserving all earlier image indices. Six R19 image payloads change, while 127 remain identical. No glow, baked highlight or reference-photo projection is used.
+
+The local `ForeEndFinish`, `ForeEndFinishRaking` and `ForeEndSideBox` shots keep the camera fixed. Neither a bright pixel nor a close mean value from an independently lit photograph establishes the actual historic finish chemistry. Compare the contrast between steel, the rubbed timber side, and the interruptions in the reflection.
+
+### R21 exterior steel
+
+The bottom long rifle in Steven Lu's *Length comparison* provides the common side view for both bands. The model now has a bowed front-band outline, an uninterrupted satin face and a small visible trim along its lower edge. The rear band has a narrower outline and a raised-looking central strip with a recessed return. These contours and the trim pose are estimates from the photograph. The surface marks on the Te Papa specimen are a separate reference for material wear. [Arms of China](https://armsofchina.com/firearm/hanyang88/) · [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119)
+
+The colour, roughness and tangent normals of the exterior steel are baked into each part's existing atlas. The front band has a broad worn patch. The rear band carries the narrower reflection along the rib. The handle reflects a compact light source while the longer steel carries an axial highlight. The two updated band outlines use the existing mesh topology. Regenerate their contact fields with `Script_HanYangContactBake.py` before running `Script_HanYangExteriorBake.py`. Inspect both sides using `Review_FrontBandProfile`, `Review_RearBandProfile` and the reverse views in the packed Blender scene.
+
+### R22 fore-end grain and impressions
+
+The photographer's original 4032 × 1728 side image resolves a forked mark, a short dark chip and a group of deeper fibre impressions on the bottom rifle. Their locations were registered on the visible timber face using the two bands and the wood outline, then checked against the packed mesh in Blender. Each impression interrupts the oil mask and changes the substrate normal and roughness. The surrounding grain has a shallower, elongated relief. The opposite face retains its existing wear. The reference photograph stays in the local review materials. [Steven Lu, Arms of China, original side photograph](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
+The whole-rifle light test keeps the lamps fixed in world space across both versions. The local `ForeWoodWitness` plate shows corresponding crops of the original photograph and both renders. Local checks compare the visible impressions under frontal and elevated light. Two off-axis area lights are also tested against the visible highlights on the handle knob. Under that hypothesis the broad fore-end flank needs a lighter worn substrate, and the guard flank a darker, rougher finish. The wood below the guard provides a local lightness comparison. The GLB changes four fore-end images and the guard pigment and ORM, with 128 other R21 images retained byte for byte.
+
+### R23 stock grain and detail charts
+
+The stock comparison shows short transverse impressions along the polished crest, then a cluster of exposed wood fibres where the stock narrows. Their pigment, roughness, tangent relief and oil coverage share the registered outlines. A neutral material under a grazing light exposed a jagged crown reflection. The crown shading now follows a smoothed field fitted to the mesh surface. The wood stain fades gradually around the turn visible in feedback image six. The exact underside finish is an artistic interpretation. [Steven Lu, stock comparison](https://armsofchina.com/wp-content/uploads/2026/04/145.jpg)
+
+The rear outline uses a local bend shared by the end of the wood and its metal cap. Both the top and side photographs were compared when choosing the outline. The visible side impression is traced from the two forms on the stock of the bottom rifle. Its meaning and date are unknown. [Steven Lu, side comparison](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
+Four small exterior detail meshes use new Blender UV islands. Per-corner UVs and tangents are stored in `Data_DetailUv.npz` in the external source folder. The asset test checks directional stretch in every affected triangle. It compares the ordered positions and frames outside the edited regions with R22, including all lateral and vertical coordinates on the stock and cap. The front timber, bands and guard retain the preceding finish.
+
+### R24 portable PBR colour
+
+All 44 base-colour maps contain the calibrated sRGB colour. A standard glTF loader and a fresh Blender import can display the same finish as the game. Prior GLBs stored darker maps and reconstructed their colours with a linear multiplier on each material. The game and motion comparison tool read the `asset.extras.calibratedBaseColor` flag to select the correct path. The historical `gunBase=authored` view uses the relative multiplier appropriate to the file it loads.
+
+The game preserves the authored steel and wood response during material setup. Several steel names include “Handle”, “Surface” or “Head”, which also match character skin names. The explicit material choice keeps skin shading off the steel. Both timber oil masks receive the same oblique-view filtering as their base colour.
+
+The end of the fore-end follows the bowed band outline. In the preceding GLB a short brown strip projected beyond the band in both side views. The correction keeps the UVs and attached finish and updates the local contact shadows. The forward band has a cooler satin face with localized polishing. The rear band's burnished rib and rolled return have a darker recess between them. Pigment, roughness and tangent relief carry the differences under changing illumination. Outside the two bands, all normal images and roughness and metalness channels retain their R23 bytes. Both oil masks are identical. The gallery study uses the bottom specimen in Steven Lu's photograph. [Arms of China, length comparison](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
+### R25 rear band finish
+
+The side photograph shows the band rib narrowing above a darker lower margin. A small area of steel remains visible beside the hanging loop. The final finish tapers the normal relief and the two worn areas together. A mottled satin surface continues across the lower margin. The lower face is a solid visual detail with a rolled edge. Its outline and the static resting pose of the loop are interpreted from the photograph. [Steven Lu, length comparison](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
+The three rear-band details use eight revised images. The other 126 embedded images retain their R24 bytes. All index and vertex streams outside the solid lower face also retain their R24 bytes. The game and published model use the native base-colour workflow introduced in R24.
+
+### Rebuild and inspect
+
+The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
+
+Additional cameras `Review_Knob`, `Review_RearSeam`, `Review_ButtCap` and `Review_FrontSeam` let an artist inspect the macro finishes and the original feedback regions directly.
+
+Under the external source directory, `ExteriorFinish_20261122/Input_R2.glb` and `Input_R2.json` retain the upstream model and bake metadata. `Input_ExteriorGeometry.glb` is the approved R4 mesh/UV/tangent source, pinned by SHA256; R5 reads the geometry attributes directly to avoid varying a smart UV pack on re-export. Its old textures are not used in the R5 bake. Keep the Dots source. `ReferenceMaterials_20261113/Data_RuntimeGains.json` is used when opening legacy comparison models. Set `HANYANG_SOURCE_DIR` before starting Blender to use another archive root. The R5 material-only rebuild can skip the mesh generation command if the geometry input and audit are present.
+
+```text
+node scripts/Script_BlenderMcp.mjs start --task HanYangExterior
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangExterior.py --timeout 600
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangExteriorAudit.py --timeout 240
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangContactBake.py --timeout 600
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangDetailUv.py --timeout 600
+python Taierzhuang1938/_import/Script_HanYangScanLibrary.py
+python Taierzhuang1938/_import/Script_HanYangExteriorBake.py
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangExteriorReview.py --timeout 600
+node scripts/Script_BlenderMcp.mjs stop
+node scripts/Script_BlenderMcp.mjs status --scan
+```
+
+The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Before promotion, an optional temporary `ReviewInput.glb` in the revision directory enables matched before/after shots; without it the review renders the finished asset only. The review includes neutral studio and narrow grazing light and saves the packed final `.blend` in the external revision directory. Promote only `Model_HanYang173R.glb` and `Data_GameGeometry.json` from that directory to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
+
+## Historical photo-reference material revision R2, 2026-11-13
 
 The user rejected the preceding smooth finish. R2 matches the two supplied receiver and barrel-band photographs with dark longitudinal timber fibres, fine steel corrosion, oxide mottling and spatially varying worn reflections. Wood uses a 6 cm repeating cylindrical unwrap with planar ends. The steel source repeats every 4 cm before baking into the existing atlases. Metal bump distance is 32 micrometres at strength 0.25. Wood bump distance is 150 micrometres at strength 0.30. Roughness varies with the source texture across each surface.
 

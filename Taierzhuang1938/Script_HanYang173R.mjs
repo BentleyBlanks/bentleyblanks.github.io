@@ -35,29 +35,35 @@ export function RepairHanYangWinding(geometry) {
 export const HANYANG_BASE_MODE = (typeof location !== 'undefined'
   && new URLSearchParams(location.search).get('gunBase') === 'authored') ? 'authored' : 'candidate';
 
-/** 某个部件的底色倍率 [r,g,b]（乘在原始底色贴图上）。mode = 'authored' | 'candidate'。 */
-export function HanYang173RBaseGain(part, mode = HANYANG_BASE_MODE) {
+/** Linear colour multiplier for a legacy or calibrated base-colour atlas. */
+export function HanYang173RBaseGain(part, mode = HANYANG_BASE_MODE, calibrated = false) {
   const g = D.exposureGain, C = D.baseCandidate;
-  if(mode === 'authored' || !C) return [g, g, g];
-  if(D.wood.includes(part)) return [...C.wood];
-  const y = C.partBaseY[part];
-  if(!(y > 0)) return [g, g, g];
-  const S = C.steel;
-  const k = Math.min(S.maxGain, Math.max(1, Math.pow(S.target / (g * y), S.exponent)));
-  return [g * k, g * k, g * k];
+  if(calibrated && mode !== 'authored') return [1, 1, 1];
+  if(!calibrated && mode === 'authored') return [g, g, g];
+  let gain = [g, g, g];
+  if(C && D.wood.includes(part)) {
+    gain = [...C.wood];
+  } else if(C?.partBaseY[part] > 0) {
+    const y = C.partBaseY[part], S = C.steel;
+    const k = Math.min(S.maxGain, Math.max(1, Math.pow(S.target / (g * y), S.exponent)));
+    gain = [g * k, g * k, g * k];
+  }
+  // A calibrated atlas already includes the candidate gain in linear space.
+  return calibrated ? gain.map(channel => g / channel) : gain;
 }
 
-export function ConfigureHanYang173R(asset, library) {
+export function ConfigureHanYang173R(asset, library, rendererAnisotropy = library?.anisotropy || 1) {
   if(!asset) return;
-  const anisotropy=Math.min(D.textureAnisotropy,library?.anisotropy||1);
+  const anisotropy=Math.min(D.textureAnisotropy,rendererAnisotropy);
+  const calibrated=asset.gltf.asset?.extras?.calibratedBaseColor===true;
   asset.gltf.scene.traverse(mesh => {
     if(!mesh.isMesh) return;
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
-    material.color.fromArray(HanYang173RBaseGain(mesh.name));
-    for(const slot of ['map','normalMap','roughnessMap','metalnessMap'])
+    material.color.fromArray(HanYang173RBaseGain(mesh.name,HANYANG_BASE_MODE,calibrated));
+    for(const slot of ['map','normalMap','roughnessMap','metalnessMap','aoMap','clearcoatMap'])
       if(material[slot]&&material[slot].anisotropy!==anisotropy) {material[slot].anisotropy=anisotropy;material[slot].needsUpdate=true;}
-    library.ConfigureExternalPbr(material,{mesh});
+    library?.ConfigureExternalPbr(material,{mesh,preserveAuthored:true});
     asset.materials.set(material.name,mesh.material);
   });
 }
