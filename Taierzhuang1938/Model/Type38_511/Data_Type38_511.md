@@ -1,5 +1,11 @@
 # Dots Type38 511 runtime integration
 
+## 旧钢表面 · 2026-11-24
+
+前版钢板样本带有拼板接缝，会在中箍和覆面上留下横线及成片暗斑。新版沿金属表面方向烘焙细擦纹，用独立的细点控制局部氧化。中箍的各层围绕圆周连续，柄颈呈窄亮带，椭圆柄头保留较宽的钢面反射和零星失光点。实物照片只供比对，运行时底色、粗糙度及已有法线使用 CC0 材质样本重建。此次涉及 41 个外观部件和 102 张内嵌图。两件木料的 10 张图与上一版逐字节相同。[钢面实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG) · [柄头实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [Metal 009](https://ambientcg.com/view?id=Metal009) · [Metal 046 B](https://ambientcg.com/view?id=Metal046B)
+
+固定相机和灯光，使用实物后视的相邻木料与尾盘校对光照，再检查柄头。按相同亮度门限采样，椭圆柄头的亮部面积占比从约 8% 变为约 21%，照片约 19%。柄颈约从 7% 变为 26%，照片约 31%。整枪侧照中另取三段前钢与相邻木材，中位亮度比在照片中为 0.71、0.75、0.89。近景和普通 NPC 分别为 72,460 与 67,852 三角。刻度和木料沿用已验收版本。[前段实物特写](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG) · [整枪侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)
+
 ## 栓尾盘与中箍挂环 · 2026-11-24
 
 后视采用同件实物照片，在手柄、木托和前景共用的固定机位下核对盘面所占画幅。盘缘向外展开，左下凸耳有更清楚的收角。中央凹圈的边唇由网格成形，点纹用法线和粗糙度表现。按 640 × 480 后视照片人工勾出的可见盘缘计算，网页模型的投影交并比由 0.722 升至 0.921。这个数值只描述该照片中的外轮廓。[实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)

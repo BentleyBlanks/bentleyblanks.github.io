@@ -20,6 +20,17 @@ assert.equal(contract.runtimeSha256,D.sourceSha256);
 assert.equal(contract.approvedReductionTriangles,69454);assert.equal(contract.triangles,D.triangles);
 assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
 assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,116);
+const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
+const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part).mesh].primitives[0]);
+const atlasMaterial=doc.materials[insetPrimitives[0].material].pbrMetallicRoughness;
+for(const primitive of insetPrimitives.slice(1)){
+ const material=doc.materials[primitive.material].pbrMetallicRoughness;
+ const uv=doc.accessors[primitive.attributes.TEXCOORD_0];
+ assert.equal(uv.count,doc.accessors[primitive.attributes.POSITION].count);
+ assert(uv.min[0]>.26&&uv.max[0]<.95&&uv.min[1]>.10&&uv.max[1]<.36,'inset UVs must stay inside the padded steel chart');
+ assert.deepEqual(material.baseColorTexture,atlasMaterial.baseColorTexture);
+ assert.deepEqual(material.metallicRoughnessTexture,atlasMaterial.metallicRoughnessTexture);
+}
 assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),72460);
 assert(!doc.animations?.length&&!doc.skins?.length);
 for(const [index,image]of doc.images.entries()){assert.equal(image.uri,undefined);const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=contract.imagePayloads[index];assert.equal(expected.index,index);assert.equal(expected.name,image.name);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
@@ -133,7 +144,7 @@ for(const mesh of fps.meshes.filter(item=>item===woodRim||item===windowTrim||Obj
   assert(edgeStart.cross(edgeEnd).length()>1e-12,`collapsed exterior bevel: ${mesh.name}`);
  }
 }
-assert.equal(Object.keys(contract.finishRoughnessP10P50P90).length,43);
+assert.deepEqual(Object.keys(contract.finishRoughnessP10P50P90).sort(),fps.meshes.map(m=>m.userData.type38Part).sort());
 assert.deepEqual(contract.markings,['scale graduations and numerals only']);
 const grip=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_HandleOval08').geometry;
 const gripPoints=grip.attributes.position, gripNormals=grip.attributes.normal;

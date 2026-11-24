@@ -4,7 +4,9 @@ import hashlib
 import io
 import json
 import subprocess
+import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 import cv2
 import numpy as np
@@ -20,6 +22,14 @@ SAMPLES = {
     'pores': ('wood_table_001', 'disp', '4k', '64948be76b2384e79459f0d5ac6fd88912c64e71377e3ade2ec7b18480f532f0'),
     'woodGloss': ('wood_table_001', 'rough', '4k', '1349d61fee3ccc6f6b4bfe5f49ebf4803c1d88bd4ba2c6e2fd3a40da84a459af'),
     'steel': ('metal_plate_02', 'rough', '2k', '7abccc92dfebe4c6fd21b57b4de659a3b8be7747434af39306fcff2059927734'),
+}
+
+METAL_SOURCES = {
+    'Metal009': {'Color':'209d3bb050be9f58c5af179d9712fa7799567a4cd50afd338d37674bdcff765b',
+                 'Roughness':'e802f013b93cb1bd4b55cd91f02a1863233475a7f8bd0e6755cfaa447a729674',
+                 'Displacement':'8a7dc69978932952ac0155d7475480b3d9f860cdedd5ccc51db9d202e8f583aa'},
+    'Metal046B': {'Color':'8263145285430210a6867010abeb09402aad5b9195366e18817a07ab5badc6fe',
+                  'Roughness':'82cf613070e28568613b8ed71093c04664015da4f925f13e91928c692edd958a'}
 }
 
 
@@ -39,6 +49,24 @@ def ReadSamples(cache):
             raise ValueError(f'Invalid source: {path}')
         bitmap = np.array(Image.open(path).convert('L'))
         layers[key] = bitmap[155:775, 190:690] if key == 'steel' else bitmap
+    for asset, channels in METAL_SOURCES.items():
+        stem = asset+'_2K-JPG'
+        pack = cache/(stem+'.zip')
+        download = None
+        if not pack.is_file():
+            with urllib.request.urlopen('https://ambientcg.com/get?file='+pack.name, timeout=120) as response:
+                download = response.read()
+        with zipfile.ZipFile(pack if download is None else io.BytesIO(download)) as archive:
+            for channel,digest in channels.items():
+                raw = archive.read(stem+'_'+channel+'.jpg')
+                if hashlib.sha256(raw).hexdigest() != digest:
+                    raise ValueError(f'Invalid {asset} {channel} sample')
+                bitmap = np.asarray(Image.open(io.BytesIO(raw)).convert('L'))
+                layers[asset+channel] = cv2.GaussianBlur(bitmap,(0,0),.8)
+        if download is not None:
+            with tempfile.NamedTemporaryFile(dir=cache,delete=False) as staging:
+                staging.write(download)
+            Path(staging.name).replace(pack)
     return layers
 
 
@@ -545,6 +573,57 @@ def VarnishTraces(length, transverse, positiveSide):
     return traces,chips
 
 
+def FinishInsetSurfaces(doc, views, source, load, store):
+    primitives = {node['extras']['SourceObject']:doc['meshes'][node['mesh']]['primitives'][0]
+                  for node in doc['nodes'] if 'mesh' in node}
+    host = primitives['T38_430B_ContinuousLowerFacing_VisualOnly']
+    atlas = doc['materials'][host['material']]['pbrMetallicRoughness']
+    base = load(atlas['baseColorTexture'])
+    orm = load(atlas['metallicRoughnessTexture'])
+    left,top,width,height,gutter = 266,104,704,256,16
+    region = np.s_[top:top+height,left:left+width]
+    assert base.shape == orm.shape == (1024,1024,3) and not orm[region][:,:,1].any()
+
+    # Both inset shells use the same projected finish across their common edge.
+    names = ['T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly']
+    charts = {}
+    for name in names:
+        pos = Attribute(doc,views,primitives[name]['attributes']['POSITION'],3)
+        charts[name] = np.column_stack((pos[:,2]+.031*pos[:,0],pos[:,0]+.55*pos[:,1]+.02*pos[:,2]))
+    allPoints = np.vstack(list(charts.values()))
+    origin,span = allPoints.min(axis=0), np.ptp(allPoints,axis=0)
+    coverage = {}
+    for name,chart in charts.items():
+        primitive = primitives[name]
+        local = (chart-origin)/span*[width-2*gutter,height-2*gutter]+gutter
+        data = np.asarray((local+[left,top])/1024,dtype='<f4')
+        mask = np.zeros((height,width),np.uint8)
+        pixels = np.rint(local-.5).astype(np.int32)
+        for face in Attribute(doc,views,primitive['indices'],3):
+            cv2.fillConvexPoly(mask,pixels[face],1)
+        coverage[name] = mask.astype(bool)
+        primitive['attributes']['TEXCOORD_0'] = len(doc['accessors'])
+        doc['accessors'].append(dict(bufferView=len(views),componentType=5126,count=len(data),type='VEC2',
+                                     min=data.min(axis=0).tolist(),max=data.max(axis=0).tolist()))
+        doc['bufferViews'].append(dict(buffer=0,target=34962,byteLength=data.nbytes))
+        views.append(data.tobytes())
+        doc['materials'][primitive['material']]['pbrMetallicRoughness'] = {
+            key:dict(atlas[key]) for key in ('baseColorTexture','metallicRoughnessTexture')}
+
+    y,x = np.mgrid[:height,:width].astype('f')
+    u = (x+.5-gutter)/(width-2*gutter)*span[0]*7.1+.32
+    v = (y+.5-gutter)/(height-2*gutter)*.62+.18
+    grain = np.clip((Sample(source['Metal009Color'],u,v)-148)/13,-1.7,1.7)
+    brush = np.clip((Sample(source['Metal009Roughness'],u,v)-119)/24,-1.8,1.8)
+    patina = np.clip((Sample(source['Metal046BColor'],u*.81+.16,v+.4)-63)/20,-1.5,1.5)
+    rough = 110+12*brush+9*patina
+    base[region] = np.rint(Tint([67,64,58],[156,151,140],.46+.19*patina+.085*grain))
+    orm[region] = np.rint(np.dstack((np.full_like(x,255),rough,240+7*patina)))
+    store(atlas['baseColorTexture'],base)
+    store(atlas['metallicRoughnessTexture'],orm)
+    return {name:np.percentile(rough[mask],[10,50,90]).round(1).tolist() for name,mask in coverage.items()}
+
+
 def Build(cache):
     repo = Path(__file__).resolve().parents[2]
     folder = repo / 'Taierzhuang1938/Model/Type38_511'
@@ -600,13 +679,15 @@ def Build(cache):
         along = length + side * .19
         band = part == 'Exterior_MiddleBand57'
         bare = band or part in ('Exterior_HandleOval08', 'T38_435F2_VisualBackingRearEnd', 'T38_440D2_IndependentVisibleRecess', 'SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH', 'SightDetailV3_DecorativeConvexRoundSurface', 'Exterior_FoldedFrame12', 'SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY')
+        patinaMap = source['steel'] if wood else source['Metal046BColor']
         weights = np.stack([normalSide,normalUp,normalLength]) ** 4
         weights /= np.maximum(weights.sum(axis=0), .0001)
         def SteelPatch(scale, bias):
             result = np.zeros_like(length)
             for weight, horizontal, vertical in zip(weights, [length,length,side], [up,side,up], strict=True):
-                result += weight * Sample(source['steel'], horizontal * scale + bias, vertical * scale * 1.17 + bias * .7, True)
-            return np.clip((result - 155) / 66, -1.5, 1.5)
+                result += weight * Sample(patinaMap, horizontal * scale + bias, vertical * scale * 1.17 + bias * .7, wood)
+            center,spread = (155,66) if wood else (63,20)
+            return np.clip((result - center) / spread, -1.5, 1.5)
         stain = SteelPatch(8.7, .43)
         grainSteel = SteelPatch(42, .16)
         edge = np.clip((bend - .025) * 2.7, 0, 1)
@@ -767,6 +848,7 @@ def Build(cache):
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
             lightTube = part in ('Exterior_LongRound44','Exterior_FrontOuterTube76')
             collar = part == 'T38_435F2_IndependentTailNeckExterior'
+            shoulder = part == 'T38_430L_VisibleUpperShoulderCoordination'
             if bare or collar or lightTube:
                 dark, light = ([108,104,97],[163,159,149]) if band else ([148,143,134],[192,189,179])
                 if part.startswith('Exterior_Folded') or part.startswith('SightDetail'):
@@ -778,11 +860,14 @@ def Build(cache):
             color = Tint(dark, light, .42 + .24*flow + .13*stain)
             color = Blend(color, np.array([156,151,143], dtype='f'), edge*(.18 if bare else .49))
             color = Blend(color, np.array([70,62,53], dtype='f'), oxidation*(.18 if bare else .22))
-            fine = Sample(source['steel'], along*33 + .12, (up*.83 + side*.53)*162 + .63, True)
-            brush = np.clip((fine - 159)/77, -1, 1)
+            acrossSteel = np.arctan2(up-(.030 if band else .041),side)/(2*np.pi)
+            grainU,grainV = length*7.1+.32, acrossSteel+.37
+            if band:
+                grainU,grainV = acrossSteel+.21,length*9.4+.17
+            if handle:
+                grainU,grainV = side*5.4+.22,np.arctan2(up-.046,length+.102)/(2*np.pi)+.29
+            brush = np.clip((Sample(source['Metal009Roughness'],grainU,grainV)-119)/24,-1.8,1.8)
             rough = (94 if bare or collar else 104) + 16*flow + 13*stain + 4*brush - 20*edge
-            if jacket or band:
-                rough += 9*flow + 8*stain
             if lightTube:
                 exposed = part == 'Exterior_LongRound44'
                 if exposed:
@@ -793,34 +878,58 @@ def Build(cache):
                     silver *= np.clip(.96+.12*flow+.035*grainSteel,.72,1)
                     polishedSteel = Tint([133,132,127],[204,202,192],.48+.18*flow+.095*stain)
                     color = Blend(color,polishedSteel,silver)
+                    distalOxide = 1-Ramp(-.850,-.780,length)
+                    reflectance = 1.056+.184*Ramp(-.750,-.692,length)+.235*distalOxide
+                    color = (color+14.025)*reflectance[:,:,None]**(1/2.4)-14.025
                     rough += silver*(91+12*flow+5*stain+5*brush-rough)
                 else:
                     color = Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
                     rough = 86+7*flow+5*stain+4*brush
-            if band:
-                color = Tint([116,113,107],[170,166,156],.48+.22*flow+.05*stain)
-                rough = 87+24*flow+17*stain+5*brush-15*edge
-            if jacket:
-                color = Tint([71,69,64],[117,111,101],.51+.22*flow+.05*stain)
-                rough = 97+25*flow+18*stain+4*brush-16*edge
-            if handle:
-                knob = Ramp(.044,.054,side)
-                color = Blend(Tint([114,110,100],[159,153,142],.48+.19*flow),
-                              Tint([101,87,75],[148,130,113],.43+.26*flow+.12*stain),knob)
-                rough = 48 + 6*flow + 4*stain + knob*(21+5*brush+4*grainSteel)
             metal = 251 - oxidation*(22 if bare else 41)
             if part == 'Exterior_LongRound44':
-                metal -= (1-silver)*(108+15*oxidation)
-            if handle:
-                metal -= knob*(42+16*oxidation)
-            if jacket:
-                metal -= 16+7*oxidation
+                metal -= (1-silver)*(108+15*oxidation+12*distalOxide)
             if trim:
                 color = Tint([39,37,33],[90,83,73],.42+.26*flow+.09*stain)
                 color = Blend(color,np.array([132,124,109],dtype='f'),.35*edge)
                 rough = 143+16*flow+13*stain-26*edge
                 metal = 207+19*edge-9*oxidation
             relief = .025*grainSteel + .024*brush
+            if shoulder or jacket or band or handle:
+                grain = np.clip((Sample(source['Metal009Color'],grainU,grainV)-148)/13,-1.7,1.7)
+                scoring = np.clip((Sample(source['Metal009Displacement'],grainU,grainV)-147)/71,-1.7,1.7)
+                # The band wraps in U. All its layers must close at the same azimuth.
+                tarnishU = grainU if band else grainU*.73
+                speckleU = grainU*(5 if band else 5.1)
+                tarnish = np.clip((Sample(source['Metal046BRoughness'],tarnishU+.16,grainV+.41)-90)/23,-1.5,1.5)
+                speckle = np.clip((Sample(source['Metal046BRoughness'],speckleU+.45,grainV*4+.29)-90)/17,-1.8,1.8)
+                pits = Ramp(.27,1.30,speckle)
+                if shoulder or jacket:
+                    crown = Ramp(-.10,.95,normalUp)
+                    rub = np.clip(.31+.44*crown+.24*flow+.15*stain+.23*edge,0,1)
+                    if shoulder:
+                        color = Tint([40,38,33],[143,138,124],.22+.66*rub+.047*grain-.08*pits)
+                        rough = 97-37*rub+10*brush+5*tarnish+5*speckle
+                        metal = 246+9*rub-3*tarnish
+                    else:
+                        color = Tint([59,55,49],[155,149,138],.12+.64*rub+.055*grain)
+                        rough = 122-40*rub+12*brush+7*tarnish+6*speckle
+                        metal = 217+29*rub-8*tarnish
+                elif band:
+                    rub = np.clip(.60+.22*stain+.14*grainSteel+.16*edge,0,1)
+                    color = Tint([99,95,86],[174,169,156],.32+.51*rub+.073*grain)
+                    rough = 110-30*rub+26*brush+9*tarnish+4*flow
+                    metal = 231+18*rub-5*tarnish
+                else:
+                    knob = Ramp(.044,.054,side)
+                    rub = np.clip(.49+.18*flow+.15*stain+.09*grain,0,1)
+                    bareOval = Tint([146,119,106],[216,194,176],.63+.085*speckle+.07*flow)
+                    oval = Blend(bareOval,np.array([93,70,60],dtype='f'),pits*.54)
+                    color = Blend(Tint([182,156,134],[252,234,218],.34+.50*rub),oval,knob)
+                    neckRough = 67+4*brush+3*tarnish
+                    rough = neckRough+knob*(89+5*speckle+16*pits+3*grain-neckRough)
+                    neckMetal = 251-2*tarnish
+                    metal = neckMetal+knob*(254-49*pits-neckMetal)
+                relief = .15*scoring+.056*tarnish-.25*pits
             if loop:
                 lowerArc = 1-Ramp(.0022,.0062,up)
                 wear = np.clip(lowerArc*(.82+.19*stain+.14*grainSteel)+.19*edge,0,1)
@@ -882,7 +991,7 @@ def Build(cache):
             normals = Load(normalSlot).astype('f') / 127.5 - 1
             if not wood and part != 'Exterior_FoldedFrame12':
                 normals[:, :, :2] *= .30 if not disk else .08
-            if wood or part == 'T38_430L_VisibleUpperShoulderCoordination':
+            if wood or handle or part == 'T38_430L_VisibleUpperShoulderCoordination':
                 normals[:, :, :2] = 0
                 normals[:, :, 2] = 1
             gradientV, gradientU = np.gradient(gaussian_filter(relief, .55))
@@ -908,7 +1017,8 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_ExteriorProfile14'
+    stats.update(FinishInsetSurfaces(doc,views,source,Load,Store))
+    doc['asset']['extras']['version'] = 'Type38_BurnishedSteel15'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088+loopTriangles-924 and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -917,8 +1027,9 @@ def Build(cache):
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['Exterior_RetainedImportedBody74'] = manifest['exteriorTriangleDeltas'].get('Exterior_RetainedImportedBody74',0)+loopTriangles-924
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=16, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=17, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
+                    metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
         chunk = views[image['bufferView']]

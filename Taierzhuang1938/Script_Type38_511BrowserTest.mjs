@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-exterior-profile-14');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72460);
+ assert.equal(evidence.identity.version,'511-burnished-steel-15');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72460);
  assert.equal(evidence.identity.npcTriangles,67852);assert.equal(evidence.identity.nearNpcTriangles,72460);
  assert.equal(evidence.identity.worldTriangles,72460);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -121,13 +121,19 @@ try{
       roughness.push(data[offset+1]);metalness.push(data[offset+2]);
      }
     const Median=values=>values.sort((first,second)=>first-second)[Math.floor(values.length/2)];
-    return {count:roughness.length,roughness:Median(roughness),metalness:Median(metalness)};
+    const oxideRough=roughness.filter((_,i)=>metalness[i]<235);
+    const steelRough=roughness.filter((_,i)=>metalness[i]>249);
+    return {count:roughness.length,roughness:Median(roughness),metalness:Median(metalness),
+     oxideFraction:oxideRough.length/roughness.length,steelFraction:steelRough.length/roughness.length,
+     oxideRoughness:Median(oxideRough),steelRoughness:Median(steelRough)};
    };
    return {neck:Sample(.13,.40),oval:Sample(.65,.90)};
   });
   const {neck,oval}=evidence.gripFinish;
-  assert(neck.count>100&&oval.count>100&&neck.metalness-oval.metalness>25&&oval.roughness-neck.roughness>12,
-   'the grip finish must separate polished neck from darker worn oval on the actual runtime maps');
+  assert(neck.count>100&&oval.count>100&&neck.metalness>245&&oval.metalness>245&&oval.roughness-neck.roughness>18,
+   'the neck and oval must both reflect as steel, with a broader highlight on the oval');
+  assert(neck.oxideFraction<.02&&oval.oxideFraction>.025&&oval.oxideFraction<.20&&oval.steelFraction>.60&&
+   oval.oxideRoughness>oval.steelRoughness+8,'scattered dull speckles must break up the worn oval reflection');
   evidence.foreFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_LongRound44')mat=mesh.material;});
