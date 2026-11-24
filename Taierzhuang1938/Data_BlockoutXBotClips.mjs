@@ -214,6 +214,25 @@ export const XBOT_DEATHS = Object.freeze({
 });
 
 /**
+ * 试玩 AI 的尸体（士兵套了外观，2026-11-24）：按原身体这一次的倒向（命中方向挑的倒地片段，见 Script_HitReactionLayer.DeathFallLocal）
+ * 挑倒向最近的一条，剩下的偏角绕竖轴转过去，胯跟着原身体的胯走 —— 看得见的尸体和命中体、血、掉的枪躺在同一个地方。
+ * 只挑站着起手、头朝倒向落地的（往前倒的趴着、往后倒的仰着，与原身体一致）；覆盖前 / 前右 / 右 / 后 / 后左 / 左 / 前左。
+ * fallLocal：演员局部系 XZ（-Z 是正前），终帧头 − 起点胯的地面投影，与倒地片段库 profile 的 fallLocal 同一口径；
+ * 2026-11-24 在遭遇试玩里对罗班长 / 何有田 / 刘文财三套外观各量一遍，三套相差不到 0.1。
+ */
+export const XBOT_DEATH_FALLS = Object.freeze([
+  M("StandingReactDeathForward_V1", { fallLocal: Object.freeze([0, -1]) }),
+  M("DeathFromBackHeadshot_V1", { fallLocal: Object.freeze([-0.22, -0.98]) }),
+  M("DeathFromTheFront_V1", { fallLocal: Object.freeze([0.41, -0.91]) }),
+  M("FallingForwardDeath_V1", { fallLocal: Object.freeze([0.75, -0.66]) }),
+  M("StandingReactDeathRight_V1", { fallLocal: Object.freeze([1, 0.07]) }),
+  M("FallingBackDeath_V1", { fallLocal: Object.freeze([0.31, 0.95]) }),
+  M("StandingReactDeathBackward_V1", { fallLocal: Object.freeze([-0.43, 0.9]) }),
+  M("StandingReactDeathLeft_V1", { fallLocal: Object.freeze([-0.96, -0.27]) }),
+  M("RifleDeath_V1", { fallLocal: Object.freeze([-0.76, -0.65]) }),
+]);
+
+/**
  * X Bot 配色（表面 / 关节两种材质，Beta_Surface / Beta_Joints）。
  * 普通人按阵营一种素色（用户 11-01：普通兵、普通百姓各一种普通颜色）：国军灰蓝、日军土黄、百姓灰褐。
  */

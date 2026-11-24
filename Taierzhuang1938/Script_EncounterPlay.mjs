@@ -19,7 +19,7 @@ import { PrepareWoundMaterials } from "./Script_CharacterWounds.mjs";
 import { AddGoreWarmProxies } from "./Script_CharacterGore.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
-import { XBOT_DEATHS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_DEATHS, XBOT_DEATH_FALLS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE } from "./Data_BlockoutXBotClips.mjs";
 import { PreloadDeathLibrary } from "./Script_HitReactionLayer.mjs";
 import { LoadEncounterCast } from "./Script_EncounterPlaySplit.mjs";
 import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_EncounterShaderWarmup.mjs";
@@ -206,6 +206,7 @@ export class EncounterPlay {
     this.ReportStep(T("boot.step.encounterDeaths"),0.16);
     const combatClipFiles=new Set([
       ...Object.values(XBOT_DEATHS).map(entry=>entry?.file),
+      ...XBOT_DEATH_FALLS.map(entry=>entry.file),
       ...Object.values(XBOT_NATIVE).map(entry=>entry?.file),
       ...Object.values(XBOT_TURN_IN_PLACE).map(entry=>entry?.file),
       ...Object.values(XBOT_LOCOMOTION_4WAY).flatMap(group=>Object.values(group||{}).map(entry=>entry?.file)),

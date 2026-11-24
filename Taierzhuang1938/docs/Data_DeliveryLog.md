@@ -14,6 +14,8 @@
 
 ## 条目
 
+- **换皮尸体倒向对上原身体（2026-11-24）**。试玩 AI（遭遇试玩、白刃实验场）的外观原来不管怎么死都播同一条「向右倒」，命中体、血和掉的枪却跟着原身体按命中方向倒，二者平均差 1.4 m（头）/ 0.9 m（胯）。现在外观按原身体这一次倒地片段的倒向（`Script_HitReactionLayer.DeathFallLocal`）从 `Data_BlockoutXBotClips.XBOT_DEATH_FALLS` 九条站姿起手的 Mixamo 倒地里挑最近的一条（往前倒的趴着、往后倒的仰着），剩下的偏角在倒地开始后 `DEATH.yawBlendS` 内转过去，胯在地面上跟着原身体的胯走（倒地片段库带位移，Mixamo 的钉在原地）。只走 SoldierView 给了 `downAge` 的那条路，白盒预演的演员照旧用 `XBOT_DEATHS`。遭遇试玩预载这九条。临时实测（03b 杀全场 25 人）：头差 1.38 → 0.25 m，胯差 0.90 → 0.11 m；`MeleeLabVariantsBrowserTest`、`EditorBlockoutPrevizRuntimeBrowserTest`、`ModuleGraphTest` 通过，quick 其余失败与改动前相同。
+
 - **东侧战车道原画复核（2026-11-24）**。固定机位以原画、无烟底片和游戏实拍校准烟团与天际过渡。前后车增设贴地层次，近处炸土同步发射体积尘、砂粒与实体碎土。车辙改用干土反射，沟沿收窄并增加断续碎土与伏草，近处横梁改为斧削旧木并重烘布边。场景、机位和重建入口见[东侧战车道说明](../Scenes/TanketteAdvanceEastTrack/README.md)。
 
 - **换皮尸体倒完、不再凭空消失（2026-11-24）**。遭遇试玩和白刃实验场的士兵外观是 X Bot／正式人物皮（`XBotSkin`），倒地动作原来只在尸体循环推原身体时一起推：原身体倒地（1.6–3.2 s）比外观的 Mixamo 倒地（约 2.6–3.5 s）短，原身体一倒完外观就定在半跪／撑地的中间帧；倒地时人在屏外，外观可见性停在「藏着」、原身体又不再更新，回头一看尸体没了（只剩枪和血）。现在外观的倒地按死了多久（`downAge` = `deadTime`）取帧，尸体循环在原身体定住后、外观出现在画面里时补推（`SoldierView.CorpseSkinPending` / `SyncCorpseSkin`），放到最后一帧即 `corpseSettled`，之后一帧不碰。尸体仍保留到本关结束：24 m 内完整人物、往外远景合批、160 m 外不画（`ACTOR_DETAIL`），定住后没有逐帧开销。临时实测（03b，杀全场 25 人）：外观倒完头高 0–0.06 m，屏外死的 14 具转回来全部可见且躺平；`MeleeLabVariantsBrowserTest`、`AiBehaviorTest` 通过。

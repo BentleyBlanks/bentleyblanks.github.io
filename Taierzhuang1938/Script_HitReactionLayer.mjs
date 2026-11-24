@@ -56,6 +56,8 @@ export function PreloadDeathLibrary() {
 }
 /** 已加载好的库（没有 = null）。 */
 export function DeathLibrary() { return library; }
+/** 这条倒地片段倒向哪（演员局部 XZ，-Z 前；库 profile 或 Kimodo A–D 的实测值），不认识的 id 返回 null。 */
+export function DeathFallLocal(id) { return library?.profiles[id]?.fallLocal ?? FALLBACK_DEATH.clips[id]?.fallLocal ?? null; }
 /** 测试 / 取证用：清掉库状态重新来。 */
 export function ResetDeathLibrary() { library = null; libraryLoading = null; libraryFailed = false; }
 

@@ -20,7 +20,7 @@ import { clone as CloneSkinned } from "./vendor/three/examples/jsm/utils/Skeleto
 import { XBotRetarget, RestSkeleton, ToposortBones, BoneKey, XBOT_FROM_SOLDIER } from "./Script_XBotRetarget.mjs";
 import { ApplyPatches } from "./Script_MaterialPatches.mjs";
 import { CHARACTER_LIGHT_PATCH } from "./Script_CharacterLight.mjs";
-import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET, XBOT_DEATHS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
+import { XBOT_PREVIZ_CLIPS, XBOT_NATIVE, XBOT_LOCOMOTION_4WAY, XBOT_TURN_IN_PLACE, XBOT_AIM_OFFSET, XBOT_DEATHS, XBOT_DEATH_FALLS, XBOT_LOOKS, XBOT_CHARACTER_LOOKS, XBOT_CHARACTER_UNITS, XBOT_MELEE } from "./Data_BlockoutXBotClips.mjs";
 import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose, DropPose, MeasureWeaponVisualOrigin } from "./Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS, XBOT_FACTION_CHARACTERS, XBOT_CAST_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter, FactionCharacterKeys } from "./Script_XBotCharacters.mjs";
@@ -28,6 +28,9 @@ import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
+import { DeathFallLocal } from "./Script_HitReactionLayer.mjs";
+import { YawToTurn } from "./Script_HitReaction.mjs";
+import { DEATH } from "./Data_Tuning_HitReaction.mjs";
 import {
   NPC_3C, XBOT_UPPER_BODY_TURN_MASK_BONES, WrapAngle, Clamp, Smooth01,
   ComputeLocomotion2D, FootLockController, TurnInPlaceController, EvaluateSpineAimDistribution, EvaluateAimOffsetGridWeights, EvaluateAdditiveFireRecoil,
@@ -938,7 +941,7 @@ export class XBotSkin {
     const rig = this.rig, actor = this.actor;
     this.sourceMatricesReady = false;
     this.frame += 1;
-    if (!intent.down) this.corpseSettled = false;
+    if (!intent.down) { this.corpseSettled = false; this.deathFall = null; }
     const visible = actor.root.visible !== false && rig.root.visible !== false;
     this.container.visible = visible;
     for (const mesh of this.hidden) mesh.visible = false;
@@ -1030,6 +1033,11 @@ export class XBotSkin {
     this.down = !!intent.down;
     const pick = this._Pick(intent, live3C ? { loco: loco3c, tip: tip3c, rifle, stance, aimWeight } : null);
     this.jumped = false;
+    // 试玩 AI 的尸体：倒地片段和原身体倒向差的那点偏角，倒地开始后同原身体的转向一样快地转过去（DEATH.yawBlendS）
+    if (pick.death && pick.deathYaw) {
+      this.container.quaternion.premultiply(_yawQ.setFromAxisAngle(_up, pick.deathYaw * Smooth01(intent.downAge / DEATH.yawBlendS)));
+      this.container.updateWorldMatrix(true, false);
+    }
     // 停在倒地姿势时，藏起来的原身体还在放它自己的倒地、布娃娃（actor.body 一上一下、在坡上会滑）：X Bot 改挂到人物根
     // （actor.root：只有预演摆它 —— 位置、朝向、藏不藏），停住那一刻相对它在哪就一直在哪；预演挪人（下一段换位置）照样跟着走
     const root = this.actor.root;
@@ -1079,6 +1087,7 @@ export class XBotSkin {
     // 记录叠加 Aim Offset / 开火后坐 / 手部 IK 之前的纯净底层姿态，避免换状态时把 Aim Offset 叠加两次导致步枪抖动
     for (let i = 0; i < this.boneList.length; i++) if (this.boneList[i]) this.preOverlayQ[i].copy(this.boneList[i].quaternion);
     this.preOverlayValid = true;
+    if (pick.death && Number.isFinite(intent.downAge)) this._FollowRigPelvis();
     this.container.updateMatrixWorld(true);
     // 脊柱 Aim Offset（优先用 BlenderMCP 9 帧精修网格）+ 开火上半身 Additive 叠加 + 三态支撑脚锁地/收步 2-Bone Leg IK
     if (live3C) {
@@ -1185,6 +1194,12 @@ export class XBotSkin {
         this.downHold = true;
         return { mode: "hold" };
       }
+      // 试玩 AI 的尸体（SoldierView 给了 downAge）：按原身体这一次的倒向挑，见 XBOT_DEATH_FALLS
+      const fall = Number.isFinite(intent.downAge) ? this._DeathFall() : null;
+      if (fall) {
+        const lib = skins.library.get(fall.file);
+        return { mode: "clip", file: fall.file, once: true, death: true, deathYaw: fall.yaw, hold: lib?.rifleTrack ? lib.hold : undefined, rifleHand: lib?.rifleHand };
+      }
       const death = XBOT_DEATHS[this.rig.deathVariantId] || XBOT_DEATHS.DeathCollapseA;
       const lib = skins.library.get(death.file);
       // 清单给这条倒地动作写了 rifleTrack（枪什么时候脱手）：枪照端枪动作的挂法放，脱手后掉地；没写的照原身体手里的位置
@@ -1246,6 +1261,32 @@ export class XBotSkin {
     if (!entry) return { mode: "mirror" };
     const lib = skins.library.get(entry.file);
     return { mode: "clip", file: entry.file, loop: lib?.loop ?? true, speedMps: entry.speedMps || null, key, hold: lib?.hold, rifleHand: lib?.rifleHand };
+  }
+
+  /** 原身体这一次倒地片段的倒向 → 倒向最近的 X Bot 倒地动作与剩下的偏角（绕竖轴，弧度）；不认识的片段返回 null（走 XBOT_DEATHS 老路）。 */
+  _DeathFall() {
+    const id = this.rig.deathVariantId;
+    if (this.deathFall?.id === id) return this.deathFall.pick;
+    const want = DeathFallLocal(id);
+    let pick = null, best = Infinity;
+    if (want) for (const entry of XBOT_DEATH_FALLS) {
+      const yaw = YawToTurn(entry.fallLocal, want);
+      if (Math.abs(yaw) < best) { best = Math.abs(yaw); pick = { file: entry.file, yaw }; }
+    }
+    this.deathFall = { id, pick };
+    return pick;
+  }
+
+  /** 试玩 AI 的尸体：胯在地面上跟着原身体的胯走（倒地片段库带位移，Mixamo 的倒地钉在原地），高度照 X Bot 自己的。 */
+  _FollowRigPelvis() {
+    const pelvis = this.rig.bones?.pelvis, hips = this.H("Hips"), parent = this.container.parent;
+    if (!pelvis || !hips || !parent) return;
+    this.container.updateMatrixWorld(true);
+    pelvis.updateWorldMatrix(true, false);
+    const now = hips.getWorldPosition(_p), want = pelvis.getWorldPosition(_p2);
+    want.y = now.y;
+    parent.worldToLocal(now); parent.worldToLocal(want);
+    this.container.position.add(want.sub(now));
   }
 
   _RifleInHands() {
