@@ -462,9 +462,13 @@ Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与�
   三维台自己建 WebGLRenderer、三盏棚灯、小房间 PMREM 反射、投影接收地面与自适应米格，**不建**游戏的后处理、天空、灯光组、人物与特效；
   材质库按工具宿主同一口径烘全部配方 + 外部 PBR 清单（`Data_ToolStudioPbrSets`）。外部道具加载器 `Script_ExternalProps` 经 TengxianCity / Water
   静态带进后处理等模块，只加载不实例化（`Script_AdvancedToolsTest` 守模块图里没有主程序 / 编辑器宿主 / 工具宿主）。
-- 目录 = 构件目录 `Script_PlaceableCatalog.PLACEABLE`（程序化构件 + tzm；持续烟火归特效预览）+ `ExternalPropCatalog()` 的外部 GLB。
-  构件仍走正片同一套生成器（`BuildPlaceableVisual` / `InstantiateExternalProp` / `InstantiateModel`），不维护第二份预览几何；不写场景、不推进碰撞盒。
-- 界面：左栏搜索（名称 / 编号 / 文件）+ 来源筛选（GLB / TZM / 程序化）+ 类别筛选（带计数，外部 GLB 按物体品类并入同一套类别，`车辆` `接收院医疗陈设` 等额外类别排在后面）
+- 目录 = 构件目录 `Script_PlaceableCatalog.PLACEABLE` 的 tzm（武器、战车；持续烟火归特效预览）+ `ExternalPropCatalog()` 的外部 GLB，共 182 项。
+  构件仍走正片同一套实例化（`InstantiateExternalProp` / `InstantiateModel`），不维护第二份预览几何；不写场景、不推进碰撞盒。
+- **2026-11-25 清理**（用户：老第一关场景与启动界面都不再用）：26 个程序化构件（树、电线杆、院落小件、沙包封门、防空洞口、四合院 / 房屋 / 院门楼、
+  牌坊等 16 个地标）从目录摘掉，生成器仍归旧滕县城；9 件建筑 / 饰件 tzm 不再进目录，其中窗棂 `WindowLattice`、门墩石 `DoorPier` 无人使用、连模型删除，
+  其余 7 件仍由旧城 `Script_TrimProps` 用；滕县建造套件（`Model_TengxianConstructionKit.glb`、数据表与 Blender 重建脚本）整套删除；
+  战场包的战壕地形 / 地面片 / 岩石与接收院的折叠包扎布从目录摘掉（共享 GLB 不重烘，节点仍在）。
+- 界面：左栏搜索（名称 / 编号 / 文件）+ 来源筛选（GLB / TZM）+ 类别筛选（带计数，外部 GLB 按物体品类并入同一套类别，`车辆` `接收院医疗陈设` 等额外类别排在后面）
   + 占满整栏的分组列表（↑↓ / PageUp/Down 换项，地址栏 `?id=` 记住选择）；中栏视角（斜视 / 正面 / 侧面 / 顶视）、镜头（广角 / 标准 / 长焦）、米格、
   1.7 m 人高参照、重新取景、逐项浏览；右栏名称、编号、包围尺寸三格、三角面 / 网格 / 碰撞盒 / 可调参数 / 来源 / 署名 / tzm 说明，八九式中战车另有可动件演示。
 - 取证口 `window.PropLibrary`（`entries` / `Select` / `stage` / `selected` / `visible` / `vehicle`）；门禁 `Script_PropLibraryBrowserTest`，

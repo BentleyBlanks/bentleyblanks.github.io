@@ -263,64 +263,6 @@
    }
   },
   {
-   "name": "WindowLattice",
-   "category": "prop",
-   "file": "Model_WindowLattice.tzm.json",
-   "triangles": 284,
-   "meshBlocks": 1,
-   "nodes": 3,
-   "joints": 0,
-   "bytes": 13429,
-   "materials": [
-    "WoodDoor"
-   ],
-   "mounts": [
-    "root",
-    "sillCenter"
-   ],
-   "bounds": {
-    "min": [
-     -0.55,
-     0,
-     -0.0275
-    ],
-    "max": [
-     0.55,
-     1.35,
-     0.0275
-    ]
-   }
-  },
-  {
-   "name": "DoorPier",
-   "category": "prop",
-   "file": "Model_DoorPier.tzm.json",
-   "triangles": 248,
-   "meshBlocks": 1,
-   "nodes": 3,
-   "joints": 0,
-   "bytes": 8990,
-   "materials": [
-    "Stone"
-   ],
-   "mounts": [
-    "root",
-    "doorSide"
-   ],
-   "bounds": {
-    "min": [
-     -0.18,
-     0,
-     -0.24
-    ],
-    "max": [
-     0.18,
-     0.63,
-     0.24
-    ]
-   }
-  },
-  {
    "name": "SemaphoreSignal",
    "category": "prop",
    "file": "Model_SemaphoreSignal.tzm.json",

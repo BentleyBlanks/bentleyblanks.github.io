@@ -61,7 +61,6 @@ import { SandbagContactMaterial } from "./Script_SandbagStandard.mjs";
 import { PACK as HW_PACK, ASSETS as HW_ASSETS } from "./Data_ExternalAssets_HouseholdWare.mjs";
 import { PACK as RY_PACK, ASSETS as RY_ASSETS } from "./Data_ExternalAssets_RuralYard.mjs";
 import { PACK as CL_PACK, ASSETS as CL_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
-import { PACK as TK_PACK, ASSETS as TK_ASSETS } from "./Data_ExternalAssets_TengxianConstruction.mjs";
 import { PACK as WARD_PACK, ASSETS as WARD_ASSETS } from "./Data_ExternalAssets_WardProps.mjs";
 
 const LOADER = new GLTFLoader();
@@ -130,6 +129,7 @@ function BarbedWireAsset(label, node) {
   };
 }
 
+// 战场包的战壕地形 / 地面片 / 岩石三个节点没有任何场景用，2026-11-25 从目录摘掉（GLB 里节点仍在，见 RETIRED_BATTLEFIELD_NODES 的测试口径）。
 const BATTLEFIELD_ASSETS = Object.freeze({
   battlefieldBarbedWire01: BarbedWireAsset("铁丝网 · 蛇腹障碍", "BattlefieldBarbedWire01"),
   battlefieldBarbedWire02: BarbedWireAsset("铁丝网 · 三道桩网", "BattlefieldBarbedWire02"),
@@ -149,12 +149,9 @@ const BATTLEFIELD_ASSETS = Object.freeze({
   battlefieldMetalPole: BattlefieldAsset("战场包 · 金属杆", "BattlefieldMetalPole", null),
   battlefieldPillbox: BattlefieldAsset("战场包 · 碉堡", "BattlefieldPillbox", null, "wall", true, "工事"),
   battlefieldLadder: BattlefieldAsset("战场包 · 梯子", "BattlefieldLadder", null),
-  battlefieldTrenchEarthwork: BattlefieldAsset("战场包 · 战壕地形", "BattlefieldTrenchEarthwork", null, "rubble", false, "工事"),
   battlefieldSandbag01: BattlefieldAsset("战场包 · 沙袋 01", "BattlefieldSandbag01", null, "barricade", true, "工事"),
   battlefieldSandbag02: BattlefieldAsset("战场包 · 沙袋 02", "BattlefieldSandbag02", null, "barricade", true, "工事"),
   battlefieldSandbag03: BattlefieldAsset("战场包 · 沙袋 03", "BattlefieldSandbag03", null, "barricade", true, "工事"),
-  battlefieldGroundPlane: BattlefieldAsset("战场包 · 地面片", "BattlefieldGroundPlane", null, "rubble", false, "景观"),
-  battlefieldRock: BattlefieldAsset("战场包 · 岩石", "BattlefieldRock", null, "rubble", true, "景观"),
 });
 
 function CityWallBreachAsset(label, node) {
@@ -349,7 +346,6 @@ const ASSETS = Object.freeze({
   ...PackAssets(HW_PACK, HW_ASSETS),
   ...PackAssets(RY_PACK, RY_ASSETS),
   ...PackAssets(CL_PACK, CL_ASSETS),
-  ...PackAssets(TK_PACK, TK_ASSETS),
   ...PackAssets(WARD_PACK, WARD_ASSETS),
   ...Object.fromEntries(DUGOUT_AID_OPEN_FIELDS_PROPS.map(({ model, node, label }) => [model, {
     label, node, url: "./Model/DugoutAidOpenFields/Model_DugoutAidOpenFields.glb?v=2",

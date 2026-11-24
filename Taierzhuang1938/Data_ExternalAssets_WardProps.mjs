@@ -19,5 +19,4 @@ export const ASSETS = Object.freeze({
   wardCeramicJar: Asset("带盖陶药罐", "WardCeramicJar"),
   wardEnamelBasin: Asset("蓝边搪瓷盆", "WardEnamelBasin"),
   wardBandageRoll: Asset("卷纱布", "WardBandageRoll"),
-  wardDressingBundle: Asset("折叠包扎布", "WardDressingBundle"),
 });

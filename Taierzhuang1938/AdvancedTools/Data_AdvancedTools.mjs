@@ -24,7 +24,7 @@ export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
  */
 export const STANDALONE_TOOLS = Object.freeze([
   Object.freeze({ id: "props", group: "assets", slot: "lead", label: "构件库预览",
-    hint: "只读浏览场景可布设的全部 Prop、程序化构件与模型：尺寸、面数、来源",
+    hint: "只读浏览场景可布设的全部 Prop 与模型：尺寸、面数、来源",
     window: Object.freeze({ url: "./Tool_PropLibrary.html", name: "TengxianPropLibrary", features: "popup,width=1600,height=1000" }) }),
   Object.freeze({ id: "modelWorkbench", group: "assets", slot: "tail", label: "3D 模型制作工作台",
     hint: "管理参考图、Blender 建模、同视角比对与独立验收",

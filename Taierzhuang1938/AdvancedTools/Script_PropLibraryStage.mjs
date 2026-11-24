@@ -1,7 +1,7 @@
 // 构件库预览（Tool_PropLibrary.html）的三维台：只读可视化，不装游戏的后处理、天空、灯光组、人物与特效。
 //
 // 自己建一套轻量渲染：WebGLRenderer + 三盏棚灯 + 小房间 PMREM 反射 + 投影接收地面 + 自适应米格。
-// 构件本身仍走正片同一套生成器（BuildPlaceableVisual / InstantiateExternalProp / InstantiateModel）
+// 构件本身仍走正片同一套实例化（InstantiateExternalProp / InstantiateModel）
 // 与同一份材质库配方（MaterialLibrary + 外部 PBR 清单），所以看到的几何与材质就是场景里摆出来的那一份；
 // 这里不写关卡、不写地形，也不推进碰撞盒。
 //
@@ -13,7 +13,7 @@ import { RECIPES } from "../Script_TexBake.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl } from "../Script_Meshes.mjs";
-import { InstantiateExternalProp, LoadExternalWorldModels } from "../Script_ExternalProps.mjs";
+import { InstantiateExternalProp } from "../Script_ExternalProps.mjs";
 import { BuildPlaceableVisual } from "./Script_PlaceableCatalog.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 
@@ -107,7 +107,6 @@ export class PropLibraryStage {
     this.scene.add(this.person);
 
     this.modelDocs = new Map();
-    this.externalModels = null;
     this.model = null;
     this.center = new THREE.Vector3();
     this.radius = 1;
@@ -161,26 +160,19 @@ export class PropLibraryStage {
     const root = new THREE.Group();
     root.name = `PropLibrary_${entry.id}`;
     const owned = [];
-    let colliders = 0;
     if (entry.external) {
       const instance = await InstantiateExternalProp(entry.external, this.library);
       if (!instance) throw new Error(`外部模型无法实例化：${entry.external}`);
       root.add(instance);
     } else {
-      if (entry.model && !this.modelDocs.has(entry.model)) {
+      if (!this.modelDocs.has(entry.model)) {
         const doc = await LoadDocument(MeshUrl(entry.model));
         if (!doc) throw new Error(`模型无法读取：${entry.model}`);
         this.modelDocs.set(entry.model, doc);
       }
-      // 树与沙包封门要外部模板（三种无叶树、沙袋组合）；第一次建程序化构件时一并载入。
-      if (!entry.model) this.externalModels ??= await LoadExternalWorldModels(this.library);
-      const item = { id: 0, type: entry.id, x: 0, z: 0, ry: 0, seed: `preview_${entry.id}`, ...(entry.defaults || {}) };
-      const built = BuildPlaceableVisual(root, entry, item, {
-        library: this.library, modelDocs: this.modelDocs,
-        externalModels: this.externalModels || new Map(), ownedGeometries: owned,
-      });
+      const item = { x: 0, z: 0, ry: 0, ...(entry.defaults || {}) };
+      const built = BuildPlaceableVisual(root, entry, item, { library: this.library, modelDocs: this.modelDocs });
       if (!built.loaded) throw new Error(`${entry.name} 没有建出来`);
-      colliders = built.colliders.length;
     }
     root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(root);
@@ -189,7 +181,7 @@ export class PropLibraryStage {
     root.position.set(-center.x, -box.min.y, -center.z);
     root.updateMatrixWorld(true);
     const size = box.getSize(new THREE.Vector3());
-    return { entry, root, owned, colliders, size, ...CountTriangles(root) };
+    return { entry, root, owned, size, ...CountTriangles(root) };
   }
 
   Release(model) {

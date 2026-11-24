@@ -31,7 +31,7 @@ async function SelectModel(label, id) {
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_PropLibrary.html`,
     { waitUntil: "load", timeout: 120000 });
-  await Ready("Tree");
+  await page.waitForFunction(() => window.PropLibrary?.ready && document.getElementById("view").dataset.state === "ready", null, { timeout: 120000 });
   await page.locator("#categoryFilter .filter-chip").filter({ hasText: /^模型/ }).click();
   await page.evaluate(() => window.PropLibrary.Select(window.PropLibrary.visible[0]));
   await Ready("Model_ZhongZheng");

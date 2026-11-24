@@ -1,6 +1,6 @@
 // 构件库预览（Tool_PropLibrary.html）：只读可视化器，只在 AdvancedTool ControlCenter 里出现，游戏里不挂任何入口。
 //
-// 目录 = 构件目录 Script_PlaceableCatalog 的 PLACEABLE（程序化构件 + tzm 模型；持续烟火归「特效预览」，不收）
+// 目录 = 构件目录 Script_PlaceableCatalog 的 tzm 模型（持续烟火归「特效预览」，不收）
 //      + Script_ExternalProps 的外部 GLB 目录。三维台在 Script_PropLibraryStage，这里只管列表、筛选与读数。
 // 自动化与验收用 window.PropLibrary（entries / Select / stage / selected / ready）。
 
@@ -14,9 +14,8 @@ const SOURCES = Object.freeze([
   { id: "all", label: "全部" },
   { id: "glb", label: "GLB" },
   { id: "tzm", label: "TZM" },
-  { id: "proc", label: "程序化" },
 ]);
-const SOURCE_LABEL = { glb: "GLB", tzm: "TZM", proc: "程序化" };
+const SOURCE_LABEL = { glb: "GLB", tzm: "TZM" };
 const USE_LABEL = { ry: "朝向", w: "宽", d: "深", h: "高", scale: "缩放", damage: "破损" };
 const number = new Intl.NumberFormat("zh-CN");
 const ById = (id) => document.getElementById(id);
@@ -40,14 +39,14 @@ function ModelName(id) {
   return head && head.length <= 16 && !/^源节点/.test(head) ? head : id;
 }
 
-/** 目录条目：程序化 / tzm 来自 PLACEABLE，GLB 来自外部道具目录。 */
+/** 目录条目：tzm 来自 PLACEABLE，GLB 来自外部道具目录。 */
 export function PropLibraryEntries() {
   const entries = PLACEABLE.filter((entry) => !entry.effect).map((entry) => ({
     ...entry,
-    name: entry.model ? ModelName(entry.model) : entry.name,
-    source: entry.model ? "tzm" : "proc",
-    file: entry.model ? `Model/${MESHES[entry.model]?.file || `Model_${entry.model}.tzm.json`}` : "程序化生成（Script_World / 地标注册表）",
-    note: entry.model ? MESHES[entry.model]?.note || "" : "",
+    name: ModelName(entry.model),
+    source: "tzm",
+    file: `Model/${MESHES[entry.model]?.file || `Model_${entry.model}.tzm.json`}`,
+    note: MESHES[entry.model]?.note || "",
   }));
   for (const item of ExternalPropCatalog()) {
     entries.push({
@@ -76,7 +75,7 @@ const filter = { cat: "all", source: "all", query: "" };
 let stage = null;
 let visible = [];
 let selected = new URLSearchParams(location.search).get("id");
-if (!entryById.has(selected)) selected = entries[0]?.id ?? null;
+if (!entryById.has(selected)) selected = categories.map((cat) => entries.find((entry) => entry.cat === cat)).find(Boolean)?.id ?? null;
 let selectionVersion = 0;
 let vehicle = null;
 
@@ -184,7 +183,7 @@ function ShowFacts(entry, model) {
   Text("sizeZ", size ? Meters(size.z) : "—");
   Text("propTriangles", model ? number.format(model.triangles) : "—");
   Text("propMeshes", model ? number.format(model.meshes) : "—");
-  Text("propColliders", !model ? "—" : entry.external ? (entry.solid ? "运行时按包围盒登记" : "仅视觉") : model.colliders ? `${model.colliders} 个` : "无");
+  Text("propColliders", !model ? "—" : entry.external ? (entry.solid ? "运行时按包围盒登记" : "仅视觉") : "无");
   const dims = ById("stageDims");
   dims.hidden = !size;
   if (size) dims.textContent = `${Meters(size.x)} × ${Meters(size.y)} × ${Meters(size.z)} m　·　米格 ${stage.gridStep >= 1 ? `${stage.gridStep} m` : `${stage.gridStep * 100} cm`}`;

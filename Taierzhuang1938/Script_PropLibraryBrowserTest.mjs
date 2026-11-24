@@ -2,8 +2,9 @@
 //
 // 查：
 //   1. 控制中心「构件库预览」卡片开出独立页面；游戏的高级工具菜单与工具宿主里没有它（Tool_Studio.html?tool=props 转到新页）；
-//   2. 目录：程序化 + tzm + 外部 GLB 全收（特效不收），外部 GLB 按物体品类并入同一套类别，筛选 / 搜索 / 键盘换项；
-//   3. 读数：程序化构件真建出来（沙包封门、房屋用正式砖材）、院落三件用专属 Base + Normal 且双面、外部 GLB 来源正确；
+//   2. 目录：tzm + 外部 GLB（特效、2026-11-25 清掉的程序化构件 / 建筑饰件 tzm / 无人用的 GLB 都不在），外部 GLB 按物体品类并入同一套类别，
+//      筛选 / 搜索 / 键盘换项；
+//   3. 读数：tzm 战车与外部 GLB 真建出来、尺寸与面数显示、来源正确；
 //   4. 八九式中战车的可动件演示能开；全程没有 pageerror / console.error，画布不是一片纯色。
 // 截图只写 _shots/PropLibrary/（本地，不提交）。
 //
@@ -72,6 +73,8 @@ try {
     return {
       total: entries.length, categories,
       sources: Object.fromEntries(["glb", "tzm", "proc"].map((id) => [id, entries.filter((entry) => entry.source === id).length])),
+      retired: ["Tree", "Compound", "Hq", "Model_Dougong", "Model_WindowLattice", "External_tengxianShopFacade", "External_battlefieldRock", "External_wardDressingBundle"]
+        .filter((id) => entries.some((entry) => entry.id === id)),
       effects: entries.filter((entry) => entry.effect).length,
       rows: document.querySelectorAll("[data-prop]").length,
       external: Object.fromEntries(["External_cart", "External_house", "External_battlefieldBarbedWire01", "External_deadTreeTrunk01", "External_wardMedicineCabinet"]
@@ -79,17 +82,17 @@ try {
       listHeight: document.getElementById("propList").getBoundingClientRect().height,
     };
   });
-  Check("目录收齐程序化 / tzm / 外部 GLB，特效不收", catalog.effects === 0 && catalog.sources.glb > 100 && catalog.sources.tzm > 10
-    && catalog.sources.proc > 10 && catalog.rows === catalog.total, JSON.stringify(catalog.sources));
+  Check("目录只收 tzm 与外部 GLB，特效与已清理条目不在", catalog.effects === 0 && catalog.sources.glb > 100 && catalog.sources.tzm > 10
+    && catalog.sources.proc === 0 && catalog.retired.length === 0 && catalog.rows === catalog.total, JSON.stringify({ ...catalog.sources, retired: catalog.retired }));
   Check("外部 GLB 按物体品类并入同一套类别，接收院陈设也能在列表里找到",
     !catalog.categories.includes("外部道具") && catalog.external.External_cart === "院落小件" && catalog.external.External_house === "建筑"
       && catalog.external.External_battlefieldBarbedWire01 === "工事" && catalog.external.External_deadTreeTrunk01 === "景观"
       && catalog.categories.includes(catalog.external.External_wardMedicineCabinet), JSON.stringify(catalog.external));
   Check("列表占满左栏（1600×1000 下高于 500 px）", catalog.listHeight > 500, `${Math.round(catalog.listHeight)} px`);
 
-  await page.fill("#propSearch", "沙包");
+  await page.fill("#propSearch", "手推车");
   const searched = await page.evaluate(() => window.PropLibrary.visible);
-  Check("搜索按名称筛选", searched.length > 0 && searched.includes("SandbagPlug"), searched.join(","));
+  Check("搜索按名称筛选", searched.length > 0 && searched.includes("External_cart"), searched.join(","));
   await page.fill("#propSearch", "");
   await page.locator("#sourceFilter .filter-chip").filter({ hasText: "TZM" }).click();
   const tzmOnly = await page.evaluate(() => window.PropLibrary.visible.every((id) => window.PropLibrary.entries.find((entry) => entry.id === id).source === "tzm"));
@@ -124,25 +127,16 @@ try {
         }
       });
       return {
-        id: model.entry.id, meshes: model.meshes, triangles: model.triangles, colliders: model.colliders,
+        id: model.entry.id, meshes: model.meshes, triangles: model.triangles,
         size: model.size.toArray(), base, normal, sides, file: model.entry.file,
         shown: ["sizeX", "sizeY", "sizeZ", "propTriangles", "propMeshes"].map((key) => document.getElementById(key).textContent),
         glError: stage.renderer.getContext().getError(),
       };
     });
   };
-  const sandbag = await Inspect("SandbagPlug");
-  Check("沙包封门真建出来（沙袋模板展开）并显示尺寸与面数", sandbag.meshes > 0 && sandbag.triangles > 0
-    && sandbag.size.every((value) => value > 0.2) && sandbag.shown.every((text) => text !== "—"), JSON.stringify({ ...sandbag, base: undefined, normal: undefined, sides: undefined }));
-  for (const spec of [{ id: "Well", stem: "WellStone" }, { id: "Millstone", stem: "Millstone" }, { id: "WaterVat", stem: "WaterVat" }]) {
-    const result = await Inspect(spec.id);
-    Check(`${spec.id} 使用专属 Base + Normal 且背面可见`, result.meshes > 0
-      && result.base.some((src) => src.includes(`Texture_${spec.stem}Base.webp`))
-      && result.normal.some((src) => src.includes(`Texture_${spec.stem}Normal.webp`)) && result.sides.includes(2),
-    JSON.stringify({ meshes: result.meshes, base: [...new Set(result.base)].slice(0, 3) }));
-  }
-  const room = await Inspect("RoomBlock");
-  Check("房屋用正式砖材", room.meshes > 0 && room.base.some((src) => src.includes("Texture_BrickWallBase")), [...new Set(room.base)].slice(0, 4).join(" "));
+  const tank = await Inspect("Model_Type97ChiHa");
+  Check("tzm 战车真建出来并显示尺寸与面数", tank.meshes > 0 && tank.triangles > 0 && tank.size.every((value) => value > 0.5)
+    && tank.shown.every((text) => text !== "—") && tank.file.includes("Model_Type97ChiHa.tzm.json"), JSON.stringify({ ...tank, base: undefined, normal: undefined, sides: undefined }));
   const cart = await Inspect("External_cart");
   Check("外部 GLB 载入并给出来源文件", cart.meshes > 0 && cart.file.includes("Model_Handcart.glb") && cart.glError === 0, cart.file);
   const pixels = await page.locator("#view").screenshot();
@@ -156,8 +150,8 @@ try {
   await Ready();
   await page.waitForFunction(() => window.PropLibrary.vehicle?.mode === "all", null, { timeout: 60000 });
   await page.waitForTimeout(600);
-  const tank = await page.evaluate(() => ({ time: window.PropLibrary.vehicle.time, visible: !document.getElementById("vehicleSection").hidden }));
-  Check("八九式中战车可动件演示在跑", tank.visible && tank.time > 0.1, JSON.stringify(tank));
+  const demo = await page.evaluate(() => ({ time: window.PropLibrary.vehicle.time, visible: !document.getElementById("vehicleSection").hidden }));
+  Check("八九式中战车可动件演示在跑", demo.visible && demo.time > 0.1, JSON.stringify(demo));
   await page.locator('[data-demo="stopped"]').click();
   await page.screenshot({ path: path.join(shotDir, "PropLibrary_Type89.png") });
 

@@ -57,7 +57,8 @@ for (const [id, spec] of Object.entries(ASSETS)) {
   assert.ok(Math.abs(box.min.y) < .001, `${id}: foot at ground`);
   meshes.set(id, group); sizes.set(id, size); totalTriangles += triangles;
 }
-assert.equal(Object.keys(ASSETS).length, 11);
+// 折叠包扎布 WardDressingBundle 没有任何摆放，2026-11-25 从目录摘掉；节点仍在 GLB 与 Data_WardProps.json 里。
+assert.equal(Object.keys(ASSETS).length, 10);
 assert.ok(totalTriangles < 50000);
 const timber = doc.materials.find(m => m.name === "WardTimber");
 assert.deepEqual(timber.pbrMetallicRoughness.baseColorFactor, [.48, .39, .28, 1], "Blender wood tint survives export");

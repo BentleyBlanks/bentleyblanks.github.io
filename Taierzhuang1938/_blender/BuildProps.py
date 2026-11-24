@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """建筑构件 + 场景饰件。
 
-第一批（门楼四件）：门楼斗拱 / 屋脊兽头 / 格子窗棂 / 门墩石 ——
-台儿庄那种鲁南运河商镇门楼上「一眼中式」的最小集合。
+第一批（门楼件）：门楼斗拱 / 屋脊兽头 ——台儿庄那种鲁南运河商镇门楼上「一眼中式」的最小集合。
+（格子窗棂、门墩石两件没有任何场景在用，2026-11-25 随构件库清理删除，git 历史可查。）
 
 第二批（滕县饰件轮 WP-E1）：臂板信号机 / 站台灯 / 教堂尖券窗花 / 牢门五金 / 道口标。
 这一批不是建筑构件而是**场景饰件**：它们由 Script_TrimProps.mjs 以运行时实例摆进
@@ -13,8 +13,6 @@
 原点一律在**安装面**上：
     Dougong        坐斗底面（落在额枋上）
     RidgeBeast     脊背安装面（落在正脊顶面）
-    WindowLattice  窗台中点
-    DoorPier       地面
     SemaphoreSignal / StationLamp / CrossingSign   地面（基墩底面）
     ChurchTracery  窗台中点（窗洞净宽中线，厚度对称于墙心）
     CellDoorIron   门板外表面、门扇底边中点（z ≥ 0 全部朝门外）
@@ -136,76 +134,6 @@ def BuildRidgeBeast():
         body.Add("RoofTile", horn, tile="roof")
 
     body.Child("ridge", t=(0.0, 0.0, 0.0))
-    return root
-
-
-def BuildWindowLattice():
-    """格子窗棂：外框 + 步步锦格心。1.10 m 宽 × 1.35 m 高的一扇。
-
-    格心用**竖 4 横 5** 的疏格 —— 再密就是把三角预算全喂给窗户了，
-    而窗棂在巷战里通常是逆光剪影，密到看不清反而丢了「木格子」这个读数。
-    """
-    root = Node("root")
-    body = root.Child("body")
-    W, H, D = 1.10, 1.35, 0.055
-    frame = 0.070
-
-    for (w, h, x, y) in ((W, frame, 0.0, H * 0.5 - frame * 0.5),
-                         (W, frame, 0.0, -H * 0.5 + frame * 0.5),
-                         (frame, H - frame * 2, -W * 0.5 + frame * 0.5, 0.0),
-                         (frame, H - frame * 2, W * 0.5 - frame * 0.5, 0.0)):
-        bar = Box(w, h, D, bevel=0.006)
-        Transform(bar, x=x, y=y + H * 0.5)
-        body.Add("WoodDoor", bar, tile="wood")
-
-    inner_w = W - frame * 2
-    inner_h = H - frame * 2
-    for i in range(4):
-        x = (-0.5 + (i + 1) / 5.0) * inner_w
-        bar = Box(0.026, inner_h, D * 0.62)
-        Transform(bar, x=x, y=H * 0.5)
-        body.Add("WoodDoor", bar, tile="wood")
-    for j in range(5):
-        y = (-0.5 + (j + 1) / 6.0) * inner_h
-        bar = Box(inner_w, 0.026, D * 0.62)
-        Transform(bar, y=y + H * 0.5)
-        body.Add("WoodDoor", bar, tile="wood")
-
-    body.Child("sillCenter", t=(0.0, 0.0, 0.0))
-    return root
-
-
-def BuildDoorPier():
-    """门墩石（抱鼓石）：方座 + 鼓面。过墙石 #B3B0A6 那一档灰白石。
-
-    鼓面用 Lathe 转出来（它本来就是个鼓），方座是带倒角的石料。
-    原点在地面。
-    """
-    root = Node("root")
-    body = root.Child("body")
-
-    base = Box(0.360, 0.300, 0.480, bevel=0.018)
-    Transform(base, y=0.150)
-    body.Add("Stone", base, tile="stone")
-
-    # 鼓：轴横着（面朝两侧），所以转完绕 Z 转 90°
-    drum = Lathe([
-        (0.0, -0.060), (0.195, -0.060), (0.215, -0.040),
-        (0.215, 0.040), (0.195, 0.060), (0.0, 0.060),
-    ], 12, smooth=True)
-    Transform(drum, rz=PI * 0.5)
-    Transform(drum, y=0.415)
-    body.Add("Stone", drum, tile="stone")
-
-    # 鼓钉一圈：只在朝外那面点六颗，低多边形
-    for i in range(6):
-        th = i / 6.0 * math.pi * 2.0
-        stud = Loft([Ring(0.0, r=0.020), Ring(0.014, r=0.014), Ring(0.020, r=0.0)], 5)
-        Transform(stud, rz=-PI * 0.5)
-        Transform(stud, x=0.062, y=0.415 + math.sin(th) * 0.145, z=math.cos(th) * 0.145)
-        body.Add("Stone", stud, tile="stone")
-
-    body.Child("doorSide", t=(-0.180, 0.150, 0.0))
     return root
 
 
@@ -492,8 +420,6 @@ def BuildCrossingSign():
 PROP_BUILDERS = {
     "Dougong": BuildDougong,
     "RidgeBeast": BuildRidgeBeast,
-    "WindowLattice": BuildWindowLattice,
-    "DoorPier": BuildDoorPier,
     # —— 滕县饰件轮（WP-E1）——
     "SemaphoreSignal": BuildSemaphoreSignal,
     "StationLamp": BuildStationLamp,

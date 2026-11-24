@@ -27,7 +27,7 @@ import { OVERVIEW_LEVEL_ID } from "./Data_Menu.mjs";
  * 资产表：tzm 模型 id → 摆放语义。
  *   { model: MESHES 的 id, solid?: [hx,hy,hz]（要挡子弹才给，中心=模型原点上方 hy）, tag?: 破坏档 }
  * E1 在此登记新件（SemaphoreSignal / StationLamp / ChurchTracery / CellDoorIron / CrossingSign…）
- * 与复用件（Dougong / RidgeBeast / WindowLattice / DoorPier）。
+ * 与复用件（Dougong / RidgeBeast）。
  */
 export const TRIM_ASSETS = Object.freeze({
   SemaphoreSignal: { model: "SemaphoreSignal" },

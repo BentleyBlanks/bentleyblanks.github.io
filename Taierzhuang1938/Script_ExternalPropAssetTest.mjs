@@ -9,7 +9,6 @@ import {
   EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
 import { ASSETS as CHINESE_LIFE_ASSETS } from "./Data_ExternalAssets_ChineseLife.mjs";
-import { ASSETS as TENGXIAN_CONSTRUCTION_ASSETS } from "./Data_ExternalAssets_TengxianConstruction.mjs";
 import { EXTERNAL_GLB_STANDARDS } from "./Data_AssetStandards.mjs";
 
 
@@ -335,26 +334,9 @@ assert.ok(courtyardSpec.triangles <= 5500, "courtyard triangle budget");
 assert.equal(courtyardSpec.minY, 0, "courtyard is ground-ready");
 assert.ok(courtyardSpec.maxSpan > 11 && courtyardSpec.maxSpan < 12, "courtyard scale is plausible");
 
-const tengxianConstruction = ReadGlb("Model_TengxianConstructionKit.glb", 600_000);
-const constructionRootNames = Object.values(TENGXIAN_CONSTRUCTION_ASSETS)
-  .map((spec) => spec.node).sort();
-assert.deepEqual(
-  constructionRootNames,
-  ["TengxianCityGateTower", "TengxianCountyOfficeGatehouse", "TengxianCourtyardHouse",
-    "TengxianOutfieldDefenseKit", "TengxianRailwayStation", "TengxianShopFacade"],
-  "six self-authored Tengxian construction roots retain stable names",
-);
-for (const spec of Object.values(TENGXIAN_CONSTRUCTION_ASSETS)) {
-  const node = tengxianConstruction.json.nodes.find((entry) => entry.name === spec.node);
-  assert.ok(node?.children?.length, spec.node + ": root carries its authored mesh parts");
-  const standard = externalStandards.get(spec.node);
-  assert.ok(standard, spec.node + ": external-GLB standards row exists");
-  assert.equal(
-    TriangleCountUnderNode(tengxianConstruction, spec.node),
-    standard.actualTriangles,
-    spec.node + ": GLB triangle count matches the asset-standards record",
-  );
-}
+// 战场包里三个没有场景用的节点 2026-11-25 从目录摘掉（GLB 不重烘，节点仍在）。
+const RETIRED_BATTLEFIELD_NODES = ["battlefieldTrenchEarthwork", "battlefieldGroundPlane", "battlefieldRock"];
+for (const id of RETIRED_BATTLEFIELD_NODES) assert.ok(!new RegExp(`\b${id}\b`).test(fs.readFileSync(path.join(root, "Script_ExternalProps.mjs"), "utf8")), `${id} is retired from the catalog`);
 
 const battlefield = InspectNodes("Model_BattlefieldPack.glb", 4_100_000);
 assert.equal(battlefield.nodes.size, 24, "all 24 battlefield components are independent nodes");
@@ -599,10 +581,9 @@ for (const stem of ["ShopDoorPbr", "StoneWellOriginal", "StoneMillOriginal"]) {
 }
 
 const runtime = fs.readFileSync(path.join(root, "Script_ExternalProps.mjs"), "utf8");
-assert.match(runtime, /Data_ExternalAssets_TengxianConstruction\.mjs/,
-  "Tengxian construction data is connected to the external-prop catalog");
-assert.match(runtime, /PackAssets\(TK_PACK, TK_ASSETS\)/,
-  "all six self-authored construction roots are visible to the component library without placements");
+// 滕县建造套件（Model_TengxianConstructionKit.glb）没有任何场景摆放，2026-11-25 用户要求随构件库清理删除。
+assert.ok(!/TengxianConstruction|TK_PACK/.test(runtime), "retired Tengxian construction kit stays out of the catalog");
+assert.ok(!fs.existsSync(path.join(root, "Model", "Model_TengxianConstructionKit.glb")), "retired construction kit GLB is deleted");
 for (const id of [
   "militaryCrateClosed", "militaryCrateOpen",
   ...Array.from({ length: 7 }, (_, index) => `stackableStone${String(index + 1).padStart(2, "0")}`),
@@ -611,7 +592,8 @@ for (const id of [
   "courtyardHouse", "marketRiceSack01", "marketRiceSack02",
   ...Array.from({ length: 3 }, (_, index) => `marketBox${String(index + 1).padStart(2, "0")}`),
   ...Array.from({ length: 4 }, (_, index) => `marketCrate${String(index + 1).padStart(2, "0")}`),
-  ...Array.from(battlefield.nodes.keys(), (name) => name[0].toLowerCase() + name.slice(1)),
+  ...Array.from(battlefield.nodes.keys(), (name) => name[0].toLowerCase() + name.slice(1))
+    .filter((id) => !RETIRED_BATTLEFIELD_NODES.includes(id)),
   "cityWallBreachShoulderLeft", "cityWallBreachShoulderRight", "cityWallBreachDebrisFan",
   "cityWallBreachBrickCluster01", "cityWallBreachBrickCluster02",
   "cityWallBreachCoping01", "cityWallBreachCoping02",

@@ -49,4 +49,4 @@
 | 城区街垒/堵门/掩体、布设、PCG | 标准模型，按中心点落地 | 脚印贴地 + 融合 |
 | 过场《北门突围》六只土袋、《王铭章》三处 | 贴沙袋图的方盒子 | `kind: "sandbag"` |
 
-没有换的（都不在正片关卡里出现）：`Model_TengxianConstructionKit.glb` 的城外防御组合里烘死的小袋子（该组合没有任何关卡摆放，只在编辑器构件库）、`_blender/Script_BuildGateDetailReference.py` 的参考模型、靶场 `?range=1` 射击台的沙袋色方块、`Script_Probe` 调试页。`Model_Sandbag.glb` 资产条目暂留在构件库里（标「旧 · 不再摆放」），删不删由用户定。
+没有换的（都不在正片关卡里出现）：`_blender/Script_BuildGateDetailReference.py` 的参考模型、靶场 `?range=1` 射击台的沙袋色方块、`Script_Probe` 调试页。`Model_Sandbag.glb` 资产条目暂留在构件库里（标「旧 · 不再摆放」），删不删由用户定。

@@ -148,7 +148,6 @@ button { cursor: pointer; }
 }
 .source-tag.glb { color: #b9c8a4; }
 .source-tag.tzm { color: #a9bfd0; }
-.source-tag.proc { color: #c9b08a; }
 
 /* ---- 视口 ---- */
 .bench { display: flex; flex-direction: column; }

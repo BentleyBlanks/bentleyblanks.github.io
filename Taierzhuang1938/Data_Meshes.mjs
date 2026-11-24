@@ -308,26 +308,10 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 },
     note: "屋脊兽头。民居的糙陶兽首，不是宫殿正吻。原点在脊背安装面。",
   },
-  WindowLattice: {
-    file: "Model_WindowLattice.tzm.json", category: "prop",
-    triangles: 284, meshBlocks: 1, nodes: 3, joints: 0,
-    materials: ["WoodDoor"], mounts: ["sillCenter"],
-    span: [1.100, 1.350, 0.055],
-    draws: { high: 1, medium: 1, low: 1 },
-    note: "格子窗棂 1.10 × 1.35 m，竖 4 横 5 的疏格。原点在窗台中点。",
-  },
-  DoorPier: {
-    file: "Model_DoorPier.tzm.json", category: "prop",
-    triangles: 248, meshBlocks: 1, nodes: 3, joints: 0,
-    materials: ["Stone"], mounts: ["doorSide"],
-    span: [0.360, 0.630, 0.480],
-    draws: { high: 1, medium: 1, low: 1 },
-    note: "门墩石（抱鼓石）。方座 + 横轴鼓面 + 六颗鼓钉。原点在地面。",
-  },
 
   // ——— 场景饰件（WP-E1）：由 Script_TrimProps.mjs 摆进战斗关卡 ———
-  // 这一族与上面四件同为 category=prop（同一条 ≤400 三角预算），区别只在用法：
-  // 门楼四件是给 Script_World 复用的建筑构件，这五件是**成列摆的场景饰件**，
+  // 这一族与上面两件门楼件同为 category=prop（同一条 ≤400 三角预算），区别只在用法：
+  // 门楼件是给 Script_World 复用的建筑构件，这五件是**成列摆的场景饰件**，
   // 落点写死在 Script_TrimProps.TRIM_PLACEMENTS 里。
   // 材质名受两头夹：既要在 _blender/TzmCore.MATERIAL_NAMES 白名单里，又要
   // ResolveTengxianMaterial 认得。交集只有 Stone / WoodBeam / WoodDoor / RoofTile /
