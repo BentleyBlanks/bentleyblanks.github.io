@@ -54,7 +54,10 @@ const WORKSPACE_DIR = path.join(WORKBENCH_ROOT, "_workspace");
 const CONFIG_PATH = path.join(WORKSPACE_DIR, "config.json");
 const TASKS_PATH = path.join(WORKSPACE_DIR, "tasks.json");
 
-const PORT = Number(process.env.WORKBENCH_PORT || process.argv[2] || 8788);
+const rawPort = Number(
+  process.env.WORKBENCH_PORT || (/^\d+$/.test(process.argv[2] || "") ? process.argv[2] : "") || 8788
+);
+const PORT = Number.isFinite(rawPort) && rawPort > 0 ? rawPort : 8788;
 const HOST = "127.0.0.1";
 
 const DEFAULT_CONFIG = {
