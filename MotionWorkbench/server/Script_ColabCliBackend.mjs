@@ -539,13 +539,34 @@ export async function runColabMocapJob({
         // ignore
       }
     }
-    return { files, summary, sessionName, gpuVariant };
+    return { files, summary, sessionName, gpuVariant: activeGpu };
   } finally {
     scheduleIdleStop(exe, sessionName, config.colabAutoStopSec ?? 180, onLog);
   }
 }
 
-export async function runColabMiniMaxH3Job({
+let h3QueueTail = Promise.resolve();
+
+export function runColabMiniMaxH3Job(opts) {
+  const prev = h3QueueTail;
+  let release;
+  h3QueueTail = new Promise((r) => {
+    release = r;
+  });
+  return (async () => {
+    if (prev) {
+      opts.onProgress?.("排队等待前一条 Colab G4 任务完成（完成后自动复用热机 61GB 权重）…");
+      await prev.catch(() => {});
+    }
+    try {
+      return await _runColabMiniMaxH3JobInner(opts);
+    } finally {
+      release();
+    }
+  })();
+}
+
+async function _runColabMiniMaxH3JobInner({
   config,
   prompt,
   duration = 6,
@@ -583,7 +604,7 @@ export async function runColabMiniMaxH3Job({
   } else {
     onProgress?.("申请 Colab 96G G4 GPU 运行时…");
     onLog?.("[MiniMax-H3] colab new --gpu G4 -s mw_h3_g4");
-    await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 120000 });
+    await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 240000 });
     activeSessionNames.add(sessionName);
   }
 

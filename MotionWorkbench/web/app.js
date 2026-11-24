@@ -833,21 +833,67 @@ function renderTaskDetail() {
   const s2ReadyCount = (task.storyboard?.shots || []).filter((s) => s.status === "succeeded").length;
   $("#s3SourceSummary").textContent = `白盒：${task.whitebox?.status === "approved" ? "已确认" : "待确认"} · 分镜：${s2ReadyCount} 张就绪 · ${task.storyboard?.qualityPreset || "720p"} · ${task.durationSec || 10}s`;
 
+  const readyCount = takes.filter((t) => t.status === "succeeded").length;
+  const runCount = takes.filter((t) => t.status === "running").length;
+  const failCount = takes.filter((t) => t.status === "failed").length;
+  const titleParts = [`${readyCount} 条成片`];
+  if (runCount) titleParts.push(`${runCount} 条生成中`);
+  if (failCount) titleParts.push(`${failCount} 条失败`);
+  const takesTitleEl = $("#s3TakesTitle");
+  if (takesTitleEl) {
+    takesTitleEl.textContent = `${task.beatCode} 本任务抽卡记录（${titleParts.join(" · ")}）`;
+  }
+
   const s3Box = $("#s3Takes");
   s3Box.innerHTML = "";
+  if (!takes.length) {
+    s3Box.innerHTML = `<div class="mwTakeEmpty">当前动作尚无抽卡记录，点击右侧「生成 1 条视频」或导入本地 MP4</div>`;
+  }
   for (const tk of takes) {
-    const sel = tk.id === task.stage3.selectedTakeId;
+    const sel = tk.id === task.stage3.selectedTakeId && tk.status === "succeeded";
+    const isRun = tk.status === "running";
+    const isErr = tk.status === "failed";
     const tile = document.createElement("div");
-    tile.className = `mwTakeTile ${sel ? "selected" : ""}`;
+    tile.className = `mwTakeTile ${sel ? "selected" : ""} ${isErr ? "isFailed" : ""}`;
+
+    const badgeHtml = sel
+      ? `<span class="mwTakeStateBadge sel">当前定稿</span>`
+      : isRun
+      ? `<span class="mwTakeStateBadge run">生成中</span>`
+      : isErr
+      ? `<span class="mwTakeStateBadge err">失败</span>`
+      : `<span class="mwTakeStateBadge">成片</span>`;
+
+    const thumbInner = tk.url
+      ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>`
+      : isRun
+      ? `<span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span><span class="mwTakeThumbMsg">${escapeHtml(tk.progressText || "云端生成中…")}</span>`
+      : `<span class="mwTakeThumbMsg">${escapeHtml(tk.error || tk.progressText || "生成失败")}</span>`;
+
     tile.innerHTML = `
-      <div class="mwTakeThumb">
-        ${tk.url ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>` : `<span>${escapeHtml(tk.progressText || tk.status)}</span>`}
+      <div class="mwTakeThumb ${tk.url ? "hasVideo" : ""}">
+        ${badgeHtml}
+        <button class="mwTakeDelBtn" type="button" title="删除此条抽卡记录">✕</button>
+        ${thumbInner}
       </div>
       <div class="mwTakeMeta">
-        <span>${escapeHtml(tk.label)}</span>
-        <span class="mwMono">${sel ? "●" : fmtSize(tk.sizeBytes)}</span>
+        <span class="mwTakeMetaTitle" title="${escapeHtml(tk.label)}">${escapeHtml(tk.label)}</span>
+        <span class="mwMono">${fmtSize(tk.sizeBytes) || (isRun ? "…" : "")}</span>
       </div>
     `;
+    const delBtn = tile.querySelector(".mwTakeDelBtn");
+    if (delBtn) {
+      delBtn.onclick = async (ev) => {
+        ev.stopPropagation();
+        try {
+          const res = await api(`/api/tasks/${task.id}/stage3/takes/${tk.id}`, { method: "DELETE" });
+          replaceTask(res.task);
+          toast("已移除该条抽卡记录");
+        } catch (err) {
+          toast(err.message, 3500);
+        }
+      };
+    }
     if (tk.status === "succeeded") {
       tile.onclick = async () => {
         const res = await api(`/api/tasks/${task.id}`, {
@@ -856,6 +902,10 @@ function renderTaskDetail() {
         });
         replaceTask(res.task);
       };
+    } else if (isErr) {
+      tile.onclick = () => toast(tk.error || tk.progressText || "该次抽卡失败，可点右上角 ✕ 移除", 5000);
+    } else if (isRun) {
+      tile.onclick = () => toast(tk.progressText || "正在生成视频…", 3500);
     }
     s3Box.appendChild(tile);
   }

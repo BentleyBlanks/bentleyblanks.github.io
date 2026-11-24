@@ -334,9 +334,19 @@ def write_bvh(bvh_path: Path, names, parents, bind_w, anim_w, fps_val: float, sc
 
 
 def run_pipeline(out_dir: Path):
+    import importlib
+    import site
     import cv2
     import numpy as np
     import torch
+
+    # `colab exec` runs inside an existing IPython kernel whose import caches predate `pip install -e`.
+    # Refresh site-packages + sys.path so editable `gem` and freshly installed `soma` resolve immediately.
+    if str(GEMX_DIR) not in sys.path:
+        sys.path.insert(0, str(GEMX_DIR))
+    for sp in site.getsitepackages():
+        site.addsitedir(sp)
+    importlib.invalidate_caches()
 
     from gem.inference.timing import prediction_fps
     from gem.inference.video import VideoFrames, normalize_video

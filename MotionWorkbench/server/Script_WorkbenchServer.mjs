@@ -303,6 +303,31 @@ async function syncLevel01Scene01Catalog() {
 
     if (!prev || prev.title !== tpl.title) changed = true;
 
+    // Recover orphaned `running`/`queued` entries left behind by a previous server restart
+    for (const sh of task.storyboard?.shots || []) {
+      if (sh.status === "running") {
+        sh.status = "failed";
+        sh.progressText = "服务重启中断，可重抽";
+        changed = true;
+      }
+    }
+    for (const tk of task.stage3?.takes || []) {
+      if (tk.status === "running") {
+        tk.status = "failed";
+        tk.error = "服务重启中断，请删除或重新抽卡";
+        tk.progressText = "服务重启中断";
+        changed = true;
+      }
+    }
+    for (const r of task.stage4?.runs || []) {
+      if (r.status === "running" || r.status === "queued") {
+        r.status = "failed";
+        r.stage = "failed";
+        r.stageLabel = "失败：服务重启中断，请重新提交提骨";
+        changed = true;
+      }
+    }
+
     // Seed verified L01_01 / L01_02 media + GEM-X v5 outputs if absent
     const vm = verifiedMedia[task.id];
     if (vm && (!task.stage3?.takes?.length || !task.stage4?.runs?.length)) {
@@ -951,6 +976,21 @@ async function handleApi(req, res, urlObj) {
       approved: body.approved !== false,
       qualityPreset: body.qualityPreset || task.storyboard?.qualityPreset || "720p",
     };
+    task.updatedAt = Date.now();
+    await saveTasks();
+    return sendJson(res, 200, { ok: true, task: hydrateTaskForClient(task) });
+  }
+
+  // Delete a specific Stage 3 take from a task's take history
+  const mDelTake = /^\/api\/tasks\/([^/]+)\/stage3\/takes\/([^/]+)$/.exec(p);
+  if (mDelTake && method === "DELETE") {
+    const task = findTask(decodeURIComponent(mDelTake[1]));
+    const takeId = decodeURIComponent(mDelTake[2]);
+    task.stage3.takes = (task.stage3?.takes || []).filter((t) => t.id !== takeId);
+    if (task.stage3.selectedTakeId === takeId) {
+      const nextOk = task.stage3.takes.find((t) => t.status === "succeeded");
+      task.stage3.selectedTakeId = nextOk?.id || null;
+    }
     task.updatedAt = Date.now();
     await saveTasks();
     return sendJson(res, 200, { ok: true, task: hydrateTaskForClient(task) });
