@@ -51,7 +51,7 @@ DXT5 等指定格式实际交给 KTX2 转码器选择，BC3 即使输入不透�
 
 ## 构建与运行时
 
-`Script_TextureImportRules` 是浏览器、保存端点、构建共用的配置校验。`Script_TextureImportBuild` 从原图生成产物，使用固定版本 sharp 0.34.5 和 BasisU 1.16.3（npm 包 `@gpu-tex-enc/basis` 1.16.4）；执行 npm install 即取得 Windows/Linux 编码器，不用额外安装 Unity、Blender 或系统 KTX CLI。
+`Script_TextureImportRules` 是浏览器、保存端点、构建共用的配置校验。`Script_TextureImportBuild` 从原图生成产物，使用固定版本 sharp 0.35.5 和 BasisU 1.16.3（npm 包 `@gpu-tex-enc/basis` 1.16.4）；执行 npm install 即取得 Windows/Linux 编码器，不用额外安装 Unity、Blender 或系统 KTX CLI。
 
 该 npm 包的 Linux 基础二进制实际为 1.15，不支持 `-max_threads`；Linux 构建先核对 `/proc/cpuinfo` 的 SSE4.1 能力，再选包内 1.16.3 的 SSE 版本。旧 CPU 保留基础版本并使用其支持的单线程参数。实际二进制、版本、SHA-256 与线程参数进入报告及缓存键，避免把不同编译器的缓存混用。
 
