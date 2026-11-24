@@ -10,6 +10,10 @@ export function PreviewRuntimeRevision(root) {
     const filePath = path.join(root, "scripts", file);
     hash.update(file).update(fs.existsSync(filePath) ? fs.readFileSync(filePath) : "missing");
   }
+  for (const file of ["Script_WorkbenchServer.mjs", "Script_ColabCliBackend.mjs", "Script_DreaminaBridge.mjs", "Script_SomaToMixamo.mjs", "Script_ImageProviderBridge.mjs"]) {
+    const filePath = path.join(root, "MotionWorkbench", "server", file);
+    hash.update("mw:" + file).update(fs.existsSync(filePath) ? fs.readFileSync(filePath) : "missing");
+  }
   return hash.digest("hex");
 }
 
