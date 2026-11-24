@@ -525,12 +525,22 @@ export class FirstPersonRangeScene {
     this.reactiveTargets.push(target);
   }
 
-  _SpawnBulletHole(point, normal) {
+  _EnsureHoleAssets() {
     if (!this._holeGeo) {
       this._holeGeo = new THREE.CircleGeometry(0.016, 12);
       this._holeMat = new THREE.MeshBasicMaterial({ color: 0x141618, polygonOffset: true, polygonOffsetFactor: -2 });
       this._Track(this._holeGeo, this._holeMat);
     }
+  }
+
+  /** 预热用弹孔代理：与真弹孔同一份几何 / 材质，不进 impactDecals。 */
+  CreateWarmProxy() {
+    this._EnsureHoleAssets();
+    return new THREE.Mesh(this._holeGeo, this._holeMat);
+  }
+
+  _SpawnBulletHole(point, normal) {
+    this._EnsureHoleAssets();
     const mesh = new THREE.Mesh(this._holeGeo, this._holeMat);
     mesh.position.copy(point).addScaledVector(normal, 0.004);
     mesh.lookAt(point.x + normal.x, point.y + normal.y, point.z + normal.z);

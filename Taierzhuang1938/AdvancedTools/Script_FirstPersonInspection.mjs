@@ -5,7 +5,7 @@
 // - 可视化人物姿态剪影 + 实时键位高亮 + #3 连射拉栓 / #4 移动惯性改前改后直出对比（只读，writeBack: false）。
 
 import * as THREE from "three";
-import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
+import { CreateStudioBase, MAX_FRAME_DT, NextFrame } from "./Script_ToolStudioRenderBase.mjs";
 import { FirstPersonRangeScene } from "./Script_FirstPersonRangeScene.mjs";
 import { LoadToolsVolume, SaveToolsVolume, ToolsVolumeLevel } from "../Script_EditorVolume.mjs";
 import { WEAPONS } from "../Data_Weapons.mjs";
@@ -1795,6 +1795,174 @@ class FirstPersonInspectionApp {
     this.base.Frame(dt > 0 ? dt : 1 / 60, { nearDof, lensFlareScale });
   }
 
+  /**
+   * 开机预热（同 Script_Main.WarmLevel 第二段 + 粒子段）：把第一次开火 / 击中 / 换弹 / 换枪 / 开镜
+   * 才会用到的材质与粒子在载入遮罩后面编好、真画一遍，玩的时候不再现编。
+   * 预热期间不放声音；结束后把枪、弹药、靶场全部还原。
+   */
+  async WarmFirstUse(onStep = () => {}) {
+    const started = performance.now();
+    const { base, vm, range, camera } = this;
+    const { renderer, scene, vfx } = base;
+    const origWeapon = this.weaponId;
+    const programsBefore = renderer.info.programs.length;
+    const report = { ms: 0, programsBefore, programsAfter: programsBefore, settleFrames: [], weapons: 0 };
+    const group = new THREE.Group();
+    group.name = "FpsInspectWarmProxies";
+    const Compile = (root) => {
+      base.firstPersonSelfShadow?.SyncForCompile();
+      const restoreTarget = renderer.getRenderTarget();
+      if (base.post?.targets?.hdr) renderer.setRenderTarget(base.post.targets.hdr);
+      try { renderer.compile(root, camera, scene); }
+      catch (error) { console.warn("[FpsInspect] 着色器提交编译失败（退回用到时现编）", error); }
+      finally { renderer.setRenderTarget(restoreTarget); }
+    };
+    const WaitProgramsReady = async (limitMs) => {
+      const start = performance.now();
+      for (;;) {
+        const programs = renderer.info.programs;
+        let ready = 0;
+        for (const program of programs) if (typeof program.isReady !== "function" || program.isReady()) ready += 1;
+        if (ready >= programs.length || performance.now() - start > limitMs) return;
+        await NextFrame();
+      }
+    };
+    const EquipForWarm = (id, bayonet) => {
+      vm.Equip(id, 0);
+      vm.SetBayonetFixed?.(bayonet);
+    };
+    try {
+      this.ApplyCamera();
+      camera.updateMatrixWorld(true);
+      const forward = camera.getWorldDirection(new THREE.Vector3());
+
+      // 一、代理组：弹孔、抛壳 / 整弹
+      onStep("预热首次开火、命中与换弹……准备代理", 0.9);
+      group.position.copy(camera.position).addScaledVector(forward, 1.5);
+      const hole = range.CreateWarmProxy();
+      group.add(hole);
+      const debrisProfiles = new Set();
+      for (const id of WEAPON_IDS) {
+        const w = WEAPONS[id];
+        if (!w.reloadKind && w.kind !== "boltRifle") continue;
+        try {
+          vm.Equip(id, 0);
+          const profile = vm.clipProp?.userData?.profile;
+          if (profile && debrisProfiles.has(profile)) continue;
+          if (profile) debrisProfiles.add(profile);
+          const proxy = vm.CreateActionDebrisWarmProxy?.();
+          if (proxy) group.add(proxy);
+        } catch (error) {
+          console.warn(`[FpsInspect] 抛壳代理失败：${id}`, error);
+        }
+      }
+      group.traverse((object) => { object.frustumCulled = false; });
+      scene.add(group);
+      group.updateMatrixWorld(true);
+
+      // 二、提交编译 + 等链接
+      const variants = [];
+      for (const id of WEAPON_IDS) {
+        variants.push([id, false]);
+        if (CanBayonet(id)) variants.push([id, true]);
+      }
+      report.weapons = variants.length;
+      for (let i = 0; i < variants.length; i += 1) {
+        onStep(`预热首次开火、命中与换弹……提交着色器 ${i + 1}/${variants.length}`, 0.9 + 0.02 * (i / variants.length));
+        EquipForWarm(...variants[i]);
+        Compile(vm.root);
+        if (i % 6 === 5) await NextFrame();
+      }
+      Compile(group);
+      onStep("预热首次开火、命中与换弹……等待着色器链接", 0.92);
+      await WaitProgramsReady(15000);
+
+      // 三、逐把真画（枪口焰、换弹道具、整弹几何）
+      for (let i = 0; i < variants.length; i += 1) {
+        onStep(`预热首次开火、命中与换弹……出画 ${i + 1}/${variants.length}`, 0.92 + 0.04 * (i / variants.length));
+        EquipForWarm(...variants[i]);
+        this.RenderFrame(1 / 60);
+        vm.DrawActionWarmup(() => base.Frame(1 / 60));
+        await NextFrame();
+      }
+
+      // 四、开镜近景景深
+      onStep("预热首次开火、命中与换弹……开镜景深", 0.96);
+      EquipForWarm(origWeapon, false);
+      await base.post?.dofPass?.Warmup?.();
+      base.Frame(1 / 60, {
+        nearDof: { strength: ADS_NEAR_DOF_STRENGTH, focus: ADS_NEAR_DOF_FOCUS_M, range: ADS_NEAR_DOF_RANGE_M, maxPx: ADS_NEAR_DOF_MAX_PX, sightUv: [0.5, 0.5] },
+      });
+      await NextFrame();
+
+      // 五、粒子：枪口焰与四种命中
+      onStep("预热首次开火、命中与换弹……粒子", 0.97);
+      if (vfx) {
+        const kinds = [...new Set(WEAPON_IDS.map((id) => WEAPONS[id].kind))];
+        _muzzle.copy(camera.position).addScaledVector(forward, 0.8);
+        for (const kind of kinds) vfx.MuzzleFlash?.(_muzzle, forward, { player: true, kind });
+        const hitPoint = new THREE.Vector3(0, 1.62, -9.9);
+        const hitNormal = new THREE.Vector3(0, 0, 1);
+        for (const surface of ["brick", "dirt", "wood", "metal"]) {
+          vfx.Impact?.(hitPoint, hitNormal, surface, { weaponKind: "boltRifle", hardSparks: surface === "metal" });
+        }
+        await vfx.particles?.Ready?.();
+        const settleStart = performance.now();
+        let calm = 0;
+        for (let i = 0; i < 12 && performance.now() - settleStart < 12000; i += 1) {
+          const t0 = performance.now();
+          vfx.Update?.(1 / 60);
+          base.Frame(1 / 60);
+          renderer.getContext().finish();
+          const ms = performance.now() - t0;
+          report.settleFrames.push(Math.round(ms));
+          calm = ms < 80 ? calm + 1 : 0;
+          await NextFrame();
+          if (i >= 3 && calm >= 2) break;
+        }
+        vfx.ClearParticles?.();
+      }
+
+      // 六、音频包：首次手势才 Unlock → LoadPacks 解码，会在第一枪时卡主线程，提前解完（不放声）
+      const audio = base.audio;
+      if (audio?.enabled) {
+        onStep("预热首次开火、命中与换弹……音频", 0.98);
+        const audioStart = performance.now();
+        audio.CreateContext();
+        audio.LoadPacks();
+        const Busy = () => audio.voiceLoading || audio.sfxLoading || audio.ambLoading || audio.musicLoading || audio.bedOverlayLoading;
+        while (Busy()) {
+          if (performance.now() - audioStart > 10000) { report.audioTimedOut = true; break; }
+          await NextFrame();
+        }
+        report.audioMs = Math.round(performance.now() - audioStart);
+      }
+    } catch (error) {
+      console.warn("[FpsInspect] 开机预热失败，照常进入工具", error);
+    } finally {
+      group.removeFromParent();
+      group.clear();
+      range.ClearBulletHoles();
+      for (const target of range.reactiveTargets) {
+        target.angle = 0;
+        target.vel = 0;
+        target.flashT = 0;
+        target.flashMat.opacity = 0;
+        target.pivot.rotation.x = 0;
+      }
+      try { vm.SetBayonetFixed?.(false); } catch { /* 无刺刀 */ }
+      this.recoilPitch = 0;
+      this.recoilYaw = 0;
+      this.firePunch = 0;
+      this.queuedBoltShot = null;
+      this.SetWeapon(origWeapon);
+      report.programsAfter = renderer.info.programs.length;
+      report.ms = Math.round(performance.now() - started);
+      this.warmReport = report;
+    }
+    return report;
+  }
+
   Snapshot() {
     const w = WEAPONS[this.weaponId];
     return {
@@ -1847,6 +2015,7 @@ async function Main() {
     // 先跑 2 帧预热相机、靶场与反射探针
     app.RenderFrame(1 / 60);
     app.RenderFrame(1 / 60);
+    await app.WarmFirstUse(SetStep);
 
     const manual = params.get("manual") === "1";
     base.onResize = () => {
@@ -1876,6 +2045,7 @@ async function Main() {
       Trigger: (act) => app.TriggerAction(act),
       StepFrames(count = 1, dt = 1 / 60) { for (let i = 0; i < count; i += 1) app.RenderFrame(dt); },
       Snapshot: () => app.Snapshot(),
+      warmReport: app.warmReport,
     };
     bootOverlay?.setAttribute("hidden", "");
   } catch (error) {

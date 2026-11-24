@@ -496,7 +496,7 @@ function NextTask() {
 }
 
 /** 让出一帧：可见时等 rAF，隐藏时走宏任务（同 Script_Main.NextFrame，去掉加载纸）。 */
-async function NextFrame() {
+export async function NextFrame() {
   if (document.hidden) return NextTask();
   await new Promise((resolve) => {
     let frame;
