@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "asset": "DitchFireSmoke",
+  "dimensions": [
+    64,
+    72,
+    48
+  ],
+  "atlasTiles": [
+    4,
+    3,
+    1
+  ],
+  "frames": 12,
+  "duration": 6,
+  "anchor": [
+    0.5,
+    0,
+    0.5
+  ],
+  "channels": 1,
+  "encoding": "sqrt-unorm8",
+  "source": "authored",
+  "sourceType": "procedural",
+  "sourceFrameIndices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "boundsM": [
+    41,
+    32,
+    36
+  ],
+  "file": "Volume_DitchFireSmoke.bin.gz",
+  "compressedBytes": 402478,
+  "gpuBytes": 2654208,
+  "sha256": "1bae0418775edda60a934f53fe123748a3a0b30844f24a525864130040f50a5f",
+  "opticalGuideSha256": "3e4ea28994e28dc357e6223051e758918beede30c0d97b7092d77847003d139a",
+  "recipe": "_import/AircraftEvacuationDitch/Script_BakeDitchHaze.py"
+}

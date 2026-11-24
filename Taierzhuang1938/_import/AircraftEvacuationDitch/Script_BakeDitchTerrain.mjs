@@ -22,12 +22,12 @@ const NEAR_BANK_RELIEF = [
   [-2.56, -3.09, .49, .20, -.50,  .13],
   [-2.43, -3.92, .48, .19, -.82, -.17],
   [-2.31, -4.72, .62, .27,  .45, -.21],
-  [ 2.91, -4.86, .65, .24, -.77, -.28],
-  [ 3.08, -4.54, .70, .19, -.66,  .13],
-  [ 3.12, -4.31, .65, .18, -.69, -.22],
-  [ 3.29, -3.84, .63, .26, -.87, -.17],
-  [ 3.54, -3.63, .70, .27, -.65,  .13],
-  [ 3.70, -4.73, .62, .31, -.66,  .16],
+  [ 2.91, -4.86, .65, .24, -.77, -.19],
+  [ 3.08, -4.54, .70, .19, -.66,  .07],
+  [ 3.12, -4.31, .65, .18, -.69, -.14],
+  [ 3.29, -3.84, .63, .26, -.87, -.12],
+  [ 3.54, -3.63, .70, .27, -.65,  .08],
+  [ 3.70, -4.73, .62, .31, -.66,  .09],
 ];
 
 function Noise(x, z) {
@@ -64,6 +64,7 @@ function Height(x, z) {
   const yard = 1.32 + .15 * Math.sin(.168 * x - z * .09) + .12 * Math.cos(z * .16 + x * .05);
   const rightShoulder = Mound(x,z,7.8,-9.9,3.4,5.1,.23);
   const shoulderCove = Mound(x,z,4.45,-9.12,1.46,4.7,-.20);
+  const bankBrow = Mound(x,z,3.91,-4.55,.96,2.8,.13) + Mound(x,z,5.37,-11.4,1.24,3.6,-.20);
   const rubbleRidge = Mound(x,z,-.9,-28,2.5,4.8,1.02) + Mound(x,z,8.5,-43,6,11,.48)
     + Mound(x,z,-10.75,-12.35,1.6,1.4,.26);
   const distanceFade = 1 - .74 * Smooth(-20,-78,z);
@@ -77,7 +78,7 @@ function Height(x, z) {
     + face * (.18 * channels + .082 * Noise(z * .62, side * 3.5)));
   const erosion = NEAR_BANK_RELIEF.reduce((value, [cx, cz, width, length, angle, depth]) =>
     value + Mound(x,z,cx,cz + (x - cx) * angle,width,length,depth), 0);
-  const ground = yard + ditch + rightShoulder + shoulderCove + rubbleRidge + floor + ravel + erosion;
+  const ground = yard + ditch + rightShoulder + shoulderCove + bankBrow + rubbleRidge + floor + ravel + erosion;
   return ground * (1 - .66 * Smooth(-58,-188,z));
 }
 

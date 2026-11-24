@@ -1757,6 +1757,7 @@ export class VfxSystem {
       backdrop: opts.backdrop || null,
       fire: opts.fire ?? 0,
       fireEmission: opts.fireEmission,
+      fireTint: opts.fireTint,
       firePosition: opts.firePosition ? new THREE.Vector3(opts.firePosition.x,opts.firePosition.y,opts.firePosition.z) : null,
       nearLight: !!opts.nearLight,
       nearLightActive: false,

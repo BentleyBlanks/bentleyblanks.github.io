@@ -13,6 +13,9 @@ export function BurningParticleModules(source, scale=1) {
       if(Number.isFinite(source.fireEmission)){
         modules.renderer.emissionStrength*=Math.max(0,Math.min(2,source.fireEmission));
       }
+      if(Array.isArray(source.fireTint)&&source.fireTint.length===3&&source.fireTint.every(Number.isFinite)){
+        modules.main.startColor=[...source.fireTint.map(channel=>Math.max(0,Math.min(1,channel))),1];
+      }
       return {preset,modules};
     }
     modules.main.startSize.min*=size;modules.main.startSize.max*=size;

@@ -1,6 +1,6 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "name": "TerrainDitchRootedVerge",
   "preset": "drySoil",
   "source": {
@@ -23,11 +23,11 @@
   "heightSource": null,
   "params": {
     "mean": [
-      0.425,
-      0.383,
-      0.339
+      0.431,
+      0.392,
+      0.348
     ],
-    "contrast": 0.068,
+    "contrast": 0.06,
     "lumaRange": [
       0.28,
       0.46
@@ -40,7 +40,7 @@
       0.05,
       0.12
     ],
-    "reliefM": 0.006,
+    "reliefM": 0.0048,
     "rough": 0.93,
     "roughVar": 0.05,
     "roughLumaK": 0.0,
@@ -76,44 +76,44 @@
       "file": "Texture_TerrainDitchRootedVergeBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 228886,
-      "sha256": "048d1a3393ba5490ab773e9e764938709af97fba38a7f565e78b1d0f36218fdb"
+      "bytes": 205144,
+      "sha256": "e8bdb6af95459771bd1c492402767ccd9db96f997e878aaed10e7e99dcf63286"
     },
     {
       "channel": "Normal",
       "file": "Texture_TerrainDitchRootedVergeNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 66574,
-      "sha256": "6754d5473329dd05f2155d76144c23d49e08a23033753087afb4a70426cc193c"
+      "bytes": 56284,
+      "sha256": "bd447f3b5a90f9d2a91cc4c57e38831de9c87abf135a96f343fb5c376dad9173"
     },
     {
       "channel": "Orh",
       "file": "Texture_TerrainDitchRootedVergeOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 41462,
-      "sha256": "1a45762ebc28e6a50a5f0704df80686dab725bb5580a7cf70ba96d038b0e75ee"
+      "bytes": 41444,
+      "sha256": "0163ed604cc2eae04749205b2b081dd7be86b1fd13f72e3ada9d602c447d84ab"
     }
   ],
-  "totalBytes": 336922,
+  "totalBytes": 302872,
   "metrics": {
     "meanSrgb": [
-      0.4243,
-      0.3838,
-      0.3385
+      0.4303,
+      0.3928,
+      0.3478
     ],
-    "luma": 0.3822,
-    "lumaStd": 0.067,
-    "sat": 0.2021,
+    "luma": 0.3903,
+    "lumaStd": 0.0589,
+    "sat": 0.1918,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0028,
-    "seam": 0.0478,
-    "interior": 0.0479,
-    "seamRatio": 0.997,
-    "border": 0.983,
-    "swing": 0.0045,
+    "lowFreq": 0.0024,
+    "seam": 0.0427,
+    "interior": 0.0437,
+    "seamRatio": 0.977,
+    "border": 0.979,
+    "swing": 0.0041,
     "aoMean": 0.953,
     "roughMean": 0.916,
     "texelsPerMeter": 660.6

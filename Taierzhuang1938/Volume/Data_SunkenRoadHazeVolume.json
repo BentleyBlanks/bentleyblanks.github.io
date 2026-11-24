@@ -54,9 +54,9 @@
     48
   ],
   "file": "Volume_SunkenRoadHaze.bin.gz",
-  "compressedBytes": 871732,
+  "compressedBytes": 870866,
   "gpuBytes": 1824768,
-  "sha256": "5edf6d3aacf4f5fd443ae6decfcc237edbf8070cb195eab8e00396bb83f17004",
-  "opticalGuideSha256": "77810f99dcb33558d0693a6149503c87f82d92580b3f1445077b2669f6143147",
+  "sha256": "49b5b2ec8185c53a294d041d33d1d34019dfe0d8a681cc1bc38239a67c2a6a60",
+  "opticalGuideSha256": "3a04a434dfe4dc0703bc7d5edde2bb8d512d6a2d537e85972251a20b75e9061f",
   "recipe": "_import/AircraftEvacuationDitch/Script_BakeDitchHaze.py"
 }

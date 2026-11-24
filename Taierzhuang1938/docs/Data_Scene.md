@@ -53,7 +53,7 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 注册表的 `previewParam` 让场景编辑器在视口内加载对应的游戏渲染入口。`look.groundPaintCellM` 可细化地表涂色采样。
 各 `paint` 项可用 `tint` 设置正式地表的反照率倍率，支持六位 Hex 或 0–2 的三个 sRGB 倍率。
-显式标高的道具可用 `params.grounding: "authored"` 控制贴地。落地、常驻、无碰撞的单件道具可用 `params.grounding: "conform"`，把枯草或根须的顶点沿地表弯折。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。`options.fireEmission` 是火舌亮度的倍率，默认为 1。
+显式标高的道具可用 `params.grounding: "authored"` 控制贴地。落地、常驻、无碰撞的单件道具可用 `params.grounding: "conform"`，把枯草或根须的顶点沿地表弯折。独立预览的 `smokeColumns` 复用游戏的烟源，`heightOffset` 相对于烟源下方的采样地面。`options.fireEmission` 是火舌亮度的倍率，默认为 1。`options.fireTint` 可用 0–1 的线性 RGB 三元组为火舌调色。
 
 场景可在 `smokeColumns[].options.backdrop.volume` 提供已登记的 TVOL 资产 `asset`、三轴全尺寸 `bounds`、消光系数 `density` 和播放倍率 `speed`。`backdrop` 还需要 `seed`、`life`，可用绝对米制坐标 `ignition` 设烟场锚点。明火可通过 `options.firePosition` 单独定位。
 

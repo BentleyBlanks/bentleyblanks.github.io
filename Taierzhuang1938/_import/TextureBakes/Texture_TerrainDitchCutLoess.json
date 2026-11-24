@@ -1,6 +1,6 @@
 {
   "generator": "Script_BakePbrTexture.py@1",
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "name": "TerrainDitchCutLoess",
   "preset": "rammedEarth",
   "source": {
@@ -23,11 +23,11 @@
   "heightSource": null,
   "params": {
     "mean": [
-      0.451,
-      0.402,
-      0.354
+      0.448,
+      0.391,
+      0.341
     ],
-    "contrast": 0.071,
+    "contrast": 0.062,
     "lumaRange": [
       0.32,
       0.52
@@ -40,7 +40,7 @@
       0.035,
       0.11
     ],
-    "reliefM": 0.012,
+    "reliefM": 0.0085,
     "rough": 0.93,
     "roughVar": 0.04,
     "roughLumaK": 0.0,
@@ -51,7 +51,7 @@
     "flattenSigma": 0.1,
     "isotropic": true,
     "heightFromLuma": "direct",
-    "tileM": 1.58,
+    "tileM": 1.21,
     "size": 1024,
     "dataSize": 512,
     "pack": "orh",
@@ -76,47 +76,47 @@
       "file": "Texture_TerrainDitchCutLoessBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 173026,
-      "sha256": "67adf013212b40e9c7504ddd9facbf953d61f78d45ceda59040d601c850f3f93"
+      "bytes": 150120,
+      "sha256": "c37dcf0fe570548ed8ef065e819554feebdeb7a34bc1443ee3f65f89d7e4b772"
     },
     {
       "channel": "Normal",
       "file": "Texture_TerrainDitchCutLoessNormal.webp",
       "width": 512,
       "height": 512,
-      "bytes": 66212,
-      "sha256": "c4a383c36b55d3e971fd56cdc7af0ae98b7b0f6834a5e5c285aedc4bb9c98484"
+      "bytes": 61624,
+      "sha256": "c68416ede2e2834bb47cf30d71dd37119d376ae650bcb4e7da558539a893d6b9"
     },
     {
       "channel": "Orh",
       "file": "Texture_TerrainDitchCutLoessOrh.webp",
       "width": 512,
       "height": 512,
-      "bytes": 27160,
-      "sha256": "aaf0960b9f2068e4895b9967d9d5818acb6444228962e3af85f7288fd238a414"
+      "bytes": 26834,
+      "sha256": "96e308b2bd04e1fd74d395a76797f9a291ddea64860ca3b699c7e35fb0aa2efb"
     }
   ],
-  "totalBytes": 266398,
+  "totalBytes": 238578,
   "metrics": {
     "meanSrgb": [
-      0.4505,
-      0.4029,
-      0.3535
+      0.4474,
+      0.392,
+      0.3407
     ],
-    "luma": 0.4023,
-    "lumaStd": 0.0701,
-    "sat": 0.2152,
+    "luma": 0.3933,
+    "lumaStd": 0.0611,
+    "sat": 0.2386,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0184,
-    "seam": 0.0363,
-    "interior": 0.0357,
-    "seamRatio": 1.017,
-    "border": 0.92,
-    "swing": 0.0057,
+    "lowFreq": 0.0164,
+    "seam": 0.0322,
+    "interior": 0.0313,
+    "seamRatio": 1.031,
+    "border": 0.914,
+    "swing": 0.0048,
     "aoMean": 0.958,
-    "roughMean": 0.926,
-    "texelsPerMeter": 648.1
+    "roughMean": 0.927,
+    "texelsPerMeter": 846.3
   },
   "gateProblems": []
 }

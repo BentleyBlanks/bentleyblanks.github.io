@@ -279,9 +279,11 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
     "三架飞机保留编辑器标高，处于布局边界内且不生成碰撞");
   Check(layout.sceneProps.length === doc.objects.length && layout.smokeColumns.some(source => source.options.fire > 0)
     && slice.landmarks.length === 5, "沟底撤运道具、火源与五个站位完整进入预览");
-  Check(layout.smokeColumns.some(source => source.options.backdrop?.frame === 0)
-    && layout.smokeColumns.some(source => source.options.backdrop?.volume?.asset === "SunkenRoadHaze"),
-    "凹路预览保留带厚度的烟柱和独立的漂浮灰雾");
+  const [fire] = layout.smokeColumns.filter(source => source.options.fire > 0);
+  const volumeAssets = new Set(layout.smokeColumns.map(source => source.options.backdrop?.volume?.asset));
+  Check(fire?.options.backdrop?.frame === 0
+    && volumeAssets.has("DitchFireSmoke") && volumeAssets.has("SunkenRoadHaze"),
+    "凹路预览保留火点短烟柱、翻卷烟团与中距灰霾");
   const roots = doc.objects.find(obj => obj.params?.grounding === "conform");
   Check(doc.terrain.cellM === .2 && roots && layout.blocks.some(block => block.id === roots.id && block.propConformGround)
     && !ValidateScene({ ...doc, objects: [{ ...roots, solid: true }] }).ok,
