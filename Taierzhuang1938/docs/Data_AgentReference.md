@@ -769,11 +769,11 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
 ### 编辑器与调试工具
 - 人物面部：`Script_EditorFacial.mjs`，配套录音、口型/表情近景与关键帧草稿；见 [人物面部编辑器](Data_FacialEditor.md)。
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,ShotCamera,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
+- `Script_Editor{Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropPcg,ShotCamera,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   ShotCamera = 出图脚本与测试用的定镜小工具（不进菜单，`Debug.OpenEditor("shotCamera")` + `ApplyPose`）；
-  构件目录在 `Script_PlaceableCatalog.mjs`（构件库预览用它，以后的新场景编辑器也复用）。场景关卡 / 地形 / 完整场景预览 / 采样点四个工具已于 2026-10-31 用户要求删除；
+  构件目录在 `Script_PlaceableCatalog.mjs`（控制中心的独立页面构件库预览 `Tool_PropLibrary.html` 用它，以后的新场景编辑器也复用）。场景关卡 / 地形 / 完整场景预览 / 采样点四个工具已于 2026-10-31 用户要求删除；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   DebugRendering、Profiler、Frame Debugger、WorldInfo、玩家状态、敌军 AI 是菜单 设置 → Debug工具 里的叠加层；
   都可叠加且不接管相机、不暂停玩法。高级工具 = 顶部菜单栏 + 右侧 Inspector；整组开发工具只经 Script_DevTools / Data_DevTools

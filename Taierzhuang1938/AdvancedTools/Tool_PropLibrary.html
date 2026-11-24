@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../">
+  <title>构件库预览 · 血战滕县</title>
+  <link rel="icon" href="./Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
+  <link rel="stylesheet" href="./Style_Editor.css?v=20261113ToolsSeparation">
+  <link rel="stylesheet" href="./AdvancedTools/Style_PropLibrary.css?v=20261125Standalone">
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./AdvancedTools/Script_PropLibrary.mjs?v=20261125Standalone"></script>
+</head>
+<body class="uiToolSurface edThemedSurface">
+  <header class="tool-header">
+    <h1>构件库预览</h1>
+    <p class="tool-sub">只读 · 场景可布设的 Prop、程序化构件与模型</p>
+    <a id="controlCenter" class="edMenuMainMenu" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
+  </header>
+
+  <main class="workspace edHome">
+    <aside class="catalog" aria-labelledby="catalogTitle">
+      <header class="catalog-header">
+        <h2 id="catalogTitle">构件目录</h2>
+        <output id="catalogCount" for="propSearch"></output>
+      </header>
+      <div class="search">
+        <input id="propSearch" type="search" aria-label="搜索名称、编号或文件" placeholder="搜索名称、编号或文件" autocomplete="off">
+      </div>
+      <div class="filter-row" id="sourceFilter" role="group" aria-label="来源"></div>
+      <div class="filter-row categories" id="categoryFilter" role="group" aria-label="类别"></div>
+      <div id="propList" class="prop-list" tabindex="0" role="listbox" aria-label="构件列表（↑↓ 切换）"></div>
+    </aside>
+
+    <section class="bench" aria-label="构件视口">
+      <div class="view-bar">
+        <div class="seg" role="group" aria-label="视角" id="viewButtons">
+          <span aria-hidden="true">视角</span>
+          <button type="button" class="edBtn on" data-view="perspective" aria-pressed="true">斜视</button>
+          <button type="button" class="edBtn" data-view="front" aria-pressed="false">正面</button>
+          <button type="button" class="edBtn" data-view="side" aria-pressed="false">侧面</button>
+          <button type="button" class="edBtn" data-view="top" aria-pressed="false">顶视</button>
+        </div>
+        <div class="seg" role="group" aria-label="镜头" id="lensButtons">
+          <span aria-hidden="true">镜头</span>
+          <button type="button" class="edBtn" data-lens="wide" aria-pressed="false">广角</button>
+          <button type="button" class="edBtn on" data-lens="normal" aria-pressed="true">标准</button>
+          <button type="button" class="edBtn" data-lens="tele" aria-pressed="false">长焦</button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <canvas id="view" tabindex="0" aria-label="三维构件，方向键旋转，Shift 加方向键平移，正负号缩放，Home 重新取景" aria-describedby="viewHint"></canvas>
+        <div class="stage-dims" id="stageDims" hidden></div>
+        <div class="stage-status" id="stageStatus">
+          <span id="loadMessage" role="status">正在准备材质…</span>
+          <span class="progress" aria-hidden="true"><span id="loadBar"></span></span>
+          <button type="button" class="edBtn" id="retryLoad" hidden>重试</button>
+        </div>
+      </div>
+
+      <footer class="bench-footer">
+        <div class="overlays" role="group" aria-label="预览叠层">
+          <button type="button" class="edBtn on" id="gridToggle" aria-pressed="true">米格</button>
+          <button type="button" class="edBtn" id="personToggle" aria-pressed="false" title="在构件旁放一根 1.7 m 的人高参照">人高 1.7 m</button>
+          <button type="button" class="edBtn" id="refitButton">重新取景</button>
+        </div>
+        <div class="stepper" role="group" aria-label="逐项浏览">
+          <button type="button" class="edBtn" id="prevButton" aria-label="上一个">‹ 上一个</button>
+          <output id="stepIndex">—</output>
+          <button type="button" class="edBtn" id="nextButton" aria-label="下一个">下一个 ›</button>
+        </div>
+        <div id="viewHint">
+          <span><kbd>左键</kbd> 旋转</span>
+          <span><kbd>右键</kbd> 平移</span>
+          <span><kbd>滚轮</kbd> 缩放</span>
+          <span><kbd>↑↓</kbd> 换构件</span>
+        </div>
+      </footer>
+    </section>
+
+    <aside class="details" aria-labelledby="propName">
+      <header class="prop-heading">
+        <p class="eyebrow"><span id="propCategory"></span><span class="source-tag" id="propSource"></span></p>
+        <h2 id="propName">—</h2>
+        <code id="propId"></code>
+      </header>
+
+      <section class="dims" aria-label="包围尺寸">
+        <h3>包围尺寸 <small>m</small></h3>
+        <div class="dim-tiles">
+          <div><span>宽</span><strong id="sizeX">—</strong></div>
+          <div><span>高</span><strong id="sizeY">—</strong></div>
+          <div><span>深</span><strong id="sizeZ">—</strong></div>
+        </div>
+      </section>
+
+      <section aria-label="构件数据">
+        <h3>构件数据</h3>
+        <dl class="facts">
+          <div><dt>三角面</dt><dd id="propTriangles">—</dd></div>
+          <div><dt>网格</dt><dd id="propMeshes">—</dd></div>
+          <div><dt>碰撞盒</dt><dd id="propColliders">—</dd></div>
+          <div><dt>可调参数</dt><dd id="propUses">—</dd></div>
+          <div class="file"><dt>来源</dt><dd id="propFile">—</dd></div>
+          <div class="file" id="propCreditRow" hidden><dt>署名</dt><dd id="propCredit"></dd></div>
+          <div class="file note" id="propNoteRow" hidden><dt>说明</dt><dd id="propNote"></dd></div>
+        </dl>
+      </section>
+
+      <section class="vehicle" id="vehicleSection" aria-label="战车可动件演示" hidden>
+        <h3>可动件演示</h3>
+        <div class="chip-grid" id="vehicleButtons">
+          <button type="button" class="edBtn" data-demo="all" aria-pressed="false">全部联动</button>
+          <button type="button" class="edBtn" data-demo="tracks" aria-pressed="false">履带与轮组</button>
+          <button type="button" class="edBtn" data-demo="turret" aria-pressed="false">炮塔与主炮</button>
+          <button type="button" class="edBtn" data-demo="machineGuns" aria-pressed="false">两挺机枪</button>
+          <button type="button" class="edBtn" data-demo="stopped" aria-pressed="true">停止复位</button>
+        </div>
+        <p class="note">左右履带独立行程；炮塔整周回转。演示速度和机枪限位为复原参数。</p>
+      </section>
+
+      <p class="edNote warn" id="resourceNote" role="status" hidden></p>
+    </aside>
+  </main>
+</body>
+</html>

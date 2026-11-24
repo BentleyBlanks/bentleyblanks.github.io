@@ -13,14 +13,12 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { PropLibraryEditor } from "./Script_EditorPropLibrary.mjs";
 import { AssetStandardsEditor } from "./Script_EditorAssetStandards.mjs";
-import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
+import { CONTROL_CENTER_URL, STANDALONE_TOOLS } from "./Data_AdvancedTools.mjs";
 
 /** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页（含特效预览、音效音乐），不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
-  ActorEditor, FacialEditor,
-  PropLibraryEditor, AssetStandardsEditor,
+  ActorEditor, FacialEditor, AssetStandardsEditor,
 ]);
 
 /** 菜单分组：从 Data_DevTools.TOOL_MENUS 中筛选摄影棚类工具，空组不列。 */
@@ -413,6 +411,12 @@ async function Main() {
     const dest = new URL(TOOL_INFO[params.get("tool")].window.url, document.baseURI);
     for (const key of moved) { const value = params.get(key); if (value != null) dest.searchParams.set(key, value); }
     location.replace(dest);
+    return;
+  }
+  // 构件库预览 2026-11-25 改成只在控制中心出现的独立只读页面（游戏与本宿主里都不再挂）。
+  const standalone = STANDALONE_TOOLS.find((tool) => tool.id === params.get("tool"));
+  if (standalone) {
+    location.replace(new URL(standalone.window.url, location.href));
     return;
   }
   if (params.get("tool") === "weapon") {

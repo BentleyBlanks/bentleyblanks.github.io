@@ -553,7 +553,7 @@ async function CheckInterface() {
     const listed=await page.evaluate(()=>[...document.querySelectorAll('.mnToolItem')].map(el=>el.dataset.toolId));
     const {TOOL_MENUS}=await import('./Data_DevTools.mjs');
     const expected=TOOL_MENUS.flatMap(menu=>menu.items);
-    Check('高级工具右栏按分组列出全部工具，数量与顺序同 TOOL_MENUS',expected.length===18&&listed.join()===expected.join(),listed.join());
+    Check('高级工具右栏按分组列出全部工具，数量与顺序同 TOOL_MENUS',expected.length===17&&!expected.includes('props')&&listed.join()===expected.join(),listed.join());
     Check('独立窗口与先选关卡工具带标签',await page.evaluate(()=>['sceneEditor','mixamoPreview','textures'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='独立窗口 ↗')
       &&['splines','propPcg'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='先选关卡')));
     await page.screenshot({path:path.join(outDir,'Scene_InterfaceToolsPane.png')});
@@ -1413,12 +1413,12 @@ async function CheckMissionList() {
   }
   await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
 
-  // 实际复现玩家路径：暂停 → 设置 → 构件库预览。过去只有场景/地形工具会
+  // 实际复现玩家路径：暂停 → 设置 → 摄影棚类工具（原为构件库预览，2026-11-25 拆出游戏后改用人物动作）。过去只有场景/地形工具会
   // 收起暂停菜单，摄影棚类编辑器会把「继续 / 设置 / 调试选项」叠在背景里。
   // 所有编辑器接管后都必须整层隐藏菜单；关闭工具后再回原暂停层，不能恢复战斗。
   await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuAct("settings");
-    window.Taierzhuang.Debug.OpenEditor("props");
+    window.Taierzhuang.Debug.OpenEditor("actor");
   });
   await page.evaluate(() => window.Taierzhuang.StepFrames(4));
   const propEditorOpen = await page.evaluate(() => ({
@@ -1427,8 +1427,8 @@ async function CheckMissionList() {
     menuDisplay: getComputedStyle(document.getElementById("menu")).display,
     running: window.Taierzhuang.state.running,
   }));
-  Check("构件库编辑器打开时暂停菜单整层隐藏",
-    propEditorOpen.editor.active === "props" && !propEditorOpen.menu.open
+  Check("摄影棚编辑器打开时暂停菜单整层隐藏",
+    propEditorOpen.editor.active === "actor" && !propEditorOpen.menu.open
       && propEditorOpen.menuDisplay === "none" && !propEditorOpen.running,
     JSON.stringify(propEditorOpen));
   await page.screenshot({ path: path.join(outDir, "Menu_PropEditorFromPause.png") });
@@ -1440,7 +1440,7 @@ async function CheckMissionList() {
     menuDisplay: getComputedStyle(document.getElementById("menu")).display,
     running: window.Taierzhuang.state.running,
   }));
-  Check("关闭构件库编辑器后恢复设置目录",
+  Check("关闭摄影棚编辑器后恢复设置目录",
     !propEditorClosed.editor.capturing && propEditorClosed.menu.open
       && propEditorClosed.menu.mode === "settings" && propEditorClosed.menuDisplay !== "none"
       && !propEditorClosed.running,
@@ -1467,7 +1467,7 @@ async function CheckMissionList() {
   Check("继续之后背景音接回来", audioBack === false, `audio.paused=${audioBack}`);
   const hudBack = await page.evaluate(() => getComputedStyle(document.getElementById("hud")).display);
   Check("继续之后 HUD 回来", hudBack !== "none", `display=${hudBack}`);
-  // 这一整段走的正是玩家报的那条路：暂停 → 设置 → 构件库 → 关掉 → 继续。
+  // 这一整段走的正是玩家报的那条路：暂停 → 设置 → 摄影棚工具 → 关掉 → 继续。
   // 收口断在哪一步这里都红：回到战斗时手里必须还有枪。
   await page.evaluate(() => window.Taierzhuang.StepFrames(8));
   const gunBack = await page.evaluate(() => ({

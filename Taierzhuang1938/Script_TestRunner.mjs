@@ -67,7 +67,8 @@ export const testDefs = {
   LevelFlowDebugBrowserTest: { file: "Script_LevelFlowDebugBrowserTest.mjs", timeoutMs: 240000, desc: "Editor Profiler and frame captures ordered by viewport, WebGL2/Canvas2D and popup lifecycle" },
   LevelFlowTouchBrowserTest: { file: "Script_LevelFlowTouchBrowserTest.mjs", timeoutMs: 90000, desc: "Native touchscreen pinch, XZ pan, twist, contact transitions, mouse recovery and optional HUD" },
   AdvancedToolsTest: { file: "Script_AdvancedToolsTest.mjs", timeoutMs: 180000, desc: "高级工具拆分（纯 Node）：目录表与 TOOL_INFO 对账、搬走的页面、四个入口类的窗口地址、控制中心卡片、启动器 dry-run / .lnk / 真起预览服" },
-  AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 17 张卡片与链接、九个摄影棚工具在独立工具宿主里逐个打开、四个搬走的独立页面新地址可用" },
+  AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 19 张卡片与链接、摄影棚工具在独立工具宿主里逐个打开、四个搬走的独立页面新地址可用" },
+  PropLibraryBrowserTest: { file: "Script_PropLibraryBrowserTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "构件库预览（控制中心独立只读页面）：卡片与旧地址、目录收录与品类、筛选 / 搜索 / 键盘换项、程序化构件与院落专属 PBR、外部 GLB 来源、八九式可动件演示" },
   ToolStudioParityBrowserTest: { file: "Script_ToolStudioParityBrowserTest.mjs", timeoutMs: 60 * 60 * 1000, desc: "独立工具宿主与游戏宿主画面对照：九个摄影棚工具各取确定状态，整页截图平均绝对差 ≤ 2/255（每个工具要开两次整套游戏，约 20+ 分钟）" },  HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairGroomTest: { file: "Script_HairGroomTest.mjs", desc: "Hair binary sections, measured-ear root clearance, braid, LOD and character head bindings" },
@@ -664,6 +665,7 @@ export const browserTests = new Set([
   "LiuWencaiEncounterBrowserTest", "NierEncounterBrowserTest",
   "VillageStealthPlayBrowserTest",
   "AdvancedToolsBrowserTest",
+  "PropLibraryBrowserTest",
   "ToolStudioParityBrowserTest",  "HairReferenceBrowserTest",
   "HairRangeBrowserTest",
   "HairCapBrowserTest",
@@ -959,7 +961,7 @@ export const domains = {
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothBloodAsyncTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
-  advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
+  advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "PropLibraryBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
@@ -1119,7 +1121,7 @@ const changedDomainRules = [
   {domain:'flareEffects',pattern:/Flare(?:Visual|Optics|Particles|Glare|Lifecycle|Bloom|Spark|OpticalScale|Flicker|Photometry|TemporalResponse|Camera|Night|Field|RenderBudget|Shadow(?:Coverage|Bounds|Instances)?|Surface|World|Track|Effects|Test|\.mjs)|Tuning_Flare/},
   {domain:'combat',pattern:/HanYang173R/},
   {domain:'combat',pattern:/Type38_511/},
-  {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_EditorPropLibrary/},
+  {domain:"type89MediumTank",pattern:/Type89|Data_VehicleAssets|Script_PropLibrary/},
   {domain:"menu",pattern:/ToolsHome|Icon_TabSeal/},
   {domain:"combat",pattern:/FirstPersonGait/},
   {domain:"ai",pattern:/NpcLocomotion3C/},
@@ -1331,7 +1333,7 @@ const changedDomainRules = [
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
   { domain: "editor", pattern: /Trench(es|Plan|Spline|Editor)/i },
-  { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
+  { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_PropLibrary/i },
   // LayeredGait（2026-09-28 NPC 脚步与位移同步的分层步态）由 ActorLocomotionTest 看着，归动画域。
   { domain: 'animation', pattern: /ProneCrawl|BackRifleRun|RelaxedGait|IjaAlertGait|RifleHoldRun|RifleShoulderMarch|LayeredGait|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 背枪走 / 空手走目前只在 01–02 开场导演里用（日兵甲乙、纵深日兵、翻译）：改它要连开场一起验。

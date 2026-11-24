@@ -73,6 +73,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **2026-11-21**：新增独立窗口工具「动作衔接对比」（`motionCompare`，入口 `AdvancedTools/Tool_MotionCompare.html` + `Script_MotionCompare.mjs` + `Script_EditorMotionCompare.mjs`），归入「角色」分组；左右同步分屏实机对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / BlenderMCP 9 帧 Aim Offset / 开火叠加 / 第一人称双腿防穿插 / WASD 沙盒）。控制中心共 18 项，16 项已拆分，白盒与 Timeline 共 2 项仍走游戏入口。
 - **2026-11-22**：删除「小队行进」编辑器及其独立宿主与游戏内入口。控制中心共 17 项，其中 8 项使用摄影棚宿主、7 项开独立窗口、2 项走游戏入口。
 - **2026-11-22**：枪械检查台改用独立窗口，控制中心现有 7 项使用摄影棚宿主、8 项开独立窗口、2 项走游戏入口。[枪械检查台](#枪械检查台)
+- **2026-11-25**：构件库预览拆出游戏，成为只在控制中心出现的独立只读页面 `Tool_PropLibrary.html`（见 [构件库预览](#构件库预览-advancedtoolstool_proplibraryhtml只在控制中心)）。游戏菜单 17 项（15 项拆分、2 项游戏内），控制中心 19 张卡（另含构件库预览与模型制作工作台两张只在控制中心的卡）；工具宿主剩 `actor facial assetStandards`。
 - **2026-11-23**：特效预览与音效音乐拆为独立窗口（`Tool_VfxPreview.html`、`Tool_AudioPreview.html`，共用窗口壳 `Script_ToolWindowShell.mjs`、入口类 `Script_EditorMediaEntry.mjs`），从游戏灯光 / 后处理 / 天空 / 材质库 / 关卡数据解耦：音效窗口只装 `AudioEngine` 与固定听者，零渲染依赖；特效窗口装 `VfxSystem` + 中性预览台 `Script_VfxPreviewStage.mjs` / 预览灯 `Script_VfxPreviewLights.mjs`（与游戏共用 `Script_EffectLightEnvelope.mjs`、`Script_ToneMapCurves.mjs`）+ 昼夜读取项目环境预设 `Script_VfxPreviewEnvironment.mjs`（`Environment/EnvPreset_*.json` 的 looks，不写死时段）。共享预通道标记（`Script_RenderTags.mjs`）、太阳阴影采样（`Script_SunShadowSampling.mjs`）、体积噪声（`Script_VolumetricNoise.mjs`）与烟场样式（`Data_SmokePlumeStyles.mjs`）从重模块拆出，也顺带让主菜单包去掉了整条后处理与灯光链。游戏内回归测试（`?editor=vfx`、`Debug.OpenEditor("vfx")`）经 `VfxPreviewEntry.harness` 保留原游戏宿主口径；旧 `Tool_Studio.html?tool=vfx|audio` 重定向至新页。控制中心现有 4 项使用工具宿主（`actor facial props assetStandards`）、11 项开独立窗口（另含模型制作工作台共 12 张独立窗口卡）、2 项走游戏入口。
 
 ## 精简测试界面
@@ -106,7 +107,7 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 （`Script_ToolsHomeField`，只为引擎有地方站），画面由整页的工具首页（`Script_EditorHome`）盖住，
 按菜单栏同一分组列出全部工具，等人自己挑。
 
-- 摄影棚类工具（人物、第一人称持枪、特效、音效、构件库）在首页上打开。Esc 先回首页，首页上再按 Esc 回标题菜单。
+- 摄影棚类工具（人物、面部、资产规范）在首页上打开（构件库预览 2026-11-25 起只在控制中心）。Esc 先回首页，首页上再按 Esc 回标题菜单。
 - 场景编辑器卡片标 ↗，点了直接开独立窗口，不用载入关卡。
 - 场景类工具（样条、PCG 撒点）卡片标「载入关卡」：先弹单子选七章之一，
   再整页换到 `?phase=N&editor=tools&tool=<id>`，载入完自动打开那个工具（菜单栏里点它们也走这张单子）。
@@ -450,15 +451,24 @@ Bloom、体积光、饱和度和对比度完整参数。Spline 叠加层按正�
 Spline、环境与种子三块 JSON 都用 `<details>` 默认折叠；列表与摘要读数始终可见，只有用户
 主动展开或点击 JSON 按钮时才占用面板高度。
 
-### 构件库预览 `Script_EditorPropLibrary.mjs`
+### 构件库预览 `AdvancedTools/Tool_PropLibrary.html`（只在控制中心）
 
-专门浏览构件目录（`Script_PlaceableCatalog.mjs`，原场景关卡编辑器的可布设表）里的全部构件，以及 `Script_ExternalProps` 已放进正式战场的
-带署名 GLB（乡村房屋 / 手推车 / 栅栏 / 木箱 / 砖瓦堆）。每次在共用摄影棚里展示一项，
-程序化构件走同一个 `BuildSink` / `Script_World` 生成器，tzm 模型走同一个
-`InstantiateModel`，外部道具走同一个缓存与运行时材质克隆；不维护第二份预览几何。
-筛选只按物体本身的品类（景观 / 院落小件 / 工事 / 建筑 / 地标 / 模型），不再另设
-“外部道具”这一来源分类；来源、参数、网格数、碰撞定义与包围尺寸仍在取证栏显示。
-这个入口只预览，不写场景文档、不推进碰撞盒。
+2026-11-25 用户：构件库预览不需要植入游戏，做成独立的只读可视化器。游戏的高级工具菜单、`TOOL_INFO`、拆分边界
+`Script_DevToolsSplit`、工具宿主 `Tool_Studio.html` 与 `index.html` 的 import map 里都不再有它；入口只有 AdvancedTool ControlCenter
+资产组第一张卡片（`Data_AdvancedTools.STANDALONE_TOOLS`，与模型制作工作台同一类），旧地址 `Tool_Studio.html?tool=props` 转到新页。
+原游戏内编辑器 `Script_EditorPropLibrary.mjs` 已删。
+
+- 代码：页面 `Script_PropLibrary.mjs`（目录、筛选、读数）+ 三维台 `Script_PropLibraryStage.mjs` + `Style_PropLibrary.css`，版式同枪械检查台三栏。
+  三维台自己建 WebGLRenderer、三盏棚灯、小房间 PMREM 反射、投影接收地面与自适应米格，**不建**游戏的后处理、天空、灯光组、人物与特效；
+  材质库按工具宿主同一口径烘全部配方 + 外部 PBR 清单（`Data_ToolStudioPbrSets`）。外部道具加载器 `Script_ExternalProps` 经 TengxianCity / Water
+  静态带进后处理等模块，只加载不实例化（`Script_AdvancedToolsTest` 守模块图里没有主程序 / 编辑器宿主 / 工具宿主）。
+- 目录 = 构件目录 `Script_PlaceableCatalog.PLACEABLE`（程序化构件 + tzm；持续烟火归特效预览）+ `ExternalPropCatalog()` 的外部 GLB。
+  构件仍走正片同一套生成器（`BuildPlaceableVisual` / `InstantiateExternalProp` / `InstantiateModel`），不维护第二份预览几何；不写场景、不推进碰撞盒。
+- 界面：左栏搜索（名称 / 编号 / 文件）+ 来源筛选（GLB / TZM / 程序化）+ 类别筛选（带计数，外部 GLB 按物体品类并入同一套类别，`车辆` `接收院医疗陈设` 等额外类别排在后面）
+  + 占满整栏的分组列表（↑↓ / PageUp/Down 换项，地址栏 `?id=` 记住选择）；中栏视角（斜视 / 正面 / 侧面 / 顶视）、镜头（广角 / 标准 / 长焦）、米格、
+  1.7 m 人高参照、重新取景、逐项浏览；右栏名称、编号、包围尺寸三格、三角面 / 网格 / 碰撞盒 / 可调参数 / 来源 / 署名 / tzm 说明，八九式中战车另有可动件演示。
+- 取证口 `window.PropLibrary`（`entries` / `Select` / `stage` / `selected` / `visible` / `vehicle`）；门禁 `Script_PropLibraryBrowserTest`，
+  火车两件的懒载与 PBR 由 `Script_TrainLibraryTest` 在同一页面上查。
 
 ### 资产规范 `Script_EditorAssetStandards.mjs`
 
@@ -922,7 +932,7 @@ Actor，桶早就建好（所以被藏）；城里那几关的日军几乎全在
 ### 构件目录与出图机位（2026-10-31）
 
 - `Script_PlaceableCatalog.mjs`：可放置构件总表（`PLACEABLE` / `MODEL_PLACEABLE` / `PLACEABLE_CATEGORIES`、`BuildPlaceableVisual`、
-  `FlushSinkProps`），从已删的场景关卡编辑器里原样搬出；构件库预览用它，以后的新场景编辑器也复用它当资产目录。
+  `FlushSinkProps`），从已删的场景关卡编辑器里原样搬出；构件库预览（独立页面 `Tool_PropLibrary.html`）用它，以后的新场景编辑器也复用它当资产目录。
 - `Script_EditorShotCamera.mjs`（id `shotCamera`，不进菜单）：采样点编辑器删除后留下的最小一块 ——
   出图脚本与几支浏览器测试用 `Debug.OpenEditor("shotCamera")` 暂停玩法、接管相机、藏视图模型，再调 `ApplyPose` 摆镜头
   （位姿口径：`y` 绝对高度，缺省取 地高 + `h`；没写 `fov` 取画质档出厂值，没写 `far` 取 620 m）。

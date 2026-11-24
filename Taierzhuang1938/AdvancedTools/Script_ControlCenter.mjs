@@ -1,8 +1,9 @@
 // AdvancedTool ControlCenter：本地「高级工具」总入口页（ControlCenter.html）。
 //
 // 版式照游戏内的工具首页 Script_EditorHome（World at War 主题：卡片网格、按 Data_DevTools.TOOL_MENUS 分六组）。
-// 三种卡片：
-//   · 独立窗口页：打开各自的页面，窗口参数取 TOOL_INFO.window；
+// 卡片：
+//   · 独立窗口页：打开各自的页面，窗口参数取 TOOL_INFO.window；只在控制中心出现的独立工具（构件库预览、模型制作工作台）
+//     取 Data_AdvancedTools.STANDALONE_TOOLS，按 slot 排在所属组游戏工具的前或后；
 //   · 摄影棚类工具：打开独立工具宿主 Tool_Studio.html?tool=<id>；
 //   · 留在游戏里的工具（标「游戏内」）：链到游戏现有入口——白盒 / Timeline / 环境用各自入口类的 Url()（与游戏内入口完全一致），
 //     其余走 ../index.html?editor=tools&tool=<id>（需要选关卡的工具，游戏的工具首页会先弹「载入哪一关」）。
@@ -12,7 +13,9 @@ import { El } from "../Script_EditorUi.mjs";
 import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { BlockoutEntry } from "../Script_EditorBlockoutEntry.mjs";
 import { TimelineEditor } from "../Script_EditorTimeline.mjs";
-import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, StudioToolUrl, GameToolUrl, GAME_PAGE } from "./Data_AdvancedTools.mjs";
+import {
+  STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl, GameToolUrl, GAME_PAGE,
+} from "./Data_AdvancedTools.mjs";
 
 /** 控制中心的名字（页面标题与顶栏）。 */
 export const CONTROL_CENTER_TITLE = "AdvancedTool ControlCenter";
@@ -28,7 +31,11 @@ const GAME_ENTRY = { blockout: BlockoutEntry, timeline: TimelineEditor };
 export function ControlCenterCards(pageHref = globalThis.location?.href || "http://localhost/Taierzhuang1938/AdvancedTools/ControlCenter.html") {
   const gameIndex = new URL(GAME_PAGE, pageHref).href;
   const cards = [];
+  const Standalone = (menu, slot) => STANDALONE_TOOLS.filter((tool) => tool.group === menu.id && tool.slot === slot)
+    .map((tool) => ({ group: menu.id, groupLabel: menu.label, id: tool.id, kind: "window", label: tool.label, hint: tool.hint,
+      href: new URL(tool.window.url, pageHref).href, target: tool.window.name, features: tool.window.features }));
   for (const menu of TOOL_MENUS) {
+    cards.push(...Standalone(menu, "lead"));
     for (const id of menu.items) {
       const info = TOOL_INFO[id];
       if (!info) throw new Error(`TOOL_MENUS 里的工具 ${id} 在 TOOL_INFO 里没有登记`);
@@ -47,13 +54,8 @@ export function ControlCenterCards(pageHref = globalThis.location?.href || "http
       }
       cards.push(card);
     }
+    cards.push(...Standalone(menu, "tail"));
   }
-  cards.push({
-    group: "assets", groupLabel: "资产", id: "modelWorkbench", kind: "window", label: "3D 模型制作工作台",
-    hint: "管理参考图、Blender 建模、同视角比对与独立验收",
-    href: new URL("./Tool_ModelWorkbench.html?v=20261124", pageHref).href,
-    target: "TengxianModelWorkbench", features: "popup,width=1520,height=960",
-  });
   return cards;
 }
 

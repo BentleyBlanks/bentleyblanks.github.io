@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { TextureCatalog } from "./Script_TextureImportRules.mjs";
+import { TOOL_MENUS } from "./Data_DevTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -161,8 +162,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏有六组高级工具、右侧 Debug工具，共 17 个高级工具入口。
-Check("菜单栏列出全部编辑器入口", afterGear.entries === 17
+// 菜单栏有六组高级工具、右侧 Debug工具；入口数同 TOOL_MENUS（构件库预览只在控制中心，不进游戏菜单）。
+const menuToolCount = TOOL_MENUS.flatMap((menu) => menu.items).length;
+Check("菜单栏列出全部编辑器入口", afterGear.entries === menuToolCount
   && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
   && !afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
@@ -1484,140 +1486,8 @@ Check("Timeline 入口在菜单里、跳到白盒编辑器并带上 timeline 参
     && /audio=0/.test(timelineEntry.url),
   JSON.stringify(timelineEntry));
 
-// ---------------------------------------------------------------------------
-// 6c) 构件库预览器
-// ---------------------------------------------------------------------------
-// 打开前的相机投影：摄影棚存下的「原始投影」必须就是它（关构件库时还回去的就是这一份）。
-const projectionBeforeProps = await page.evaluate(() => [window.Taierzhuang.camera.fov, window.Taierzhuang.camera.far]);
-await ClickTool("props");
-await Step(8);
-const props = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
-  active.SetPalette("SandbagPlug");
-  const SetSlider = (control, value) => {
-    const input = control.root.querySelector("input");
-    input.value = String(value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  };
-  SetSlider(active.projectionControls.fov, 47);
-  SetSlider(active.projectionControls.far, 480);
-  return {
-    id: T.editor.ActiveId,
-    studio: T.editor.studio.Active,
-    selected: active.paletteId,
-    loaded: active.preview && active.preview.loaded,
-    meshes: active.preview ? active.preview.meshes : 0,
-    categories: active.categories,
-    externalCategories: Object.fromEntries([
-      "External_cart", "External_house", "External_battlefieldBarbedWire01",
-      "External_deadTreeTrunk01",
-    ].map((id) => [id, active.Entry(id)?.cat])),
-    originalProjection: [T.editor.studio.saved.fov, T.editor.studio.saved.far],
-    projection: [T.camera.fov, T.camera.far],
-    sections: [...active.panel.root.querySelectorAll(".edSection > .h")]
-      .map((node) => node.textContent),
-  };
-});
-Check("构件库用独立摄影棚预览正片构件",
-  props.id === "props" && props.studio && props.selected === "SandbagPlug"
-    && props.loaded && props.meshes > 0, JSON.stringify(props));
-Check("构件库预览器不混入关卡布设或地形面板",
-  props.sections.includes("全部可布设构件") && props.sections.includes("预览相机")
-    && !props.sections.includes("已放置") && !props.sections.includes("地形笔刷"),
-  props.sections.join(" / "));
-Check("外部 GLB 按物体品类合并筛选",
-  !props.categories.includes("外部道具")
-    && props.externalCategories.External_cart === "院落小件"
-    && props.externalCategories.External_house === "建筑"
-    && props.externalCategories.External_battlefieldBarbedWire01 === "工事"
-    && props.externalCategories.External_deadTreeTrunk01 === "景观",
-  JSON.stringify({ categories: props.categories, entries: props.externalCategories }));
-Check("构件库相机可调 FOV 与远裁剪面",
-  props.projection[0] === 47 && props.projection[1] === 480, props.projection.join(" / "));
-Check("构件库摄影棚存下的原始相机参数就是打开前那一份",
-  JSON.stringify(props.originalProjection) === JSON.stringify(projectionBeforeProps),
-  `${projectionBeforeProps.join("/")} → ${props.originalProjection.join("/")}`);
-
-// 三件院落小物不能再共用通用 Stone：构件库就是玩家报告问题的入口，逐件确认
-// Base / Normal 真接上，并把双面材质契约钉住（井筒和水缸从口沿看进去就是背面）。
-await fs.promises.mkdir(path.join(projectDir, "_shots"), { recursive: true });
-const courtyardPbr = {};
-for (const spec of [
-  { id: "Well", stem: "WellStone" },
-  { id: "Millstone", stem: "Millstone" },
-  { id: "WaterVat", stem: "WaterVat" },
-]) {
-  await page.evaluate((id) => window.Taierzhuang.editor.active.SetPalette(id), spec.id);
-  await Step(2);
-  courtyardPbr[spec.id] = await page.evaluate(() => {
-    const active = window.Taierzhuang.editor.active;
-    const base = [], normal = [], sides = [];
-    active.previewRoot.traverse((node) => {
-      const materials = Array.isArray(node.material) ? node.material : [node.material];
-      for (const material of materials) {
-        if (!material) continue;
-        const baseSrc = material.map?.image?.currentSrc || material.map?.image?.src;
-        const normalSrc = material.normalMap?.image?.currentSrc || material.normalMap?.image?.src;
-        if (baseSrc) base.push(baseSrc);
-        if (normalSrc) normal.push(normalSrc);
-        sides.push(material.side);
-      }
-    });
-    return { base, normal, sides, meshes: active.preview?.meshes || 0 };
-  });
-  const result = courtyardPbr[spec.id];
-  Check(`${spec.id} 使用专属 Base + Normal 且背面可见`,
-    result.meshes > 0
-      && result.base.some((src) => src.includes(`Texture_${spec.stem}Base.webp`))
-      && result.normal.some((src) => src.includes(`Texture_${spec.stem}Normal.webp`))
-      && result.sides.includes(2),
-    JSON.stringify(result));
-  await page.screenshot({
-    path: path.join(projectDir, "_shots", `editor_prop_${spec.id}_pbr.png`),
-  });
-}
-
-await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("RoomBlock"));
-await Step(2);
-const roomBlockPreview = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  const textures = [];
-  active.previewRoot.traverse((node) => {
-    const src = node.material?.map?.image?.currentSrc || node.material?.map?.image?.src;
-    if (src) textures.push(src);
-  });
-  return {
-    loaded: active.preview?.loaded,
-    meshes: active.preview?.meshes || 0,
-    texture: textures.find((src) => src.includes("Texture_BrickWallBase")) || "",
-    anchor: active.previewRoot.userData.previewAnchor,
-    sections: [...active.panel.root.querySelectorAll(".edSection > .h")].map((node) => node.textContent),
-  };
-});
-// 2026-11-01 删了「炮击初损 / 严重破坏」两档战损态：房屋照常用正式砖材，面板里不再有战损切换。
-Check("构件库房屋用正式砖材且不再有战损切换",
-  roomBlockPreview.loaded && roomBlockPreview.meshes > 0 && !!roomBlockPreview.texture
-    && roomBlockPreview.anchor === "boundsCenter" && !roomBlockPreview.sections.includes("建模状态"),
-  JSON.stringify(roomBlockPreview));
-
-await page.evaluate(() => window.Taierzhuang.editor.active.SetPalette("External_cart"));
-await Step(6);
-const externalProp = await page.evaluate(() => {
-  const active = window.Taierzhuang.editor.active;
-  return {
-    selected: active.paletteId,
-    category: active.cat,
-    loaded: active.preview && active.preview.loaded,
-    meshes: active.preview ? active.preview.meshes : 0,
-    // 精简面板不再展示源码路径，仍核对实际选中资产的来源。
-    source: active.Entry(active.paletteId)?.url || "",
-  };
-});
-Check("构件库覆盖正式战场新增的带署名外部 GLB",
-  externalProp.selected === "External_cart" && externalProp.loaded && externalProp.meshes > 0
-    && externalProp.category === "院落小件"
-    && externalProp.source.includes("Model_Handcart.glb"), JSON.stringify(externalProp));
+// 6c) 构件库预览器 2026-11-25 拆成只在控制中心出现的独立只读页面（Tool_PropLibrary.html），
+// 原来这里的取证（院落小件专属 PBR、房屋砖材、外部 GLB 品类与来源）搬到 Script_PropLibraryBrowserTest。
 
 // ---------------------------------------------------------------------------
 // 7) 关掉之后有没有还干净
@@ -1702,8 +1572,8 @@ Check("出图模式下编辑器不可见但 API 还在",
 //
 // 这条专门锁住一个容易被 menu=0 冒烟漏掉的路径：主菜单的活场景有自己的
 // 相机循环。若菜单没有在编辑器接管时退出，编辑器就会和菜单运镜叠在同一张画面上。
-// （原来用场景关卡编辑器验这条，2026-10-31 该工具删除后改用构件库预览器：交接在
-// EditorSuite.Open 的公共入口里，不是哪个工具自己做的。）
+// （原来用场景关卡编辑器验这条，2026-10-31 该工具删除后改用构件库预览器，2026-11-25 构件库拆出游戏后改用
+// 人物动作：交接在 EditorSuite.Open 的公共入口里，不是哪个工具自己做的。）
 // ---------------------------------------------------------------------------
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?quality=low&scale=small&phase=2`,
   { waitUntil: "load", timeout: 120000 });
@@ -1712,7 +1582,7 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined
 const menuToEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
   // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，必须先收起它。
-  T.editor.Open("props");
+  T.editor.Open("actor");
   return {
     menu: T.state.menu,
     menuVisible: !document.getElementById("menu").classList.contains("off"),
@@ -1721,7 +1591,7 @@ const menuToEditor = await page.evaluate(() => {
   };
 });
 Check("从主菜单打开编辑器会交还菜单相机",
-  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "props"
+  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "actor"
     && menuToEditor.capturing, JSON.stringify(menuToEditor));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 const returnedToMenu = await page.evaluate(() => ({

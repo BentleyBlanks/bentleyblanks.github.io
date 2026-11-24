@@ -1,7 +1,7 @@
 // 高级工具拆分（AdvancedTools/）真浏览器门禁。
 //
 // 查：
-//   1. 控制中心 ControlCenter.html：18 张卡片、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
+//   1. 控制中心 ControlCenter.html：19 张卡片（含只在控制中心的构件库预览、模型制作工作台）、六组、各卡片链接对（独立窗口开各自页面、摄影棚开 Tool_Studio.html?tool=、游戏内的标「游戏内」）、
 //      点一张摄影棚卡片真能开出独立工具宿主；
 //   2. 独立工具宿主 Tool_Studio.html?tool=<id>：摄影棚工具逐个开，工作窗 .edPanel.work 出现、没有 console.error / pageerror、
 //      画布不是一片纯色；菜单栏只列摄影棚类工具、可在页内切换、有「返回控制中心」；无 tool 参数时是空 Inspector；
@@ -19,7 +19,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { TOOL_INFO } from "./Data_DevTools.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
-import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS } from "./AdvancedTools/Data_AdvancedTools.mjs";
+import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS } from "./AdvancedTools/Data_AdvancedTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -63,6 +63,8 @@ async function OpenPage(url, { viewport = { width: 1280, height: 720 }, waitUnti
     if (/fonts\.(googleapis|gstatic)\.com/.test(location)) return;
     // 静态测试服没有贴图存盘口，贴图管理自己退回「在线浏览模式」（页面设计如此）
     if (/\/__textures\/status/.test(location)) return;
+    // 静态测试服也没有 /__preview/ping：控制中心的后端新鲜度检查会 404（页面设计如此）
+    if (/\/__preview\/ping/.test(location)) return;
     errors.push(`CONSOLE ${message.text().slice(0, 200)} @ ${location}`);
   });
   await page.goto(url, { waitUntil, timeout: 120000 });
@@ -85,11 +87,12 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("18 张卡片，含模型制作工作台，小队行进入口已删除", info.cards.length === 18
+    Check("19 张卡片，含构件库预览与模型制作工作台，小队行进入口已删除", info.cards.length === 19
       && info.cards.some((entry) => entry.id === "modelWorkbench" && entry.href.includes("Tool_ModelWorkbench.html"))
+      && info.cards.some((entry) => entry.id === "props" && entry.href.includes("Tool_PropLibrary.html"))
       && !info.cards.some((entry) => entry.id === "squadMarch"), String(info.cards.length));
     const card = (id) => info.cards.find((entry) => entry.id === id);
-    Check("游戏工具文案取 TOOL_INFO 的 label / hint", info.cards.filter((entry) => entry.id !== "modelWorkbench")
+    Check("游戏工具文案取 TOOL_INFO 的 label / hint", info.cards.filter((entry) => !STANDALONE_TOOLS.some((tool) => tool.id === entry.id))
       .every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
     for (const id of WINDOW_TOOL_IDS) {
       const expected = new URL(TOOL_INFO[id].window.url, `http://127.0.0.1:${port}/Taierzhuang1938/`).href;

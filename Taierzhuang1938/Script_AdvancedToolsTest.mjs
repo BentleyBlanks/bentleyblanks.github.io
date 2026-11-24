@@ -4,7 +4,7 @@
 //   1. 目录表 Data_AdvancedTools 与 Data_DevTools 对账，分别检查独立窗口、摄影棚、游戏内入口；
 //   2. 搬走的页面都在 AdvancedTools/，旧位置不留跳转壳；
 //   3. 独立窗口入口类解析出的仍是 AdvancedTools/<页面>；
-//   4. 控制中心卡片：18 张、六组、地址与「游戏内」标注都对；
+//   4. 控制中心卡片：19 张（游戏菜单 17 + 只在控制中心的构件库预览、模型制作工作台）、六组、地址与「游戏内」标注都对；
 //   5. 启动器：--dry-run 的计划、--shortcut-dir 生成的 .lnk（目标 node、参数本脚本、工作目录仓库根）、
 //      没有预览服时真起一份（端口以输出为准）并能 ping 出本仓库根目录。
 //
@@ -20,7 +20,7 @@ import http from "node:http";
 import { once } from "node:events";
 import { PreviewRuntimeRevision } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { TOOL_INFO, TOOL_MENUS } from "./Data_DevTools.mjs";
-import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
+import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
 import { ControlCenterCards, CONTROL_CENTER_TITLE } from "./AdvancedTools/Script_ControlCenter.mjs";
 import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
 
@@ -37,21 +37,27 @@ const Same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].s
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);
 const splitIds = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
-Check("split 条目共 16 项", splitIds.length === 16, splitIds.join(","));
+Check("split 条目共 15 项", splitIds.length === 15, splitIds.join(","));
 Check("独立窗口 + 摄影棚 = split 的全部", Same([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS], splitIds));
 Check("独立窗口 = split 且带 window 的条目", Same(WINDOW_TOOL_IDS, splitIds.filter((id) => TOOL_INFO[id].window)));
 Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, menuIds.filter((id) => !TOOL_INFO[id].split)));
-Check("菜单 18 项且三类互不重叠", menuIds.length === 18 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 18);
+Check("菜单 17 项且三类互不重叠", menuIds.length === 17 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 17);
+Check("只在控制中心的独立工具不进游戏清单与拆分边界", STANDALONE_TOOLS.every((tool) => !TOOL_INFO[tool.id] && !menuIds.includes(tool.id)
+  && ![...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS].includes(tool.id))
+  && !/PropLibrary/.test(fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8"))
+  && !/PropLibrary|PlaceableCatalog/.test(fs.readFileSync(path.join(projectDir, "index.html"), "utf8")));
 
 // --- 2. 搬家 ---------------------------------------------------------------------
 const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "Tool_MotionWorkbench.html",
-  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html"];
+  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html", "Tool_PropLibrary.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
 Check("旧位置不留跳转壳", pages.slice(0, 6).every((page) => !fs.existsSync(path.join(projectDir, page))));
-Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio", "PropLibrary", "AssetStandards",
+Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio", "AssetStandards",
   "SceneEntry", "LevelFlow", "MixamoPreview", "MotionCompare", "MotionWorkbench", "Textures", "WeaponEntry"].every((name) => fs.existsSync(path.join(toolsDir, `Script_Editor${name}.mjs`))
   && !fs.existsSync(path.join(projectDir, `Script_Editor${name}.mjs`))));
 Check("旧枪械工作窗已移除", !fs.existsSync(path.join(toolsDir, "Script_EditorWeapon.mjs")));
+Check("游戏内构件库编辑器已移除，独立页面代码在 AdvancedTools/", !fs.existsSync(path.join(toolsDir, "Script_EditorPropLibrary.mjs"))
+  && ["Script_PropLibrary.mjs", "Script_PropLibraryStage.mjs", "Style_PropLibrary.css", "Script_PlaceableCatalog.mjs"].every((file) => fs.existsSync(path.join(toolsDir, file))));
 
 Check("PCG 验证界面迁入独立工具目录", ["Splines", "PropPcg"].every((id) => fs.existsSync(path.join(toolsDir, `Script_Editor${id}.mjs`)) && !fs.existsSync(path.join(projectDir, `Script_Editor${id}.mjs`))));
 Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPersonMotion.mjs", "Script_EditorFirstPersonMotionBrowserTest.mjs"].every((file) => !fs.existsSync(path.join(projectDir, file))));
@@ -103,6 +109,15 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     Walk(path.join(toolsDir, entry));
     return [...seen].map((file) => path.basename(file));
   };
+  // 构件库预览是只读可视化：不装游戏主程序、编辑器宿主与工具宿主渲染底座。外部道具加载器（Script_ExternalProps → TengxianCity
+  // → Water → Post…）会把后处理 / 天空等模块静态带进来，但页面只建自己的轻量棚灯，不实例化它们（Script_PropLibraryStage）。
+  {
+    const modules = Closure("Script_PropLibrary.mjs");
+    const bad = modules.filter((name) => /^Script_(Main|Editor|EditorStage|EditorUi|DevTools\w*|ToolStudio\w*|FrameModes)\.mjs$/.test(name));
+    Check(`Tool_PropLibrary.html 的模块图不含游戏主程序 / 编辑器宿主 / 工具宿主（${modules.length} 个模块）`, bad.length === 0, bad.join(", "));
+    const stage = fs.readFileSync(path.join(toolsDir, "Script_PropLibraryStage.mjs"), "utf8");
+    Check("构件库三维台不建游戏的后处理、天空与灯光组", !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|VfxSystem|AudioEngine)\b/.test(stage));
+  }
   for (const [entry, page] of [["Script_AudioPreview.mjs", "Tool_AudioPreview.html"], ["Script_VfxPreview.mjs", "Tool_VfxPreview.html"]]) {
     const modules = Closure(entry);
     const bad = modules.filter((name) => FORBIDDEN.test(name));
@@ -124,12 +139,17 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   const page = "http://127.0.0.1:9/Taierzhuang1938/AdvancedTools/ControlCenter.html";
   const cards = ControlCenterCards(page);
   Check("标题是 AdvancedTool ControlCenter", CONTROL_CENTER_TITLE === "AdvancedTool ControlCenter");
-  const gameMenuCards = cards.filter((card) => card.id !== "modelWorkbench");
+  const standaloneIds = STANDALONE_TOOLS.map((tool) => tool.id);
+  const gameMenuCards = cards.filter((card) => !standaloneIds.includes(card.id));
   Check("卡片 19 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 19 && new Set(cards.map((card) => card.group)).size === 6
     && JSON.stringify(gameMenuCards.map((card) => card.id)) === JSON.stringify(menuIds));
   Check("游戏工具文案取 TOOL_INFO 的 label / hint", gameMenuCards.every((card) => card.label === TOOL_INFO[card.id].label && card.hint === TOOL_INFO[card.id].hint));
   Check("模型制作工作台是控制中心的独立资产工具", cards.some((card) => card.id === "modelWorkbench" && card.group === "assets"
     && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_ModelWorkbench.html")));
+  const assets = cards.filter((card) => card.group === "assets").map((card) => card.id);
+  Check("构件库预览是控制中心资产组第一张独立窗口卡片", assets[0] === "props" && assets.at(-1) === "modelWorkbench"
+    && cards.some((card) => card.id === "props" && card.kind === "window" && card.target === "TengxianPropLibrary"
+      && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_PropLibrary.html")), assets.join(","));
   for (const id of WINDOW_TOOL_IDS) {
     const card = cards.find((entry) => entry.id === id);
     const expected = new URL(TOOL_INFO[id].window.url, "http://127.0.0.1:9/Taierzhuang1938/").href;

@@ -2,7 +2,7 @@
 
 当前交付为 **GeometryV54 / SurfaceV14**：游戏版 **417130 三角、9 材质、25 张内嵌贴图**；可编辑高源 1462012 三角、游戏源 419856 三角。运行文件 SHA-256：`5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b`。
 
-按用户授权作为可选资产接入。入口是「高级工具 → 构件库预览 → 模型 → 八九式中战车乙型」，选中后才加载；`Data_VehicleAssets.mjs` 的 `campaignEnabled:false` 保留当前关卡战车配置。
+按用户授权作为可选资产接入。入口是「ControlCenter → 构件库预览（`AdvancedTools/Tool_PropLibrary.html`）→ 模型 → 八九式中战车乙型」，选中后才加载；`Data_VehicleAssets.mjs` 的 `campaignEnabled:false` 保留当前关卡战车配置。
 
 构件库提供「全部联动」「履带与轮组」「炮塔与主炮」「两挺机枪」「停止复位」。左右各 81 个履带节、15 个轮组保持独立节点；炮塔整周回转，主炮俯仰／后坐、两挺机枪及舱盖保留各自轴心。展示期间车体固定在展台上。
 

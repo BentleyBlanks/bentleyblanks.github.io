@@ -23,7 +23,7 @@
 
 ## 游戏使用
 
-在高级工具（菜单 设置 → 高级工具，或右上角齿轮）的「资产」菜单打开 **构件库预览 → 模型**，可选择「蒸汽机车 · 五组动轮（最终版）」与「木制敞车 · 双轴（最终版）」。目录 ID 分别为 `trainReferenceLocomotive`、`trainReferenceGondola`；点击时才加载，保留原 PBR 与完整机械节点，不增加关卡默认布设或开机下载。
+在 AdvancedTool ControlCenter 资产组打开 **构件库预览**（独立页面 `AdvancedTools/Tool_PropLibrary.html`，2026-11-25 起不在游戏菜单里），类别选「模型」，可选择「蒸汽机车 · 五组动轮（最终版）」与「木制敞车 · 双轴（最终版）」。目录 ID 分别为 `trainReferenceLocomotive`、`trainReferenceGondola`；点击时才加载，保留原 PBR 与完整机械节点，不增加关卡默认布设或开机下载。
 
 GLB 保留机械轴心，导出的是静止初始姿态。Blender 驱动器不会自动成为 glTF 动画，因此不能只加载 GLB 就期待车轮自行转动。
 

@@ -18,27 +18,23 @@ page.on("request", (request) => {
 });
 page.on("pageerror", (error) => errors.push(error.message));
 
+// 构件库预览 2026-11-25 拆成控制中心里的独立只读页面（AdvancedTools/Tool_PropLibrary.html），不再走游戏编辑器。
+const Ready = (selectedId) => page.waitForFunction((key) => window.PropLibrary?.ready && window.PropLibrary.selected === key
+  && document.getElementById("view").dataset.state === "ready", selectedId, { timeout: 120000 });
+
 async function SelectModel(label, id) {
-  await page.locator(".edPanel.work .edList .it").filter({ hasText: label }).click();
-  await page.waitForFunction((selectedId) => {
-    const active = window.Taierzhuang.editor.active;
-    return active.paletteId === selectedId && active.preview?.loaded;
-  }, `External_${id}`, { timeout: 120000 });
-  await page.evaluate(() => window.Taierzhuang.StepFrames(8));
+  await page.locator(".prop-row").filter({ hasText: label }).click();
+  await Ready(`External_${id}`);
+  await page.evaluate(() => window.PropLibrary.stage.Settle());
 }
 
 try {
-  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0`,
+  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/AdvancedTools/Tool_PropLibrary.html`,
     { waitUntil: "load", timeout: 120000 });
-  await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
-  assert.equal(requests.length, 0, "Game boot must not fetch train GLBs");
-  await page.click("#bootStart");
-  await page.evaluate(() => window.Taierzhuang.Debug.OpenEditor("props"));
-  await page.locator(".edPanel.work .edChip").filter({ hasText: /^模型$/ }).click();
-  await page.waitForFunction(() => {
-    const active = window.Taierzhuang.editor.active;
-    return active.paletteId === "Model_ZhongZheng" && active.preview?.loaded;
-  }, null, { timeout: 120000 });
+  await Ready("Tree");
+  await page.locator("#categoryFilter .filter-chip").filter({ hasText: /^模型/ }).click();
+  await page.evaluate(() => window.PropLibrary.Select(window.PropLibrary.visible[0]));
+  await Ready("Model_ZhongZheng");
   assert.deepEqual(errors, [], "The model category's default TZM must resolve its steel/wood materials");
   assert.equal(requests.length, 0, "Opening the catalog must not preload trains");
   console.log("ok Train GLBs are lazy-loaded, outside the boot payload");
@@ -53,7 +49,8 @@ try {
       const { CreateTrainRig } = await import("./Model/TrainReference/Script_TrainRig.mjs");
       const { InstantiateExternalProp } = await import("./Script_ExternalProps.mjs");
       const manifest = await (await fetch("./Model/TrainReference/Data_TrainRig.json")).json();
-      const T = window.Taierzhuang, active = T.editor.active, root = active.previewRoot;
+      const library = window.PropLibrary, stage = library.stage, root = stage.model.root;
+      const entry = library.entries.find((item) => item.id === library.selected);
       const assetRoot = root.getObjectByName(spec.root);
       const box = new THREE.Box3().setFromObject(root);
       const meshes = [], materials = new Set();
@@ -69,23 +66,22 @@ try {
       const rollingError = Math.max(...wheelRecords.map((record) => Math.abs(
         root.getObjectByName(record.name).rotation.z + 1.37 / record.radius + record.phase)));
       // A second loader clone must retain its independent rest pose.
-      const other = await InstantiateExternalProp(spec.id, active.host.library);
+      const other = await InstantiateExternalProp(spec.id, stage.library);
       const firstWheel = root.getObjectByName(wheelRecords[0].name);
       const otherWheel = other.getObjectByName(wheelRecords[0].name);
       const isolated = firstWheel !== otherWheel && Math.abs(firstWheel.rotation.z - otherWheel.rotation.z) > 0.1;
       rig.SetTravelMeters(0);
-      T.StepFrames(8);
-      const canvasRect = active.host.canvas.getBoundingClientRect();
-      const panelLeft = active.panel.root.getBoundingClientRect().left;
+      await stage.Settle();
+      const canvasRect = stage.canvas.getBoundingClientRect();
       const screenCorners = [];
       for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) {
         for (const z of [box.min.z, box.max.z]) {
-          const projected = new THREE.Vector3(x, y, z).project(T.camera);
+          const projected = new THREE.Vector3(x, y, z).project(stage.camera);
           screenCorners.push(canvasRect.left + (projected.x + 1) * canvasRect.width / 2);
         }
       }
       return {
-        id: spec.id, root: !!assetRoot, category: active.cat,
+        id: spec.id, root: !!assetRoot, category: entry.cat,
         meshes: meshes.length,
         triangles: meshes.reduce((sum, mesh) => sum + (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3, 0),
         dimensions: box.getSize(new THREE.Vector3()).toArray(), floor: box.min.y,
@@ -95,10 +91,11 @@ try {
           && material.metalnessMap && material.normalMap.colorSpace === THREE.NoColorSpace
           && material.roughnessMap.colorSpace === THREE.NoColorSpace),
         wheels: rig.wheelCount, rods: rig.rodCount, rollingError, isolated,
-        source: active.Entry(active.paletteId).sourceLabel,
-        status: active.status.textContent,
-        glError: active.host.renderer.getContext().getError(),
-        clearOfPanel: Math.max(...screenCorners) < panelLeft,
+        source: entry.credit,
+        colliders: document.getElementById("propColliders").textContent,
+        solid: entry.solid,
+        glError: stage.renderer.getContext().getError(),
+        clearOfPanel: Math.min(...screenCorners) > canvasRect.left && Math.max(...screenCorners) < canvasRect.right,
       };
     }, spec);
     assert.ok(report.root && report.category === "模型", `${spec.id}: model hierarchy is present`);
@@ -113,18 +110,16 @@ try {
     // The simplified editor keeps provenance in its catalog and shows collision
     // behaviour in the panel; do not require the retired implementation label.
     assert.ok(report.source.includes("本项目 GLB"), `${spec.id}: catalog retains correct attribution`);
-    assert.equal(report.status, "仅视觉，无碰撞", `${spec.id}: preview collision status`);
+    assert.equal(report.colliders, report.solid ? "运行时按包围盒登记" : "仅视觉", `${spec.id}: catalog collision status`);
     reports.push(report);
     await page.screenshot({ path: path.join(outputDir, `Texture_${spec.root}Library.png`) });
     console.log(`ok ${spec.label}: ${report.triangles} triangles, ${report.wheels} wheels, native PBR, isolated rig`);
   }
   await SelectModel("蒸汽机车", "trainReferenceLocomotive");
   assert.equal(requests.length, 2, "Switching back reuses cached GLBs");
-  await page.evaluate(() => window.Taierzhuang.editor.Close());
-  assert.equal(await page.locator(".edPanel.work").count(), 0, "Editor closes cleanly");
   assert.deepEqual(errors, [], "No uncaught browser errors");
   fs.writeFileSync(path.join(outputDir, "Data_TrainLibraryValidation.json"), JSON.stringify({ reports, requests, errors }, null, 2));
-  console.log("PASS TrainLibraryTest: both final models selectable and rendered in the game editor");
+  console.log("PASS TrainLibraryTest: both final models selectable and rendered in the standalone component library");
 } finally {
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
