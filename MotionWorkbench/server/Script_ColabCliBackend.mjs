@@ -636,7 +636,7 @@ async function _runColabMiniMaxH3JobInner({
       `H3_DURATION=${duration}`,
       `H3_RESOLUTION=${resolution}`,
       "H3_OUTPUT_MP4=/content/mw_h3_out.mp4",
-      "H3_UPSCALE=1",
+      `H3_UPSCALE=${resolution === "1080p" ? "1" : "0"}`,
     ];
     if (startImagePath && fs.existsSync(startImagePath)) {
       onProgress?.("上传首帧分镜图到 G4 运行时…");
@@ -649,7 +649,7 @@ async function _runColabMiniMaxH3JobInner({
       envs.push(`H3_END_IMG=${remoteEnd}`);
     }
 
-    onProgress?.("启动 ComfyUI + MiniMax-H3 (44GB) 推理…");
+    onProgress?.("启动 ComfyUI + MiniMax-H3 (nvfp4+int8+8step Turbo) 推理…");
     await new Promise((resolve, reject) => {
       const args = ["exec", "-s", sessionName, "-f", H3_RUNNER_SCRIPT, "--timeout", "0"];
       for (const kv of envs) args.push("--env", kv);

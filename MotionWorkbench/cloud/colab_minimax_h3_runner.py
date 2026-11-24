@@ -1,6 +1,13 @@
-"""Remote ComfyUI + Comfy-Org/MiniMax-H3 (44GB) + RealESRGAN_x2plus runner on Colab 96G G4.
+"""Remote ComfyUI + Comfy-Org/MiniMax-H3 (Blackwell G4 nvfp4+int8+8step turbo) + RealESRGAN_x2plus runner.
 
 Executed via `colab exec -f colab_minimax_h3_runner.py --timeout 0 -s mw_h3_g4`.
+Optimized for Colab 96GB RTX PRO 6000 Blackwell (G4):
+  - Text Encoder: qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors (15.7 GB)
+  - Video Model:  minimax_h3_fl2va_int8_convrot.safetensors (34.0 GB)
+  - Turbo LoRA:   minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors (2.0 GB, 8 steps)
+  - Video VAE:    minimax_h3_video_vae_fp16.safetensors (5.2 GB)
+  - Upscaler:     RealESRGAN_x2plus.pth (when resolution == 1080p)
+
 Emits structured markers parsed by MotionWorkbench:
   [PROGRESS] <0-100>|<label>
   [TELEMETRY] <json>
@@ -132,7 +139,7 @@ def discover_hf_files(repo_id: str):
 
 
 def ensure_comfy_and_weights():
-    marker = Path("/content/.mw_minimax_h3_ready")
+    marker = Path("/content/.mw_minimax_h3_v2_nvfp4_int8_8step.json")
     if not shutil.which("aria2c"):
         run_cmd(["apt-get", "update", "-qq"], check=False)
         run_cmd(["apt-get", "install", "-y", "-qq", "aria2", "ffmpeg"], check=False)
@@ -143,17 +150,16 @@ def ensure_comfy_and_weights():
         run_cmd([sys.executable, "-m", "pip", "install", "-q", "-r", str(COMFY_DIR / "requirements.txt")], check=False)
 
     if marker.exists():
-        emit_progress(42, "复用临时盘已缓存的 MiniMax-H3 (44GB) 权重…")
+        emit_progress(42, "复用临时盘已缓存的 MiniMax-H3 (nvfp4 + int8 + 8step Turbo) 权重…")
         return json.loads(marker.read_text(encoding="utf-8"))
 
-    emit_progress(22, "机房光纤 aria2 直拉 Comfy-Org/MiniMax-H3 完整权重到临时盘…")
+    emit_progress(20, "机房光纤 aria2 直拉 MiniMax-H3 Blackwell 加速权重（int8 + nvfp4 + 8step LoRA）…")
     emit_telemetry()
     files = discover_hf_files("Comfy-Org/MiniMax-H3")
-    has_frames = bool(START_IMG and Path(START_IMG).exists())
 
-    # Pick full-quality diffusion model (prefer fl2v when start/end frames exist, else t2v/fl2v), text encoder, and VAE
     diff_cands = [f for f in files if "diffusion_models/" in f]
     te_cands = [f for f in files if "text_encoders/" in f]
+    lora_cands = [f for f in files if "loras/" in f]
     vae_cands = [f for f in files if "vae/" in f]
 
     def pick(cands, keywords):
@@ -163,23 +169,67 @@ def ensure_comfy_and_weights():
                     return c
         return cands[0] if cands else None
 
-    diff_file = pick(diff_cands, ["fl2v", "bf16", "fp8", "int8"] if has_frames else ["t2v", "fl2v", "bf16", "fp8"])
-    te_file = pick(te_cands, ["fp8", "int8", "awq", "qwen"])
-    video_vae = pick([v for v in vae_cands if "audio" not in v.lower()], ["video", "vae", "bf16", "fp32"]) or pick(vae_cands, ["vae"])
+    # Blackwell G4 optimal stack: unpruned FL2VA int8 (34GB) + Qwen3-VL nvfp4 (15.7GB) + 8-step turbo LoRA (2GB)
+    diff_file = pick(
+        diff_cands,
+        [
+            "minimax_h3_fl2va_int8_convrot",
+            "fl2va_pruned_int8_convrot",
+            "fl2va_pruned_fp8_scaled",
+            "fl2va_bf16",
+            "fl2v",
+        ],
+    )
+    te_file = pick(
+        te_cands,
+        [
+            "nvfp4_awq",
+            "nvfp4",
+            "int8_convrot",
+            "bf16",
+        ],
+    )
+    turbo_lora = pick(
+        lora_cands,
+        [
+            "fl2v_turbo_8step",
+            "turbo_8step",
+            "fl2v_turbo_4step",
+        ],
+    )
+    video_vae = pick(
+        [v for v in vae_cands if "audio" not in v.lower() and "sol" not in v.lower()],
+        ["video_vae_fp16", "video_vae_int8", "video"],
+    ) or pick(vae_cands, ["vae"])
+    audio_vae = pick([v for v in vae_cands if "audio" in v.lower()], ["audio_vae_fp32", "audio"])
 
-    picked = {"diffusion": diff_file, "text_encoder": te_file, "vae": video_vae}
-    print("[MiniMax-H3] Selected weights:", json.dumps(picked, ensure_ascii=False), flush=True)
+    picked = {
+        "diffusion": diff_file,
+        "text_encoder": te_file,
+        "turbo_lora": turbo_lora,
+        "vae": video_vae,
+        "audio_vae": audio_vae,
+    }
+    print("[MiniMax-H3] Selected Blackwell fast stack:", json.dumps(picked, ensure_ascii=False), flush=True)
 
     base_hf = "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/"
     if diff_file:
+        emit_progress(24, f"aria2 拉取视频模型 {Path(diff_file).name}…")
         aria2_fetch(base_hf + diff_file, MODELS_DIR / "diffusion_models" / Path(diff_file).name)
     if te_file:
+        emit_progress(32, f"aria2 拉取 NVFP4 文本编码器 {Path(te_file).name}…")
         aria2_fetch(base_hf + te_file, MODELS_DIR / "text_encoders" / Path(te_file).name)
+    if turbo_lora:
+        emit_progress(36, f"aria2 拉取 8step Turbo LoRA {Path(turbo_lora).name}…")
+        aria2_fetch(base_hf + turbo_lora, MODELS_DIR / "loras" / Path(turbo_lora).name)
     if video_vae:
+        emit_progress(38, f"aria2 拉取视频 VAE {Path(video_vae).name}…")
         aria2_fetch(base_hf + video_vae, MODELS_DIR / "vae" / Path(video_vae).name)
+    if audio_vae:
+        aria2_fetch(base_hf + audio_vae, MODELS_DIR / "vae" / Path(audio_vae).name)
 
-    if UPSCALE:
-        emit_progress(38, "aria2 拉取 RealESRGAN_x2plus 超分模型…")
+    if UPSCALE or RESOLUTION == "1080p":
+        emit_progress(40, "aria2 拉取 RealESRGAN_x2plus 超分模型…")
         aria2_fetch(
             "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
             MODELS_DIR / "upscale_models" / "RealESRGAN_x2plus.pth",
@@ -263,10 +313,16 @@ def main():
                 "未在当前 ComfyUI 版本中找到内置 MiniMax-H3 API 工作流模板，请先执行 `colab ssh` 打开 8188 导出 API JSON"
             )
 
-        emit_progress(54, f"载入官方模板 {tpl_path.name} 并提交 G4 推理…")
+        emit_progress(54, f"载入官方模板 {tpl_path.name} 并提交 G4 8-step Turbo 推理…")
         wf = json.loads(tpl_path.read_text(encoding="utf-8"))
-        # Patch prompt, frame images, and selected weight filenames in API-format workflow nodes
+        # Resolution mapping: 480p -> 832x480, 720p -> 1280x720, 1080p -> native 1280x720 + post upscale to 1920x1080
+        gen_w, gen_h = (832, 480) if RESOLUTION == "480p" else (1280, 720)
+        target_frames = max(25, int(round(DURATION_SEC * 24)) + 1)
+        has_turbo = bool(weights.get("turbo_lora"))
+
+        # Patch prompt, frame images, resolution, duration, and Blackwell fast stack weights in API-format workflow nodes
         if isinstance(wf, dict) and "nodes" not in wf:
+            lora_patched = False
             for node in wf.values():
                 if not isinstance(node, dict):
                     continue
@@ -285,7 +341,21 @@ def main():
                 if weights.get("text_encoder") and "clip_name" in inp:
                     inp["clip_name"] = Path(weights["text_encoder"]).name
                 if weights.get("vae") and "vae_name" in inp:
-                    inp["vae_name"] = Path(weights["vae"]).name
+                    if "audio" in str(inp.get("vae_name", "")).lower() and weights.get("audio_vae"):
+                        inp["vae_name"] = Path(weights["audio_vae"]).name
+                    else:
+                        inp["vae_name"] = Path(weights["vae"]).name
+                if has_turbo and "lora_name" in inp:
+                    inp["lora_name"] = Path(weights["turbo_lora"]).name
+                    lora_patched = True
+                if "width" in inp and "height" in inp and isinstance(inp["width"], int) and isinstance(inp["height"], int):
+                    if inp["width"] >= 480 and inp["height"] >= 320:
+                        inp["width"] = gen_w
+                        inp["height"] = gen_h
+                if "length" in inp and isinstance(inp["length"], int) and inp["length"] >= 16:
+                    inp["length"] = target_frames
+                if has_turbo and lora_patched and "steps" in inp and isinstance(inp["steps"], int) and inp["steps"] > 8:
+                    inp["steps"] = 8
 
             payload = json.dumps({"prompt": wf}).encode("utf-8")
             req = urllib.request.Request(
@@ -297,7 +367,7 @@ def main():
             with urllib.request.urlopen(req, timeout=30) as resp:
                 queued = json.loads(resp.read().decode("utf-8"))
             pid = queued["prompt_id"]
-            emit_progress(60, f"MiniMax-H3 渲染中（prompt_id={pid[:8]}）…")
+            emit_progress(60, f"MiniMax-H3 渲染中（{RESOLUTION} · {DURATION_SEC:g}s · prompt_id={pid[:8]}）…")
 
             while True:
                 time.sleep(4)
@@ -313,8 +383,46 @@ def main():
 
         src_mp4 = mp4s[0]
         OUT_MP4.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src_mp4, OUT_MP4)
-        emit_progress(92, f"MiniMax-H3 生成完成（{OUT_MP4.stat().st_size // 1024} KB），准备回传…")
+        if RESOLUTION == "1080p":
+            # Free ComfyUI VRAM before 1080p upscale/encode (per Blackwell G4 best practice)
+            try:
+                free_req = urllib.request.Request(
+                    "http://127.0.0.1:8188/free",
+                    data=json.dumps({"unload_models": True, "free_memory": True}).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                urllib.request.urlopen(free_req, timeout=10).read()
+            except Exception:
+                pass
+            emit_progress(86, "清显存并输出 1080p 成片（Lanczos / 超分缩放）…")
+            run_cmd(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(src_mp4),
+                    "-vf",
+                    "scale=1920:1080:flags=lanczos",
+                    "-c:v",
+                    "libx264",
+                    "-crf",
+                    "18",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-movflags",
+                    "+faststart",
+                    "-c:a",
+                    "copy",
+                    str(OUT_MP4),
+                ]
+            )
+        else:
+            shutil.copy2(src_mp4, OUT_MP4)
+        emit_progress(92, f"MiniMax-H3 生成完成（{RESOLUTION} · {OUT_MP4.stat().st_size // 1024} KB），准备回传…")
         emit_telemetry()
     finally:
         stop_evt.set()

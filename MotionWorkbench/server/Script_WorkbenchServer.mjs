@@ -53,6 +53,16 @@ const WEB_DIR = path.join(WORKBENCH_ROOT, "web");
 const WORKSPACE_DIR = path.join(WORKBENCH_ROOT, "_workspace");
 const CONFIG_PATH = path.join(WORKSPACE_DIR, "config.json");
 const TASKS_PATH = path.join(WORKSPACE_DIR, "tasks.json");
+const SCHEDULE_PATH = path.join(WORKSPACE_DIR, "schedule.json");
+
+const DEFAULT_SCHEDULE = {
+  enabled: true,
+  runTime: "06:00", // 北京时间 06:00（美国低峰窗口 06:00~11:00）
+  autoStopAfterBatch: true,
+  lastTriggeredDate: null,
+  runningBatch: false,
+  items: [],
+};
 
 const rawPort = Number(
   process.env.WORKBENCH_PORT || (/^\d+$/.test(process.argv[2] || "") ? process.argv[2] : "") || 8788
@@ -137,6 +147,7 @@ function sanitizeConfigForClient(cfg) {
 let state = {
   config: { ...DEFAULT_CONFIG },
   tasks: [],
+  schedule: { ...DEFAULT_SCHEDULE, items: [] },
 };
 
 const activePollers = new Map();
@@ -172,6 +183,420 @@ async function saveConfig(cfg) {
   state.config = { ...DEFAULT_CONFIG, ...cfg };
   await fsp.mkdir(WORKSPACE_DIR, { recursive: true });
   await fsp.writeFile(CONFIG_PATH, JSON.stringify(state.config, null, 2), "utf-8");
+}
+
+async function saveSchedule() {
+  await fsp.mkdir(WORKSPACE_DIR, { recursive: true });
+  await fsp.writeFile(SCHEDULE_PATH, JSON.stringify(state.schedule, null, 2), "utf-8");
+}
+
+function localDateKey(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function localTimeHHMM(d = new Date()) {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function computeNextRunText(sch) {
+  if (!sch.enabled) return "已暂停自动触发（仍可手动点「立即执行队列」）";
+  const pending = (sch.items || []).filter((x) => x.status === "pending").length;
+  if (sch.runningBatch) return "正在执行错峰队列…";
+  if (!pending) return `已开启每日 ${sch.runTime} 错峰自动触发（队列当前为空）`;
+  const now = new Date();
+  const [hh, mm] = String(sch.runTime || "06:00").split(":").map(Number);
+  const target = new Date(now);
+  target.setHours(Number.isFinite(hh) ? hh : 6, Number.isFinite(mm) ? mm : 0, 0, 0);
+  if (target.getTime() <= now.getTime() || sch.lastTriggeredDate === localDateKey(now)) {
+    target.setDate(target.getDate() + 1);
+  }
+  const diffMin = Math.max(1, Math.round((target.getTime() - now.getTime()) / 60000));
+  const dh = Math.floor(diffMin / 60);
+  const dm = diffMin % 60;
+  const isToday = target.getDate() === now.getDate();
+  return `下次触发：${isToday ? "今天" : "明天"} ${sch.runTime}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，待跑 ${pending} 项）`;
+}
+
+function hydrateScheduleForClient() {
+  return {
+    ...state.schedule,
+    nextRunText: computeNextRunText(state.schedule),
+    pendingCount: (state.schedule.items || []).filter((x) => x.status === "pending").length,
+    serverTime: localTimeHHMM(),
+  };
+}
+
+function launchMiniMaxH3Take(task, { resolution, duration, prompt } = {}) {
+  const shots = task.storyboard?.shots || [];
+  const readyShots = shots.filter((s) => s.status === "succeeded" && s.localPath);
+  const startShot = readyShots.find((s) => s.lockRole === "start") || readyShots[0] || null;
+  const endShot = readyShots.find((s) => s.lockRole === "end") || null;
+  const dur = Number(duration || task.durationSec || 6);
+  const resVal = resolution || task.storyboard?.qualityPreset || "720p";
+
+  const takeId = `take_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+  const takeNum = (task.stage3?.takes?.length || 0) + 1;
+  const outPath = path.join(WORKSPACE_DIR, "tasks", task.id, "videos", `${task.id}_h3_take${takeNum}.mp4`);
+  const nowMs = Date.now();
+  const appendTakeLog = (entry, rawLine) => {
+    const line = String(rawLine || "").trim();
+    if (!line) return;
+    const ts = new Date().toTimeString().slice(0, 8);
+    const formatted = /^\[\d\d:\d\d:\d\d\]/.test(line) ? line : `[${ts}] ${line}`;
+    entry.logs = entry.logs || [];
+    if (entry.logs[entry.logs.length - 1] !== formatted) {
+      entry.logs.push(formatted);
+      if (entry.logs.length > 160) entry.logs.splice(0, entry.logs.length - 160);
+    }
+    entry.updatedAt = Date.now();
+  };
+  const updateH3Progress = (entry, text) => {
+    const s = String(text || "");
+    const prev = Number(entry.progress || 5);
+    let next = prev;
+    if (/排队|等待上一条|申请.*GPU|colab new/i.test(s)) next = Math.max(next, 8);
+    else if (/已分配|复用热机|上传首帧|上传尾帧/i.test(s)) next = Math.max(next, 16);
+    else if (/下载|aria2|safetensors|权重/i.test(s)) {
+      const mPct = /\((\d{1,3})%\)/.exec(s);
+      if (mPct) {
+        const dlPct = Math.max(0, Math.min(100, Number(mPct[1])));
+        next = Math.max(next, Math.round(20 + dlPct * 0.36));
+      } else {
+        next = Math.max(next, 24);
+      }
+    } else if (/ComfyUI|推理|采样|denois|sampler|加载模型|FL2V|Turbo/i.test(s)) {
+      const mStep = /(\d+)\s*\/\s*(\d+)/.exec(s);
+      if (mStep && Number(mStep[2]) > 0 && Number(mStep[2]) <= 100) {
+        const r = Math.max(0, Math.min(1, Number(mStep[1]) / Number(mStep[2])));
+        next = Math.max(next, Math.round(58 + r * 28));
+      } else {
+        next = Math.max(next, 62);
+      }
+    } else if (/超分|RealESRGAN|upscale|1080p/i.test(s)) next = Math.max(next, 88);
+    else if (/回传|下载成片|download/i.test(s)) next = Math.max(next, 94);
+    entry.progress = Math.min(99, next);
+  };
+  const takeEntry = {
+    id: takeId,
+    label: `Take #${takeNum} · MiniMax-H3 (G4 96G) ${resVal} ${dur}s`,
+    model: "minimax_h3_colab",
+    resolution: resVal,
+    duration: dur,
+    status: "running",
+    progress: 6,
+    progressText: "正在通过 Colab CLI 启动 96G G4…",
+    logs: [],
+    createdAt: nowMs,
+    updatedAt: nowMs,
+  };
+  appendTakeLog(
+    takeEntry,
+    `[MiniMax-H3] 提交任务 ${task.beatCode} · ${resVal} · ${dur}s · ${startShot && endShot ? "首尾帧 FL2V" : startShot ? "首帧 I2V" : "文生视频 T2V"}`
+  );
+  task.stage3.takes.unshift(takeEntry);
+  task.updatedAt = nowMs;
+
+  const donePromise = runColabMiniMaxH3Job({
+    config: state.config,
+    prompt: prompt || task.stage1.videoPrompt,
+    duration: dur,
+    resolution: resVal,
+    startImagePath: startShot?.localPath || null,
+    endImagePath: endShot && endShot !== startShot ? endShot.localPath : null,
+    outMp4Path: outPath,
+    onProgress: (msg) => {
+      takeEntry.progressText = msg;
+      updateH3Progress(takeEntry, msg);
+      appendTakeLog(takeEntry, `[MiniMax-H3] ${msg}`);
+    },
+    onLog: (line) => {
+      updateH3Progress(takeEntry, line);
+      appendTakeLog(takeEntry, line);
+      pushSystemLog(line);
+    },
+  })
+    .then(async (resH3) => {
+      takeEntry.status = "succeeded";
+      takeEntry.progress = 100;
+      takeEntry.localPath = resH3.localPath;
+      takeEntry.sizeBytes = resH3.sizeBytes;
+      takeEntry.progressText = "MiniMax-H3 成片已回传本地";
+      takeEntry.finishedAt = Date.now();
+      appendTakeLog(takeEntry, `[完成] MiniMax-H3 成片已回传本地 (${Math.round((resH3.sizeBytes || 0) / 1024)} KB)`);
+      task.stage3.selectedTakeId = takeEntry.id;
+      task.updatedAt = Date.now();
+      await saveTasks();
+      return takeEntry;
+    })
+    .catch(async (err) => {
+      takeEntry.status = "failed";
+      takeEntry.error = err.message;
+      takeEntry.progressText = `失败: ${err.message}`;
+      takeEntry.finishedAt = Date.now();
+      appendTakeLog(takeEntry, `[失败] ${err.message}`);
+      task.updatedAt = Date.now();
+      await saveTasks();
+      throw err;
+    });
+
+  return { takeEntry, donePromise };
+}
+
+function launchColabMocapRun(task, { take, precisionPreset = "standard_l4" }) {
+  const jobId = `colab_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 5)}`;
+  const outDir = path.join(WORKSPACE_DIR, "tasks", task.id, "mocap", jobId);
+  const stem = path.basename(take.localPath, path.extname(take.localPath));
+  const gpuLabel = precisionPreset === "high_a100" ? "A100" : "L4";
+
+  const run = {
+    jobId,
+    backend: "colab_cli",
+    takeId: take.id,
+    status: "running",
+    stage: "starting_gpu",
+    stageLabel: `正在通过 Colab CLI 申请 ${gpuLabel} GPU…`,
+    progress: 4,
+    createdAt: Date.now(),
+    files: {},
+    telemetry: null,
+    containerState: "starting_gpu",
+    logs: [`[Colab CLI] 提交 ${path.basename(take.localPath)} -> ${gpuLabel} (${precisionPreset})`],
+  };
+  task.stage4.runs.unshift(run);
+  task.stage4.activeRunId = run.jobId;
+  task.updatedAt = Date.now();
+
+  const donePromise = runColabMocapJob({
+    config: state.config,
+    videoPath: take.localPath,
+    stem,
+    precisionPreset,
+    outDir,
+    onProgress: (pct, label) => {
+      run.progress = pct;
+      run.stageLabel = label;
+    },
+    onTelemetry: (tm) => {
+      run.telemetry = tm;
+      run.containerState = "running";
+    },
+    onLog: (line) => {
+      run.logs.push(line);
+      if (run.logs.length > 140) run.logs.splice(0, run.logs.length - 140);
+      pushSystemLog(line);
+    },
+  })
+    .then(async (resJob) => {
+      run.status = "succeeded";
+      run.stage = "done";
+      run.progress = 100;
+      run.finishedAt = Date.now();
+      run.files = resJob.files;
+      run.summary = resJob.summary;
+      run.containerState = "scaled_to_zero";
+      run.stageLabel = `已完成（Colab ${resJob.gpuVariant} · GEM-X 77 骨）`;
+      try {
+        ensureMixamoRetargetForTask(task);
+      } catch (reErr) {
+        run.logs.push(`[Retarget] 自动重定向警告：${reErr.message}`);
+      }
+      task.updatedAt = Date.now();
+      await saveTasks();
+      return run;
+    })
+    .catch(async (err) => {
+      run.status = "failed";
+      run.stage = "failed";
+      run.stageLabel = `失败：${err.message}`;
+      run.containerState = "scaled_to_zero";
+      run.logs.push(`[Colab CLI 失败] ${err.message}`);
+      task.updatedAt = Date.now();
+      await saveTasks();
+      throw err;
+    });
+
+  return { run, donePromise };
+}
+
+async function runScheduledBatch(triggerReason = "定时触发") {
+  if (state.schedule.runningBatch) return { started: false, reason: "定时队列已在执行中" };
+  const pendingAll = (state.schedule.items || []).filter((x) => x.status === "pending");
+  if (!pendingAll.length) return { started: false, reason: "队列中没有等待执行的任务" };
+
+  state.schedule.runningBatch = true;
+  await saveSchedule();
+  pushSystemLog(`[错峰定时队列] ${triggerReason}：开始执行 ${pendingAll.length} 项任务（按 MiniMax-H3 → Colab 提骨分组复用热机）`);
+
+  (async () => {
+    try {
+      // Phase 1: All MiniMax-H3 video tasks together (reuse warm G4 96G weights across the entire batch)
+      const h3Items = pendingAll.filter((x) => x.kind === "stage3_h3");
+      for (const item of h3Items) {
+        if (item.status !== "pending") continue;
+        const task = state.tasks.find((t) => t.id === item.taskId);
+        if (!task) {
+          item.status = "failed";
+          item.message = "对应动作任务不存在";
+          item.finishedAt = Date.now();
+          await saveSchedule();
+          continue;
+        }
+        item.status = "running";
+        item.startedAt = Date.now();
+        item.message = "正在 Colab 96G G4 生成 MiniMax-H3 视频…";
+        await saveSchedule();
+        try {
+          const { donePromise } = launchMiniMaxH3Take(task, {
+            resolution: item.resolution || task.storyboard?.qualityPreset || "720p",
+            duration: item.duration || task.durationSec || 6,
+          });
+          await saveTasks();
+          await donePromise;
+          item.status = "succeeded";
+          item.message = "MiniMax-H3 视频已生成并回传本地";
+          item.finishedAt = Date.now();
+        } catch (err) {
+          item.status = "failed";
+          item.message = String(err?.message || err).slice(0, 220);
+          item.finishedAt = Date.now();
+        }
+        await saveSchedule();
+      }
+
+      // Stop G4 immediately before starting Stage 04 mocap so 96G G4 never sits idle billing 10 units/hr
+      if (h3Items.length && state.schedule.autoStopAfterBatch) {
+        pushSystemLog("[错峰定时队列] MiniMax-H3 批次结束，立即停机释放 Colab G4 显卡…");
+        await stopWorkbenchColabSessions(state.config, (l) => pushSystemLog(l)).catch(() => {});
+      }
+
+      // Phase 2: All Stage 04 mocap tasks together (reuse warm L4/A100 across the batch)
+      const mocapItems = pendingAll.filter((x) => x.kind === "stage4_mocap");
+      for (const item of mocapItems) {
+        if (item.status !== "pending") continue;
+        const task = state.tasks.find((t) => t.id === item.taskId);
+        if (!task) {
+          item.status = "failed";
+          item.message = "对应动作任务不存在";
+          item.finishedAt = Date.now();
+          await saveSchedule();
+          continue;
+        }
+        const take =
+          task.stage3?.takes?.find((t) => t.id === task.stage3.selectedTakeId && t.status === "succeeded") ||
+          task.stage3?.takes?.find((t) => t.status === "succeeded");
+        if (!take?.localPath) {
+          item.status = "failed";
+          item.message = "该任务尚无可用成片视频，跳过提骨";
+          item.finishedAt = Date.now();
+          await saveSchedule();
+          continue;
+        }
+        item.status = "running";
+        item.startedAt = Date.now();
+        item.message = "正在 Colab 云端执行 GEM-X 77 骨提取…";
+        await saveSchedule();
+        try {
+          const { donePromise } = launchColabMocapRun(task, {
+            take,
+            precisionPreset: item.precisionPreset || task.stage4?.precisionPreset || "standard_l4",
+          });
+          await saveTasks();
+          await donePromise;
+          item.status = "succeeded";
+          item.message = "GEM-X 77 骨提取与 Mixamo 重定向已完成（Colab）";
+          item.finishedAt = Date.now();
+        } catch (err) {
+          const errMsg = String(err?.message || err);
+          if (item.fallbackToModal && /503|暂不可用|满载|Service Unavailable|超时/i.test(errMsg)) {
+            if (state.config.modalBaseUrl) {
+              pushSystemLog(`[错峰定时队列] ${item.beatCode} Colab 满载，自动回退至 Modal Serverless GPU…`);
+              item.message = "Colab 满载，已自动切换 Modal Serverless GPU 提交提骨…";
+              await saveSchedule();
+              try {
+                const submitted = await submitModalMocapJob({
+                  modalBaseUrl: state.config.modalBaseUrl,
+                  apiToken: state.config.modalApiToken,
+                  videoPath: take.localPath,
+                  cameraMode: "static",
+                  useContactIk: true,
+                  exportFbxAndGlb: true,
+                });
+                const mRun = {
+                  jobId: submitted.jobId,
+                  backend: "modal_serverless",
+                  takeId: take.id,
+                  status: "queued",
+                  stage: "queued",
+                  stageLabel: "Colab 满载已自动回退至 Modal Serverless GPU，正在按需冷启…",
+                  progress: 4,
+                  createdAt: Date.now(),
+                  files: {},
+                  telemetry: null,
+                  containerState: "starting_gpu",
+                  logs: [`[错峰回退 Modal] ${path.basename(take.localPath)} -> Modal Job ${submitted.jobId}`],
+                };
+                task.stage4.runs.unshift(mRun);
+                task.stage4.activeRunId = mRun.jobId;
+                task.updatedAt = Date.now();
+                await saveTasks();
+                startModalPoller(task, mRun);
+                item.status = "succeeded";
+                item.message = `Colab 满载，已自动回退提交至 Modal (${submitted.jobId})`;
+                item.finishedAt = Date.now();
+              } catch (mErr) {
+                item.status = "failed";
+                item.message = `Colab 满载且 Modal 回退失败：${String(mErr?.message || mErr).slice(0, 180)}`;
+                item.finishedAt = Date.now();
+              }
+            } else {
+              item.status = "failed";
+              item.message = "Colab 满载（503），且 Modal 尚未完成部署配置，无法自动回退";
+              item.finishedAt = Date.now();
+            }
+          } else {
+            item.status = "failed";
+            item.message = errMsg.slice(0, 220);
+            item.finishedAt = Date.now();
+          }
+        }
+        await saveSchedule();
+      }
+    } finally {
+      if (state.schedule.autoStopAfterBatch) {
+        pushSystemLog("[错峰定时队列] 整批任务执行完毕，立即执行 colab stop 停表释放算力");
+        await stopWorkbenchColabSessions(state.config, (l) => pushSystemLog(l)).catch(() => {});
+      }
+      state.schedule.runningBatch = false;
+      await saveSchedule();
+    }
+  })();
+
+  return { started: true, count: pendingAll.length };
+}
+
+let scheduleTickerStarted = false;
+function startScheduleTicker() {
+  if (scheduleTickerStarted) return;
+  scheduleTickerStarted = true;
+  setInterval(() => {
+    const sch = state.schedule;
+    if (!sch?.enabled || sch.runningBatch) return;
+    const hasPending = (sch.items || []).some((x) => x.status === "pending");
+    if (!hasPending) return;
+    const now = new Date();
+    const hhmm = localTimeHHMM(now);
+    const today = localDateKey(now);
+    if (hhmm === sch.runTime && sch.lastTriggeredDate !== today) {
+      sch.lastTriggeredDate = today;
+      saveSchedule().catch(() => {});
+      runScheduledBatch(`定时 ${sch.runTime} 自动触发`).catch((err) => {
+        pushSystemLog(`[错峰定时队列] 触发异常：${err.message}`);
+      });
+    }
+  }, 15_000);
 }
 
 async function saveTasks() {
@@ -641,6 +1066,7 @@ async function handleApi(req, res, urlObj) {
       dreamina,
       cloud,
       imageProviders,
+      schedule: hydrateScheduleForClient(),
       recentLogs: recentLogs.slice(-60),
       host: {
         hostname: os.hostname(),
@@ -649,6 +1075,101 @@ async function handleApi(req, res, urlObj) {
         workspaceDir: WORKSPACE_DIR,
       },
     });
+  }
+
+  // Off-peak Scheduled Batch Queue API (default 06:00 Beijing time for US Colab off-peak window)
+  if (method === "GET" && p === "/api/schedule") {
+    return sendJson(res, 200, { ok: true, schedule: hydrateScheduleForClient() });
+  }
+  if (method === "POST" && p === "/api/schedule/config") {
+    const body = await readJsonBody(req);
+    if (typeof body.enabled === "boolean") state.schedule.enabled = body.enabled;
+    if (typeof body.autoStopAfterBatch === "boolean") state.schedule.autoStopAfterBatch = body.autoStopAfterBatch;
+    if (typeof body.runTime === "string") {
+      const t = body.runTime.trim();
+      if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t)) {
+        return sendJson(res, 400, { ok: false, error: "时间格式无效，请使用 HH:MM（如 06:00）" });
+      }
+      if (state.schedule.runTime !== t) {
+        state.schedule.runTime = t;
+        state.schedule.lastTriggeredDate = null;
+      }
+    }
+    await saveSchedule();
+    return sendJson(res, 200, { ok: true, schedule: hydrateScheduleForClient() });
+  }
+  if (method === "POST" && p === "/api/schedule/items") {
+    const body = await readJsonBody(req);
+    const added = [];
+    const addOne = (task, kind, opts = {}) => {
+      if (!task) return;
+      const dup = (state.schedule.items || []).find(
+        (x) => x.taskId === task.id && x.kind === kind && (x.status === "pending" || x.status === "running")
+      );
+      if (dup) return;
+      const item = {
+        id: `sch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        taskId: task.id,
+        beatCode: task.beatCode || task.id,
+        taskTitle: task.title || task.id,
+        kind,
+        resolution: opts.resolution || task.storyboard?.qualityPreset || "720p",
+        duration: Number(opts.duration || task.durationSec || 6),
+        precisionPreset: opts.precisionPreset || task.stage4?.precisionPreset || "standard_l4",
+        fallbackToModal: Boolean(opts.fallbackToModal),
+        status: "pending",
+        message: `等待 ${state.schedule.runTime} 错峰自动启动`,
+        createdAt: Date.now(),
+        startedAt: null,
+        finishedAt: null,
+      };
+      state.schedule.items.push(item);
+      added.push(item);
+    };
+
+    if (body.batchMode === "all_pending_h3") {
+      for (const t of state.tasks) {
+        if (t.route === "mixamo") continue;
+        const hasShot = (t.storyboard?.shots || []).some((s) => s.status === "succeeded" && s.localPath);
+        const hasVideo = (t.stage3?.takes || []).some((tk) => tk.status === "succeeded" && tk.localPath);
+        if (hasShot && !hasVideo) addOne(t, "stage3_h3");
+      }
+    } else if (body.batchMode === "all_pending_mocap") {
+      for (const t of state.tasks) {
+        if (t.route === "mixamo") continue;
+        const hasVideo = (t.stage3?.takes || []).some((tk) => tk.status === "succeeded" && tk.localPath);
+        const hasMocap = (t.stage4?.runs || []).some((r) => r.status === "succeeded");
+        if (hasVideo && !hasMocap) addOne(t, "stage4_mocap");
+      }
+    } else {
+      const task = findTask(String(body.taskId || ""));
+      const kind = body.kind === "stage4_mocap" ? "stage4_mocap" : "stage3_h3";
+      addOne(task, kind, body);
+    }
+
+    await saveSchedule();
+    return sendJson(res, 200, { ok: true, addedCount: added.length, schedule: hydrateScheduleForClient() });
+  }
+  const mDelSch = /^\/api\/schedule\/items\/([^/]+)$/.exec(p);
+  if (mDelSch && method === "DELETE") {
+    const id = decodeURIComponent(mDelSch[1]);
+    state.schedule.items = (state.schedule.items || []).filter((x) => x.id !== id || x.status === "running");
+    await saveSchedule();
+    return sendJson(res, 200, { ok: true, schedule: hydrateScheduleForClient() });
+  }
+  if (method === "DELETE" && p === "/api/schedule/items") {
+    const scope = urlObj.searchParams.get("scope") || "done";
+    if (scope === "all") {
+      state.schedule.items = (state.schedule.items || []).filter((x) => x.status === "running");
+    } else {
+      state.schedule.items = (state.schedule.items || []).filter((x) => x.status === "pending" || x.status === "running");
+    }
+    await saveSchedule();
+    return sendJson(res, 200, { ok: true, schedule: hydrateScheduleForClient() });
+  }
+  if (method === "POST" && p === "/api/schedule/run-now") {
+    const resRun = await runScheduledBatch("手动立即执行");
+    return sendJson(res, 200, { ok: true, ...resRun, schedule: hydrateScheduleForClient() });
   }
 
   if (method === "POST" && p === "/api/config") {
@@ -1657,6 +2178,28 @@ async function ensureWorkbenchBooted() {
           }
         }
       }
+      // Load persisted off-peak scheduled queue and start 15s ticker
+      try {
+        const loadedSch = JSON.parse(await fsp.readFile(SCHEDULE_PATH, "utf-8"));
+        state.schedule = {
+          ...DEFAULT_SCHEDULE,
+          ...loadedSch,
+          runningBatch: false,
+          items: Array.isArray(loadedSch.items) ? loadedSch.items : [],
+        };
+        let resetAny = false;
+        for (const it of state.schedule.items) {
+          if (it.status === "running") {
+            it.status = "pending";
+            it.message = `上次服务重启中断，已重回 ${state.schedule.runTime} 等待队列`;
+            resetAny = true;
+          }
+        }
+        if (resetAny) await saveSchedule();
+      } catch {
+        state.schedule = { ...DEFAULT_SCHEDULE, items: [] };
+      }
+      startScheduleTicker();
       getCachedProbes(true).catch(() => {});
     })();
   }

@@ -43,6 +43,10 @@
         <span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span>
         <span id="topBusyText">加载中…</span>
       </button>
+      <button id="btnSchedule" class="mwSysBtn" type="button" aria-expanded="false" aria-controls="schDrawer" title="错峰定时队列（默认早 06:00 自动跑）">
+        <span id="schBtnLabel">定时 06:00</span>
+        <span id="schCountBadge" class="mwSchBadge hidden">0</span>
+      </button>
       <button id="btnSystem" class="mwSysBtn" type="button" aria-expanded="false" aria-controls="sysDrawer">
         <span id="sysDot" class="mwDot"></span>
         <span id="sysBtnLabel">系统</span>
@@ -340,11 +344,11 @@
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-m="minimax_h3_colab" type="button">
                     <div class="mwSpecTop">
-                      <span class="mwSpecName">MiniMax-H3 完整版</span>
+                      <span class="mwSpecName">MiniMax-H3 加速版</span>
                       <span class="mwSpecBadge">0 即梦积分</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">Colab 96G G4 · ComfyUI + 2x 超分</div>
-                    <div class="mwSpecDesc">机房光纤直拉 44GB 权重跑首尾帧 FL2V，完片自动停表</div>
+                    <div class="mwSpecEngine mwMono">Colab 96G G4 · int8 + nvfp4 + 8step Turbo</div>
+                    <div class="mwSpecDesc">机房光纤直拉 Blackwell 加速权重跑首尾帧 FL2V，1080p 清显存后超分，完片自动停表</div>
                   </button>
                 </div>
               </div>
@@ -362,6 +366,7 @@
               <!-- ④ 主操作 CTA -->
               <div class="mwSec">
                 <button id="btnStage3Gen" class="mwBtnCta mwFull" type="button">生成 1 条视频</button>
+                <button id="btnStage3QueueSch" class="mwBtn mwFull" type="button">加入 06:00 错峰队列（MiniMax-H3）</button>
               </div>
             </div>
             <!-- 仅在已有可用视频时显示进入 04 提骨按钮 -->
@@ -523,6 +528,7 @@
               <!-- ③ 主操作 CTA -->
               <div class="mwSec">
                 <button id="btnStage4Run" class="mwBtnCta mwFull" type="button">提交云端提骨</button>
+                <button id="btnStage4QueueSch" class="mwBtn mwFull" type="button">加入 06:00 错峰队列（Colab 提骨）</button>
               </div>
 
               <!-- ④ 历史批次（次要信息折叠收拢，不再抢占主配置区） -->
@@ -875,6 +881,60 @@
         <button id="btnCopySysLogs" class="mwBtn mwSm" type="button">复制日志</button>
       </div>
       <pre id="s4Logs" class="mwCodeBox mwLogFull">暂无日志</pre>
+    </div>
+  </aside>
+
+  <!-- 错峰定时队列抽屉（默认北京时间 06:00 美国低峰窗口自动运行） -->
+  <div id="schScrim" class="mwScrim hidden"></div>
+  <aside id="schDrawer" class="mwDrawer hidden" aria-label="错峰定时队列">
+    <div class="mwDrawerHead">
+      <div class="mwDrawerTitleWrap">
+        <span class="mwDrawerTitle">错峰定时队列</span>
+        <span class="mwDrawerSub">美国低峰窗口 06:00~11:00 / 14:00~20:00 · 整批复用热机</span>
+      </div>
+      <button id="btnCloseSch" class="mwIconBtn" type="button" title="关闭">✕</button>
+    </div>
+
+    <div class="mwDrawerBody">
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead">
+          <span>定时触发策略</span>
+          <label class="mwSchToggle">
+            <input id="schEnabled" type="checkbox" checked>
+            <span>启用自动跑</span>
+          </label>
+        </div>
+        <div class="mwSchTimeRow">
+          <button class="mwBtn mwSm mwSchPreset" data-time="06:00" type="button">06:00 早高峰前</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="14:00" type="button">14:00 午后窗口</button>
+          <input id="schRunTime" class="mwSchTimeInput" type="time" value="06:00">
+        </div>
+        <label class="mwSchCheck">
+          <input id="schAutoStop" type="checkbox" checked>
+          <span>整批跑完立刻执行 <code>colab stop</code> 停表，绝不空转烧算力</span>
+        </label>
+        <div id="schNextRunText" class="mwSchHint">—</div>
+      </div>
+
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead"><span>一键批量入队</span></div>
+        <div class="mwSchBatchRow">
+          <button id="btnSchAddAllH3" class="mwBtn mwSm" type="button">+ 全部有分镜待出片 → MiniMax-H3</button>
+          <button id="btnSchAddAllMocap" class="mwBtn mwSm" type="button">+ 全部有视频待提骨 → Colab 提骨</button>
+        </div>
+      </div>
+
+      <div class="mwDashBox mwSchListBox">
+        <div class="mwDashBoxHead">
+          <span id="schQueueTitle">队列任务 (0)</span>
+          <button id="btnSchClearDone" class="mwLinkBtn" type="button">清理已完成</button>
+        </div>
+        <div id="schItemsList" class="mwSchList"></div>
+      </div>
+
+      <div class="mwSchFoot">
+        <button id="btnSchRunNow" class="mwBtnCta mwFull" type="button">立即执行当前队列</button>
+      </div>
     </div>
   </aside>
 

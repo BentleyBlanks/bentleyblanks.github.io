@@ -11,6 +11,7 @@ const appState = {
   dreamina: null,
   cloud: null,
   imageProviders: [],
+  schedule: null,
   recentLogs: [],
   host: null,
   routeFilter: "mocap", // "mocap" | "all" | "mixamo"
@@ -20,6 +21,7 @@ const appState = {
   s6Tab: "brief",
   sysTab: "overview",
   sysOpen: false,
+  schOpen: false,
   pendingCreditAction: null,
   retViewer: null,
   retPlaying: false,
@@ -1653,8 +1655,94 @@ function replaceTask(updated) {
   renderAll();
 }
 
+function renderScheduleUI() {
+  const sch = appState.schedule;
+  if (!sch) return;
+  const runTime = sch.runTime || "06:00";
+  const items = sch.items || [];
+  const pendingCount = items.filter((x) => x.status === "pending" || x.status === "running").length;
+
+  const btnLbl = $("#schBtnLabel");
+  if (btnLbl) btnLbl.textContent = sch.runningBatch ? "定时运行中" : `定时 ${runTime}`;
+  const badge = $("#schCountBadge");
+  if (badge) {
+    badge.textContent = String(pendingCount);
+    badge.classList.toggle("hidden", pendingCount === 0);
+  }
+  const s3q = $("#btnStage3QueueSch");
+  if (s3q) s3q.textContent = `加入 ${runTime} 错峰队列（MiniMax-H3）`;
+  const s4q = $("#btnStage4QueueSch");
+  if (s4q) s4q.textContent = `加入 ${runTime} 错峰队列（Colab 提骨）`;
+
+  if ($("#schEnabled")) $("#schEnabled").checked = Boolean(sch.enabled);
+  if ($("#schAutoStop")) $("#schAutoStop").checked = sch.autoStopAfterBatch !== false;
+  if ($("#schRunTime") && document.activeElement !== $("#schRunTime")) $("#schRunTime").value = runTime;
+  $$(".mwSchPreset").forEach((b) => b.classList.toggle("active", b.dataset.time === runTime));
+  if ($("#schNextRunText")) $("#schNextRunText").textContent = sch.nextRunText || "—";
+  if ($("#schQueueTitle")) $("#schQueueTitle").textContent = `队列任务 (${items.length}，待执行 ${pendingCount})`;
+
+  const runBtn = $("#btnSchRunNow");
+  if (runBtn) {
+    runBtn.disabled = Boolean(sch.runningBatch || pendingCount === 0);
+    runBtn.textContent = sch.runningBatch ? "正在按序执行错峰队列…" : `立即执行当前队列（${pendingCount} 项）`;
+  }
+
+  const listEl = $("#schItemsList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  if (!items.length) {
+    listEl.innerHTML = `<div class="mwSchEmpty">暂无排队任务。可在 03/04 阶段点「加入 ${escapeHtml(runTime)} 错峰队列」，或点上方一键批量入队</div>`;
+    return;
+  }
+  for (const it of items) {
+    const isRun = it.status === "running";
+    const isErr = it.status === "failed";
+    const isDone = it.status === "succeeded";
+    const row = document.createElement("div");
+    row.className = `mwSchItem ${isRun ? "isRun" : ""} ${isErr ? "isErr" : ""}`;
+    const kindLabel =
+      it.kind === "stage4_mocap"
+        ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}`
+        : `H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
+    const stText = isRun ? "运行中" : isDone ? "已完成" : isErr ? "失败" : `待 ${runTime}`;
+    row.innerHTML = `
+      <div class="mwSchItemMain">
+        <div class="mwSchItemTop">
+          <span class="mwMono">${escapeHtml(it.beatCode)}</span>
+          <span class="mwSchItemKind">${escapeHtml(kindLabel)}</span>
+          <span>${escapeHtml(it.taskTitle)}</span>
+        </div>
+        <div class="mwSchItemMsg">[${stText}] ${escapeHtml(it.message || "")}</div>
+      </div>
+      ${isRun ? "" : `<button class="mwIconBtn" type="button" data-del-sch="${escapeHtml(it.id)}" title="移出队列">✕</button>`}
+    `;
+    const delBtn = row.querySelector("[data-del-sch]");
+    if (delBtn) {
+      delBtn.onclick = async () => {
+        try {
+          const res = await api(`/api/schedule/items/${encodeURIComponent(it.id)}`, { method: "DELETE" });
+          appState.schedule = res.schedule;
+          renderScheduleUI();
+        } catch (err) {
+          toast(err.message, 3500);
+        }
+      };
+    }
+    listEl.appendChild(row);
+  }
+}
+
+function setScheduleDrawer(open) {
+  appState.schOpen = Boolean(open);
+  $("#schDrawer")?.classList.toggle("hidden", !appState.schOpen);
+  $("#schScrim")?.classList.toggle("hidden", !appState.schOpen);
+  $("#btnSchedule")?.setAttribute("aria-expanded", String(appState.schOpen));
+  if (appState.schOpen) renderScheduleUI();
+}
+
 function renderAll() {
   renderSystemAggregated();
+  renderScheduleUI();
   renderTaskList();
   renderTaskDetail();
   updateGlobalBusyUI();
@@ -2289,6 +2377,114 @@ $("#btnS4FixColabLogin").onclick = () => {
 $("#btnS4RetryFromFail").onclick = () => $("#btnStage4Run")?.click();
 $("#btnS4OpenLogs").onclick = () => setSystemDrawer(true, "logs");
 
+// Off-peak scheduled batch queue controls
+$("#btnSchedule").onclick = () => setScheduleDrawer(!appState.schOpen);
+$("#btnCloseSch").onclick = () => setScheduleDrawer(false);
+$("#schScrim").onclick = () => setScheduleDrawer(false);
+
+async function saveScheduleConfig(patch) {
+  try {
+    const res = await api("/api/schedule/config", {
+      method: "POST",
+      body: JSON.stringify(patch),
+    });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(`定时策略已更新：${res.schedule.enabled ? `每日 ${res.schedule.runTime}` : "已暂停自动触发"}`);
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+}
+$("#schEnabled").onchange = (e) => saveScheduleConfig({ enabled: Boolean(e.target.checked) });
+$("#schAutoStop").onchange = (e) => saveScheduleConfig({ autoStopAfterBatch: Boolean(e.target.checked) });
+$("#schRunTime").onchange = (e) => {
+  if (e.target.value) saveScheduleConfig({ runTime: e.target.value });
+};
+$$(".mwSchPreset").forEach((b) => {
+  b.onclick = () => saveScheduleConfig({ runTime: b.dataset.time, enabled: true });
+});
+
+$("#btnStage3QueueSch").onclick = async () => {
+  const task = currentTask();
+  if (!task) return;
+  try {
+    const res = await api("/api/schedule/items", {
+      method: "POST",
+      body: JSON.stringify({
+        taskId: task.id,
+        kind: "stage3_h3",
+        resolution: task.storyboard?.qualityPreset || "720p",
+        duration: task.durationSec || 6,
+      }),
+    });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（MiniMax-H3）` : "该动作已在定时队列中");
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+};
+$("#btnStage4QueueSch").onclick = async () => {
+  const task = currentTask();
+  if (!task) return;
+  try {
+    const preset = task.stage4?.precisionPreset === "high_a100" ? "high_a100" : "standard_l4";
+    const res = await api("/api/schedule/items", {
+      method: "POST",
+      body: JSON.stringify({
+        taskId: task.id,
+        kind: "stage4_mocap",
+        precisionPreset: preset,
+      }),
+    });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（Colab 提骨）` : "该动作已在定时队列中");
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+};
+$("#btnSchAddAllH3").onclick = async () => {
+  try {
+    const res = await api("/api/schedule/items", { method: "POST", body: JSON.stringify({ batchMode: "all_pending_h3" }) });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(res.addedCount > 0 ? `已批量加入 ${res.addedCount} 个待出片任务` : "没有新的待出片任务（需先有分镜图且尚无成片）");
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+};
+$("#btnSchAddAllMocap").onclick = async () => {
+  try {
+    const res = await api("/api/schedule/items", { method: "POST", body: JSON.stringify({ batchMode: "all_pending_mocap" }) });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(res.addedCount > 0 ? `已批量加入 ${res.addedCount} 个待提骨任务` : "没有新的待提骨任务（需先有成片视频且尚未提骨）");
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+};
+$("#btnSchClearDone").onclick = async () => {
+  try {
+    const res = await api("/api/schedule/items?scope=done", { method: "DELETE" });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast("已清理已完成/失败的队列记录");
+  } catch (err) {
+    toast(err.message, 3500);
+  }
+};
+$("#btnSchRunNow").onclick = async () => {
+  try {
+    const res = await api("/api/schedule/run-now", { method: "POST", body: "{}" });
+    appState.schedule = res.schedule;
+    renderScheduleUI();
+    toast(res.started ? `已开始按序执行 ${res.count} 项队列任务` : res.reason || "无法启动");
+  } catch (err) {
+    toast(err.message, 4000);
+  }
+};
+
 async function boot() {
   try {
     const data = await api("/api/bootstrap");
@@ -2299,6 +2495,7 @@ async function boot() {
     appState.dreamina = data.dreamina;
     appState.cloud = data.cloud;
     appState.imageProviders = data.imageProviders || [];
+    appState.schedule = data.schedule || null;
     appState.recentLogs = data.recentLogs || [];
     appState.host = data.host;
     appState.selectedTaskId = filteredTasks()[0]?.id || data.tasks[0]?.id || null;
@@ -2311,13 +2508,15 @@ async function boot() {
   }
 
   setInterval(async () => {
-    const anyActive = appState.tasks.some(
-      (t) =>
-        (t.storyboard?.shots || []).some((s) => s.status === "running") ||
-        (t.stage3?.takes || []).some((x) => x.status === "running") ||
-        (t.stage4?.runs || []).some((r) => r.status === "queued" || r.status === "running") ||
-        (t.stage6?.runs || []).some((r) => r.status === "running")
-    );
+    const anyActive =
+      Boolean(appState.schedule?.runningBatch) ||
+      appState.tasks.some(
+        (t) =>
+          (t.storyboard?.shots || []).some((s) => s.status === "running") ||
+          (t.stage3?.takes || []).some((x) => x.status === "running") ||
+          (t.stage4?.runs || []).some((r) => r.status === "queued" || r.status === "running") ||
+          (t.stage6?.runs || []).some((r) => r.status === "running")
+      );
     if (!anyActive) return;
     try {
       const [tasksRes, bootRes] = await Promise.all([
@@ -2326,6 +2525,7 @@ async function boot() {
       ]);
       appState.tasks = tasksRes.tasks;
       appState.dreamina = bootRes.dreamina;
+      appState.schedule = bootRes.schedule || appState.schedule;
       appState.recentLogs = bootRes.recentLogs || [];
       renderAll();
     } catch {}
