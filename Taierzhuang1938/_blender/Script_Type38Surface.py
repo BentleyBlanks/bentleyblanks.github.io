@@ -572,6 +572,11 @@ def Build(cache):
                 color = Blend(color,Tint([48,17,8],[116,49,19],amber),foreTip*.84)
                 handBed = np.exp(-((length+.29)/.18)**2)
                 color = Blend(color,Tint([88,35,12],[199,92,24],amber),handBed*.43)
+                foreStain = Ramp(-.777,-.724,length)*(1-Ramp(-.707,-.676,length))
+                foreStain *= Ramp(.012,.022,up)*Ramp(.30,.76,np.abs(normalSide))
+                color = Blend(color,Tint([73,32,13],[154,76,28],amber),foreStain*.68)
+                foreBody = Ramp(-.920,-.846,length)*(1-Ramp(-.759,-.718,length))
+                color = Blend(color,Tint([85,38,14],[155,80,30],amber),foreBody*.60)
             color *= (1-(.17 if separate else .25)*fleck)[:,:,None]
             if not separate:
                 heel = Ramp(.12,.245,length)*np.clip(.62-.28*stain,0,1)
@@ -704,8 +709,18 @@ def Build(cache):
                 rough += 9*flow + 8*stain
             if lightTube:
                 exposed = part == 'Exterior_LongRound44'
-                color = Tint([150,151,149],[194,192,183],.60+.15*flow+.04*stain) if exposed else Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
-                rough = (68 if exposed else 86) + 7*flow + 5*stain + 4*brush
+                if exposed:
+                    polished = Ramp(-.900,-.646,length)
+                    color = Tint([46,47,47],[116,114,106],.30+.43*polished+.14*flow+.065*stain)
+                    rough = 79-24*polished+8*flow+5*stain+4*brush
+                    silver = Ramp(-.696,-.653,length)
+                    silver *= np.clip(.96+.12*flow+.035*grainSteel,.72,1)
+                    polishedSteel = Tint([133,132,127],[204,202,192],.48+.18*flow+.095*stain)
+                    color = Blend(color,polishedSteel,silver)
+                    rough += silver*(91+12*flow+5*stain+5*brush-rough)
+                else:
+                    color = Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
+                    rough = 86+7*flow+5*stain+4*brush
             if band:
                 color = Tint([116,113,107],[170,166,156],.48+.22*flow+.05*stain)
                 rough = 87+24*flow+17*stain+5*brush-15*edge
@@ -718,6 +733,8 @@ def Build(cache):
                               Tint([101,87,75],[148,130,113],.43+.26*flow+.12*stain),knob)
                 rough = 48 + 6*flow + 4*stain + knob*(21+5*brush+4*grainSteel)
             metal = 251 - oxidation*(22 if bare else 41)
+            if part == 'Exterior_LongRound44':
+                metal -= (1-silver)*(108+15*oxidation)
             if handle:
                 metal -= knob*(42+16*oxidation)
             if jacket:
@@ -808,7 +825,7 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    doc['asset']['extras']['version'] = 'Type38_WornFilm12'
+    doc['asset']['extras']['version'] = 'Type38_SatinSteel13'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -816,7 +833,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=14, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=15, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     markings=['scale graduations and numerals only'])
     for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):

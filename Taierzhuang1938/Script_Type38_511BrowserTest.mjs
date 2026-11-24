@@ -34,7 +34,7 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-worn-film-12');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
+ assert.equal(evidence.identity.version,'511-satin-steel-13');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72088);
  assert.equal(evidence.identity.npcTriangles,67480);assert.equal(evidence.identity.nearNpcTriangles,72088);
  assert.equal(evidence.identity.worldTriangles,72088);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -128,6 +128,22 @@ try{
   const {neck,oval}=evidence.gripFinish;
   assert(neck.count>100&&oval.count>100&&neck.metalness-oval.metalness>25&&oval.roughness-neck.roughness>12,
    'the grip finish must separate polished neck from darker worn oval on the actual runtime maps');
+  evidence.foreFinish=await page.evaluate(()=>{
+   let mat;
+   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_LongRound44')mat=mesh.material;});
+   const Sample=(image,u,v,channel)=>{
+    const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);
+    const data=ctx.getImageData(Math.round(u*canvas.width)-3,Math.round(v*canvas.height)-3,7,7).data,values=[];
+    for(let offset=channel;offset<data.length;offset+=4)values.push(data[offset]);
+    return values.sort((first,second)=>first-second)[24];
+   };
+   return [[.1914,.15448],[.19243,.51833],[.19271,.83016]].map(([u,v])=>({
+    albedo:Sample(mat.map.image,u,v,0),metal:Sample(mat.roughnessMap.image,u,v,2)}));
+  });
+  const [bandEnd,midSteel,farSteel]=evidence.foreFinish;
+  assert(bandEnd.albedo>midSteel.albedo+45&&midSteel.albedo>farSteel.albedo+5&&bandEnd.metal>farSteel.metal+30,
+   'polished steel by the band must not whiten the entire outer length');
   evidence.frameFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_FoldedFrame12')mat=mesh.material;});
