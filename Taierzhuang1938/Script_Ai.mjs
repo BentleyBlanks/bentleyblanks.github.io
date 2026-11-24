@@ -1173,6 +1173,24 @@ export class AiDirector {
     return soldier;
   }
 
+  /**
+   * 测试场摆靶辅助（由主人 Script_Ai 写入，避免测试场直接跨模块写士兵组件字段）。
+   * 设成守点靶时保留真实躲雷 AI（dummy=false）；停火通过 coolUntil=Infinity 控制，不拆枪模。
+   */
+  ConfigureRangeTarget(soldier, { holdZone = null, defensive = true, holdFire = true, dummy = false, yaw = null } = {}) {
+    if (!soldier) return null;
+    soldier.dummy = !!dummy;
+    soldier.order = holdZone ? "hold" : "advance";
+    soldier.scriptDefensive = !!defensive;
+    soldier.holdZone = holdZone ? { ...holdZone } : null;
+    soldier.coolUntil = holdFire ? Infinity : 0;
+    if (Number.isFinite(yaw)) {
+      soldier.yaw = yaw;
+      soldier.lookYaw = yaw;
+    }
+    return soldier;
+  }
+
   Remove(soldier) {
     // 出场也要把手上的东西交回去（阵亡走 NotifyDeath，撤场走这里）。
     // 漏一样就会有「掩体永远有人占」「令牌被一个已经不在场上的人握着」这类

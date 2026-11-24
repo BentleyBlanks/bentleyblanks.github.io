@@ -1,0 +1,126 @@
+{
+  "generator": "Script_BakePbrTexture.py@1",
+  "date": "2026-11-24",
+  "name": "TimedGrenadeBand",
+  "preset": "drySoil",
+  "source": {
+    "path": "_shots/SeedreamRaw/TimedGrenadeBandAtlas.png",
+    "sha256": "ad3a48b04d65b23789d6812f92362bd4079a784c031d50b3cd877ededca6a1ba",
+    "metrics": {
+      "meanSrgb": [
+        0.4222,
+        0.2231,
+        0.1851
+      ],
+      "luma": 0.2768,
+      "lumaStd": 0.0966,
+      "sat": 0.5617,
+      "clipLow": 0.0002,
+      "clipHigh": 0.0,
+      "lowFreq": 0.0917
+    }
+  },
+  "heightSource": null,
+  "params": {
+    "mean": [
+      0.416,
+      0.362,
+      0.268
+    ],
+    "contrast": 0.1,
+    "lumaRange": [
+      0.28,
+      0.46
+    ],
+    "satRange": [
+      0.18,
+      0.42
+    ],
+    "stdRange": [
+      0.05,
+      0.12
+    ],
+    "reliefM": 0.008,
+    "rough": 0.86,
+    "roughVar": 0.1,
+    "roughLumaK": 0.0,
+    "ao": 0.45,
+    "metal": 0.0,
+    "seamless": "none",
+    "rowFlatten": true,
+    "flattenSigma": 0.088,
+    "isotropic": true,
+    "heightFromLuma": "direct",
+    "tileM": 0.25,
+    "size": 512,
+    "dataSize": 256,
+    "pack": "orm",
+    "normalConvention": "gl",
+    "normalStrength": 1.0,
+    "toneStrength": 1.0,
+    "keepTone": true,
+    "noFlatten": true,
+    "invertHeight": false,
+    "keepAlpha": false,
+    "roughMin": 0.3,
+    "baseQuality": 86,
+    "dataQuality": 90,
+    "dataLossless": false,
+    "detailBalance": 0,
+    "heightFineWeight": 0.45,
+    "uvAtlasReason": "UV atlas for special pull-cord stick grenade crimson tactical band and braided hemp pull cord"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_TimedGrenadeBandBase.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 91032,
+      "sha256": "c9e53cd1aa36f1c9727f39fa62683f79bbfe51666edaecd81b4f16d8b6261f63"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_TimedGrenadeBandNormal.webp",
+      "width": 256,
+      "height": 256,
+      "bytes": 47500,
+      "sha256": "cdb41cfd1460752412b18943fe87a5a26225d86e9506b1c307495d9b2be81202"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_TimedGrenadeBandOrm.webp",
+      "width": 256,
+      "height": 256,
+      "bytes": 19496,
+      "sha256": "cb8c4d30758beb49f0a39eb60b56acadffe0900c4674530f0982b19e44ff569a"
+    }
+  ],
+  "totalBytes": 158028,
+  "metrics": {
+    "meanSrgb": [
+      0.4228,
+      0.2235,
+      0.1842
+    ],
+    "luma": 0.2768,
+    "lumaStd": 0.0965,
+    "sat": 0.5644,
+    "clipLow": 0.0002,
+    "clipHigh": 0.0,
+    "lowFreq": 0.0916,
+    "seam": 0.0864,
+    "interior": 0.0526,
+    "seamRatio": 1.642,
+    "border": 0.814,
+    "swing": 0.2392,
+    "aoMean": 0.927,
+    "roughMean": 0.821,
+    "texelsPerMeter": 2048.0
+  },
+  "gateProblems": [
+    "亮度 0.2768 不在 [0.28, 0.46]",
+    "饱和 0.5644 不在 [0.18, 0.42]",
+    "纹素密度 2048.0 px/m 不在 [128, 1024]"
+  ]
+}

@@ -270,13 +270,18 @@ const PLUGINS = {
     phase: EXPLOSION_RANGE_PHASE, World: ExplosionRangeField,
     Create: (h) => {
       const runtime = new ExplosionRange({
-        battlefield: h.battlefield, combat: h.combat, interact: h.interact, player: h.player, ai: h.ai, hud: h.hud, aircraft: h.aircraft,
-        GiveGrenade: h.GiveGrenade,
+        battlefield: h.battlefield, combat: h.combat, interact: h.interact, player: h.player, ai: h.ai,
+        hud: h.hud, aircraft: h.aircraft, vfx: h.vfx, audio: h.audio, viewmodel: h.viewmodel,
+        library: h.library, scene: h.scene, camera: h.camera, state: h.state,
+        CanUse: h.CanUse, Focus: h.Focus, GiveGrenade: h.GiveGrenade, ctx: h.ctx,
       });
       // 取证口 Debug.Explosions 是常驻的（不在爆炸场时返回 null），见 SandboxDebugStubs。
       return Instance(runtime, {
         updateSlot: "afterCombat",
-        api: { State: () => runtime.State() || null, GoTo: (id) => runtime.GoTo(id), Reset: () => runtime.Reset() },
+        OnKey: (detail) => runtime.OnKey(detail),
+        ActionPrompts: () => runtime.ActionPrompts(),
+        UpdatePanel: () => runtime.UpdatePanel(),
+        api: runtime.api,
       });
     },
   },
@@ -403,6 +408,24 @@ export function SandboxDebugStubs(current) {
       State: () => Explosions()?.State() || null,
       GoTo: (id) => Explosions()?.GoTo(id),
       Reset: () => Explosions()?.Reset(),
+      SelectLoadout: (mode) => Explosions()?.SelectLoadout?.(mode),
+      SetFuseDuration: (s) => Explosions()?.SetFuseDuration?.(s),
+      SetShowTimer: (on) => Explosions()?.SetShowTimer?.(on),
+      SetOvercookExplodes: (on) => Explosions()?.SetOvercookExplodes?.(on),
+      BeginPull: (mode) => Explosions()?.BeginPull?.(mode),
+      RequestThrow: (power) => Explosions()?.RequestThrow?.(power),
+      SpawnEnemies: () => Explosions()?.SpawnEnemies?.(),
+      ClearEnemies: () => Explosions()?.ClearEnemies?.(),
+      SetEnemyMode: (mode) => Explosions()?.SetEnemyMode?.(mode),
+      SetEnemyDistance: (m) => Explosions()?.SetEnemyDistance?.(m),
+      SetCoverWall: (on) => Explosions()?.SetCoverWall?.(on),
+      SetPatrols: (on) => Explosions()?.SetPatrols?.(on),
+      SetVehicle: (id) => Explosions()?.SetVehicle?.(id),
+      FireVehicle: (id) => Explosions()?.FireVehicle?.(id),
+      StartBarrage: () => Explosions()?.StartBarrage?.(),
+      StartAirstrike: () => Explosions()?.StartAirstrike?.(),
+      ThrowPracticeGrenade: () => Explosions()?.ThrowPracticeGrenade?.(),
+      RefillThrowables: () => Explosions()?.RefillThrowables?.(),
     },
   };
 }

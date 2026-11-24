@@ -2154,6 +2154,7 @@ export class Viewmodel {
     this.spentCasePending = false;
     this.armPoseKey = weaponId ? armPose || weaponId : null;
     this.action = null;
+    this.timedGrenadePose = null;
     this.carryOverride = null;
     this.bayonetCarry = this.bayonetFixed && this.weapon?.bayonet ? 1 : 0;
     this.boltOpen = false;
@@ -2832,8 +2833,8 @@ export class Viewmodel {
     this._RecomputeCompensation(this._lastWorldFov || 60);
   }
 
-  /** 投弹。power 0..1 是蓄力（只影响出手速度与摆幅，不影响时长）。 */
-  TriggerThrow(power = 1, { kind = null, onRelease = null } = {}) {
+  /** 投弹。power 0..1 是蓄力（只影响出手速度与摆幅，不影响时长）。startT 可从已抬臂架势直接起甩。 */
+  TriggerThrow(power = 1, { kind = null, onRelease = null, startT = 0 } = {}) {
     // 其余 Trigger* 都有这道闸，只有这个漏了：空手时 _StepAction 会直接 return，
     // action 的 t 永远推不到 1，onThrowRelease / onActionEnd 一次都不触发，
     // 这一发就被静默吞掉了。
@@ -2848,6 +2849,7 @@ export class Viewmodel {
     }
     if (!this.rig) return false;
     this._StartAction("throw", (THROW_TRACKS[this.weaponId] || FPS_GRENADE_THROW).durationS);
+    if (startT > 0) this.action.t = Math.min(0.44, startT);
     this.action.restoreWeapon = restoreWeapon;
     this.action.onRelease = onRelease;
     this.action.power = Clamp01(power);
@@ -2855,6 +2857,11 @@ export class Viewmodel {
     this.action.offhand = !this.weapon || this.weapon.kind !== "throwable";
     if (this.action.offhand) this.offhandGrenade.visible = true;
     return true;
+  }
+
+  /** 特制拉线木柄弹的第一人称姿态覆写（null = 交还默认持握）。 */
+  SetTimedGrenadePose(pose) {
+    this.timedGrenadePose = pose || null;
   }
 
   /**
@@ -3368,6 +3375,7 @@ export class Viewmodel {
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
       const throwTrack = this._ThrowTrack();
       if(throwTrack) this._ApplyGrenadeThrow(throwTrack);
+      else if (this.timedGrenadePose) this._ApplyTimedGrenadePose(this.timedGrenadePose);
       if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
       if(throwTrack) this._ReleaseThrow(this.action.t,this.action.power,false);
     }
@@ -4863,6 +4871,31 @@ export class Viewmodel {
     const opening=Ease.InOut(Ease.Seg(t,openStart,openEnd))*(1-Ease.InOut(Ease.Seg(t,closeStart,closeEnd)));
     rig.SetContactWeight("r",1-opening);
     rig.operationPose.r={shape:"open",nextShape:"open",shapeMix:0};
+  }
+
+  /** 特制拉线木柄弹的实时手持 / 拉线 / 温雷姿势（与 _ApplyGrenadeThrow 共用同一套骨骼与锚点空间）。 */
+  _ApplyTimedGrenadePose(pose) {
+    this.weaponMount.position.fromArray(pose.mountPos);
+    this.weaponMount.rotation.set(pose.mountEuler[0], pose.mountEuler[1], pose.mountEuler[2], "YXZ");
+    const rig = this.riggedArms;
+    if (!rig) return;
+    rig.SetPoseState({ ads: 0, sprint: 0 });
+    rig.videoBody = {
+      shoulders: { right: pose.shoulders.right, left: pose.shoulders.left },
+      elbowPoles: { right: pose.elbowPoles.right, left: pose.elbowPoles.left },
+      authoredElbows: true,
+    };
+    rig.SetContactWeight("r", 1);
+    rig.SetContactWeight("l", pose.leftContact ?? 0);
+    if (pose.leftHand) {
+      this._rootMatrixFresh = false;
+      this.armAnchor.updateWorldMatrix(true, false);
+      const hand = this.handLeft.group;
+      const target = this.armAnchor.localToWorld(this._tmpVec.fromArray(pose.leftHand));
+      hand.position.copy(hand.parent.worldToLocal(target));
+    }
+    const shape = pose.leftShape || "open";
+    rig.operationPose.l = { shape, nextShape: shape, shapeMix: 0 };
   }
 
   _ReleaseThrow(t,power,offhand) {

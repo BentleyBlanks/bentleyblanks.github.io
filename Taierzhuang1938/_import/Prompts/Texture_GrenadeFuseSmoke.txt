@@ -1,0 +1,11 @@
+Provider: jimeng (Seedream 5.0 Pro, dreamina-canvas)
+Canvas: https://jimeng.jianying.com/ai-tool/ai-canvas/df0c1006-016f-4e1d-a8dc-3acd4d381952
+Node: node_7rvpnfz9v4
+Resource: a303e9a7-f25d-44d0-a87a-33365e02f99d
+Date: 2026-11-24
+
+Prompt:
+2x2 grid VFX sprite sheet on pure solid pitch-black #000000 background, four isolated wisps of delicate curling white-gray gunpowder fuse smoke rising vertically from a small burning stick-grenade igniter, realistic dark-field studio photography of thin turbulent sulfur smoke tendrils, soft feathered edges fading completely into pure black well inside each quadrant, game particle atlas, no text, no lines, no borders.
+
+Post-processing:
+Cropped off bottom fuse stick per quadrant, converted luminance to smooth alpha channel with pre-lifted sulfur-gray RGB and per-quadrant edge feathering, saved as 512x512 RGBA WebP (q=88).

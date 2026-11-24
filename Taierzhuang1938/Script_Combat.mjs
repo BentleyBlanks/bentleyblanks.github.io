@@ -203,8 +203,12 @@ export class CombatSystem {
     const p = new Projectile(kind, start, velocity, weapon, owner,
       options && options.ownerId !== undefined ? options.ownerId : null);
     this.Attach(p);
-    // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来
-    p.fuse = Math.max(THROW.cookedFuseMinS, p.fuse - cookedFor);
+    // 攥着数几秒再扔（cook）：老兵的做法，落地即炸不给对面时间踢回来。
+    // 特制拉线木柄弹显式传入 exactFuse 时按精确剩余引信起爆（允许空爆与落地瞬爆），通用弹保持原下限。
+    p.fuse = Number.isFinite(options?.exactFuse)
+      ? Math.max(0.02, options.exactFuse)
+      : Math.max(THROW.cookedFuseMinS, p.fuse - cookedFor);
+    p.timedStick = !!options?.timedStick;
     p.mesh = this.TakeMesh(kind);
     p.mesh.position.copy(start);
     this.projectiles.push(p);

@@ -115,6 +115,8 @@ const EAST_TRACK_TERRAIN_BYTES = 640 * 1024;
 // The sunken-road preview loads these two 1024² surface sets on demand.
 // Preserve the cut-face and fine root detail within a separate 650 KiB limit.
 const AIRCRAFT_DITCH_TERRAIN_BYTES = 650 * 1024;
+// Special pull-cord cookable stick grenade (ExplosionRange): 512² spark/smoke VFX atlases + 512²/256² tactical wrap/cord PBR (243 KiB total, lazy/fx only).
+const TIMED_GRENADE_ASSETS_BYTES = 256 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -134,14 +136,14 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES + TIMED_GRENADE_ASSETS_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
   totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES
     + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
     + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
-    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES,
+    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1835,6 +1837,48 @@ export const TEXTURE_MANIFEST = Object.freeze([
       ["Menu/History/Texture_HistoryConscriptionProcedureImage.webp", "Image", 1070, 1505],
       ["Menu/History/Texture_HistoryLeshanConscription1943Image.webp", "Image", 400, 599],
       ["Menu/History/Texture_HistoryZhongjiangConscription1945Image.webp", "Image", 299, 369],
+    ],
+  },
+  {
+    id: "GrenadeFuseSpark", kind: "vfx", tier: "fx",
+    source: {
+      provider: "jimeng", date: "2026-11-24",
+      ref: "canvas df0c1006-016f-4e1d-a8dc-3acd4d381952; node node_7gkdrkpgdx; resource fd242700-87e8-4cde-9a24-c47df277c8cf",
+      prompt: "_import/Prompts/Texture_GrenadeFuseSpark.txt",
+      note: "Seedream 5.0 Pro 生成的 2×2 木柄手榴弹拉火引信火花图集，纯黑底去边，用于第一人称拉线起燃火花与温雷喷焰。",
+    },
+    consumers: [{ file: "Data_TimedGrenade.mjs", token: "Texture_GrenadeFuseSpark_01.webp" }],
+    files: [["Texture_GrenadeFuseSpark_01.webp", "Atlas", 512, 512]],
+  },
+  {
+    id: "GrenadeFuseSmoke", kind: "vfx", tier: "fx",
+    source: {
+      provider: "jimeng", date: "2026-11-24",
+      ref: "canvas df0c1006-016f-4e1d-a8dc-3acd4d381952; node node_7rvpnfz9v4; resource a303e9a7-f25d-44d0-a87a-33365e02f99d",
+      prompt: "_import/Prompts/Texture_GrenadeFuseSmoke.txt",
+      note: "Seedream 5.0 Pro 生成的 2×2 引信硫磺细烟图集，带平滑 alpha，用于手持温雷与飞行尾烟。",
+    },
+    consumers: [{ file: "Data_TimedGrenade.mjs", token: "Texture_GrenadeFuseSmoke_01.webp" }],
+    files: [["Texture_GrenadeFuseSmoke_01.webp", "Atlas", 512, 512]],
+  },
+  {
+    id: "TimedGrenadeBand", kind: "material", tier: "lazy",
+    toneClass: null,
+    toneReason: "UV atlas for special pull-cord stick grenade crimson tactical band and braided hemp pull cord",
+    metersPerTile: null,
+    bake: "_import/Script_BakePbrTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_TimedGrenadeBand.json",
+    source: {
+      provider: "jimeng", date: "2026-11-24",
+      ref: "canvas df0c1006-016f-4e1d-a8dc-3acd4d381952; node node_85mxgh571t; resource 8c65e7cc-d58e-4f7c-b90b-657b7dd22c8b",
+      prompt: "_import/Prompts/Texture_TimedGrenadeBand.txt",
+      note: "Seedream 5.0 Pro 生成的红褐军布警示带 + 麻绳编织双区 UV 贴图，仅爆炸测试场特制拉线木柄弹按需加载。",
+    },
+    consumers: [{ file: "Data_TimedGrenade.mjs", token: "Texture_TimedGrenadeBandBase.webp" }],
+    files: [
+      ["Texture_TimedGrenadeBandBase.webp", "Base", 512, 512],
+      ["Texture_TimedGrenadeBandNormal.webp", "Normal", 256, 256],
+      ["Texture_TimedGrenadeBandOrm.webp", "Orm", 256, 256],
     ],
   },
 

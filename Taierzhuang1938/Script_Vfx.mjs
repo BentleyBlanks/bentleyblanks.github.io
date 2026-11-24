@@ -1428,6 +1428,63 @@ export class VfxSystem {
   }
 
   /**
+   * 飞行中特制拉线木柄弹的尾端火星尾迹（streak + star 共享池，零新材质与零额外 draw call）。
+   */
+  FuseTrailSpark(position, velocity = null, remainingFuse = 2) {
+    const urgent = remainingFuse < 1.2;
+    const count = urgent ? 3 : 2;
+    for (let i = 0; i < count; i += 1) {
+      const s = ResetSpawn();
+      s.x = position.x + this._Signed(0.015);
+      s.y = position.y + this._Signed(0.015);
+      s.z = position.z + this._Signed(0.015);
+      s.vx = (velocity?.x || 0) * 0.18 + this._Signed(urgent ? 2.4 : 1.5);
+      s.vy = (velocity?.y || 0) * 0.18 + this._Range(0.2, urgent ? 2.2 : 1.3);
+      s.vz = (velocity?.z || 0) * 0.18 + this._Signed(urgent ? 2.4 : 1.5);
+      s.ay = -7.5; s.drag = 2.1;
+      s.life = this._Range(0.14, urgent ? 0.34 : 0.24);
+      s.sizeStart = urgent ? 0.014 : 0.010; s.sizeEnd = 0.003;
+      s.stretch = this._Range(0.12, urgent ? 0.36 : 0.24);
+      s.minPx = 1.6;
+      s.opacity = 1; s.fadeIn = 0.02;
+      s.groundY = this.groundSampler ? this.groundSampler(position.x, position.z) : this.groundLevel;
+      s.colorA = VFX_PALETTE.sparkBurstHot; s.colorB = VFX_PALETTE.sparkBurstCool;
+      s.seed = this.random();
+      this.pools.streak.Spawn(s, this.time);
+    }
+    const f = ResetSpawn();
+    f.x = position.x; f.y = position.y; f.z = position.z;
+    f.drag = 14;
+    f.life = 0.055;
+    f.sizeStart = urgent ? 0.14 : 0.09; f.sizeEnd = urgent ? 0.05 : 0.03;
+    f.opacity = 0.95; f.fadeIn = 0.01;
+    f.angle = this._Range(0, 6.283); f.spin = this._Signed(8);
+    f.colorA = VFX_PALETTE.muzzleCore; f.colorB = VFX_PALETTE.sparkBurstHot;
+    f.seed = this.random();
+    this.pools.star.Spawn(f, this.time);
+  }
+
+  /** 飞行中特制拉线木柄弹的尾端硫磺细烟迹。 */
+  FuseTrailSmoke(position, velocity = null) {
+    const s = ResetSpawn();
+    s.x = position.x + this._Signed(0.018);
+    s.y = position.y + this._Signed(0.018);
+    s.z = position.z + this._Signed(0.018);
+    s.vx = (velocity?.x || 0) * 0.08 + this._Signed(0.18);
+    s.vy = (velocity?.y || 0) * 0.06 + this._Range(0.22, 0.55);
+    s.vz = (velocity?.z || 0) * 0.08 + this._Signed(0.18);
+    s.ax = this.wind.x * 0.6; s.ay = 0.22; s.az = this.wind.z * 0.6;
+    s.drag = 1.4;
+    s.life = this._Range(0.55, 1.05);
+    s.sizeStart = 0.055; s.sizeEnd = this._Range(0.24, 0.42);
+    s.opacity = 0.34; s.fadeIn = 0.08;
+    s.angle = this._Range(0, 6.283); s.spin = this._Signed(1.4);
+    s.colorA = VFX_PALETTE.powderThin; s.colorB = VFX_PALETTE.powderSmoke;
+    s.seed = this.random();
+    this.pools.smoke.Spawn(s, this.time);
+  }
+
+  /**
    * 爆炸。看起来"有当量"的关键不是火球大小，是**贴地扩散的尘环**：
    * 冲击波沿地面推出去的那一圈灰，才让人相信地面被砸了一下。
    */

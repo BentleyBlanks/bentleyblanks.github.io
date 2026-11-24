@@ -1151,3 +1151,35 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .battleReactionLab .brCompass{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:6px 0}
 .battleReactionLab .brCompass .siBtn{padding:6px 2px}
 .battleReactionLab .brDistances .siBtn{flex:1 1 22%;padding:5px 2px}
+
+/* 爆炸测试场左侧面板（?explosions=1）与特制拉线木柄弹准星引信环。 */
+.explosionLab{top:10px;left:10px;width:302px;max-height:calc(100vh - 20px);overflow-y:auto}
+.explosionLab .siHead{padding:8px 12px}
+.explosionLab .siBody{padding:6px 12px 10px}
+.explosionLab h3{margin:8px 0 4px;font-size:11px}
+.explosionLab h3:first-child{margin-top:2px}
+.explosionLab .siLabel{margin:5px 0 2px;font-size:10.5px}
+.explosionLab .siButtons{gap:4px;margin:3px 0}
+.explosionLab .siBtn{padding:4px 5px;font-size:11.5px}
+.explosionLab .exLoadouts .siBtn,.explosionLab .exVehicles .siBtn{flex:1 1 44%;padding:4px 4px;font-size:11.5px}
+.explosionLab .siSwitch{margin:4px 0;padding:4px 8px;font-size:11.5px}
+.explosionLab .siBtn:disabled{opacity:.38;cursor:not-allowed}
+.explosionLab .exControls{font-size:10.5px;line-height:1.4;color:#bcb9a8;margin-top:4px;padding:5px 7px}
+.explosionLab .exRead{font-size:10.5px;line-height:1.45;padding:5px 7px}
+.timedFuseHud{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:26;pointer-events:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:96px;height:96px}
+.timedFuseHud[hidden]{display:none}
+.timedFuseHud .tfRing{width:88px;height:88px;transform:rotate(-90deg);overflow:visible}
+.timedFuseHud .tfTrack{fill:none;stroke:rgba(225,214,185,.22);stroke-width:3}
+.timedFuseHud .tfArc{fill:none;stroke:#edca83;stroke-width:3.8;stroke-linecap:butt;transition:stroke .12s ease}
+.timedFuseHud.isPulling .tfArc{stroke:#fff0c4}
+.timedFuseHud.isUrgent .tfArc{stroke:#f59b38}
+.timedFuseHud.isCritical .tfArc{stroke:#ff4b3a;filter:drop-shadow(0 0 6px rgba(255,75,58,.75))}
+.timedFuseHud.isCritical{animation:tfPulse .28s ease-in-out infinite}
+.timedFuseHud.hideTimer .tfRing,.timedFuseHud.hideTimer .tfTime{opacity:0}
+.timedFuseHud .tfTime{position:absolute;top:calc(50% + 22px);font:700 13px/1 var(--ui-font,system-ui,sans-serif);font-variant-numeric:tabular-nums;color:#f5e7c4;text-shadow:0 1px 4px #000}
+.timedFuseHud.isUrgent .tfTime{color:#ffbc63}
+.timedFuseHud.isCritical .tfTime{color:#ff7266}
+.timedFuseHud .tfHint{position:absolute;top:calc(50% + 44px);white-space:nowrap;padding:2px 8px;background:rgba(16,19,18,.72);border:1px solid #c1bdab3a;color:#e4e0d0;font:600 11px/1.35 var(--ui-font,system-ui,sans-serif);letter-spacing:.04em}
+.timedFuseHud .tfHint:empty{display:none}
+@keyframes tfPulse{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.07)}}
+@media(prefers-reduced-motion:reduce){.timedFuseHud.isCritical{animation:none}}

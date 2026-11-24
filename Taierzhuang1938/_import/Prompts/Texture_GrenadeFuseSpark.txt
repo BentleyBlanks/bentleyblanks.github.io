@@ -1,0 +1,11 @@
+Provider: jimeng (Seedream 5.0 Pro, dreamina-canvas)
+Canvas: https://jimeng.jianying.com/ai-tool/ai-canvas/df0c1006-016f-4e1d-a8dc-3acd4d381952
+Node: node_7gkdrkpgdx
+Resource: fd242700-87e8-4cde-9a24-c47df277c8cf
+Date: 2026-11-24
+
+Prompt:
+2x2 grid VFX sprite sheet on pure solid pitch-black #000000 background, four isolated realistic pyrotechnic friction-igniter fuse spark bursts for a WWII stick grenade: top-left tight white-gold ignition flash core with crisp radial sparks, top-right directional fan spray of incandescent golden-orange sizzling sparks, bottom-left dense crackling amber ember shower with fine forked spark streaks, bottom-right blazing high-energy white-orange sputtering flare. Wide pure black margins around every quadrant, zero clipping at edges, additive game particle atlas, photorealistic dark studio fire sparks, no text, no lines, no borders.
+
+Post-processing:
+Downsampled to 512x512 RGB WebP (q=88) with black-floor crush and smooth per-quadrant edge vignette so additive sampling has zero quadrant seam bleed.

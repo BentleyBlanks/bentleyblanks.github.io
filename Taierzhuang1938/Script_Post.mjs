@@ -511,6 +511,8 @@ export class PostPipeline {
     // SSR 的历史与颜色金字塔同样作废：硬切之后重投影全部对不上位，
     // 不清的话镜面上会挂一帧上一场戏的倒影。
     this.ssrPass.hasHistory = false;
+    this.ssrPass.hasRoughness = false;
+    if (this.ssrPass.trace?.uSsrHasColor) this.ssrPass.trace.uSsrHasColor.value = 0;
     // GTAO 的时域累积与 SSIL 的颜色历史同理：瞬移之后那两张图里是别的地方。
     this.gtaoPass.NotifyCameraCut();
     // 曝光适应也要跟着切：硬切到一个亮度完全不同的机位时，慢慢"适应"过去

@@ -1142,6 +1142,45 @@ const RECIPES = {
     v.Live(0.3);
   },
 
+  // 特制拉线木柄弹：麻绳猛拉摩擦声 + 瓷珠脱扣脆响 + 拉发火管「嗤——」起燃。
+  grenadeCordPull(A, v) {
+    const t = v.t;
+    // 1) 麻绳抽过木孔的干涩摩擦声
+    const pull = v.Noise("pink", 0.14);
+    const pullBp = v.Filter("bandpass", v.F(1200), 1.4);
+    pullBp.frequency.setValueAtTime(v.F(900), t);
+    pullBp.frequency.exponentialRampToValueAtTime(v.F(2800), t + 0.11);
+    const pullG = v.Gain(FLOOR);
+    Swell(pullG.gain, t, 0.18, 0.03, 0.04, 0.07);
+    pull.connect(pullBp).connect(pullG).connect(v.out);
+    v.Start(pull, t, 0.14);
+    // 2) 拉火管擦断瞬间的金属/瓷珠脆击
+    MetalClick(v, t + 0.07, 4300, 0.22, 0.055, 18);
+    // 3) 黑火药起燃那一记明亮「嗤啪」
+    const ignite = v.Noise("white", 0.24);
+    const igniteHp = v.Filter("bandpass", v.F(5400), 0.75);
+    const igG = v.Gain(FLOOR);
+    Hit(igG.gain, t + 0.08, 0.24, 0.008, 0.20);
+    ignite.connect(igniteHp).connect(igG).connect(v.out);
+    v.Start(ignite, t + 0.08, 0.24);
+    v.wetGain.gain.value = 0.08;
+    v.Live(0.36);
+  },
+
+  // 引信持续燃烧嘶声（带细碎火药爆裂颗粒，温雷临爆时抬高音调）。
+  grenadeFuseHiss(A, v) {
+    const t = v.t;
+    const fizz = v.Noise("white", 0.30);
+    const bp = v.Filter("bandpass", v.F(5800), 0.9);
+    const g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.16, 0.025, 0.16, 0.10);
+    fizz.connect(bp).connect(g).connect(v.out);
+    v.Start(fizz, t, 0.30);
+    Ticks(v, t + 0.02, 3, 0.22, 3800, 7400, 0.06, 0.012, 8);
+    v.wetGain.gain.value = 0.05;
+    v.Live(0.32);
+  },
+
   // 投掷：袖子/棉衣带起的风声，中间夹一记木柄离手的轻响。
   grenadeThrow(A, v) {
     const src = v.Noise("pink", 0.36);
@@ -3018,7 +3057,7 @@ const NODE_COST = {
   type92: 18, explosionNear: 18, grenadeExplosionNra: 18, grenadeExplosionIja: 18,
   rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, tankMg: 16, bayonetHit: 16, magIn: 15,
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
-  grenadePin: 13, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
+  grenadePin: 13, grenadeCordPull: 13, grenadeFuseHiss: 8, impactBrick: 13, impactWood: 13, footstepRubble: 13, hurt: 13,
   dadaoHit: 12, shellIncoming: 11, whistle: 11,
   // 断肢两条：照各自建了几个节点数出来再留一格（sever = 闷响 3 + 湿裂 3 + 骨断 3
   // + 碎屑 3；land 少一层骨）。
@@ -3087,7 +3126,7 @@ const DEFAULT_COST = 19;
  */
 const MIX_GAIN = {
   zb26: 0.71, type11: 0.70, type92: 0.67, tankMg: 0.7,
-  bolt: 3.9, boltHanYang: 3.9, grenadePin: 3.9, hurt: 3.6, dadaoSwing: 3.0,
+  bolt: 3.9, boltHanYang: 3.9, grenadePin: 3.9, grenadeCordPull: 3.4, grenadeFuseHiss: 1.5, hurt: 3.6, dadaoSwing: 3.0,
   rifleNraFar: 2.2, rifleIjaFar: 2.2,
   impactMetal: 1.75, grenadeThrow: 1.5, impactBrick: 1.5,
   bayonetHit: 1.4, explosionNear: 1.25,

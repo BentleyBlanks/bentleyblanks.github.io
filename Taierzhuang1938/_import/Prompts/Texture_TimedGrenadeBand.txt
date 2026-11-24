@@ -1,0 +1,11 @@
+Provider: jimeng (Seedream 5.0 Pro, dreamina-canvas)
+Canvas: https://jimeng.jianying.com/ai-tool/ai-canvas/df0c1006-016f-4e1d-a8dc-3acd4d381952
+Node: node_85mxgh571t
+Resource: 8c65e7cc-d58e-4f7c-b90b-657b7dd22c8b
+Date: 2026-11-24
+
+Prompt:
+Seamless tileable flat top-down PBR albedo texture of weathered 1938 Chinese military crimson-ochre painted coarse canvas tactical band and braided hemp twine wrap, matte muted brick-red lacquer dye worn along raised coarse cloth fibers, faint soot and handling patina, completely flat even diffuse lighting with no directional shadows or highlights, photorealistic game material texture, no text.
+
+Post-processing:
+Composed dual-zone UV atlas (top 65% horizontally-seamless crimson-ochre coarse canvas, bottom 35% horizontally-seamless braided hemp pull cord) and baked via _import/Script_BakePbrTexture.py to 512x512 Base + 256x256 Normal/Orm WebP.
