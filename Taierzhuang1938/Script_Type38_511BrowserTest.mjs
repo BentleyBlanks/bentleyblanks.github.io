@@ -34,7 +34,18 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-burnished-steel-15');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72460);
+ assert.equal(evidence.identity.version,'511-polished-grip-16');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72460);
+ evidence.gripDirection=await page.evaluate(()=>{
+  let finish;
+  window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
+   if(mesh.userData.type38Part!=='Exterior_HandleOval08')return;
+   const mat=mesh.material,map=mat.anisotropyMap;
+   if(map)finish={physical:mat.isMeshPhysicalMaterial,strength:mat.anisotropy,data:map.colorSpace,scale:map.repeat.toArray()};
+  });
+  return finish;
+ });
+ assert(evidence.gripDirection?.physical&&evidence.gripDirection.strength>.3&&evidence.gripDirection.data==='');
+ assert.deepEqual(evidence.gripDirection.scale,[128/1024,24/1024],'directional data must use its own padded atlas tile');
  assert.equal(evidence.identity.npcTriangles,67852);assert.equal(evidence.identity.nearNpcTriangles,72460);
  assert.equal(evidence.identity.worldTriangles,72460);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
@@ -107,8 +118,10 @@ try{
   assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
    'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{
-   const rig=window.Tengxian.viewmodel.rig.group;let maps;
-   rig.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_HandleOval08')maps=mesh.material.roughnessMap.image;});
+   const rig=window.Tengxian.viewmodel.rig.group;let maps,direction;
+   rig.traverse(mesh=>{
+    if(mesh.userData.type38Part==='Exterior_HandleOval08'){maps=mesh.material.roughnessMap.image;direction=mesh.material.anisotropyMap;}
+   });
    const canvas=document.createElement('canvas');canvas.width=maps.width;canvas.height=maps.height;
    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(maps,0,0);
    const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
@@ -127,13 +140,24 @@ try{
      oxideFraction:oxideRough.length/roughness.length,steelFraction:steelRough.length/roughness.length,
      oxideRoughness:Median(oxideRough),steelRoughness:Median(steelRough)};
    };
-   return {neck:Sample(.13,.40),oval:Sample(.65,.90)};
+   const neck=Sample(.13,.40),oval=Sample(.65,.90);
+   canvas.width=direction.image.width;canvas.height=direction.image.height;
+   ctx.drawImage(direction.image,0,0);
+   const brushSamples=[[.27,.20],[.60,.50],[.91,.74],[.99,.74],[.91,.20]].map(([u,v])=>{
+    const x=Math.floor(canvas.width*(direction.offset.x+u*direction.repeat.x));
+    const y=Math.floor(canvas.height*(direction.offset.y+v*direction.repeat.y));
+    return Array.from(ctx.getImageData(x,y,1,1).data).slice(0,3);
+   });
+   return {neck,oval,brushSamples};
   });
   const {neck,oval}=evidence.gripFinish;
   assert(neck.count>100&&oval.count>100&&neck.metalness>245&&oval.metalness>245&&oval.roughness-neck.roughness>18,
    'the neck and oval must both reflect as steel, with a broader highlight on the oval');
   assert(neck.oxideFraction<.02&&oval.oxideFraction>.025&&oval.oxideFraction<.20&&oval.steelFraction>.60&&
    oval.oxideRoughness>oval.steelRoughness+8,'scattered dull speckles must break up the worn oval reflection');
+  const [stem,gap,outer,pole,wornFlank]=evidence.gripFinish.brushSamples;
+  assert(stem[0]<75&&stem[1]>200&&stem[2]>180&&outer[0]>245&&outer[2]>235&&wornFlank[2]<160&&gap[2]<8&&pole[2]<8,
+   'the brush direction must fade through the junction and close smoothly at the tip');
   evidence.foreFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_LongRound44')mat=mesh.material;});

@@ -30,7 +30,7 @@ export function ConfigureType38_511(asset,library) {
     // Normal/ORM/coat/specular-intensity slots are data, in both source and
     // published models. Keep their original bits and use the same data tag.
     for(const slot of ['normalMap','roughnessMap','metalnessMap','aoMap','clearcoatMap',
-      'clearcoatRoughnessMap','clearcoatNormalMap','specularIntensityMap']){
+      'clearcoatRoughnessMap','clearcoatNormalMap','specularIntensityMap','anisotropyMap']){
       const texture=mesh.material[slot];
       if(texture&&texture.colorSpace!==THREE.NoColorSpace){texture.colorSpace=THREE.NoColorSpace;texture.needsUpdate=true;}
     }

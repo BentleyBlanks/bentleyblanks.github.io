@@ -573,7 +573,7 @@ def VarnishTraces(length, transverse, positiveSide):
     return traces,chips
 
 
-def FinishInsetSurfaces(doc, views, source, load, store):
+def FinishSteelAtlas(doc, views, source, load, store):
     primitives = {node['extras']['SourceObject']:doc['meshes'][node['mesh']]['primitives'][0]
                   for node in doc['nodes'] if 'mesh' in node}
     host = primitives['T38_430B_ContinuousLowerFacing_VisualOnly']
@@ -619,6 +619,39 @@ def FinishInsetSurfaces(doc, views, source, load, store):
     rough = 110+12*brush+9*patina
     base[region] = np.rint(Tint([67,64,58],[156,151,140],.46+.19*patina+.085*grain))
     orm[region] = np.rint(np.dstack((np.full_like(x,255),rough,240+7*patina)))
+    # Store the grip's longitudinal brush direction in another unused part of the numeric atlas.
+    # The outer end keeps a more elongated glint in the oblique reference photograph.
+    tileX,tileY,tileW,tileH = 480,464,144,40
+    brushTile = orm[tileY:tileY+tileH,tileX:tileX+tileW]
+    assert not brushTile[:,:,1].any()
+    border = 8
+    along = (np.arange(tileW)+.5-border)/(tileW-2*border)
+    around = (np.arange(tileH)+.5-border)/(tileH-2*border)
+    # The two photographs resolve a narrow stripe on the stem and a stretched
+    # reflection at the outer oval. Fade directional detail at the pole,
+    # where the longitudinal tangent is undefined.
+    stemFinish = 1-Ramp(.36,.57,along)
+    ovalFinish = Ramp(.64,.89,along)*(1-Ramp(.944,.979,along))
+    # Turn the tangent only in the isotropic gap so the glint cannot kink at the junction.
+    turn = Ramp(.575,.64,along)
+    angle = np.deg2rad(132)*(1-turn)+.08*turn
+    brushTile[:,:,0] = np.rint(127.5*(1+np.cos(angle)))
+    brushTile[:,:,1] = np.rint(127.5*(1+np.sin(angle)))
+    # The flank seen in the side photograph retains a more directional sheen.
+    # Use a continuous circumferential field that meets at the UV seam.
+    flank = .45+.55*Ramp(-.35,.75,-np.sin((around-.02)*2*np.pi/.96))
+    shoulderSheen = .055*Ramp(.60,.64,along)*(1-Ramp(.73,.89,along))
+    strength = .39*stemFinish+shoulderSheen+.43*ovalFinish*flank[:,None]
+    brushTile[:,:,2] = np.rint(255*np.clip(strength/.43,0,1))
+    uvTransform = dict(offset=[(tileX+border)/1024,(tileY+border)/1024],
+                       scale=[(tileW-2*border)/1024,(tileH-2*border)/1024])
+    directionMap = dict(atlas['metallicRoughnessTexture'],extensions={'KHR_texture_transform':uvTransform})
+    handleMaterial = doc['materials'][primitives['Exterior_HandleOval08']['material']]
+    handleMaterial.setdefault('extensions',{})['KHR_materials_anisotropy'] = dict(
+        anisotropyStrength=.43,anisotropyRotation=0,anisotropyTexture=directionMap)
+    for extension in ('KHR_materials_anisotropy','KHR_texture_transform'):
+        if extension not in doc['extensionsUsed']:
+            doc['extensionsUsed'].append(extension)
     store(atlas['baseColorTexture'],base)
     store(atlas['metallicRoughnessTexture'],orm)
     return {name:np.percentile(rough[mask],[10,50,90]).round(1).tolist() for name,mask in coverage.items()}
@@ -922,13 +955,17 @@ def Build(cache):
                 else:
                     knob = Ramp(.044,.054,side)
                     rub = np.clip(.49+.18*flow+.15*stain+.09*grain,0,1)
-                    bareOval = Tint([146,119,106],[216,194,176],.63+.085*speckle+.07*flow)
+                    bareOval = Tint([129,113,111],[193,183,181],.63+.085*speckle+.07*flow)
                     oval = Blend(bareOval,np.array([93,70,60],dtype='f'),pits*.54)
-                    color = Blend(Tint([182,156,134],[252,234,218],.34+.50*rub),oval,knob)
-                    neckRough = 67+4*brush+3*tarnish
-                    rough = neckRough+knob*(89+5*speckle+16*pits+3*grain-neckRough)
+                    outward = Ramp(.030,.039,side)
+                    neck = Tint([188,161,151],[261,243,246],.34+.50*rub)
+                    neck = (neck+14.025)*(1.17-.33*outward[:,:,None])**(1/2.4)-14.025
+                    color = Blend(neck,oval,knob)
+                    neckRough = 66-3*outward+4*brush+3*tarnish
+                    rough = neckRough+knob*(88.5+5*speckle+16*pits+3*grain-neckRough)
                     neckMetal = 251-2*tarnish
-                    metal = neckMetal+knob*(254-49*pits-neckMetal)
+                    outerEnd = Ramp(.875,.955,(np.arange(width,dtype='f')+.5)/width)
+                    metal = neckMetal+knob*(251-49*pits-3*outerEnd-neckMetal)
                 relief = .15*scoring+.056*tarnish-.25*pits
             if loop:
                 lowerArc = 1-Ramp(.0022,.0062,up)
@@ -1017,8 +1054,8 @@ def Build(cache):
         Store(ormSlot, orm)
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
-    stats.update(FinishInsetSurfaces(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_BurnishedSteel15'
+    stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
+    doc['asset']['extras']['version'] = 'Type38_PolishedGrip16'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == 72088+loopTriangles-924 and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1027,7 +1064,7 @@ def Build(cache):
     manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
     manifest['exteriorTriangleDeltas']['Exterior_RetainedImportedBody74'] = manifest['exteriorTriangleDeltas'].get('Exterior_RetainedImportedBody74',0)+loopTriangles-924
     manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=17, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=18, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])

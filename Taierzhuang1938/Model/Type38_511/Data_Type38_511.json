@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 17,
+  "version": 18,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "3a89adfa71210457de9e75fd4e11a166870b01590a084772ddbbe9cbc4fb9c69",
+  "runtimeSha256": "b2c427991e50558f66019e21ab0f2a7e113436579ce7a073dca2f9554749d2a7",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 72460,
@@ -100,14 +100,14 @@
     {
       "index": 11,
       "name": "Texture_Type38Sample04Base",
-      "bytes": 273188,
-      "sha256": "d86d2fd4b5c045c3816df1ae3995e8df2d5c6eab2489499f6fbc33bc5c2a36f0"
+      "bytes": 271460,
+      "sha256": "19f06b3ac2e7134964c8e8433b153d7da183fba8520cf6233876ff883312d269"
     },
     {
       "index": 12,
       "name": "Texture_Type38Sample04Orm",
-      "bytes": 180125,
-      "sha256": "22da0f071d8af56db01773598983037e204ba9812280ea2566d598de4a1a4f95"
+      "bytes": 181993,
+      "sha256": "0983fba2b4d2d15999ca1e7d4f385499b4f6ff02afa8b0c419e1b4ec4a0d16ec"
     },
     {
       "index": 13,
@@ -418,8 +418,8 @@
     {
       "index": 64,
       "name": "Texture_Type38Sample28Orm",
-      "bytes": 470400,
-      "sha256": "76563e992b9f86abf1a7a89f18ab90eb1332d34975cb02423a7e006041b59d4d"
+      "bytes": 471118,
+      "sha256": "a69367efb1f64702795037937577fcefbd71273e14d0bec0405e9672ae94efc1"
     },
     {
       "index": 65,
@@ -765,9 +765,9 @@
       177.6
     ],
     "Exterior_HandleOval08": [
-      65.1,
-      71.5,
-      91.2
+      62.7,
+      69.2,
+      90.6
     ],
     "Wood_UpperFittedCrown05": [
       81.4,

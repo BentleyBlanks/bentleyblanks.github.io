@@ -1,5 +1,11 @@
 # Dots Type38 511 runtime integration
 
+## 栓柄钢面的双视角对照 · 2026-11-24
+
+以前版上线模型为基线。后视沿用已校对的相机和闪光，另用同一件实物的侧斜照核对柄头。侧斜机位按外轮廓配准，边缘偏差中位数约 0.9 像素（640 × 480），取景只包含这件金属外观。每组对照的前后两版共用光照。后视下，实物柄颈和柄头的亮部面积分别约 31% 和 19%，前版约 26% 和 21%，新版约 30% 和 20%。侧斜照中，柄头最亮一带的长宽比约为 2∶1，前版约为 1.1∶1，新版约为 2∶1。[实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [实物侧斜视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)
+
+柄颈与柄头分别烘焙钢色、粗糙度和磨损分布。方向性反射沿柄颈、过渡处和椭圆端连续变化，旋转模型或移动照明时，高光跟随表面移动。方向与强度写入现有线性数据图集的空白区域，由 glTF 的 `KHR_materials_anisotropy` 读取。此次修改三张内嵌图和一个材质，沿用 45 个部件、116 张图，近景与普通 NPC 分别为 72,460、67,852 三角。
+
 ## 旧钢表面 · 2026-11-24
 
 前版钢板样本带有拼板接缝，会在中箍和覆面上留下横线及成片暗斑。新版沿金属表面方向烘焙细擦纹，用独立的细点控制局部氧化。中箍的各层围绕圆周连续，柄颈呈窄亮带，椭圆柄头保留较宽的钢面反射和零星失光点。实物照片只供比对，运行时底色、粗糙度及已有法线使用 CC0 材质样本重建。此次涉及 41 个外观部件和 102 张内嵌图。两件木料的 10 张图与上一版逐字节相同。[钢面实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG) · [柄头实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [Metal 009](https://ambientcg.com/view?id=Metal009) · [Metal 046 B](https://ambientcg.com/view?id=Metal046B)
