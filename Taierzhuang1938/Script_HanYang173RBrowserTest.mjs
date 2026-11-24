@@ -24,17 +24,34 @@ try{
   const world=g.actorFactory.ModelInstance('HanYang');
   const result={version:vm.rig.assetVersion,triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),
    parts:meshes.length,worldTriangles:world.tris,privateGeometry:world.meshes.every(m=>meshes.every(f=>f.geometry!==m.geometry)),
-   materials:meshes.map(m=>({part:m.userData.hanYang173RPart,base:m.material.map?.colorSpace,normal:m.material.normalMap?.colorSpace,
+   materials:meshes.map(m=>({part:m.userData.hanYang173RPart,authored:m.material.userData.preserveAuthoredPbr,materialClass:m.material.userData.externalMaterialClass,skin:m.material.userData.materialShadingSurface?.skin,baseFilter:m.material.map?.anisotropy,coatFilter:m.material.clearcoatMap?.anisotropy,base:m.material.map?.colorSpace,normal:m.material.normalMap?.colorSpace,
     orm:m.material.roughnessMap?.colorSpace,folded:!m.material.metalnessMap,patches:PatchesOf(m.material).map(p=>p.key),
-    color:m.material.color.toArray(),metalness:m.material.metalness,roughness:m.material.roughness}))};
+    color:m.material.color.toArray(),metalness:m.material.metalness,roughness:m.material.roughness,specular:m.material.specularIntensity??1,
+    coat:m.material.clearcoat??0,coatRough:m.material.clearcoatRoughness??0,filmMap:!!m.material.clearcoatMap,filmSpace:m.material.clearcoatMap?.colorSpace}))};
   for(const m of world.meshes)m.geometry.dispose();
   const roof=new THREE.Mesh(new THREE.BoxGeometry(12,.2,12),new THREE.MeshStandardMaterial({color:0x666666,roughness:1}));
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261113R2');assert.equal(evidence.identity.triangles,64266);
- assert.equal(evidence.identity.worldTriangles,64266);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.version,'173R-20261124R25');assert.equal(evidence.identity.triangles,77396);
+ assert.equal(evidence.identity.worldTriangles,77396);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
+ const timber=evidence.identity.materials.filter(material=>/^(MainWood_|FrontWood_|UpperWood_)/.test(material.part));
+ assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-(material.part.startsWith('FrontWood_')?.54:material.part.startsWith('UpperWood_')?.17:.24))<1e-5),'game preserves the distinct authored timber reflectances');
+ const oil=timber.find(material=>material.part.startsWith('MainWood_'));
+ assert(oil.filmMap&&Math.abs(oil.coat-.34)<1e-5&&Math.abs(oil.coatRough-.18)<1e-5&&['','srgb-linear'].includes(oil.filmSpace),'the game binds the linear crest-finish mask and both physical factors');
+ const foreOil=timber.find(material=>material.part.startsWith('FrontWood_'));
+ assert(foreOil.filmMap&&Math.abs(foreOil.coat-.72)<1e-5&&Math.abs(foreOil.coatRough-.245)<1e-5&&['','srgb-linear'].includes(foreOil.filmSpace),'front film has its own linear wear mask and broad reflection');
+ assert(timber.filter(material=>material!==oil&&material!==foreOil).every(material=>!material.filmMap&&material.coat===0));
+ for(const m of evidence.identity.materials){
+  assert.equal(m.authored,true,m.part);assert.equal(m.materialClass,'authored',m.part);assert.equal(m.skin,false,m.part);
+  assert.deepEqual(m.color,[1,1,1],m.part+' uses the calibrated native texture');
+  if(m.filmMap)assert.equal(m.coatFilter,m.baseFilter,'oil and wood use the same oblique-view filtering');
+ }
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert(['','srgb-linear'].includes(m.normal));assert(['','srgb-linear'].includes(m.orm));assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
+ const contact=evidence.identity.materials.filter(material=>material.patches.includes('ormma'));
+ assert.equal(contact.length,9,'fixed-contact AO folds into the existing roughness sampler in game');
+ assert(contact.some(material=>material.part.startsWith('ButtCap_')),'the fixed butt-cap joint receives the shared contact field');
+ assert(contact.some(material=>material.part==='RearBand_ControlledCrown')&&timber.every(material=>contact.includes(material)));
  evidence.lighting=[];
  for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
   const row=await page.evaluate(async mode=>{
@@ -90,7 +107,7 @@ try{
  });
  assert(evidence.frame.rifle.rows.length>0,'production frame includes authored rifle draws');
  assert.deepEqual(errors,[]);
- console.log('ok HanYang173R actual game: 64266 triangles, 44 PBR parts, high day/shadow/overcast/night/ADS');
+ console.log('ok HanYang173R actual game: 77396 triangles, 44 PBR parts, high day/shadow/overcast/night/ADS');
 }finally{
  await fs.writeFile(path.join(out,'Data_Acceptance.json'),JSON.stringify({evidence,errors},null,2));
  await browser.close();await new Promise(r=>server.close(r));

@@ -1,20 +1,20 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
-  "triangles": 64266,
+  "gameSha256": "087599edb8d5c0ef5cf10931da5597d74afcc2bc4f74a12733f9595cd7e3c1c0",
+  "triangles": 77396,
   "repairedTangents": 45491,
   "parts": [
     {
       "part": "ButtCap_LimitedProfileBlend",
       "sourceTriangles": 4864,
-      "gameTriangles": 476,
-      "gameToSourceMaxM": 0.00011704934149747714,
-      "sourceToGameMaxM": 0.00018406505114398897,
+      "gameTriangles": 1622,
+      "gameToSourceMaxM": 0.00688845245167613,
+      "sourceToGameMaxM": 0.006783353630453348,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 20.98,
-        "uvCoverage": 0.406,
+        "pxPerMm": 15.62,
+        "uvCoverage": 0.256355,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -22,14 +22,14 @@
     {
       "part": "FrontBand_ContinuousEnvelopeContact",
       "sourceTriangles": 1152,
-      "gameTriangles": 1152,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameTriangles": 4608,
+      "gameToSourceMaxM": 0.0018913745880126953,
+      "sourceToGameMaxM": 0.0032734730198934222,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 24.02,
-        "uvCoverage": 0.608,
+        "pxPerMm": 18.89,
+        "uvCoverage": 0.362304,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -37,14 +37,14 @@
     {
       "part": "FrontBandSideStrip",
       "sourceTriangles": 36,
-      "gameTriangles": 36,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameTriangles": 156,
+      "gameToSourceMaxM": 7.040714262984693e-05,
+      "sourceToGameMaxM": 0.00016969506395980716,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 10.35,
-        "uvCoverage": 0.359,
+        "pxPerMm": 10.37,
+        "uvCoverage": 0.356842,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -52,14 +52,14 @@
     {
       "part": "FrontSideBoss_LowRoundedExterior",
       "sourceTriangles": 716,
-      "gameTriangles": 70,
-      "gameToSourceMaxM": 0.00010726600157795474,
-      "sourceToGameMaxM": 0.00017974941874854267,
+      "gameTriangles": 489,
+      "gameToSourceMaxM": 9.102296462515369e-05,
+      "sourceToGameMaxM": 0.0001797493314370513,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 20.67,
-        "uvCoverage": 0.845,
+        "pxPerMm": 14.47,
+        "uvCoverage": 0.413998,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -68,28 +68,28 @@
       "part": "FrontWood_ContinuousOval",
       "sourceTriangles": 4732,
       "gameTriangles": 1278,
-      "gameToSourceMaxM": 9.96330491034314e-05,
-      "sourceToGameMaxM": 0.0001265172177227214,
+      "gameToSourceMaxM": 0.018700148910284042,
+      "sourceToGameMaxM": 0.00012099814193788916,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 34.13333333333333,
-        "uvCoverage": 1,
-        "tiledUv": true,
-        "tileMeters": 0.06
+        "pxPerMm": 6.14,
+        "uvCoverage": 0.261859,
+        "tiledUv": false,
+        "tileMeters": null
       }
     },
     {
       "part": "HandledCylinder",
       "sourceTriangles": 1878,
       "gameTriangles": 1878,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameToSourceMaxM": 0.0,
+      "sourceToGameMaxM": 0.0,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
         "pxPerMm": 18.91,
-        "uvCoverage": 0.689,
+        "uvCoverage": 0.688978,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -97,14 +97,14 @@
     {
       "part": "HandleNeck",
       "sourceTriangles": 380,
-      "gameTriangles": 320,
-      "gameToSourceMaxM": 0.0011909109307453036,
-      "sourceToGameMaxM": 0.0008563905139453709,
+      "gameTriangles": 796,
+      "gameToSourceMaxM": 0.0011504489229992032,
+      "sourceToGameMaxM": 0.0008563937153667212,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 29.76,
-        "uvCoverage": 0.746,
+        "pxPerMm": 29.25,
+        "uvCoverage": 0.719956,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -112,14 +112,14 @@
     {
       "part": "HandleRoot",
       "sourceTriangles": 164,
-      "gameTriangles": 164,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameTriangles": 556,
+      "gameToSourceMaxM": 3.7483961932593957e-05,
+      "sourceToGameMaxM": 4.698496195487678e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 14.15,
-        "uvCoverage": 0.626,
+        "pxPerMm": 11.92,
+        "uvCoverage": 0.443562,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -134,7 +134,7 @@
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 18.92,
-        "uvCoverage": 0.528,
+        "uvCoverage": 0.527671,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -148,8 +148,8 @@
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 18.82,
-        "uvCoverage": 0.435,
+        "pxPerMm": 20.99,
+        "uvCoverage": 0.541988,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -163,8 +163,8 @@
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 18.82,
-        "uvCoverage": 0.435,
+        "pxPerMm": 21.05,
+        "uvCoverage": 0.545017,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -173,13 +173,13 @@
       "part": "HY150_RoundedUpperExterior",
       "sourceTriangles": 1048,
       "gameTriangles": 1048,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameToSourceMaxM": 0.0,
+      "sourceToGameMaxM": 0.0,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 12.82,
-        "uvCoverage": 0.475,
+        "uvCoverage": 0.474796,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -187,14 +187,14 @@
     {
       "part": "HY150_VisualFrontSleeve",
       "sourceTriangles": 1916,
-      "gameTriangles": 186,
-      "gameToSourceMaxM": 0.00021093948453199118,
-      "sourceToGameMaxM": 0.0003057809663005173,
+      "gameTriangles": 539,
+      "gameToSourceMaxM": 0.00036457247915677726,
+      "sourceToGameMaxM": 0.0003542198392096907,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 9.16,
-        "uvCoverage": 0.596,
+        "pxPerMm": 9.11,
+        "uvCoverage": 0.589287,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -208,8 +208,8 @@
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 22.13,
-        "uvCoverage": 0.548,
+        "pxPerMm": 22.16,
+        "uvCoverage": 0.549644,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -224,7 +224,7 @@
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 21.05,
-        "uvCoverage": 0.387,
+        "uvCoverage": 0.386684,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -233,13 +233,13 @@
       "part": "HY155_ContinuousInnerEdgeTrim_Neg",
       "sourceTriangles": 872,
       "gameTriangles": 116,
-      "gameToSourceMaxM": 0.0002090171619784087,
+      "gameToSourceMaxM": 0.0003600172349251807,
       "sourceToGameMaxM": 0.00036351796006783843,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 7.58,
-        "uvCoverage": 0.03,
+        "uvCoverage": 0.030169,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -248,13 +248,13 @@
       "part": "HY155_ContinuousInnerEdgeTrim_Pos",
       "sourceTriangles": 872,
       "gameTriangles": 116,
-      "gameToSourceMaxM": 0.0002090171619784087,
+      "gameToSourceMaxM": 0.00036001906846649945,
       "sourceToGameMaxM": 0.0003635199973359704,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 7.58,
-        "uvCoverage": 0.03,
+        "uvCoverage": 0.02996,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -263,13 +263,13 @@
       "part": "LongOuterSteel_TrueRound",
       "sourceTriangles": 2230,
       "gameTriangles": 1086,
-      "gameToSourceMaxM": 0.00012946959759574383,
-      "sourceToGameMaxM": 0.0002366597909713164,
+      "gameToSourceMaxM": 0.00025191629538312554,
+      "sourceToGameMaxM": 0.00023666000925004482,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
         "pxPerMm": 8.22,
-        "uvCoverage": 0.558,
+        "uvCoverage": 0.558266,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -277,14 +277,14 @@
     {
       "part": "LowerPlateGuard_FlatSideNarrowReturn",
       "sourceTriangles": 4648,
-      "gameTriangles": 664,
-      "gameToSourceMaxM": 6.414193921955302e-05,
-      "sourceToGameMaxM": 9.2435693659354e-05,
+      "gameTriangles": 3330,
+      "gameToSourceMaxM": 7.431424455717206e-05,
+      "sourceToGameMaxM": 9.25380372791551e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 9.79,
-        "uvCoverage": 0.382,
+        "pxPerMm": 9.93,
+        "uvCoverage": 0.393862,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -293,28 +293,28 @@
       "part": "MainWood_ContinuousLowerShoulder",
       "sourceTriangles": 183704,
       "gameTriangles": 32211,
-      "gameToSourceMaxM": 2.1554073100560345e-05,
-      "sourceToGameMaxM": 8.427218563156202e-05,
+      "gameToSourceMaxM": 0.006910260301083326,
+      "sourceToGameMaxM": 0.006889007519930601,
       "gameplayAdaptation": null,
       "rebake": {
-        "textureSize": 2048,
-        "pxPerMm": 34.13333333333333,
-        "uvCoverage": 1,
-        "tiledUv": true,
-        "tileMeters": 0.06
+        "textureSize": 4096,
+        "pxPerMm": 4.8,
+        "uvCoverage": 0.175897,
+        "tiledUv": false,
+        "tileMeters": null
       }
     },
     {
       "part": "MiddleSideDisk",
       "sourceTriangles": 1920,
-      "gameTriangles": 187,
-      "gameToSourceMaxM": 6.194590241648257e-05,
-      "sourceToGameMaxM": 0.00012237978808116168,
+      "gameTriangles": 912,
+      "gameToSourceMaxM": 6.067890353733674e-05,
+      "sourceToGameMaxM": 0.0001223885192302987,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 14.24,
-        "uvCoverage": 0.465,
+        "pxPerMm": 15.47,
+        "uvCoverage": 0.548954,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -329,7 +329,7 @@
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 301.62,
-        "uvCoverage": 0.579,
+        "uvCoverage": 0.578474,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -338,13 +338,13 @@
       "part": "PlateExterior_ShallowSurfaceMark_2",
       "sourceTriangles": 2208,
       "gameTriangles": 216,
-      "gameToSourceMaxM": 7.641163392690942e-06,
+      "gameToSourceMaxM": 7.641155207238626e-06,
       "sourceToGameMaxM": 9.073644832824357e-06,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 252.11,
-        "uvCoverage": 0.629,
+        "uvCoverage": 0.628974,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -359,7 +359,7 @@
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 268.47,
-        "uvCoverage": 0.567,
+        "uvCoverage": 0.566546,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -368,13 +368,13 @@
       "part": "RearBand_ControlledCrown",
       "sourceTriangles": 1152,
       "gameTriangles": 1152,
-      "gameToSourceMaxM": 0.00832793116569519,
-      "sourceToGameMaxM": 0.006776297464966774,
+      "gameToSourceMaxM": 0.00832793155254865,
+      "sourceToGameMaxM": 0.00702902075246604,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 18.07,
-        "uvCoverage": 0.27,
+        "pxPerMm": 20.34,
+        "uvCoverage": 0.296442,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -382,14 +382,14 @@
     {
       "part": "RearBand_ExternalAttachmentBridge",
       "sourceTriangles": 188,
-      "gameTriangles": 18,
-      "gameToSourceMaxM": 6.594588921871036e-05,
-      "sourceToGameMaxM": 0.00037018940201960504,
+      "gameTriangles": 76,
+      "gameToSourceMaxM": 0.009049788021536883,
+      "sourceToGameMaxM": 0.0018608802872383489,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 30.0,
-        "uvCoverage": 0.464,
+        "pxPerMm": 18.18,
+        "uvCoverage": 0.587681,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -397,14 +397,14 @@
     {
       "part": "RearBand_ExternalAttachmentLoop",
       "sourceTriangles": 2304,
-      "gameTriangles": 224,
-      "gameToSourceMaxM": 0.00014513653877656907,
-      "sourceToGameMaxM": 0.00022237257508095354,
+      "gameTriangles": 678,
+      "gameToSourceMaxM": 0.00011975305824307725,
+      "sourceToGameMaxM": 0.0002289606782142073,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 37.65,
-        "uvCoverage": 0.444,
+        "pxPerMm": 32.54,
+        "uvCoverage": 0.328816,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -414,12 +414,12 @@
       "sourceTriangles": 412,
       "gameTriangles": 576,
       "gameToSourceMaxM": 0.003201794344931841,
-      "sourceToGameMaxM": 0.0034775049425661564,
+      "sourceToGameMaxM": 0.0034775014501065016,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 12.5,
-        "uvCoverage": 0.688,
+        "uvCoverage": 0.688589,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -434,7 +434,7 @@
       "rebake": {
         "textureSize": 2048,
         "pxPerMm": 23.76,
-        "uvCoverage": 0.724,
+        "uvCoverage": 0.723268,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -449,7 +449,7 @@
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 23.82,
-        "uvCoverage": 0.641,
+        "uvCoverage": 0.639923,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -464,7 +464,7 @@
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 75.29,
-        "uvCoverage": 0.594,
+        "uvCoverage": 0.594162,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -472,14 +472,14 @@
     {
       "part": "RearStock_ExternalAttachmentBridge",
       "sourceTriangles": 188,
-      "gameTriangles": 18,
-      "gameToSourceMaxM": 6.914518598932773e-05,
-      "sourceToGameMaxM": 0.00039191587711684406,
+      "gameTriangles": 68,
+      "gameToSourceMaxM": 1.3552527156068805e-20,
+      "sourceToGameMaxM": 0.00021607472616585555,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 27.79,
-        "uvCoverage": 0.753,
+        "pxPerMm": 12.19,
+        "uvCoverage": 0.185932,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -487,14 +487,14 @@
     {
       "part": "RearStock_ExternalAttachmentLoop",
       "sourceTriangles": 2304,
-      "gameTriangles": 224,
-      "gameToSourceMaxM": 0.0001193079151562415,
-      "sourceToGameMaxM": 0.0001749249640852213,
+      "gameTriangles": 672,
+      "gameToSourceMaxM": 0.0001382458140142262,
+      "sourceToGameMaxM": 0.00019602826796472073,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 37.54,
-        "uvCoverage": 0.464,
+        "pxPerMm": 30.61,
+        "uvCoverage": 0.302164,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -502,14 +502,14 @@
     {
       "part": "RearTab",
       "sourceTriangles": 4788,
-      "gameTriangles": 204,
-      "gameToSourceMaxM": 0.0015367220621556044,
+      "gameTriangles": 708,
+      "gameToSourceMaxM": 0.0015367219457402825,
       "sourceToGameMaxM": 0.009889484383165836,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 46.82,
-        "uvCoverage": 0.46,
+        "pxPerMm": 43.94,
+        "uvCoverage": 0.403962,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -517,14 +517,14 @@
     {
       "part": "RearTopExternalLever",
       "sourceTriangles": 9482,
-      "gameTriangles": 156,
-      "gameToSourceMaxM": 0.002182992175221443,
+      "gameTriangles": 524,
+      "gameToSourceMaxM": 0.0021661599166691303,
       "sourceToGameMaxM": 0.005228149238973856,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 19.12,
-        "uvCoverage": 0.306,
+        "pxPerMm": 19.11,
+        "uvCoverage": 0.305025,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -532,14 +532,14 @@
     {
       "part": "ReceiverOuterCollar",
       "sourceTriangles": 1200,
-      "gameTriangles": 1472,
-      "gameToSourceMaxM": 0.00013008873793296516,
+      "gameTriangles": 2058,
+      "gameToSourceMaxM": 0.00012017588596791029,
       "sourceToGameMaxM": 0.00013425841461867094,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 14.68,
-        "uvCoverage": 0.542,
+        "pxPerMm": 12.79,
+        "uvCoverage": 0.411101,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -547,14 +547,14 @@
     {
       "part": "SideWoodButton",
       "sourceTriangles": 1920,
-      "gameTriangles": 188,
-      "gameToSourceMaxM": 5.5076172429835424e-05,
-      "sourceToGameMaxM": 0.00010242292046314105,
+      "gameTriangles": 883,
+      "gameToSourceMaxM": 5.440817403723486e-05,
+      "sourceToGameMaxM": 0.00010239520634058863,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 28.87,
-        "uvCoverage": 0.726,
+        "pxPerMm": 27.26,
+        "uvCoverage": 0.647002,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -564,12 +564,12 @@
       "sourceTriangles": 796,
       "gameTriangles": 77,
       "gameToSourceMaxM": 0.0001091946687665768,
-      "sourceToGameMaxM": 0.0003639120259322226,
+      "sourceToGameMaxM": 0.0003639118222054094,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 15.12,
-        "uvCoverage": 0.398,
+        "uvCoverage": 0.396446,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -578,13 +578,13 @@
       "part": "Sight_LowCrossPiece",
       "sourceTriangles": 188,
       "gameTriangles": 220,
-      "gameToSourceMaxM": 0.35704728960990906,
-      "sourceToGameMaxM": 0.3569072186946869,
+      "gameToSourceMaxM": 0.00037807575426995754,
+      "sourceToGameMaxM": 0.00017119292169809341,
       "gameplayAdaptation": "4.5mm rear sight notch",
       "rebake": {
         "textureSize": 1024,
         "pxPerMm": 35.68,
-        "uvCoverage": 0.731,
+        "uvCoverage": 0.731838,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -593,13 +593,13 @@
       "part": "Sight_ShallowRoundSeat",
       "sourceTriangles": 796,
       "gameTriangles": 77,
-      "gameToSourceMaxM": 0.00018554927373770624,
+      "gameToSourceMaxM": 0.00018554885173216462,
       "sourceToGameMaxM": 0.00045746975229121745,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 6.18,
-        "uvCoverage": 0.422,
+        "uvCoverage": 0.420261,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -614,7 +614,7 @@
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 65.32,
-        "uvCoverage": 0.668,
+        "uvCoverage": 0.667957,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -629,7 +629,7 @@
       "rebake": {
         "textureSize": 512,
         "pxPerMm": 65.32,
-        "uvCoverage": 0.668,
+        "uvCoverage": 0.667957,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -638,13 +638,13 @@
       "part": "Trigger_FlatCurvedExternalStrip",
       "sourceTriangles": 1436,
       "gameTriangles": 1436,
-      "gameToSourceMaxM": 0,
-      "sourceToGameMaxM": 0,
+      "gameToSourceMaxM": 0.0,
+      "sourceToGameMaxM": 0.0,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 512,
-        "pxPerMm": 13.39,
-        "uvCoverage": 0.397,
+        "pxPerMm": 15.68,
+        "uvCoverage": 0.544674,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -652,1079 +652,1095 @@
     {
       "part": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront",
       "sourceTriangles": 41590,
-      "gameTriangles": 11893,
-      "gameToSourceMaxM": 5.074305136076873e-06,
-      "sourceToGameMaxM": 1.1489803000586107e-05,
+      "gameTriangles": 12107,
+      "gameToSourceMaxM": 0.004702415317296982,
+      "sourceToGameMaxM": 0.005104949697852135,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 34.13333333333333,
-        "uvCoverage": 1,
-        "tiledUv": true,
-        "tileMeters": 0.06
+        "pxPerMm": 6.43,
+        "uvCoverage": 0.32717,
+        "tiledUv": false,
+        "tileMeters": null
       }
     }
   ],
   "texturePayloads": [
     {
       "name": "ButtCap_LimitedProfileBlend_Normal",
-      "mimeType": "image/png",
-      "sha256": "63972f82829c948520bb64e6fcfb5c6eafa416bc8a08df30f07161da3d7a785d",
-      "sourceSha256": "cf0c01b2204cc283bfdd1af182d2592b64416370b076e55eb084ff590d8f0baf",
-      "islandCoverage": 0.4727,
+      "mimeType": "image/webp",
+      "sha256": "cdcbf6f2c78c61d81966405c33995c99d496eddbdcbcfb91cb786082d92f313f",
+      "sourceSha256": "04d7eba9705974f3d8a5c1c9ac9d16bfaeed3d78c4ab842bb284b267d807a932",
+      "islandCoverage": 0.256355,
       "rebake": true
     },
     {
       "name": "ButtCap_LimitedProfileBlend_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "b192c06b9d179e9dec3151a6db5cd47b548e60c6b996e05945071de9d62735c2",
-      "sourceSha256": "fd302ad08d415a001378ddbdea6e0dfd3a4bc0c483291eefa1f3923f3f3e6581",
-      "islandCoverage": 0.4727,
+      "mimeType": "image/webp",
+      "sha256": "c3633dfe2f59071e6c40e0c4e0b7379d55074e75230c5c9cb7dae06b7ff0044b",
+      "sourceSha256": "b94a375b5689c6284015eea0bc3a88830710097a3d8d4fc3ccfeca1f14bb5954",
+      "islandCoverage": 0.256355,
       "rebake": true
     },
     {
       "name": "ButtCap_LimitedProfileBlend_ORM",
-      "mimeType": "image/png",
-      "sha256": "86e1dd03c8b23d769dcd35005e3fe58b64380cf726610b72fa15c918e797c17e",
-      "sourceSha256": "4d10599a5e38132fff9aebdd3978a1635f5afe4b074caf088b36c9ab3625638c",
-      "islandCoverage": 0.4727,
+      "mimeType": "image/webp",
+      "sha256": "8c7da03ae6e06edbf92198002c453d5e82beb9af5abd0996c63dd9fc013d450c",
+      "sourceSha256": "3407f46f80521d707b29d8ab4a51124739b4c2172956680d51105522104a50b0",
+      "islandCoverage": 0.256355,
       "rebake": true
     },
     {
       "name": "FrontBand_ContinuousEnvelopeContact_Normal",
-      "mimeType": "image/png",
-      "sha256": "681dc080f65c25512c0980479fa4e6451934730dbc47da90d61df3ec4f048634",
-      "sourceSha256": "a18285cdc6d35b515ad210f4f39141216a2e4a0368a6e3c88cf33ab40c424843",
-      "islandCoverage": 0.7025,
+      "mimeType": "image/webp",
+      "sha256": "0777fa269edd950b23574d7a4cf1cce2063f21e7f76990f8493e9bf55d7302a3",
+      "sourceSha256": "e4c82e2d14ca74840208ff875bebe2606fb324dcf4b24b1f6329c2d9d5a04799",
+      "islandCoverage": 0.362304,
       "rebake": true
     },
     {
       "name": "FrontBand_ContinuousEnvelopeContact_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "5324b75068e340067140fef4e5a7460874dffb8e66b72269887f2e1e752b4bb9",
-      "sourceSha256": "e17c4060e557c9854747b8ec6ff28a9e223346e483d75e25f557ec1a1e5ab0ed",
-      "islandCoverage": 0.7025,
+      "mimeType": "image/webp",
+      "sha256": "57ff97a76867f75cf9a6e02b600c5e816b25bcea2794da883d82097892919e9f",
+      "sourceSha256": "bc5f8a2424b8310408a812d795785b063482fc061efbd65f89e8f5f77e340d0e",
+      "islandCoverage": 0.362304,
       "rebake": true
     },
     {
       "name": "FrontBand_ContinuousEnvelopeContact_ORM",
-      "mimeType": "image/png",
-      "sha256": "1080f7342fe1e8e73772d7a0b66df582d956bfdabee5c9e48b69b12b47813b9e",
-      "sourceSha256": "3bdc0b6b293246b7bd70f9266eac8d1f9ef115489c881b1ec0768f7bd02ec020",
-      "islandCoverage": 0.7025,
+      "mimeType": "image/webp",
+      "sha256": "04ad7e70248794af6a19bfbe7791d4f561cadea01ad0a4e319788946896d1eca",
+      "sourceSha256": "b731203940ee87cf1c0b60c0aebdf83a2a6b9b664ca2a83256281ec14a253b1b",
+      "islandCoverage": 0.362304,
       "rebake": true
     },
     {
       "name": "FrontBandSideStrip_Normal",
-      "mimeType": "image/png",
-      "sha256": "19cc4172514dc885234c40a7bd38a4fabdd41da2cc890d5d706a14199101c565",
-      "sourceSha256": "b81ab37c9e5e7acb65c1b60cb534ff086f56a5e456326e0b375b5b47f0e0c712",
-      "islandCoverage": 0.4637,
+      "mimeType": "image/webp",
+      "sha256": "1e3c5d905668e6454f834804393ac7b4b2a586712ab09414940f0731c9b361d2",
+      "sourceSha256": "7e0bb3dcd20bb46f1020e6fb089e132d9eca5f6a15dfb942a99da0f8faf59395",
+      "islandCoverage": 0.356842,
       "rebake": true
     },
     {
       "name": "FrontBandSideStrip_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "ed71f1b48cbbdf1cca254e97cb025f5ed03e8532870dad347bb364a081e33a33",
-      "sourceSha256": "1e6ab969bbed9059e0cdb076f93e117054844025a03af29509d4fe37d415496c",
-      "islandCoverage": 0.4637,
+      "mimeType": "image/webp",
+      "sha256": "f305c94505c3822e79ade0e33af195c9f37e7275bc3b901ff59e92c29902ca66",
+      "sourceSha256": "1ca4ab9ded35052463228f22f01be040cfa79d0e819bbef0430ff4a72c0495ca",
+      "islandCoverage": 0.356842,
       "rebake": true
     },
     {
       "name": "FrontBandSideStrip_ORM",
-      "mimeType": "image/png",
-      "sha256": "556f2ac7124da123da3fe5f021cac7349cc43520de439df7da9735678885d858",
-      "sourceSha256": "7d1a33f19a74334e3184b627c3d4bfc54eac4711702c46bbcceeee03ac84e4de",
-      "islandCoverage": 0.4637,
+      "mimeType": "image/webp",
+      "sha256": "315e981f61e2e6b9fefdb4accb022f1b55b3baf0addc4da1bb319e903d698c2c",
+      "sourceSha256": "2339feffdc2006c0f9ceb066b8745d59a6df483373638f42b2e7fba15e9b7d04",
+      "islandCoverage": 0.356842,
       "rebake": true
     },
     {
       "name": "FrontSideBoss_LowRoundedExterior_Normal",
-      "mimeType": "image/png",
-      "sha256": "f0486b35bed5a64247159e8f97513c7cc4deb7e4969eb5193601cafe74bced97",
-      "sourceSha256": "d7fa5f126c241271b6603683b99a3f5ce64a48d08665cb6965fae53a4497e7ae",
-      "islandCoverage": 0.9458,
+      "mimeType": "image/webp",
+      "sha256": "686f8150754708b434ad33e566cf0e22e535f3e59966fd122b5cb94051242a3d",
+      "sourceSha256": "ad4e2e50e2de5ffc192b5a625f372df61648a3160af09ca58aa025be9d07abeb",
+      "islandCoverage": 0.413998,
       "rebake": true
     },
     {
       "name": "FrontSideBoss_LowRoundedExterior_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "22d2effab7cad77ff287ae60c1c7265ed6db69a095ab6805a1e7fa6610cf08fe",
-      "sourceSha256": "f39b8a3da71645cca87cbd639493f62e1a17550d0e9feee33b3280661cddce0f",
-      "islandCoverage": 0.9458,
+      "mimeType": "image/webp",
+      "sha256": "e7dc8327a7ed827161bb9efa0a534850c08fd3624d9d9f34b7803fe891440e7f",
+      "sourceSha256": "50afae793a9d32faf62bf3b9b13cb884c84a4b3c655c958ef5c77a3a2fe0add8",
+      "islandCoverage": 0.413998,
       "rebake": true
     },
     {
       "name": "FrontSideBoss_LowRoundedExterior_ORM",
-      "mimeType": "image/png",
-      "sha256": "71b450a9d44ad9ae762d160c39d73e2184a954a5c6b0b776dc07f843f9668a9c",
-      "sourceSha256": "6d582fe7a459e108822bd407edc875912c6fad9d3f11f19bd2a083eb689e8aba",
-      "islandCoverage": 0.9458,
+      "mimeType": "image/webp",
+      "sha256": "917646f7874afcb7a5991c36eb79e4fb178fbc4580d1074feea9084b71953fef",
+      "sourceSha256": "9123d5db0e7e65ef43a4af9e6003273c670f150448639b2296957ec1af25dee7",
+      "islandCoverage": 0.413998,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_Normal",
-      "mimeType": "image/png",
-      "sha256": "2e7276e636f7fa157a07b943d789b9148cc770d6ab710d5333ded5c62023894c",
-      "sourceSha256": "7f741c99368595aaf8218898c8400d6bc2a62b724754c3c684b5dfaf45c98290",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "10a68e5fc5e233831a5fd28329b5646b3b88f9b67a8ab6d09f5d6e975205511f",
+      "sourceSha256": "1d3f9805e5dc12d74fc06823fe5a966bced33f9de332b864b38142511c46ed5b",
+      "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "5d94b6fee464494187e89367b910ca6b38b71cddcdcfc111fe9307994d583704",
-      "sourceSha256": "787099155d40ebed31693e64dd8807c5d472b5361b09b966cdc7f8e340c8fac4",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "6943d1837b43368129b6af723e367094ab6b8b77ae03a11523d632a36d852f6a",
+      "sourceSha256": "abccc4763aacc832f069abd94c13d07308361d60b7d76a13860ab2ed33f38c66",
+      "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_ORM",
-      "mimeType": "image/png",
-      "sha256": "ccdd7582df9f98a384fddbed24f44e9894bb5561bb4c1f075b22f1c0ee36a48e",
-      "sourceSha256": "a75afabf7a801af932e732a19b1cf2656035bb23b4b36846ed1b7a9abfcdb620",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "bedf7dfaf3c09b0aa18cb8b4ed2e095cd27eab08dbfd5b3111cc1c0d2fba8643",
+      "sourceSha256": "cfb2c28c25403751447102f72be3bcb5b064c2eb1185d14f19f5f7692792c98c",
+      "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "HandledCylinder_Normal",
-      "mimeType": "image/png",
-      "sha256": "48c4fd84ea802ec5cb33fdc6243b87f211dbebbebec253b83d20760bf25f5127",
-      "sourceSha256": "d5ac8d616ce5f3958a78eda8df50e8e0211af82d57e707e63d64240a6e1f969f",
-      "islandCoverage": 0.8112,
+      "mimeType": "image/webp",
+      "sha256": "99380f17e15ec5457447ff86961085ed7d6d4bd14bad60ad6e8565355710f3ab",
+      "sourceSha256": "4b42f30313d677544255970d493d846e31caa984a49009143fe2e5624f2cc57b",
+      "islandCoverage": 0.688978,
       "rebake": true
     },
     {
       "name": "HandledCylinder_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "746ebafcfe2e5b9c3410cbaa417d97a963c2a29345ec469303445e1e793fb4f3",
-      "sourceSha256": "eea1edff4af31751bdca230dd57c453b1313b4bc86b77d36e1e73240f8974c34",
-      "islandCoverage": 0.8112,
+      "mimeType": "image/webp",
+      "sha256": "84ecc7b70205a71c6b5a4a779b4661e3b02780e87481b0352d43b227baaf0079",
+      "sourceSha256": "92554050baa8951eb41ebcaa09c34e143ca7121915b89c3041bea0a21d8d05ae",
+      "islandCoverage": 0.688978,
       "rebake": true
     },
     {
       "name": "HandledCylinder_ORM",
-      "mimeType": "image/png",
-      "sha256": "4a68e50c00635e8800687eda80078a3f4bb75369952427778deef46748e66faa",
-      "sourceSha256": "62713494d323db5779de6e2437bb7f41981596475ca8a4658cb062244fe80f03",
-      "islandCoverage": 0.8112,
+      "mimeType": "image/webp",
+      "sha256": "cb8756762a481f7b0716cb4bf0dc038e25b3b7e2fa26c1b891a9de294eac8845",
+      "sourceSha256": "22e127b9b3f35b3aed6556f31d3ceff6fc5a98d7cc48006975306ea51d95c5e2",
+      "islandCoverage": 0.688978,
       "rebake": true
     },
     {
       "name": "HandleNeck_Normal",
-      "mimeType": "image/png",
-      "sha256": "e180dd6384402ee3e145bd116259113decbb232d5c0cd933786e2df2a392a4bf",
-      "sourceSha256": "b715a286cdc2a822f64a2786819f6b7fec463b86a05df1c69a26c50f31400d43",
-      "islandCoverage": 0.8502,
+      "mimeType": "image/webp",
+      "sha256": "1cae518a8ba17d2640a219738d423d6b532dd05e28e6158c83114f5e372f189d",
+      "sourceSha256": "6276d143552cf2e375e03779df7e3d95b1695994ee1ab43b3f6aa90be155c346",
+      "islandCoverage": 0.719956,
       "rebake": true
     },
     {
       "name": "HandleNeck_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "0e8925e69ff1864f7412f6f64c22221358718eabdde58349ba8db79eaee6c09d",
-      "sourceSha256": "1b626367f7440e73a289a158926d40fab864a5d8892d7d4fc4715f8d66a2b0d9",
-      "islandCoverage": 0.8502,
+      "mimeType": "image/webp",
+      "sha256": "c95b674a885a67158615df6dcbac91e3c0a9b9cb98371c8c0cc581351e952d3c",
+      "sourceSha256": "b6018c200b75266fe6faaea1326585501697950d48fe0d892ccc617561484d03",
+      "islandCoverage": 0.719956,
       "rebake": true
     },
     {
       "name": "HandleNeck_ORM",
-      "mimeType": "image/png",
-      "sha256": "f8bf54ebaef6923287e90fd1a4bef66e03bad73ce20027b0791505f46712710a",
-      "sourceSha256": "fe9cc1e7b45d8126f5887e84cb5993996b76cc91b2ae1f433e2f5d1078afb3d1",
-      "islandCoverage": 0.8502,
+      "mimeType": "image/webp",
+      "sha256": "3214383fcc698121609a2f5f250d582bd378d39bc2d40ba226d24fdccf3224bb",
+      "sourceSha256": "5d15eb8b1cecf017a0be04d956349c985c8b8624e78dd27b72b5643fcfb4cdb8",
+      "islandCoverage": 0.719956,
       "rebake": true
     },
     {
       "name": "HandleRoot_Normal",
-      "mimeType": "image/png",
-      "sha256": "03689630e11cbf6a68f77cbe9f83d6b112404c27143870c561cc5dca41219260",
-      "sourceSha256": "234c1a5da7c43e4b981fb7be011981d2c4ed8e98783e149bc213181eb916eb84",
-      "islandCoverage": 0.7223,
+      "mimeType": "image/webp",
+      "sha256": "22e4b0981a13c1b8ad178d59ff67aa52f72863dfa9463f8d38884c7756a7786d",
+      "sourceSha256": "a5819fe027b05d6f03971e2776f4d300a848a6ce07e7ef512cee1948a3e2d37b",
+      "islandCoverage": 0.443562,
       "rebake": true
     },
     {
       "name": "HandleRoot_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "ab52fcdaf30bb83a262eb61085194e629a59c47b6a452a1b9c0ddc49adf9bcd4",
-      "sourceSha256": "43e613350d370ddb9dfffbb14ead63ad2d05e1b31e4ae2c8a127f9cc168051ad",
-      "islandCoverage": 0.7223,
+      "mimeType": "image/webp",
+      "sha256": "919eedac3bfcebe3fe13610732a929b516343d0405caa3fc1be3988d60ac6f8a",
+      "sourceSha256": "447da0f72e53ce721632e7e31faf6229aa2b74a1702ba15091bd505fe0aa6a51",
+      "islandCoverage": 0.443562,
       "rebake": true
     },
     {
       "name": "HandleRoot_ORM",
-      "mimeType": "image/png",
-      "sha256": "452288fe4b09230e3d5889b9881dfce9abedad55945e0d6cde7b4dd59df0af22",
-      "sourceSha256": "e78c98d074926550a89c4b7109abd88840882a2d3c3c0f1d1a7660f99423fb85",
-      "islandCoverage": 0.7223,
+      "mimeType": "image/webp",
+      "sha256": "bf949fb53fe45cad0ecfd248752aa82ca76801219dcf447321034b40d27b1cca",
+      "sourceSha256": "edbd856da98ede61382f99da1898ab8fcd98a12d786953a6fe0122d34879d2f0",
+      "islandCoverage": 0.443562,
       "rebake": true
     },
     {
       "name": "HandleSphere_Normal",
-      "mimeType": "image/png",
-      "sha256": "cc97fcebf77ff6586370e1be796a100135ac7ce03175cf72b143aae724bb1ae1",
-      "sourceSha256": "808f861002125a3360ee64c77c40ecbe2f70f967505e4819499bc0d54de78ab0",
-      "islandCoverage": 0.6078,
+      "mimeType": "image/webp",
+      "sha256": "f2444917b40cd39061f7ce52dd70431924e2dd09178151dff550f5dfb8f6fd79",
+      "sourceSha256": "905e96a2eacd2bfa76f26dec5ba9989f9a83c54840e5c5b224bd52ff6cb6066a",
+      "islandCoverage": 0.527671,
       "rebake": true
     },
     {
       "name": "HandleSphere_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "673a5e1b9f9581110ee473341f80f9a8cfdca4cfc0042a59e252e5c071522c9d",
-      "sourceSha256": "d713608c390fa25c6ed4e9e37915bdd0d1ec93cf6d4f726c670711f569ab3d96",
-      "islandCoverage": 0.6078,
+      "mimeType": "image/webp",
+      "sha256": "f6a1f04f27cc512a7d18cdfa232a719fc51c674655d2ef69f2de0f0e2be4c97a",
+      "sourceSha256": "178f8892e959a041ce81f2f17f1c726c9be519e019ad675c7efdd408b6c8a63b",
+      "islandCoverage": 0.527671,
       "rebake": true
     },
     {
       "name": "HandleSphere_ORM",
-      "mimeType": "image/png",
-      "sha256": "3262de044cf1a985dd3a674a4f359cec2fdc482fd89a6c3bd83b527cde63ec97",
-      "sourceSha256": "a5184c40344a6767f025b1d3ff60f79fcf7e54d1005700ac5f1d3a30ddc485f7",
-      "islandCoverage": 0.6078,
+      "mimeType": "image/webp",
+      "sha256": "c3037b0b283f68d5c8e17dae3846560ae5827f3ff8a23cde72cc73aa18a78ed1",
+      "sourceSha256": "4b8d6074652080aae3ee828c83079f8bb7142a90720fa009336e15d1efaf1147",
+      "islandCoverage": 0.527671,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Neg_Normal",
-      "mimeType": "image/png",
-      "sha256": "ec83c164164db886e1ef64969a82f225163f82e19a71d69a963f00702b68e633",
-      "sourceSha256": "8f0e00d5e6d4ecaee29696acd37565aaf099fb98f68946106f91f44fe7e8f1e8",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "6852945f9492cd780919707b0c16c1f2d4f818bd02fa4e2ddd2e926846552f70",
+      "sourceSha256": "83b89e422a3f4915ef13d2452a242043113d537803c67a9009aa795ec38671c1",
+      "islandCoverage": 0.541988,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Neg_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "f6738d0a9605784c8e9d6b21058f61f6edb391ff78aae433b8d54f3495f3134d",
-      "sourceSha256": "67dad25914118c473b818cee5d515d7501aa6d455f70bfbf95546886f106c1cf",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "a80f14d2af9613b06f843ba41ff0d63c7d469a8f1df5ec6943a555fa97d470cf",
+      "sourceSha256": "5d9b5bae3ff12302a592de64fb5c51d7de6dd3c215549b435b9be9f7e282e21e",
+      "islandCoverage": 0.541988,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Neg_ORM",
-      "mimeType": "image/png",
-      "sha256": "bae5fd19d5b050cdd5b65bf7dcd925594d419e6b2f8a1b2ef067c9f9714e80d7",
-      "sourceSha256": "ef45b0385a4bb938615284928fc1e03be63e544bcc68e389993a6d13661bab18",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "a1cd1062b77ab590dce23009ec6880fc8789d23732d6f545f5e822748330d807",
+      "sourceSha256": "cc140fb26dcf9bbfb647db4052419f0537032cb64c5da6438cd41d4bbc49000e",
+      "islandCoverage": 0.541988,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Pos_Normal",
-      "mimeType": "image/png",
-      "sha256": "7b4eec03578b0932184c9ed593e3247b71240f1a9de9e319c915eb371d559a37",
-      "sourceSha256": "9442551a61b9a19453ad8ef22c03d8373a8a9ec2e17e687e2166900f0ccd3ecd",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "cf0ccc7471ebf79987d850126d5981145c1d976633df483aec945287bb1f6a26",
+      "sourceSha256": "2681d2394d7dcee2651979868d9880c78be77d322b58b36aa5c3d5500e480abf",
+      "islandCoverage": 0.545017,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Pos_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "a68c4d5773246475387e78a9fd5ec0b37bb35ccc70bf70f3b4db65370883d25f",
-      "sourceSha256": "cfb3eaab14f8bbc1ba16cc09074c29c2f6a916bb6619a6ac2e0f622018906d4f",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "d0f953dc2a6e2e26be2b299e0fb1315a53d7a6be3725f0da5e862a295496114b",
+      "sourceSha256": "73c8945495ce1c0580016e472ad683ef56f42a38ab9940ef5957e6093032c798",
+      "islandCoverage": 0.545017,
       "rebake": true
     },
     {
       "name": "HY150_ExteriorSideRelief_Pos_ORM",
-      "mimeType": "image/png",
-      "sha256": "38ee79e669a0fa73948fffbd2f43c5ce75d20dccb3af719eebcc6b7cfb5404ff",
-      "sourceSha256": "e058435f8bfebe65e0394b38b168bb3db775a0e049e24c3f450110c7dab75e81",
-      "islandCoverage": 0.5873,
+      "mimeType": "image/webp",
+      "sha256": "58a4a5bf2b7ab5b932b1b31c3661f48342fe6e0c8784273484c790010652b9ef",
+      "sourceSha256": "8f567706fb86e9e320b381051b04839afb187322837521ca4782ef2724599456",
+      "islandCoverage": 0.545017,
       "rebake": true
     },
     {
       "name": "HY150_RoundedUpperExterior_Normal",
-      "mimeType": "image/png",
-      "sha256": "d4f8d687da8b9dc9f4eb60d693487a433c43a8be9ecc665f45903256101844cf",
-      "sourceSha256": "b17d2d4c328cd0b709e2bacabad4cdca952879c27f0bd70e6c77ded71164f62e",
-      "islandCoverage": 0.6025,
+      "mimeType": "image/webp",
+      "sha256": "7beafb1e429d8c79c12a1af728c1639745a14bbeb12de91923348057e98f2093",
+      "sourceSha256": "0466178eab1cfdfa8e661a7b1292245fbc6db3bdfe323ad2deaf50f29c064c1f",
+      "islandCoverage": 0.474796,
       "rebake": true
     },
     {
       "name": "HY150_RoundedUpperExterior_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "4b1d15333f5884148a61bde051443622485c3f16d7e2b7b33f7232d51fa338d3",
-      "sourceSha256": "b3cf3b4877eb26919c939e31d8a34163500b3e11fa5d6ae587133609fe483251",
-      "islandCoverage": 0.6025,
+      "mimeType": "image/webp",
+      "sha256": "b2becbfcf85506dbdd68dcf5cd849068744e03a67a746ea9ce984f5a58ea6f9e",
+      "sourceSha256": "f1241405b5fc377cc1bdb3a41faa87cf2a830fb856fb0fe4edc614f219ec12ee",
+      "islandCoverage": 0.474796,
       "rebake": true
     },
     {
       "name": "HY150_RoundedUpperExterior_ORM",
-      "mimeType": "image/png",
-      "sha256": "76d494864e484c37812c1b839d8e87a8f3b6c926da2b7c0b93a06ab2a726fdef",
-      "sourceSha256": "eb74c130ce35eb2a7ccb8c89a31a85135694f2e275fd9bcaeaa3362023bcd25a",
-      "islandCoverage": 0.6025,
+      "mimeType": "image/webp",
+      "sha256": "4e5805801a7e6634f6f7663caf3f7fd11cb90fdf263a8d7cf1d15013ffce36cb",
+      "sourceSha256": "81c1b5f8327b447e986c215db42001702d75db3df7746f0bd49e1784fe88b955",
+      "islandCoverage": 0.474796,
       "rebake": true
     },
     {
       "name": "HY150_VisualFrontSleeve_Normal",
-      "mimeType": "image/png",
-      "sha256": "53f3073e9c0e8c40a558af245c31608f2440565ebd6f09bb95f544bf5817ac14",
-      "sourceSha256": "43ecc264b55c17b4ccdcf0323059f0f0c4e5e98ed45d7da485bd3174a0d82165",
-      "islandCoverage": 0.8229,
+      "mimeType": "image/webp",
+      "sha256": "2ba504735699c9b9bef2f08a6221a080131c5cbe8b069217e0f39b93e5e1eb24",
+      "sourceSha256": "87f26db0a522aa03322465e466ca3966f70f215372330033da9c406124ad104e",
+      "islandCoverage": 0.589287,
       "rebake": true
     },
     {
       "name": "HY150_VisualFrontSleeve_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "6bcbcb108550326c1375c0c5068291aff112199c321b4fade8c1f73fddbd4b09",
-      "sourceSha256": "09655343a9f3624e27d37b279c1be3c557ed64ccc478ad0890dee6c62831a0de",
-      "islandCoverage": 0.8229,
+      "mimeType": "image/webp",
+      "sha256": "1b6c7f4ef6a042260b0da2c809f0078858263067cf6e9994f11c8d311d815e9f",
+      "sourceSha256": "06d012a90c7279ad77977fe247448d0c549a7173b16b1651f8bd4c68f07b334f",
+      "islandCoverage": 0.589287,
       "rebake": true
     },
     {
       "name": "HY150_VisualFrontSleeve_ORM",
-      "mimeType": "image/png",
-      "sha256": "24fd98789e9f517e74973c1e2449150e8c411f28050f424a1fc4c4f3f911ad38",
-      "sourceSha256": "d55b2e45f711276bbb3118b8b5e80a18e027c235ee0e01fbc6a7d144f27f2043",
-      "islandCoverage": 0.8229,
+      "mimeType": "image/webp",
+      "sha256": "ae3cf91dfb710bdb859be1c39a273e35311d436e54b59c5fdf6bf9350ac20a9a",
+      "sourceSha256": "83bbdf2051a843f685d9eb15ecda1c7f6329f504fb31711d32301edd716e2ea8",
+      "islandCoverage": 0.589287,
       "rebake": true
     },
     {
       "name": "HY151_LowRearShoulder_Normal",
-      "mimeType": "image/png",
-      "sha256": "1462e381768e5c44ff290910ef46c3f45b50757ec3390eb879e2b382df587ffb",
-      "sourceSha256": "60563135ca718dd85114bdd40d39ef5c4afc05ceff326dfc805393cae03f03d8",
-      "islandCoverage": 0.6923,
+      "mimeType": "image/webp",
+      "sha256": "1f7ccf034ee8f2fd11cdbb720ab2517c953797e1a1d03e24cd021fc3c8e1f44e",
+      "sourceSha256": "c07c4bb378c09ddacc3458b6fdfa71bd259f83a8912c03be131088d88ff72f27",
+      "islandCoverage": 0.549644,
       "rebake": true
     },
     {
       "name": "HY151_LowRearShoulder_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "acdfa8838aa86db47d2facac6373b220c083bf9c9d518cdc418811da4757e52b",
-      "sourceSha256": "e075bb8709a661d2ae0de0f7b82fcedef6f565f27961fa817a4bae80276d6091",
-      "islandCoverage": 0.6923,
+      "mimeType": "image/webp",
+      "sha256": "568c9012fa6e8c80faa2062996240aad0040c4434086d407f52cb543cba9262d",
+      "sourceSha256": "965cffbc135c6323d9278b016a271a91b61a40927ce8b0e44ad5ff9fdb2907ce",
+      "islandCoverage": 0.549644,
       "rebake": true
     },
     {
       "name": "HY151_LowRearShoulder_ORM",
-      "mimeType": "image/png",
-      "sha256": "1aeb472f240f69e5a3238e14257a63e8e6de1ef74cebc0c2f492dac96defaa6c",
-      "sourceSha256": "13f0836fa835aec1c35b7adbc1f2e48e3c2f760a106b3a57853b8cd57d63fc1e",
-      "islandCoverage": 0.6923,
+      "mimeType": "image/webp",
+      "sha256": "dcffd0c83966753da1cc19470726eef6e973debcde1c362b0700dc46b0005603",
+      "sourceSha256": "e9d5d700f0fc1fff6e6d4989e8e2c11e507e165a32990e51a9738431d342e484",
+      "islandCoverage": 0.549644,
       "rebake": true
     },
     {
       "name": "HY153_VisualMouthLipAndShallowRecess_Normal",
-      "mimeType": "image/png",
-      "sha256": "269800fe80172be2817632f020d8dba0096084de0e816418d6b1ae8572f8320e",
-      "sourceSha256": "7afaab0cdc6fdd126fdbfc0c152030cbedeec71aaf930c14d654277850c57ee9",
-      "islandCoverage": 0.5752,
+      "mimeType": "image/webp",
+      "sha256": "30637723a7a6b6b99fa404046165a1722234c8396ba3eb19cfe0660ade0b481b",
+      "sourceSha256": "5dbf23ac48753d5d6aa88ff9e94c9269501eb29f39a6b76205f779bce31dd424",
+      "islandCoverage": 0.386684,
       "rebake": true
     },
     {
       "name": "HY153_VisualMouthLipAndShallowRecess_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "a973e2f643e841753d017a75f100ce820dbe87c7b590c2a9a30c4e0c4e6c189c",
-      "sourceSha256": "2a031617cf2e500e765662b9262cd53b13b506ae2d3d4dfaa1afd24418cd313d",
-      "islandCoverage": 0.5752,
+      "mimeType": "image/webp",
+      "sha256": "0c28d6218f7c9b251283cfb1574686284a94eb97326478b76364c376713a171d",
+      "sourceSha256": "88b97fc6979b2f01ec919508fa3c15c4a4ef421dee0fd88dc90d53ffa7fbd853",
+      "islandCoverage": 0.386684,
       "rebake": true
     },
     {
       "name": "HY153_VisualMouthLipAndShallowRecess_ORM",
-      "mimeType": "image/png",
-      "sha256": "4882cfaf160e2f49408e2790f66fa69080da121cc57a345f6328c2931a70725d",
-      "sourceSha256": "2f12e1ebb17c646bf08237b78bc08b69bb0c401d2c5c2015a67233f3f7246ba6",
-      "islandCoverage": 0.5752,
+      "mimeType": "image/webp",
+      "sha256": "44364e2ffa20e2bf9a13db4b7f1084865f5cbb4ac70e8a26569c6466a47e0e26",
+      "sourceSha256": "7e3e25422b91131fd0204ac04e362541e52afc95532ea491229181f5e3ab424a",
+      "islandCoverage": 0.386684,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Neg_Normal",
-      "mimeType": "image/png",
-      "sha256": "45bab8c8093726dbe5ceab0d64fc5a510578c4b2c3681ce418bb8150e7cf7f30",
-      "sourceSha256": "fb1a2280d0301e81caccaef872f9fa09450a8f4ffcdc74f53856a502914c9b2a",
-      "islandCoverage": 0.2274,
+      "mimeType": "image/webp",
+      "sha256": "edb294b14832fee3ca713f85a3094b4a2601d87c7dad1699b2d32491b0378c70",
+      "sourceSha256": "5ee6d8536e313731df6078ea2ef8e8bcee1264d5acbcb9935bc3627fba16e084",
+      "islandCoverage": 0.030169,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Neg_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "15c1712e96948002650859088623634c06cd9469f5a93ac060d21aa5257ae64d",
-      "sourceSha256": "7c1794445ff10c5a65c63fdd0c39572a43d913c64b557724a5259326158d41b9",
-      "islandCoverage": 0.2274,
+      "mimeType": "image/webp",
+      "sha256": "fdb728b686c7d361fdde7c5b1efc78753a9d1a5152dffd2d063c5b693bbf93f9",
+      "sourceSha256": "07f29c38379c3544fd19b48557f2591ae4c7e120371fdf9fd975e0abefaaa9fc",
+      "islandCoverage": 0.030169,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Neg_ORM",
-      "mimeType": "image/png",
-      "sha256": "6be92571c758684f5c47b37b2270b7a8c67b8626d4d483735858477de218fc29",
-      "sourceSha256": "39555b3c1fc119480240471a8bd3d4aaec79436d0bd13b86fd44800c1f77a62f",
-      "islandCoverage": 0.2274,
+      "mimeType": "image/webp",
+      "sha256": "a437ac61d2ea8aaccce42cf543d17914daaa1bf4ff352864ba9979b1e538140d",
+      "sourceSha256": "b86607f7809832b9ceea8c4299457ec662d2a7e88b4792acf87f952e88157467",
+      "islandCoverage": 0.030169,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Pos_Normal",
-      "mimeType": "image/png",
-      "sha256": "22dfd42b75ea9838db995acc1ea9787efc4e9c9c8c7b289402bd422daba82775",
-      "sourceSha256": "9561f8c827f1f97fd33d436421538b4e0dc267ca23e0d0346ca6f6f84814865d",
-      "islandCoverage": 0.228,
+      "mimeType": "image/webp",
+      "sha256": "9fa7bf8cec528e334a0b409e0596d372d4bcce75fbf1e1a7bb6650fd4c5e6ec5",
+      "sourceSha256": "e5ee85ff3cd364bdbe40508ad49d2f90cb6d75bf5f46811dfde7b35c6fb48ea3",
+      "islandCoverage": 0.02996,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Pos_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "bb4afbd26642179ee27565c3471e75abd11209ce7e4dcb9f066bfbc2716e1bea",
-      "sourceSha256": "88b5949dec92774d7611604088c0c13af8dacb911c638b683ccb786a54ae3645",
-      "islandCoverage": 0.228,
+      "mimeType": "image/webp",
+      "sha256": "a49aacb91235f3b067fd5b62251a33fe55f3a6a4d2dc223fbd6b35447c624a27",
+      "sourceSha256": "284ffd17d9ed05a3a802ab646824ff8e20c0618b3d765f49d3f66a4587da36ff",
+      "islandCoverage": 0.02996,
       "rebake": true
     },
     {
       "name": "HY155_ContinuousInnerEdgeTrim_Pos_ORM",
-      "mimeType": "image/png",
-      "sha256": "b18920137186cd4c3e53d0084745242979c346e6cb50840d299260e6e4eeb689",
-      "sourceSha256": "c685b36b086a374c78db58569e8a86b60f11602694ab9cf37df8f1448bd21981",
-      "islandCoverage": 0.228,
+      "mimeType": "image/webp",
+      "sha256": "29e05ad6c13f3cc639b818adfef2f63007777cd94777c733e31a10b26d0deb29",
+      "sourceSha256": "05097bd4474692c18632a7eb8d0c31b74c5c9ba0fcce4054addde1df86b1a526",
+      "islandCoverage": 0.02996,
       "rebake": true
     },
     {
       "name": "LongOuterSteel_TrueRound_Normal",
-      "mimeType": "image/png",
-      "sha256": "87d79a69b957e842fc4b2e8ae55f91e9e2832ed772e30e887ae29a2e831b602d",
-      "sourceSha256": "a91059238a684fb510537dfbccb42bcbbb4b7147cbbd04c9c8458d0ca5bf7d69",
-      "islandCoverage": 0.8646,
+      "mimeType": "image/webp",
+      "sha256": "d04d8c2669f5bd59b074378bb4a1e90e917872b01646b929dffd555dafe7613c",
+      "sourceSha256": "8303fe4944bb59c990380c255421e05fa396f68866292269fc4a29935049803f",
+      "islandCoverage": 0.558266,
       "rebake": true
     },
     {
       "name": "LongOuterSteel_TrueRound_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "73d8496754a71d9c9b14a4b46b257f462e6c8e14a53a03e157955ba205ef0fd6",
-      "sourceSha256": "604effdf59e059291f3fb13a954951dce5de547f54a0e3ed5e21044841f13f8c",
-      "islandCoverage": 0.8646,
+      "mimeType": "image/webp",
+      "sha256": "558de46b7ee81a33dac6fe31d7d098489e6ce43965b7d846d636e188f4b316d9",
+      "sourceSha256": "1fb33d94f47f6ab1e48998da387fe2e2b5704c29e6e9bc1ef3cbe03d2eea10b9",
+      "islandCoverage": 0.558266,
       "rebake": true
     },
     {
       "name": "LongOuterSteel_TrueRound_ORM",
-      "mimeType": "image/png",
-      "sha256": "cc8147d1e33bab003122edf79aaad95a6241bc3b45e35fd04cc68f0425f7ba1b",
-      "sourceSha256": "aeebb529d4eeffeeda821669dcaf5dbe97f71e87282d0606090906d559879750",
-      "islandCoverage": 0.8646,
+      "mimeType": "image/webp",
+      "sha256": "722092cf9c424575a38b6fcc3521e8b855643a98d99285cc559c477c0ab57ab4",
+      "sourceSha256": "d766a3eb76a21d4477f5ad351124a7501ccea05d762d4155af2d4112553d9b5f",
+      "islandCoverage": 0.558266,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_Normal",
-      "mimeType": "image/png",
-      "sha256": "4b382ed73721c65b910e56453d614fa129abc9cd2798b76edbf965b59adeea8b",
-      "sourceSha256": "bcf02b5f66efbb9807a6bdfbc2384924cb2c96a539554f41782a4c07824a96c3",
-      "islandCoverage": 0.7467,
+      "mimeType": "image/webp",
+      "sha256": "a5701268be60353002a4314c1e6cfee68d24bda55775bc2cdef8becd0f279538",
+      "sourceSha256": "8443442a6ae454e57a6518dc473c1a02acf80c1adc7992b74a84e8d5b00e6bdc",
+      "islandCoverage": 0.393862,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "a6ba930c64015832ecbc7da4de869f9f349d9ed95cc99edfd3b40356fabb17a7",
-      "sourceSha256": "3d2a7a75f9820edb7adc631f738f79fd1cca94ceaf089b12bcf2ee38d6a48c6a",
-      "islandCoverage": 0.7467,
+      "mimeType": "image/webp",
+      "sha256": "eb8534114d441d09a550c3b08de6a711d35b6b2985e1cb5a3797ef2a6b621941",
+      "sourceSha256": "d60970f4f8d62476b968ec34ade2113b95b5e26aaad2d8e15409733d036eac62",
+      "islandCoverage": 0.393862,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_ORM",
-      "mimeType": "image/png",
-      "sha256": "d0db99556f8d19bcc78c2c0808db80c604a1dec28568979a5547d23365b12d8e",
-      "sourceSha256": "49a2c2c7dcdd0793acf2ae47465511f02a60f5ff5d9afd02db59fcbc062d4016",
-      "islandCoverage": 0.7467,
+      "mimeType": "image/webp",
+      "sha256": "9477e549366a8a6f69b63bde79fe6c36e05b175336130dd2a4174474486dec02",
+      "sourceSha256": "a119240adfcd3b0c323f966fbb1c6bc54c39311ea3bd68777f03d423f3990397",
+      "islandCoverage": 0.393862,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_Normal",
-      "mimeType": "image/png",
-      "sha256": "2e7276e636f7fa157a07b943d789b9148cc770d6ab710d5333ded5c62023894c",
-      "sourceSha256": "7f741c99368595aaf8218898c8400d6bc2a62b724754c3c684b5dfaf45c98290",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "59dc824ac77c09592d4765517de93fb180c212f2467ddb9a16ccb2d3b301adc3",
+      "sourceSha256": "32aa29a0472f38f968c1bbbcaff73c91359df60b285901468a3ad2fbd2bbadcd",
+      "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "5d94b6fee464494187e89367b910ca6b38b71cddcdcfc111fe9307994d583704",
-      "sourceSha256": "787099155d40ebed31693e64dd8807c5d472b5361b09b966cdc7f8e340c8fac4",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "e5bfdb9927a469ffbe8dd9d4b137b76ada1ef7dd7cb508cc166f23dc5d1356cb",
+      "sourceSha256": "9551a337388308241c29118193d38e6942ddd731dbe3196fa3ce0644c570a930",
+      "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
-      "mimeType": "image/png",
-      "sha256": "ccdd7582df9f98a384fddbed24f44e9894bb5561bb4c1f075b22f1c0ee36a48e",
-      "sourceSha256": "a75afabf7a801af932e732a19b1cf2656035bb23b4b36846ed1b7a9abfcdb620",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "11fdd0ab45cd16132b1a6bf0eded1355dfe89850b684f80141aa36d2f109bccc",
+      "sourceSha256": "c22e684a34647b883c7c594e6590d22fc94259b81de4773c7cf17e6e5d78b013",
+      "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MiddleSideDisk_Normal",
-      "mimeType": "image/png",
-      "sha256": "17c8beab601b8dc2c57421788dff086b91f1735b828ec3bdf58555e0e41db00e",
-      "sourceSha256": "63f21886408870a1ed13c98a4a2b88f1ef789acfa6e5aee5c6907b31a3415e27",
-      "islandCoverage": 0.568,
+      "mimeType": "image/webp",
+      "sha256": "8509cbf0bb38ffc37d6861be1a898a88f5740a71e30c9b8580d4cc020e840d52",
+      "sourceSha256": "8374623a317503dd33ecdf60c71c44d969f2d7b7002b2a8f62bc2ddba364fc06",
+      "islandCoverage": 0.548954,
       "rebake": true
     },
     {
       "name": "MiddleSideDisk_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "7e7fc7b7a50b1e99513a189df43f8fd986566914de1de8164bd3b9f169f806fe",
-      "sourceSha256": "30591f69ebf89fb6a3e4704d7c4d61dab55b3421fc0df7c120b4ed732fd41474",
-      "islandCoverage": 0.568,
+      "mimeType": "image/webp",
+      "sha256": "cd6967d3db5969d5fa60a1b4e1c11c158e2e23fc23740f1ed802d3061b00e546",
+      "sourceSha256": "139d1f028a2e83211d28c5d23cb0e15eadf6c31707114027b82550b383ea78a7",
+      "islandCoverage": 0.548954,
       "rebake": true
     },
     {
       "name": "MiddleSideDisk_ORM",
-      "mimeType": "image/png",
-      "sha256": "27aef27104c66a43ef71aa8050a11421796149582cb095f1ab5a798bb232e889",
-      "sourceSha256": "ab29f06e83340b1937d86c26a3fc2f6dd4caedd41da269c823f0f090f8a32d9f",
-      "islandCoverage": 0.568,
+      "mimeType": "image/webp",
+      "sha256": "73392fef4dc402b332929b8dec28a6a23741a778e812a07d6af40cc88aee8c85",
+      "sourceSha256": "0b3195972e7ddc940fd3c0d4d9f22a209d84d810533ef77785981cfc7a42b3d0",
+      "islandCoverage": 0.548954,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_1_Normal",
-      "mimeType": "image/png",
-      "sha256": "7cd97849cd62d39df6a89295fe89e6a375450085f7c8b168b13a616ef8bbc03b",
-      "sourceSha256": "a809bbcbbcb9cbd190f6ec358500f692a898276e90a57888da639276bb615d2c",
-      "islandCoverage": 0.8089,
+      "mimeType": "image/webp",
+      "sha256": "79356a3d33a94a802369d8b54f734221d5d25d462f36700cc0da8f8032ba44f8",
+      "sourceSha256": "1cc2c4fddf8f9ed12d5d1d3494556d1fcc00a6901347b4e6e832392d3a61b26d",
+      "islandCoverage": 0.578474,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_1_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "4e3cddbb8d9878f1b392208b882696bf826cc200d57527dd173d28ab18700262",
-      "sourceSha256": "fee57d33f7eb364c4233743fa0b5ab6adb7a832b870f299e60da48721b0cde7c",
-      "islandCoverage": 0.8089,
+      "mimeType": "image/webp",
+      "sha256": "ba9a7534c19a124b4c97806750bf4a75a04bce71c66e811051468fdb2eca98a3",
+      "sourceSha256": "2be82c0d3675175a35cd5437719e453767148080336b09d58e88a9726f3aa43b",
+      "islandCoverage": 0.578474,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_1_ORM",
-      "mimeType": "image/png",
-      "sha256": "2520d40dbc6ec82e41d8db59d2df886ecf168f5dc9e5d841b1045b7bd7fc7a3f",
-      "sourceSha256": "ff3d85057a3395e0c956616bd6ac6d56e546de07390a2645d654c1e86f53b26e",
-      "islandCoverage": 0.8089,
+      "mimeType": "image/webp",
+      "sha256": "05a084bda8fdf3aa28ff1fb2e5aacdccbdf183def8a6aab25f455fa6069bee52",
+      "sourceSha256": "09eed65b270c2d91409a0dab3f2db1c6ba21342f06371be49a4d6cca4370e3cd",
+      "islandCoverage": 0.578474,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_2_Normal",
-      "mimeType": "image/png",
-      "sha256": "b9339b9861970796fc989f5d542ae747e99d68fb5c35b58899a557d57e6d336a",
-      "sourceSha256": "8ad41a33ae2b23017b9643ec0d725c923373a4d92a6ff28694d1e7a08254bf9f",
-      "islandCoverage": 0.7497,
+      "mimeType": "image/webp",
+      "sha256": "17fdead0315c13445bfc13f96342af6afad2da5d6ae33353bafea935d9098eaf",
+      "sourceSha256": "f723987b6fecbab7b43718de4040a666ad0f7d06d90b1e13ec8f8a8afd8c4e98",
+      "islandCoverage": 0.628974,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_2_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "c4a064016c74d6c14faf0e291ef3406448d004a8531fcd0061d70f4b308cc29f",
-      "sourceSha256": "3d4db61f50ae9b42134b0199c82ee0e7bd9ede6cb052e34424f5d2ecd65995e1",
-      "islandCoverage": 0.7497,
+      "mimeType": "image/webp",
+      "sha256": "3d2bb26f4b394ca5a7a39442634c39eb50df68c2793687753e8b3976d24f2581",
+      "sourceSha256": "7ac90b171a1dfc625f630cb1d80644bef1d35e37c651e667b7b0f33a5da575fc",
+      "islandCoverage": 0.628974,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_2_ORM",
-      "mimeType": "image/png",
-      "sha256": "5c8c7413e0724ee1c0a6ccddc4fc6249e7e791e859957fdb7847d1eb4fae4050",
-      "sourceSha256": "bcaea00a0fb4f95617f63505d5dc523d4fe176d3b978fdc1f655d9c1e597814a",
-      "islandCoverage": 0.7497,
+      "mimeType": "image/webp",
+      "sha256": "c7ca9369262279778a504a99ddddf51da6cabb3362599999eaa7fa38d106c23e",
+      "sourceSha256": "b7f55edc71f42776a17d1d688a426349fe9f7d58e9c718791a510b9fbc72b72e",
+      "islandCoverage": 0.628974,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_3_Normal",
-      "mimeType": "image/png",
-      "sha256": "fd5b91cfeefb608b1936b24c35212383e0741bd3096edceeae395e64b63f935d",
-      "sourceSha256": "f2da04158c3aed43b65d1dd6fee02c9d3c42413ed31dc7703708082bbbb78895",
-      "islandCoverage": 0.7361,
+      "mimeType": "image/webp",
+      "sha256": "90761d9d03dcb5e61abd4826d178075d88a65889ba0b6415dbaedcf347a92f83",
+      "sourceSha256": "af38530dda2b6bb76fb46a566c11ab08ad54496802c83a697eb7cf02dd0c1be3",
+      "islandCoverage": 0.566546,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_3_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "1a70063fff0b2aa9e3125fb665ad9d635178bf705832a933bf853487d0f91493",
-      "sourceSha256": "b3d4749eef052d9cc9115d4d595c66234fd913cb5044cb69f68ca2c5339f8bf7",
-      "islandCoverage": 0.7361,
+      "mimeType": "image/webp",
+      "sha256": "e03633c6a4632aebdaf05f1a79fd5a662dd03724258a5bcbb1a523f2500344d5",
+      "sourceSha256": "50096a3b478c41eda61cfada6fbfbf0eab2fc8cf098e916fd4760cf8056484a3",
+      "islandCoverage": 0.566546,
       "rebake": true
     },
     {
       "name": "PlateExterior_ShallowSurfaceMark_3_ORM",
-      "mimeType": "image/png",
-      "sha256": "e8417090e51444b92b6a4ac584000e14d59c530f53e1a9716a1746859d6fa177",
-      "sourceSha256": "c9a6347c317fd8cafbc04e6b85c0bd11ff065de66bde3f001a5e65ca7351c966",
-      "islandCoverage": 0.7361,
+      "mimeType": "image/webp",
+      "sha256": "f4788f0431bf33b4a4eea17cb055871a761e9c13c4c45caebb5af137b4b61e62",
+      "sourceSha256": "8e99e58a82645e9a53f398d15225c10976397e5047a779662de6a18caca0a272",
+      "islandCoverage": 0.566546,
       "rebake": true
     },
     {
       "name": "RearBand_ControlledCrown_Normal",
-      "mimeType": "image/png",
-      "sha256": "6d0d76b4a1b6de21861c7a0f5896c0e10484c1ebd9a2fac849388fcd68bae1a7",
-      "sourceSha256": "a728984c32be2ffdf87bda5534526ac9fd3f131e7e493adf4c36f9104e78fcfd",
-      "islandCoverage": 0.6614,
+      "mimeType": "image/webp",
+      "sha256": "051f074952dfc40f753ad68a15b7b3c6a9dcb762777d3bd9a7593e4313bf83f9",
+      "sourceSha256": "9edf1f568af5080993dc0c2ccf6afa65e83467394f332e4c30936cbeb4b48bc5",
+      "islandCoverage": 0.296442,
       "rebake": true
     },
     {
       "name": "RearBand_ControlledCrown_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "ee53304f15362723b0902c8e9a66c1b9d1f432ead466f07b972645ac5dfd093e",
-      "sourceSha256": "7a41e9ff5b0073aa288c2006040410cc4d3f71288f3f16a0fb9c2fe07a5faa9b",
-      "islandCoverage": 0.6614,
+      "mimeType": "image/webp",
+      "sha256": "19b9bba5d4c567c10237497b615abe0f462af4d2b744378f8f44a6b5d7fc5ada",
+      "sourceSha256": "d4d5d7be9127bea16d6ab7fd638e72703479acecdbf75bd52864d6857c432562",
+      "islandCoverage": 0.296442,
       "rebake": true
     },
     {
       "name": "RearBand_ControlledCrown_ORM",
-      "mimeType": "image/png",
-      "sha256": "4f8b4031681f455ef58e4335cb384f21e0c6a00316ff2f0374be412235ee99b2",
-      "sourceSha256": "7b7c477ef09d9a7d7c33a0882770ab8c8a8cd11c3ed358288b8eb172a85aa570",
-      "islandCoverage": 0.6614,
+      "mimeType": "image/webp",
+      "sha256": "96f78d57d850f1a034798e9223c94bf4e0b9fbec268fb84f32119d564252f052",
+      "sourceSha256": "49efbb145e2bd33ef8e51140c037d8cbccb6921540f2cd9efb4bcaba2fcbc931",
+      "islandCoverage": 0.296442,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentBridge_Normal",
-      "mimeType": "image/png",
-      "sha256": "e550908986c1522a57e51935e6d5477919d4a6a7ca8203d571558f51c87b29d0",
-      "sourceSha256": "46ae234aaed69d0f0160e86fa60c4edd15f8014b4eaf666591c9c95d1c671c6b",
-      "islandCoverage": 0.6558,
+      "mimeType": "image/webp",
+      "sha256": "e2042f0b48560ab813ffeff1e6950717bc2d7bbfba3c8f0e42aaccf52ea4f471",
+      "sourceSha256": "6ace2347a336ca5f01bb248709c48af32e325a1fe229baf5d51b986bf893796a",
+      "islandCoverage": 0.587681,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentBridge_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "0be4b85a76af6e531ebaf433d0c3716c4f67ca5809b105bb362d71364041035d",
-      "sourceSha256": "7f7e4e7483cafcfc2c5c5568c999fb34cc64655008b8fa44cd7b2b35da858e59",
-      "islandCoverage": 0.6558,
+      "mimeType": "image/webp",
+      "sha256": "96fa1d7de5480664cfca297cb32ff1772dc0183c7284525fdfb14043904e54d7",
+      "sourceSha256": "4500cdba0cbbf1c958dbc9667b4e145f10f9b3665a4023d788c415c616a17f25",
+      "islandCoverage": 0.587681,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentBridge_ORM",
-      "mimeType": "image/png",
-      "sha256": "27cb8f3d6fb4c1fe4b0b0a5a3405f1323a9d9109788c1e525adcc30416336e3b",
-      "sourceSha256": "028031067dc2f40b154656b41fb00619ba5dc0e854ea7ba2e2daf0936e6e45d5",
-      "islandCoverage": 0.6558,
+      "mimeType": "image/webp",
+      "sha256": "4cca348f491b828e625bbec4a43fd5a24e88dd8fc6ebff35e583cd328c6bdd01",
+      "sourceSha256": "16244023ec031cd2ffdc53afa6891b3550b8fc6bc8f4e0ae4d8f25543a183c02",
+      "islandCoverage": 0.587681,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentLoop_Normal",
-      "mimeType": "image/png",
-      "sha256": "1b6a47edf0f47b16e9006950d0119035da6333a9d6c33f6b03885fc44d711612",
-      "sourceSha256": "04cd56da45e2e5a2eec292b84afe5151d0fd776ce2da7cd0155033c367145688",
-      "islandCoverage": 0.648,
+      "mimeType": "image/webp",
+      "sha256": "a89b902ea44ee7d3eed1ea57957e2cd2bd6e5df1d825af980fc51fb4a31f441e",
+      "sourceSha256": "51885c87dd9a42cc5ee5344c75aece3e4c877734a00e007f4698fae4f86af0b6",
+      "islandCoverage": 0.328816,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentLoop_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "896fd253a72c06b06f8f144b5087cf76f5bdf05c357f12f572149754354926cf",
-      "sourceSha256": "788e1cdd964e5935f6dd945daf2f11af48b4fdeae73bfa9cdfd5f4dc66794f11",
-      "islandCoverage": 0.648,
+      "mimeType": "image/webp",
+      "sha256": "56c3799942915db9cc1fd5a86965d777cd31c75c8b695c9601420eed0f14034e",
+      "sourceSha256": "13779fb4175819e64b7da0f3a2fad6c5d763831b7276c75b86139f2363017243",
+      "islandCoverage": 0.328816,
       "rebake": true
     },
     {
       "name": "RearBand_ExternalAttachmentLoop_ORM",
-      "mimeType": "image/png",
-      "sha256": "4461abc5493942b6ffbed4658232b4f0b1c20445c7dd233915aa4da3c958911b",
-      "sourceSha256": "d1a5b7afe793725dc5957bdc892ed0eff36da6d00c9b0607b4b6169881e9eeff",
-      "islandCoverage": 0.648,
+      "mimeType": "image/webp",
+      "sha256": "422a1ab961cdb7a0dc01ce8339d404c45f606345f9bac2db2732696b659f9b85",
+      "sourceSha256": "111fecb8446600bf8841b6dcd648b2aae92de936644e04d199ea794219369c1e",
+      "islandCoverage": 0.328816,
       "rebake": true
     },
     {
       "name": "RearCockingExterior_Normal",
-      "mimeType": "image/png",
-      "sha256": "adcedf0a2cc9a4b9d8113df2ab38bf1b3261825af5919241f166221ea124d1db",
-      "sourceSha256": "4f62601c9f737fe8b1aa0ab62484be2ed0102a53e3823cf4d2b8dc215245fe16",
-      "islandCoverage": 0.7656,
+      "mimeType": "image/webp",
+      "sha256": "c0380ffc43420b167a5b79e76c0de6b4722cfba4e695af30c32c26a0a029c7a5",
+      "sourceSha256": "14ea21f4d22d403936082e73b6471d1506c37e04aa7b76ec434a5e9e33a24ed3",
+      "islandCoverage": 0.688589,
       "rebake": true
     },
     {
       "name": "RearCockingExterior_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "b031ed8ad0b143c058af1a0d91a4aa5a281f2e3c64d5abc82a1c509d8236ecc9",
-      "sourceSha256": "d478d4f7092c7e94e59daa15af7f24a6210527f62d1be0df3692dd25b2a85799",
-      "islandCoverage": 0.7656,
+      "mimeType": "image/webp",
+      "sha256": "71f64a55885d35d70936d83c80c9011ec4c9c6bab306e2d3451ae7c92ec87389",
+      "sourceSha256": "e73bd6fa43aae7840edb378636a3695a75e8136552debda0f8662d8493076bcb",
+      "islandCoverage": 0.688589,
       "rebake": true
     },
     {
       "name": "RearCockingExterior_ORM",
-      "mimeType": "image/png",
-      "sha256": "611b365c74de10921717eec972b3b7696a08fe38f4170ff1bc0342644639c695",
-      "sourceSha256": "b8ff2e0e0894b9ceada5b8411acba2aa2da620cf60f2097be650586d11639a65",
-      "islandCoverage": 0.7656,
+      "mimeType": "image/webp",
+      "sha256": "de6ecdd50022fcb57c428ea314b600072052e95b3252a0c2c0b8611d8e03fbd6",
+      "sourceSha256": "e84d55d9ca1fe746adfa443f159a730a14715c084535831f9e9600db6412737a",
+      "islandCoverage": 0.688589,
       "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_Normal",
-      "mimeType": "image/png",
-      "sha256": "b8b862e932210396720e691b1e557bf0f80ebbfb504e68928306461498d4d788",
-      "sourceSha256": "4e5efb1f32219075b006413688735f7c9597e7c937130127a6a5f3f04dac2b9d",
-      "islandCoverage": 0.8255,
+      "mimeType": "image/webp",
+      "sha256": "6adc93d53b800a174fec5f80b269e9ca1f8d9f851e38f89376e6ca9e1ab34ff1",
+      "sourceSha256": "ddf30760ecd7a8b8b29542943c77c6587003f9fa1ac4cd14bf8a90e381d43b4a",
+      "islandCoverage": 0.723268,
       "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "f0468e27ed3e6e03aa1bb8e2917234efd72a58499c6dc21dc35647c9c7cb028c",
-      "sourceSha256": "0fb9a98ab745436a1005b2f1c4d0eca9ba70a318a43d7928d4c0a36bc069f94d",
-      "islandCoverage": 0.8255,
+      "mimeType": "image/webp",
+      "sha256": "7fe6317079c6e7e056c10ec71c04d98e1739ec35cecedd2ac61ac9e817111c6d",
+      "sourceSha256": "9463d314343532c039fd314958ec86b87df361e7f73fe152b3b179a21ca3d73a",
+      "islandCoverage": 0.723268,
       "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_ORM",
-      "mimeType": "image/png",
-      "sha256": "b7ecbc5d14f1d2e091f7459aded320e9b704ebd89d51853eabcbbea4c086925e",
-      "sourceSha256": "dcec5fa90665ac66c5d084cff39501634e0cdf7d31547d1ce40d7fe91092205f",
-      "islandCoverage": 0.8255,
+      "mimeType": "image/webp",
+      "sha256": "b5b06563e54a25b937105e83fb559fa9c997c5f8913e65a1581c4c33d2b5ba98",
+      "sourceSha256": "cc16f16afc08a375e65e9a89ded8dd64907d3e1d7db122a773c6df85031e686c",
+      "islandCoverage": 0.723268,
       "rebake": true
     },
     {
       "name": "RearSmallCover_Normal",
-      "mimeType": "image/png",
-      "sha256": "bb321c89c91562fc0672427036cdd8880235e293a166561675bfea4a313d32aa",
-      "sourceSha256": "731a3c4f612bad77bc7e155d85febd2fac13bc43c3502abdd668700da596f3f8",
-      "islandCoverage": 0.7421,
+      "mimeType": "image/webp",
+      "sha256": "965a1255801fa5e6cdca20e09e278ea291a24462c9da320207594b3e39166835",
+      "sourceSha256": "29cbe037fec1236bfe3f1bd8814b1afd34606ea76c196c7aaae94bb19578eddf",
+      "islandCoverage": 0.639923,
       "rebake": true
     },
     {
       "name": "RearSmallCover_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "e08e11d28970ebaf50a4ce23d17ad811da345c0a7a632f35622c88dac75bdd1e",
-      "sourceSha256": "236cf6deb2314b5cc0730864c47a627ca225d51fdb93b80c0fd5f1ce1bfcdb99",
-      "islandCoverage": 0.7421,
+      "mimeType": "image/webp",
+      "sha256": "602f3490aa2e20a028e787cc0d097ebe6fb20f04870e0ff7e0c572d17caadff2",
+      "sourceSha256": "af46b86c3226c24a0c7e060992c8c9bf4b9a2be7e740d337071108122deaa08d",
+      "islandCoverage": 0.639923,
       "rebake": true
     },
     {
       "name": "RearSmallCover_ORM",
-      "mimeType": "image/png",
-      "sha256": "86313d186c59867910bccad1fc55c176b014edbb1a27a4811aa06f2f189a2b4d",
-      "sourceSha256": "fdb12fe67ce058d54725ee23e9c507b8233d46698487e42bcfe0ccbc17632724",
-      "islandCoverage": 0.7421,
+      "mimeType": "image/webp",
+      "sha256": "df51d6f5f2f196581d806edb3f7b5cb9ff3b8a536563046c59edee03cac4e222",
+      "sourceSha256": "df61c7ee5b038ef77deacf01eef9ba10496b1ee2cf55deb959e6c663b0d52512",
+      "islandCoverage": 0.639923,
       "rebake": true
     },
     {
       "name": "RearSmallPin_Normal",
-      "mimeType": "image/png",
-      "sha256": "c90837ff416a45400aa22f9351e5d051e823ec4dc17811867a16769cf795b494",
-      "sourceSha256": "0594ab2397af3e574f158927832ec524ae96995d212ace505ac7df9158dadc2d",
-      "islandCoverage": 0.737,
+      "mimeType": "image/webp",
+      "sha256": "484af2f4a163425465f203a9daa9487c82410d3df677cccf36708456869103da",
+      "sourceSha256": "7af210d3698ff3b00d0bedd873aa15098d46c0d74f1cdad046c415950c4268bb",
+      "islandCoverage": 0.594162,
       "rebake": true
     },
     {
       "name": "RearSmallPin_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "21771d16d20a3d590792ab456673c40a21256c77a2d4d72ffdde826b4769ca34",
-      "sourceSha256": "adf4f01404070336865dee93dbd300be5a158b34057f5930aa542f60b9fc5c01",
-      "islandCoverage": 0.737,
+      "mimeType": "image/webp",
+      "sha256": "734b2c04fe6bb9b2becb7e75055d3450dfb74a0ef9871a6d9c7a646c317b85a4",
+      "sourceSha256": "009da8988d6292e3d1005c2467d719b598b7874a5be9d9581ce36f5c763361d3",
+      "islandCoverage": 0.594162,
       "rebake": true
     },
     {
       "name": "RearSmallPin_ORM",
-      "mimeType": "image/png",
-      "sha256": "6b7e9e37f0ddb2ffd9118ea785abc4f4f689b628326efaa0ffef3f41d8971fa4",
-      "sourceSha256": "f77d41dd5e6331eb5917907ab3ba5927e57290ca3928acb857ce21a2e3d35912",
-      "islandCoverage": 0.737,
+      "mimeType": "image/webp",
+      "sha256": "ceb52bebabd024dd8597966adb7b39dd1f6c9348a931edd27920626836b784be",
+      "sourceSha256": "079a347a92734e3583f382758ceba34b94cf0eaca909cc4984ba278e2cb4b47e",
+      "islandCoverage": 0.594162,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentBridge_Normal",
-      "mimeType": "image/png",
-      "sha256": "115342e34471f5e00ad99caec76fe85ab4f4d735411a5c55f1e8cf74df38fc2b",
-      "sourceSha256": "f810895048920222c4b530090b0def2da41baa29c560981162c117e562bf465b",
-      "islandCoverage": 0.9923,
+      "mimeType": "image/webp",
+      "sha256": "6900af42bf841895c8876bb10c8b1abb1b3e4ecf14899046e3c60142c26ee05e",
+      "sourceSha256": "bec51c0e41452a50588ba855016668f277644b1ec6ea0743d29815654334f23a",
+      "islandCoverage": 0.185932,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentBridge_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "cd9271ff5f7dcc14ac5be2981475bb3c6808ae9929955aca1717f6b65cd1d292",
-      "sourceSha256": "88bf573bf24b6b6e866f3febd0e1cf06e2eef30f3d8ac0d6ab378cdc9df419a1",
-      "islandCoverage": 0.9923,
+      "mimeType": "image/webp",
+      "sha256": "8da1cb9262bb68e62c1168a339baabc2ad1fe8fbf8d7dbf29834eb1ab8fa2779",
+      "sourceSha256": "23d34a211adfb2a8fbec5331b29bd59a467525af0117142506a066dd056a9324",
+      "islandCoverage": 0.185932,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentBridge_ORM",
-      "mimeType": "image/png",
-      "sha256": "182a4ad43ad1256cf4187341948049ae8cb3978a109a6ce3b6d4f5afef286f4b",
-      "sourceSha256": "d0d947c63932da0f2c562126b8f2d38d762fe6948d3bf4a6b0b0742214623915",
-      "islandCoverage": 0.9923,
+      "mimeType": "image/webp",
+      "sha256": "049b4e8d925210347c5e0b7a37852e14c46de4aa0afe682a980f823df85b8867",
+      "sourceSha256": "e44b854b27bb90e337fd4e22036d57e02fcec905eea81fa0b0e32f6ef3a266f7",
+      "islandCoverage": 0.185932,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentLoop_Normal",
-      "mimeType": "image/png",
-      "sha256": "310108ef25b0bc1d8c93cab1eec3e40de372c0b636a8f00ddd96c94d5665776c",
-      "sourceSha256": "3b52523de8fe5eadfccc4e7aa2379b964d1653b863c11decb27dd4a999b78ab9",
-      "islandCoverage": 0.6989,
+      "mimeType": "image/webp",
+      "sha256": "cd073c1ef0b91c2bf31abfe6aee8b44d41aa7f09160804032efdda69f1560ae3",
+      "sourceSha256": "a0647b7d0a17eeb093793f7b366ff768a3ed41be0c3b36d3f641bf8fc95a8028",
+      "islandCoverage": 0.302164,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentLoop_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "9561b3e7253f459e180175d4caee08a2a2a049844fed3cd3b13e3ca781a819d3",
-      "sourceSha256": "14adbff11b427fd3f410c7af6e99de851e5fffab0faf6e0c869c21949987a2f9",
-      "islandCoverage": 0.6989,
+      "mimeType": "image/webp",
+      "sha256": "ee912d013fbae60e8ab48b86a6325b1805f486d030471bd58f5a909668ea87f1",
+      "sourceSha256": "233a55e18d569be1e99b4c8d32e452b0db25cd3d2258553fc9e39edf1927c537",
+      "islandCoverage": 0.302164,
       "rebake": true
     },
     {
       "name": "RearStock_ExternalAttachmentLoop_ORM",
-      "mimeType": "image/png",
-      "sha256": "eb4102a397164135a445e4dfd18fc1ea83244f15c9dd30ce4db2cf90a8b0251f",
-      "sourceSha256": "32ab626f88dbf1f6620e18f75d76dcff9eec8fbafb498be94fbe8786d54690c2",
-      "islandCoverage": 0.6989,
+      "mimeType": "image/webp",
+      "sha256": "078c93c5a98f977116625af810ed709551962263c855ecffeedc6fa5e3b636ee",
+      "sourceSha256": "e75aeeff2981c34649eec05576fc6781acb1188e32b675a0f7f2bae553f68118",
+      "islandCoverage": 0.302164,
       "rebake": true
     },
     {
       "name": "RearTab_Normal",
-      "mimeType": "image/png",
-      "sha256": "d7a06ba7cf4e8d4e253e3338e7e84aab02cb877a516f30f93417c045313950dc",
-      "sourceSha256": "9b8cc30f74a1a75858056a745a53275d6843fe497394c459d39e76ab67adbd33",
-      "islandCoverage": 0.5497,
+      "mimeType": "image/webp",
+      "sha256": "26ac1110d0639c72a07ae0754e36aaafc2832d4122ab56fc4a4e3f5ec2f2daeb",
+      "sourceSha256": "a5ce7cf7d5f38ec3fbf5b79cba983ae27c0364b486bccb42b0e32b3bd6e84c8d",
+      "islandCoverage": 0.403962,
       "rebake": true
     },
     {
       "name": "RearTab_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "0ab4023cbaa8d5c950940c18b0fd7addd0ad971d112960e8a7ae8341fba4ee19",
-      "sourceSha256": "76f684d25d78b3c93510f1a38bb126a2874bf96e47b6539c56b42cd85d94e4ec",
-      "islandCoverage": 0.5497,
+      "mimeType": "image/webp",
+      "sha256": "55d0a93d51ae4a11b35bca15a15dbe33cfa7a1b12c8a79350f1d05b91fdf8d32",
+      "sourceSha256": "d5ea06fb733779059667bcb733536584c36fe4ef5a420b45c2611774f47871f6",
+      "islandCoverage": 0.403962,
       "rebake": true
     },
     {
       "name": "RearTab_ORM",
-      "mimeType": "image/png",
-      "sha256": "f8f236498cf18da2425ef2536d2c00946d0db9f340294b5c55055533d56ca6f5",
-      "sourceSha256": "9ba167dca2c19d91082ab5e8fcd5f668cf7b3c0b898e946c3117d2bcc0170eb1",
-      "islandCoverage": 0.5497,
+      "mimeType": "image/webp",
+      "sha256": "bffa1ea8f523a1d9cd095e03a520bb988363013a3db3529099f6a1263e1a290d",
+      "sourceSha256": "c421f7ea4ddf0ebd17c4db838dfe83c2a801ca65aa3fca56897d3dfa915dbe96",
+      "islandCoverage": 0.403962,
       "rebake": true
     },
     {
       "name": "RearTopExternalLever_Normal",
-      "mimeType": "image/png",
-      "sha256": "2157fd30edff1375a3d16e0baf92b05f467c42bd5e059e8eb0d2676c8c6dff18",
-      "sourceSha256": "c1b28b45616620c33d7005570441d6633c62a3cfca06052730f9e3fc3d5e63db",
-      "islandCoverage": 0.3577,
+      "mimeType": "image/webp",
+      "sha256": "45eca3e6c766392816149f0882c3a9b8d9d2fad003698513a5e83528cfa25c58",
+      "sourceSha256": "9f9aa0f9a65a7336b634dfffefa093deaa9651edfcc576b19543cb6bfb32df76",
+      "islandCoverage": 0.305025,
       "rebake": true
     },
     {
       "name": "RearTopExternalLever_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "f7215bdf245ae890d61b60f9adbb48db94f6758ef7f32e8238cab276a6bd6ddd",
-      "sourceSha256": "26bcafd4744890baf29b02b071bddcbd9aa0a894f208123395fa4de4aefc9d4d",
-      "islandCoverage": 0.3577,
+      "mimeType": "image/webp",
+      "sha256": "61d0344094f491b88fa3ee0a10d97aecf649f8da6c20cef6cf29cb4d11e131db",
+      "sourceSha256": "d8ce2154a1f54b6c4348c3e6fb7cdbd3d82d3b420a4efc1e3b8973c43a44965e",
+      "islandCoverage": 0.305025,
       "rebake": true
     },
     {
       "name": "RearTopExternalLever_ORM",
-      "mimeType": "image/png",
-      "sha256": "4267c36525682c20da07d99f7f971600a91a82f83d0028d1713f6806cb995d5b",
-      "sourceSha256": "7bb3fb17de4013e0616444beb59e4512fd905ddcc705f9c27a0d19b751f7c0f1",
-      "islandCoverage": 0.3577,
+      "mimeType": "image/webp",
+      "sha256": "60efa74ad528caca961dcde0181771fea0a66e67d39f23c018b4de821cf7c03d",
+      "sourceSha256": "b5ef995a30a1a1af79ac43420a2b78f7195a5912551945228daa0e381536f083",
+      "islandCoverage": 0.305025,
       "rebake": true
     },
     {
       "name": "ReceiverOuterCollar_Normal",
-      "mimeType": "image/png",
-      "sha256": "4093dc86571eb699eb517ca17ee3ea2296df84318973874f6d0eda9d16bb0509",
-      "sourceSha256": "5d41a87a3f6a2ac43b4af20f526e5244282e0c0645464c9531a13908c1c61943",
-      "islandCoverage": 0.7613,
+      "mimeType": "image/webp",
+      "sha256": "50b80d00cf1da66996961665e03bfca1990b1c6b4ec68b084f61a75a91ca8c5d",
+      "sourceSha256": "063e3528b5956b5b555caa19cd6b655439261ba423ae1676b50826a067520122",
+      "islandCoverage": 0.411101,
       "rebake": true
     },
     {
       "name": "ReceiverOuterCollar_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "50777c45ea7541e0aebf2da8541984d7bccff28ce4d0127ea0175528f58dc9eb",
-      "sourceSha256": "65c213bacae0b8884beb2a7a0d62c71e73a543cc026e4b4d199db2158d1d0b51",
-      "islandCoverage": 0.7613,
+      "mimeType": "image/webp",
+      "sha256": "8aade24bf3419fc2f4daa71b44f6d426c7d328867affb1b4f5cbda5400e38ff3",
+      "sourceSha256": "83e13fa46786da380b9ee3f54458d89783516a715571421fea447a8b49a33221",
+      "islandCoverage": 0.411101,
       "rebake": true
     },
     {
       "name": "ReceiverOuterCollar_ORM",
-      "mimeType": "image/png",
-      "sha256": "37dd00478857fba093378fe185174f10cb038ea1a660e00e4f6606e41e94168f",
-      "sourceSha256": "8d297850443a05308a1c4cc681f5beca3a1c20d8740a8865284285f0a4dfbd45",
-      "islandCoverage": 0.7613,
+      "mimeType": "image/webp",
+      "sha256": "9c3a7121813d969ed8a50dbbed1dc5bd541e33b33ab98e833ddf28a025e23cab",
+      "sourceSha256": "1a834b084d341e0d4de7e5b97c11ece0897b505d69fd23815cb697b4c8aa5041",
+      "islandCoverage": 0.411101,
       "rebake": true
     },
     {
       "name": "SideWoodButton_Normal",
-      "mimeType": "image/png",
-      "sha256": "445078b4264aa2a0787ecc774c4152bafbc0d8f271f076070fbdc0e323c9e038",
-      "sourceSha256": "2370d427533e8a7e4096d5499ab97000e29e90769bbf019fccea7c0d9ccc2bda",
-      "islandCoverage": 0.8745,
+      "mimeType": "image/webp",
+      "sha256": "9ab17683f2e07cfad4503d00e14ca88781230934c6bd2c95cc6e739e62e196e1",
+      "sourceSha256": "085ef7469b7ed17fa208644f828ef238c7520435ed5b504b548c9d1f3c06501f",
+      "islandCoverage": 0.647002,
       "rebake": true
     },
     {
       "name": "SideWoodButton_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "9c50ad063e64b78aaa4b599eba63982aad61e816ae092f28e776a418fe55bc1e",
-      "sourceSha256": "4908ff19945636f0b9216c330ea811427440c2d205e3eb9aca3aaf27863cd533",
-      "islandCoverage": 0.8745,
+      "mimeType": "image/webp",
+      "sha256": "574761512b0acdb4d532c3f93e4ec0ec6d82a636f003e661caca24052e32fb62",
+      "sourceSha256": "02943e3b4a1367f501988bdee25aa838e84a2e6ae09cc7965690dbdf8330c19e",
+      "islandCoverage": 0.647002,
       "rebake": true
     },
     {
       "name": "SideWoodButton_ORM",
-      "mimeType": "image/png",
-      "sha256": "c8dfea415f29ac45c08d80be23a296949a651bb3307aeace8bb20d9ff067c453",
-      "sourceSha256": "47d624e98852fd9c23bc6ee64c069aaaf4a56f75639186cd1f03786c12e7bbcc",
-      "islandCoverage": 0.8745,
+      "mimeType": "image/webp",
+      "sha256": "00a105b29d1ad8e185524b9473722a3f212cc3b2e1f538dc8353c85bd1a73709",
+      "sourceSha256": "a85a0a860173490f6c058ac5e1f24137968e8954cea9739070ca81b6e3f034b6",
+      "islandCoverage": 0.647002,
       "rebake": true
     },
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_Normal",
-      "mimeType": "image/png",
-      "sha256": "b8c4f8b34b417470bb5c12b53a62c9b8356cf497e938d0834e03ebbf45366120",
-      "sourceSha256": "4971f8a059ee3c4bde748f593e3e989b944705283103b51c4111519da1caa5b0",
-      "islandCoverage": 0.6093,
+      "mimeType": "image/webp",
+      "sha256": "9a69e28f53536c2f42cec50b1f5e34d2be80cf5cb67a4e8b1657e94c1074b790",
+      "sourceSha256": "85483155f93d946a3027bda00a718206f9e83fbdc7ec5e31d686d0daf6856e39",
+      "islandCoverage": 0.396446,
       "rebake": true
     },
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "9225698d52e26986d2cbfc63b79c9a9a274c8b5a357c00b7e2653e113986e796",
-      "sourceSha256": "b3697903abcc3882162d9db0d0c881a266150542664feec4e22f1a337a056943",
-      "islandCoverage": 0.6093,
+      "mimeType": "image/webp",
+      "sha256": "a7639098eb220702e14decbd19eb9c5bfd220754d77ddb96e48713a1ad601e29",
+      "sourceSha256": "a2420919568c7d5f68e43e230bbbd940ca56200a3fe2fbe367012ded4ca7b0b1",
+      "islandCoverage": 0.396446,
       "rebake": true
     },
     {
       "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_ORM",
-      "mimeType": "image/png",
-      "sha256": "84aa1280558ef55432fd50cff07ba08ad5308a90ec52aa1adf181d7c43e25f44",
-      "sourceSha256": "c49f73d278b76a6ba2fedab159562b6807ec00e4af1c85fa218b7424735098d3",
-      "islandCoverage": 0.6093,
+      "mimeType": "image/webp",
+      "sha256": "d8267fcaeb4496dad1058c19222aca6ff7bc70968ac4cbd981d4fa4235b81eb7",
+      "sourceSha256": "31a3405d856090a38128c5c45aa82b223c38c76244fad7dba1d87d5398c4add9",
+      "islandCoverage": 0.396446,
       "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_Normal",
-      "mimeType": "image/png",
-      "sha256": "747d3a270528a5449f1c965fa263e7fdaa45f8dafee08675a22d60d3de98f373",
-      "sourceSha256": "ac7833e55e5853b6d2cb6bccac1c7e0a669c3af668089bf03dd8569118e578f0",
-      "islandCoverage": 0.8311,
+      "mimeType": "image/webp",
+      "sha256": "500d550d3a6ae244c819c2cb667722238e198b61b5df12d20db78a6439721c96",
+      "sourceSha256": "0b56d099461ad225ba22ba94c9e84570b5433d057aaa896763d6270f6003bae9",
+      "islandCoverage": 0.731838,
       "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "fb0af38cc4b6f83c6b59952709ffbc16e7f2b8b6473fbf54a53a3a4ccfd563e9",
-      "sourceSha256": "033ac85683ca9920b84c1b97fbc0dbd8e628dc7a0bf837d535faae2da2d84f34",
-      "islandCoverage": 0.8311,
+      "mimeType": "image/webp",
+      "sha256": "b96c3b39f8a02662c014fe1f5394ccc644fa899caa6e6eb56c51fbf8c17d6aab",
+      "sourceSha256": "8c4a19ab5b2b917642eedb8b3774efccd724a96817739ea40960258c256b0df9",
+      "islandCoverage": 0.731838,
       "rebake": true
     },
     {
       "name": "Sight_LowCrossPiece_ORM",
-      "mimeType": "image/png",
-      "sha256": "9bf0e95caa0cddead9f54fe14d5e58591fd96a83ef85ed379eae92541089787e",
-      "sourceSha256": "c96e3d2412c825af606e18c4e557f97d81a298d1047fa27ea51a673e7f05d6f5",
-      "islandCoverage": 0.8311,
+      "mimeType": "image/webp",
+      "sha256": "3a491577d2f92bec12a5d89b0faccc868d97853540f55cfa24be2d5ac48a9724",
+      "sourceSha256": "70e8ccb19ffee609d4067bde0b98870d96eaee907acdf7dd88107d57ec175785",
+      "islandCoverage": 0.731838,
       "rebake": true
     },
     {
       "name": "Sight_ShallowRoundSeat_Normal",
-      "mimeType": "image/png",
-      "sha256": "d9f484151bf5f860ff747db039e6b56fd37a5122f19075a52f4fb1524fbfedd2",
-      "sourceSha256": "166e62e1d5918290249f90cd5958d787156036a98d8f3cee05524eafcf2362b6",
-      "islandCoverage": 0.6149,
+      "mimeType": "image/webp",
+      "sha256": "2ccfe9156db665ec7e08222040cdf13786c25e2f9b34581cccaf07ded26aafb3",
+      "sourceSha256": "f4e1d0e29d845c9fdf4b7180d6604ef34ba3f6a72ff1327ad4e74950e5e4079d",
+      "islandCoverage": 0.420261,
       "rebake": true
     },
     {
       "name": "Sight_ShallowRoundSeat_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "ea7d2ab571712eb12e84494e903cde3ac10cd0f80c3620cc83e0a6f90f8550a4",
-      "sourceSha256": "a7aaf16b51bdd92b11147e1823e2c7a908725ae6786c4c900a8b61943e4aa674",
-      "islandCoverage": 0.6149,
+      "mimeType": "image/webp",
+      "sha256": "fa2d5a71b9c92f5fe1fb435762f8bdfef48ca0ae0acef7a274f089e1e3a47eef",
+      "sourceSha256": "b47bf93d0a740e07c2abe40b4018e572285d7d5b16b3a77bf0b50e69f313c2d7",
+      "islandCoverage": 0.420261,
       "rebake": true
     },
     {
       "name": "Sight_ShallowRoundSeat_ORM",
-      "mimeType": "image/png",
-      "sha256": "ba44806d00f488ffc25cb02f1c22cb33c730f57989d813bc4ba203c02a9c721d",
-      "sourceSha256": "eb2d4cce11f7e2f2d67cbd6f6b03b0543a1e09e6aa371637847ccdb7155a15bf",
-      "islandCoverage": 0.6149,
+      "mimeType": "image/webp",
+      "sha256": "33feab95c6166043c88df72437e59b1880f83efa98854935fbd3cc7496f447b5",
+      "sourceSha256": "c33e1de10d7f6af104952b1747a48b17c1843b2e2f75fbbbb1a7d1ae246423c5",
+      "islandCoverage": 0.420261,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_1_Normal",
-      "mimeType": "image/png",
-      "sha256": "dc3a543f7df754dc388dce70f005bbec80c7230704fc9729af0ccf8158841373",
-      "sourceSha256": "c1cf1f97e6e8e3605b10690ec32e3a38bf1b4910126b91a6feb797379ac0efdb",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "87ce82f8500047689e1aebbbc7fcbd547cfd53c88e961e2418d52f6cad46917c",
+      "sourceSha256": "6c3f2be57e56f4b8d6d8db06eb7476a59a186374f46fa204a1e777c3ca36d5f4",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_1_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "5542ea82203d718d12103db65de3756220810b801320883c2b9798601b603a0f",
-      "sourceSha256": "a62aff956672515ad4d3654a2a291441482b8225482ebb038f76673596ea29a4",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "11e27b9883bff28ccb94d2e2e5f3a1f58087057c622627e17778fec99943bf8d",
+      "sourceSha256": "d6dd7dbeed0266993b71e42449d68c0c811f683748ac3e8b32da59e6ddfd9f44",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_1_ORM",
-      "mimeType": "image/png",
-      "sha256": "a9e3fcb9ab786882e7716a2d5c6c7ae058f0c47935fde5dc30d7392efc8c6566",
-      "sourceSha256": "4deeb74e564657cb198bdb5b263071600d71b011b76d4fd4f81d82441d4b84c5",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "9d356eea3014ab3ab2c1b9baac7d12348e86e9e853deb5ce68fe3868b3937ff6",
+      "sourceSha256": "364d6e194110ad8de2d484870ebbada4745f2bca14c9b8ab8a15bc93196aa293",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_-1_Normal",
-      "mimeType": "image/png",
-      "sha256": "668230d560fbe5b15fc1964477eb7a27bd1dd6113d8a6af8f9d1fcc810e49aa2",
-      "sourceSha256": "764f552572d89808fa2b1c517f6849b105ce4e70d00311bc46225ccf859a94c0",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "d2a3e9dcae8d1223cabbf4e37d4315d4226009b0a2300b500f207fc3ffda19f5",
+      "sourceSha256": "6d01553dc807b3b40ed1dab5153746a1857bfcbd1582ce44d47f266d7b5850fe",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_-1_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "2b8d182b341684e84fa402fcbc08aba275161ff3aec971d38e62a2bfde40c3f9",
-      "sourceSha256": "9b3cc0b21a469621d988aa742aae128893f7539640e07a2bbd52c72a0ab2c1ad",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "af564ccd064995989c56ff0c45264c0a72db11d30d2b36ab7743ef90b3243cbc",
+      "sourceSha256": "b40c41a5091d912a6687b60e2ed2544f98d4095e2737888f5a38cfd55e64860b",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Sight_SideRoundHead_-1_ORM",
-      "mimeType": "image/png",
-      "sha256": "7507d1abe6f211da36a8661437df20bb764009a1fb939b8edbcc276e276c9e48",
-      "sourceSha256": "781ffcbc94b2bfde79322c908e9f64db1ef78be9997ff2b708ebd5ac3eec5102",
-      "islandCoverage": 0.8691,
+      "mimeType": "image/webp",
+      "sha256": "467740fb829a7dab2b444f023cc1816d877caf251b0f3ac7e3c5bbc8f1538550",
+      "sourceSha256": "b2f4fc0ec3ca4128a5d3a7a32db10ebf34c014f64dbf8bd07b995eb7a7824428",
+      "islandCoverage": 0.667957,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_Normal",
-      "mimeType": "image/png",
-      "sha256": "eac4a53dbe2f78be532f18fa91aadcf94bbbd4de8f232163bac803671c79b2fd",
-      "sourceSha256": "bd958fcab2af958b46a0391e117c9eb96f81cf15b619afd10e7fe3e435e71717",
-      "islandCoverage": 0.6795,
+      "mimeType": "image/webp",
+      "sha256": "4ec75bf6b70a38277b1366a49fc652501f41b6de69a7ec574091812555181fa9",
+      "sourceSha256": "581373f6a93a9cb8776cef9de441685bc0e6417429f3ca8593aa458691dad960",
+      "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "9f202ad4605feedb966b171547ae6f8c11a34ee58dddb65be553130950dbee39",
-      "sourceSha256": "f1fd0f1350d8a5bed1832de7ea03280b985ecf8395db40ba284f5b7b7c59057a",
-      "islandCoverage": 0.6795,
+      "mimeType": "image/webp",
+      "sha256": "7566f5e33a8e574f6aa13d7e26550355da6142587111d36fad80f3659f3439bd",
+      "sourceSha256": "e728766de3f263e2e64de4c30fa3bc76dfb7728ecfa37b36116dfcfe79c58bc9",
+      "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_ORM",
-      "mimeType": "image/png",
-      "sha256": "aeb79805d138c981c095d9ccd7094b127a19d99eb4ca7e01fab59a3dd634269d",
-      "sourceSha256": "89ed828312011a72aea4b36eba3844dac266516ed1a462a20589f688999759ea",
-      "islandCoverage": 0.6795,
+      "mimeType": "image/webp",
+      "sha256": "b66398f3786e88624c93dbcd249f4fd397ef9905181695a7c528634ead59f96d",
+      "sourceSha256": "f0786a1cb9ca687ce5a62fabf9e007ded63233363f60663891bc995741ae3be5",
+      "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
-      "mimeType": "image/png",
-      "sha256": "2e7276e636f7fa157a07b943d789b9148cc770d6ab710d5333ded5c62023894c",
-      "sourceSha256": "7f741c99368595aaf8218898c8400d6bc2a62b724754c3c684b5dfaf45c98290",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "c7d3c4cf21059b5b917326a0d7425dd9b467b36becbe2ece12e69dac467058e8",
+      "sourceSha256": "27d98bf83532f8eb859cddb2e2a780fe7130ffde2ff3feb9f4bce7142ab9d02e",
+      "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
-      "mimeType": "image/png",
-      "sha256": "5d94b6fee464494187e89367b910ca6b38b71cddcdcfc111fe9307994d583704",
-      "sourceSha256": "787099155d40ebed31693e64dd8807c5d472b5361b09b966cdc7f8e340c8fac4",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "7a4f3b862bb202fc1521dc3ae62b0031e58c7df04b7f8b66ee93ad4a350e4119",
+      "sourceSha256": "3f5aba07346b0eab03d1a21d06a8cbc2d2d7f6bed29b96164ea65d6e82fa840c",
+      "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
-      "mimeType": "image/png",
-      "sha256": "ccdd7582df9f98a384fddbed24f44e9894bb5561bb4c1f075b22f1c0ee36a48e",
-      "sourceSha256": "a75afabf7a801af932e732a19b1cf2656035bb23b4b36846ed1b7a9abfcdb620",
-      "islandCoverage": 1.0,
+      "mimeType": "image/webp",
+      "sha256": "7afd219b7dfb5981e5103cb20c48153eb120b829617ebd628cc6accae6cd9070",
+      "sourceSha256": "81d7f9cd526929a90715d36784432c4e633a60e7c318d9015bac1e26ee50e2f3",
+      "islandCoverage": 0.32717,
+      "rebake": true
+    },
+    {
+      "name": "MainWood_ContinuousLowerShoulder_OilFilm",
+      "mimeType": "image/webp",
+      "sha256": "f1c7f395b49587bbcc9aceee564a2c2ccb18442981dddf022bb8dd9fa6924f97",
+      "sourceSha256": "bf703b9a5cdebcd913fd8364af51a89c352769eaf12d6128a4486441c2a2c589",
+      "islandCoverage": 0.175897,
+      "rebake": true
+    },
+    {
+      "name": "FrontWood_ContinuousOval_OilFilm",
+      "mimeType": "image/webp",
+      "sha256": "6e35f0035ce38c19af5b7d266b88d14036b7148f36de02ac07a874ecc020bc83",
+      "sourceSha256": "506fb198a3a080248aed399f2571ee1c826a25b84bd818a959b88212472fc377",
+      "islandCoverage": 0.261859,
       "rebake": true
     }
   ],
-  "textureFill": "2026-10-29 _import/Script_HanYang173RDilateTextures.py: texels outside the UV islands (ORM red = 0) pull-push filled from island texels so mipmaps do not darken island edges; island texels and bit depth unchanged. sourceSha256 is the delivered payload.",
-  "rebake": "2026-11-03 _blender/Script_HanYang173RRebake.py + _import/Script_HanYang173RRebakeAssemble.py: 18 parts get uniform-density UVs and maps rebaked from the author source onto the 60k mesh (long parts sliced every 6 cm first). For those images sourceSha256 is the raw bake and sha256 the nearest-filled payload (normals kept to 10 bits); islandCoverage is the bake hit fraction.",
+  "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
+  "rebake": "R25: tapered rear-band relief, patinated heel and solid display trim with a hanging worn loop. Portable calibrated base colour and prior wood finish retained.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -1992,7 +2008,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261113R2",
+    "version": "173R-20261124R25",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -2041,13 +2057,127 @@
       "Sight_SideRoundHead_1",
       "Trigger_FlatCurvedExternalStrip"
     ],
-    "geometry": "64266-triangle mechanism revision",
-    "scope": "Aged steel oxide, small pits, worn highlights and dark longitudinal timber grain reconstructed from the user reference photographs.",
+    "geometry": "Exterior finish, Blender edge and UV pass",
+    "scope": "Object-space baked, non-repeating wood and steel; visible exterior only.",
     "references": [
       "134e0324-2902-4c60-81e5-1d17b844824a/image-1.png",
       "134e0324-2902-4c60-81e5-1d17b844824a/image-2.png"
     ],
     "sourceAssets": [
+      {
+        "asset": "black_walnut_veneer_02",
+        "role": "Diffuse",
+        "file": "black_walnut_veneer_02_diff_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_diff_2k.jpg",
+        "sha256": "ac4cd64753a55684efe4ccaf6f81b465e237a8a885fffb95377cc371924c0f88",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "black_walnut_veneer_02",
+        "role": "Rough",
+        "file": "black_walnut_veneer_02_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_rough_2k.jpg",
+        "sha256": "172832f6fa42e539e35b04f321c067b61962da7aebe106fcd7934b84aa5dc204",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "black_walnut_veneer_02",
+        "role": "nor_gl",
+        "file": "black_walnut_veneer_02_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_nor_gl_2k.jpg",
+        "sha256": "125a46a42525157cb2cf277b712c9933a76518d5a729b43caafce1aebd96bbbb",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "metal_plate_02",
+        "role": "Diffuse",
+        "file": "metal_plate_02_diff_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_diff_2k.jpg",
+        "sha256": "2bf77bbcf18c862bf1e1501d1953ce9d511e80df6305b46e2f38b788bd37b581",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "metal_plate_02",
+        "role": "Rough",
+        "file": "metal_plate_02_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_rough_2k.jpg",
+        "sha256": "7abccc92dfebe4c6fd21b57b4de659a3b8be7747434af39306fcff2059927734",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "metal_plate_02",
+        "role": "nor_gl",
+        "file": "metal_plate_02_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_nor_gl_2k.jpg",
+        "sha256": "1da6ddb0f455d53636754b3b629942e6aec2f77fafaf6a53cee102ec107854c1",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "metal_plate_02",
+        "role": "Metal",
+        "file": "metal_plate_02_metal_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/metal_plate_02/metal_plate_02_metal_2k.jpg",
+        "sha256": "baa5ae89329b75727030fe69835c53c67cca0cc23b1505b38961d06f149556df",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "fine_grained_wood",
+        "role": "Diffuse",
+        "file": "fine_grained_wood_col_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_col_2k.jpg",
+        "sha256": "d97b1ab2c5206ac43bc0c42f21878da14f4d02497fd21396399406c03f3755a9",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "fine_grained_wood",
+        "role": "Rough",
+        "file": "fine_grained_wood_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_rough_2k.jpg",
+        "sha256": "7e8f5fc146ae7accd3b9deb2a173c1cf253707ccdee5070ce16cefd4ee68f1b7",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "fine_grained_wood",
+        "role": "nor_gl",
+        "file": "fine_grained_wood_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/fine_grained_wood/fine_grained_wood_nor_gl_2k.jpg",
+        "sha256": "c76fcd29434978227db5a35b5b0238da1bee0fb5fa8cdfc6819a76c7ef723f3c",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "rusty_metal_04",
+        "role": "Diffuse",
+        "file": "rusty_metal_04_diff_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_diff_2k.jpg",
+        "sha256": "dc17baa7c113af0a8db59a7166dbebd1d8bc842e69b1f07b89d9e90531ebbd22",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "rusty_metal_04",
+        "role": "Rough",
+        "file": "rusty_metal_04_rough_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_rough_2k.jpg",
+        "sha256": "b59cb33b478c70404b14294e39979c7a12db25e8f7fac3688cf665fcb0fdd19d",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "rusty_metal_04",
+        "role": "nor_gl",
+        "file": "rusty_metal_04_nor_gl_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_nor_gl_2k.jpg",
+        "sha256": "b230568d198778afbf3d104d2951e2e2306ddb276bc1ed2f441b9040c58af537",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "rusty_metal_04",
+        "role": "Metal",
+        "file": "rusty_metal_04_metal_2k.jpg",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_metal_2k.jpg",
+        "sha256": "9085f395c40ce3860353d77c2a55a4e9b5b370abc5756784330ed3e890654097",
+        "license": "CC0-1.0"
+      }
+    ],
+    "previousSourceAssets": [
       {
         "file": "Texture_HanYangReferenceWoodBase_Source.png",
         "generator": "built-in imagegen",
@@ -2063,10 +2193,359 @@
     ]
   },
   "runtimeNormalPacking": {
-    "sourceBits": 16,
     "runtimeBits": 8,
     "images": 44,
-    "resolution": "baked dimensions retained"
+    "source": "OpenGL material normals reoriented into the exported tangent frame, independent of pigment."
   },
-  "runtimeLosslessPacking": "Pixel-verified same-resolution WebP where smaller, using Script_CompressEmbeddedTextures.mjs"
+  "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
+  "exteriorFinish": {
+    "version": "173R-20261124R25",
+    "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
+    "newCharts": [
+      "ButtCap_LimitedProfileBlend",
+      "FrontBandSideStrip",
+      "FrontBand_ContinuousEnvelopeContact",
+      "FrontSideBoss_LowRoundedExterior",
+      "FrontWood_ContinuousOval",
+      "HY150_ExteriorSideRelief_Neg",
+      "HY150_ExteriorSideRelief_Pos",
+      "HY150_VisualFrontSleeve",
+      "HY151_LowRearShoulder",
+      "HandleNeck",
+      "HandleRoot",
+      "LowerPlateGuard_FlatSideNarrowReturn",
+      "MainWood_ContinuousLowerShoulder",
+      "MiddleSideDisk",
+      "RearBand_ControlledCrown",
+      "RearBand_ExternalAttachmentBridge",
+      "RearBand_ExternalAttachmentLoop",
+      "RearStock_ExternalAttachmentBridge",
+      "RearStock_ExternalAttachmentLoop",
+      "RearTab",
+      "RearTopExternalLever",
+      "ReceiverOuterCollar",
+      "SideWoodButton",
+      "Trigger_FlatCurvedExternalStrip",
+      "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront"
+    ],
+    "museumObject": "Te Papa 58119",
+    "museumImages": [
+      131447,
+      131366,
+      131367,
+      131438,
+      131440
+    ],
+    "triangleLimit": 80000,
+    "surfaceComparisons": {
+      "ButtCap_LimitedProfileBlend": {
+        "toDotsM": 0.00688845245167613,
+        "fromDotsM": 0.006783353630453348,
+        "toR2M": 0.006894735619425774,
+        "fromR2M": 0.0066125658340752125
+      },
+      "FrontBand_ContinuousEnvelopeContact": {
+        "toDotsM": 0.0018913745880126953,
+        "fromDotsM": 0.0032734730198934222,
+        "toR2M": 0.0018913745880126953,
+        "fromR2M": 0.0032734730198934222
+      },
+      "FrontBandSideStrip": {
+        "toDotsM": 7.040714262984693e-05,
+        "fromDotsM": 0.00016969506395980716,
+        "toR2M": 7.040714262984693e-05,
+        "fromR2M": 0.00016969506395980716
+      },
+      "FrontSideBoss_LowRoundedExterior": {
+        "toDotsM": 9.102296462515369e-05,
+        "fromDotsM": 0.0001797493314370513,
+        "toR2M": 3.754753197426908e-05,
+        "fromR2M": 4.423075733939186e-05
+      },
+      "FrontWood_ContinuousOval": {
+        "toDotsM": 0.018700148910284042,
+        "fromDotsM": 0.00012099814193788916,
+        "toR2M": 0.01869988441467285,
+        "fromR2M": 0.00010051455319626257
+      },
+      "HandledCylinder": {
+        "toDotsM": 0.0,
+        "fromDotsM": 0.0,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HandleNeck": {
+        "toDotsM": 0.0011504489229992032,
+        "fromDotsM": 0.0008563937153667212,
+        "toR2M": 7.030697452137247e-05,
+        "fromR2M": 0.00011999998241662979
+      },
+      "HandleRoot": {
+        "toDotsM": 3.7483961932593957e-05,
+        "fromDotsM": 4.698496195487678e-05,
+        "toR2M": 3.7483961932593957e-05,
+        "fromR2M": 4.698496195487678e-05
+      },
+      "HandleSphere": {
+        "toDotsM": 8.563196024624631e-05,
+        "fromDotsM": 7.769696821924299e-05,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY150_ExteriorSideRelief_Neg": {
+        "toDotsM": 3.81222453142982e-05,
+        "fromDotsM": 4.68343059765175e-05,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY150_ExteriorSideRelief_Pos": {
+        "toDotsM": 3.81222453142982e-05,
+        "fromDotsM": 4.683431689045392e-05,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY150_RoundedUpperExterior": {
+        "toDotsM": 0.0,
+        "fromDotsM": 0.0,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY150_VisualFrontSleeve": {
+        "toDotsM": 0.00036457247915677726,
+        "fromDotsM": 0.0003542198392096907,
+        "toR2M": 0.0003244059334974736,
+        "fromR2M": 0.00027790485182777047
+      },
+      "HY151_LowRearShoulder": {
+        "toDotsM": 2.707078783714678e-05,
+        "fromDotsM": 4.0196606278186664e-05,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY153_VisualMouthLipAndShallowRecess": {
+        "toDotsM": 0.0004628293972928077,
+        "fromDotsM": 0.0003266909334342927,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY155_ContinuousInnerEdgeTrim_Neg": {
+        "toDotsM": 0.0003600172349251807,
+        "fromDotsM": 0.00036351796006783843,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "HY155_ContinuousInnerEdgeTrim_Pos": {
+        "toDotsM": 0.00036001906846649945,
+        "fromDotsM": 0.0003635199973359704,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "LongOuterSteel_TrueRound": {
+        "toDotsM": 0.00025191629538312554,
+        "fromDotsM": 0.00023666000925004482,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "LowerPlateGuard_FlatSideNarrowReturn": {
+        "toDotsM": 7.431424455717206e-05,
+        "fromDotsM": 9.25380372791551e-05,
+        "toR2M": 4.566962525132112e-05,
+        "fromR2M": 2.9158009056118317e-05
+      },
+      "MainWood_ContinuousLowerShoulder": {
+        "toDotsM": 0.006910260301083326,
+        "fromDotsM": 0.006889007519930601,
+        "toR2M": 0.006910543888807297,
+        "fromR2M": 0.006887318100780249
+      },
+      "MiddleSideDisk": {
+        "toDotsM": 6.067890353733674e-05,
+        "fromDotsM": 0.0001223885192302987,
+        "toR2M": 2.045239398285048e-06,
+        "fromR2M": 2.272318624818581e-06
+      },
+      "PlateExterior_ShallowSurfaceMark_1": {
+        "toDotsM": 1.9619345039245673e-05,
+        "fromDotsM": 0.0002403515245532617,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "PlateExterior_ShallowSurfaceMark_2": {
+        "toDotsM": 7.641155207238626e-06,
+        "fromDotsM": 9.073644832824357e-06,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "PlateExterior_ShallowSurfaceMark_3": {
+        "toDotsM": 7.765989721519873e-06,
+        "fromDotsM": 9.353194400318898e-06,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "RearBand_ControlledCrown": {
+        "toDotsM": 0.00832793155254865,
+        "fromDotsM": 0.00702902075246604,
+        "toR2M": 0.0006174220020789822,
+        "fromR2M": 0.0010499954223632812
+      },
+      "RearBand_ExternalAttachmentBridge": {
+        "toDotsM": 0.009049788021536883,
+        "fromDotsM": 0.0018608802872383489,
+        "toR2M": 0.009076421662227233,
+        "fromR2M": 0.0018608802872383489
+      },
+      "RearBand_ExternalAttachmentLoop": {
+        "toDotsM": 0.00011975305824307725,
+        "fromDotsM": 0.0002289606782142073,
+        "toR2M": 1.8113012629328296e-05,
+        "fromR2M": 4.476590038393624e-05
+      },
+      "RearCockingExterior": {
+        "toDotsM": 0.003201794344931841,
+        "fromDotsM": 0.0034775014501065016,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "RearOuterCover_RoundedSideReturn": {
+        "toDotsM": 0.007182146888226271,
+        "fromDotsM": 0.008958852849900723,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "RearSmallCover": {
+        "toDotsM": 0.014020368456840515,
+        "fromDotsM": 0.006017275154590607,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "RearSmallPin": {
+        "toDotsM": 0.008192148990929127,
+        "fromDotsM": 0.01152324303984642,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "RearStock_ExternalAttachmentBridge": {
+        "toDotsM": 1.3552527156068805e-20,
+        "fromDotsM": 0.00021607472616585555,
+        "toR2M": 2.710505431213761e-20,
+        "fromR2M": 0.0
+      },
+      "RearStock_ExternalAttachmentLoop": {
+        "toDotsM": 0.0001382458140142262,
+        "fromDotsM": 0.00019602826796472073,
+        "toR2M": 2.8045194994774647e-05,
+        "fromR2M": 7.836733129806817e-05
+      },
+      "RearTab": {
+        "toDotsM": 0.0015367219457402825,
+        "fromDotsM": 0.009889484383165836,
+        "toR2M": 6.2934348534327e-05,
+        "fromR2M": 7.177810039138421e-05
+      },
+      "RearTopExternalLever": {
+        "toDotsM": 0.0021661599166691303,
+        "fromDotsM": 0.005228149238973856,
+        "toR2M": 7.453389844158664e-05,
+        "fromR2M": 9.227077680407092e-05
+      },
+      "ReceiverOuterCollar": {
+        "toDotsM": 0.00012017588596791029,
+        "fromDotsM": 0.00013425841461867094,
+        "toR2M": 3.913010914402548e-06,
+        "fromR2M": 5.787351710750954e-06
+      },
+      "SideWoodButton": {
+        "toDotsM": 5.440817403723486e-05,
+        "fromDotsM": 0.00010239520634058863,
+        "toR2M": 1.0156387588722282e-06,
+        "fromR2M": 1.0449456340211327e-06
+      },
+      "Sight_LowContinuousLeaf_NoUnknownNumbers": {
+        "toDotsM": 0.0001091946687665768,
+        "fromDotsM": 0.0003639118222054094,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "Sight_LowCrossPiece": {
+        "toDotsM": 0.00037807575426995754,
+        "fromDotsM": 0.00017119292169809341,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "Sight_ShallowRoundSeat": {
+        "toDotsM": 0.00018554885173216462,
+        "fromDotsM": 0.00045746975229121745,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "Sight_SideRoundHead_1": {
+        "toDotsM": 9.053584653884172e-05,
+        "fromDotsM": 0.00013626297004520893,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "Sight_SideRoundHead_-1": {
+        "toDotsM": 9.053584653884172e-05,
+        "fromDotsM": 0.00013626297004520893,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "Trigger_FlatCurvedExternalStrip": {
+        "toDotsM": 0.0,
+        "fromDotsM": 0.0,
+        "toR2M": 0,
+        "fromR2M": 0
+      },
+      "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
+        "toDotsM": 0.004702415317296982,
+        "fromDotsM": 0.005104949697852135,
+        "toR2M": 0.004702415317296982,
+        "fromR2M": 0.005104949697852135
+      }
+    },
+    "deviationScope": "Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.",
+    "ringPresentation": {
+      "RearBand_ExternalAttachmentLoop": {
+        "scope": "rigid exterior display pose; not a museum measurement",
+        "maxVertexTravelM": 0.0154239
+      },
+      "RearStock_ExternalAttachmentLoop": {
+        "scope": "rigid exterior display pose; not a museum measurement",
+        "maxVertexTravelM": 0.0165598
+      }
+    },
+    "frontTrimPresentation": "Underside silhouette, rigid display pose estimated from the Lu profile photograph.",
+    "closedFittings": {
+      "RearBand_ExternalAttachmentBridge": {
+        "before": 18,
+        "after": 76
+      },
+      "RearStock_ExternalAttachmentBridge": {
+        "before": 18,
+        "after": 68
+      }
+    },
+    "timberFrameRepairs": {
+      "MainWood_ContinuousLowerShoulder": 52,
+      "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": 9
+    },
+    "smoothedCrestNormals": 5280,
+    "endFrameRepairs": 6,
+    "contactVisibility": {
+      "parts": [
+        "ButtCap_LimitedProfileBlend",
+        "FrontBand_ContinuousEnvelopeContact",
+        "FrontWood_ContinuousOval",
+        "LongOuterSteel_TrueRound",
+        "LowerPlateGuard_FlatSideNarrowReturn",
+        "MainWood_ContinuousLowerShoulder",
+        "RearBand_ControlledCrown",
+        "ReceiverOuterCollar",
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront"
+      ],
+      "channel": "linear ORM red",
+      "strength": 0.85,
+      "sampling": "32 cosine-weighted directions per fixed exterior vertex; inter-part only, short range with distance falloff."
+    }
+  }
 }

@@ -14,7 +14,7 @@ import { clone as CloneSkinned } from "../vendor/three/examples/jsm/utils/Skelet
 import { ManagedGLTFLoader as GLTFLoader } from "../Script_ModelImports.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { LoadModel } from "../Script_MeshLoad.mjs";
-import { LoadHanYang173R, HanYang173RBaseGain, InstantiateHanYang173R } from "../Script_HanYang173R.mjs";
+import { ConfigureHanYang173R, LoadHanYang173R, InstantiateHanYang173R } from "../Script_HanYang173R.mjs";
 import { AimAt } from "../Script_MixamoProps.mjs";
 import { XBOT_CHARACTERS } from "../Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "../Script_XBotCharacters.mjs";
@@ -678,16 +678,7 @@ class CompareAssetBank {
     if (this.rifles.has(id)) return this.rifles.get(id);
     if (id === "HanYang") {
       const p = LoadHanYang173R().then((asset) => {
-        const aniso = Math.min(16, this.renderer.capabilities.getMaxAnisotropy());
-        asset.gltf.scene.traverse((mesh) => {
-          if (!mesh.isMesh) return;
-          const mat = mesh.material;
-          mat.color.fromArray(HanYang173RBaseGain(mesh.name));
-          for (const slot of ["map", "normalMap", "roughnessMap", "metalnessMap"]) {
-            if (mat[slot]) { mat[slot].anisotropy = aniso; mat[slot].needsUpdate = true; }
-          }
-          asset.materials.set(`HanYang173R_${mesh.name}`, mat);
-        });
+        ConfigureHanYang173R(asset, null, this.renderer.capabilities.getMaxAnisotropy());
         const inst = InstantiateHanYang173R(asset);
         return {
           root: inst.root,
