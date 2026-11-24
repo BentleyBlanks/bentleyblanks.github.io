@@ -945,21 +945,58 @@ function renderTaskDetail() {
     };
   }
 
+  function summarizeTakeError(tk) {
+    const combined = [tk?.error || "", tk?.progressText || "", ...(tk?.logs || [])].join("\n");
+    if (/未授权|authorization code|accounts\.google\.com\/o\/oauth2|去登录 Colab/i.test(combined)) {
+      return {
+        isColabAuth: true,
+        title: "Colab CLI 尚未完成 Google 授权",
+        hint: "请点击「去登录 Colab」在浏览器同意授权并贴回授权码后重试。",
+      };
+    }
+    if (/Service Unavailable|503/i.test(combined)) {
+      return {
+        isColabAuth: false,
+        title: "Google Colab 算力分配接口返回 503 Service Unavailable",
+        hint: "Google Colab 的 /tun/m/assign 接口拒绝了 GPU 分配（机房满载或当前代理节点受限，你的算力点数未消耗）。建议切换代理节点（如美/日/新）后重试，或改用右侧 Seedance 引擎生成视频。",
+      };
+    }
+    if (/ProxyError|SSLEOFError|SSLError|RemoteDisconnected|UNEXPECTED_EOF/i.test(combined)) {
+      return {
+        isColabAuth: false,
+        title: "连接 Google Colab 时代理 / SSL 连接中断",
+        hint: "请求 colab.research.google.com 时本机代理主动断开或 SSL EOF，请切换稳定代理节点后重试。",
+      };
+    }
+    if (/超时|timed out|timeout/i.test(combined)) {
+      return {
+        isColabAuth: false,
+        title: "云端执行或排队超时",
+        hint: "云端算力排队或网络超时，可直接点击「重新抽 1 条视频」或在右侧切换引擎/分辨率后重试。",
+      };
+    }
+    const raw = String(tk?.error || tk?.progressText || "视频生成失败").replace(/^失败[：:]\s*/, "");
+    const lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l && !/^[┌┐└┘│─\s]+$/.test(l) && !/^\[colab\] Creating session/i.test(l));
+    const best =
+      lines.find((l) => /(?:Error|Exception|失败|拒绝|不足)[:：]/i.test(l)) ||
+      lines[lines.length - 1] ||
+      "视频生成失败";
+    return {
+      isColabAuth: false,
+      title: best.slice(0, 140),
+      hint: "可查看下方原始执行日志排查具体报错，或直接删除此失败记录并重新抽卡。",
+    };
+  }
+
   if (showS3Fail && viewedTake) {
-    const errRaw = [viewedTake.error || "", viewedTake.progressText || "", ...(viewedTake.logs || [])].join("\n");
-    const isColabAuth = /未授权|authorization code|accounts\.google\.com\/o\/oauth2|去登录 Colab/i.test(errRaw);
-    const cleanTitle = String(viewedTake.error || viewedTake.progressText || "视频生成失败")
-      .replace(/^失败[：:]\s*/, "")
-      .split(/\r?\n/)[0]
-      .slice(0, 140);
+    const diag = summarizeTakeError(viewedTake);
     $("#s3FailTakeLabel").textContent = viewedTake.label;
-    $("#s3FailTitle").textContent = cleanTitle;
-    $("#s3FailHint").textContent = isColabAuth
-      ? "Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成授权后重试。"
-      : /超时|timed out|timeout/i.test(errRaw)
-      ? "云端算力排队或网络超时，可直接点击「重新抽 1 条视频」或在右侧切换引擎/分辨率后重试。"
-      : "可查看下方原始执行日志排查具体报错，或直接删除此失败记录并重新抽卡。";
-    $("#btnS3FailColabLogin").classList.toggle("hidden", !isColabAuth);
+    $("#s3FailTitle").textContent = diag.title;
+    $("#s3FailHint").textContent = diag.hint;
+    $("#btnS3FailColabLogin").classList.toggle("hidden", !diag.isColabAuth);
     const failBackBtn = $("#btnS3FailBackToVideo");
     if (failBackBtn) {
       failBackBtn.classList.toggle("hidden", !selectedTake?.url);
@@ -1041,7 +1078,7 @@ function renderTaskDetail() {
       ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>`
       : isRun
       ? `<span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span><span class="mwTakeThumbMsg">${escapeHtml(tk.progressText || "云端生成中…")}</span><div class="mwTakeMiniProg"><i style="width:${tkPct}%"></i></div>`
-      : `<span class="mwTakeThumbMsg">${escapeHtml(tk.error || tk.progressText || "生成失败")}</span>`;
+      : `<span class="mwTakeThumbMsg">${escapeHtml(summarizeTakeError(tk).title)}</span>`;
 
     tile.innerHTML = `
       <div class="mwTakeThumb ${tk.url ? "hasVideo" : ""}">

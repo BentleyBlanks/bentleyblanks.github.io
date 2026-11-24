@@ -604,8 +604,28 @@ async function _runColabMiniMaxH3JobInner({
   } else {
     onProgress?.("申请 Colab 96G G4 GPU 运行时…");
     onLog?.("[MiniMax-H3] colab new --gpu G4 -s mw_h3_g4");
-    await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 240000 });
-    activeSessionNames.add(sessionName);
+    try {
+      await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 240000 });
+      activeSessionNames.add(sessionName);
+    } catch (err) {
+      const raw = String(err?.message || "");
+      onLog?.(`[MiniMax-H3] 原始错误：${raw.slice(-600)}`);
+      if (/Service Unavailable|503/i.test(raw)) {
+        throw new Error("Google Colab 96G G4 分配接口返回 503 Service Unavailable（机房暂满或当前代理节点被限流），请稍后重试、切换代理节点，或改用 Seedance 引擎。");
+      }
+      if (/ProxyError|SSLEOFError|SSLError|RemoteDisconnected|UNEXPECTED_EOF/i.test(raw)) {
+        throw new Error("连接 Google Colab 时本机代理/SSL 断开（ProxyError / SSLEOFError），请检查或切换代理节点后重试。");
+      }
+      if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized/i.test(raw)) {
+        throw new Error("Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成授权后重试。");
+      }
+      const errLine = raw
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => l && !/^[┌┐└┘│─\s]+$/.test(l) && !/^\[colab\] Creating session/i.test(l))
+        .pop();
+      throw new Error(`申请 Colab 96G G4 失败：${(errLine || raw).slice(0, 220)}`);
+    }
   }
 
   try {
