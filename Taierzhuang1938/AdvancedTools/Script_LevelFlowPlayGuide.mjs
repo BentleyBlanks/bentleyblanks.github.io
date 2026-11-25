@@ -587,9 +587,7 @@ export class LevelFlowPlayGuide {
     this.canvas = Element("playGuideMap");
     this.mapWrap = Element("playGuideMapWrap");
     this.tooltip = Element("playMapTooltip");
-    this.dockLog = Element("playDialogueLog");
     this.fullLog = Element("playDialogueFullLog");
-    this.jumpLatestBtn = Element("playDialogueJumpLatest");
     this.badgeEl = Element("playDialogueBadge");
     this.countEl = Element("playDialogueCount");
 
@@ -666,25 +664,6 @@ export class LevelFlowPlayGuide {
         this.ZoomBy(1 / 1.35);
         this.refocusGame?.();
       };
-    }
-
-    const ExpandBtn = Element("playDialogueExpand");
-    if (ExpandBtn) {
-      ExpandBtn.onclick = () => {
-        this.onTabChange?.("dialogue");
-      };
-    }
-    if (this.jumpLatestBtn) {
-      this.jumpLatestBtn.onclick = () => {
-        if (this.dockLog) this.dockLog.scrollTop = this.dockLog.scrollHeight;
-        this.jumpLatestBtn.hidden = true;
-      };
-    }
-    if (this.dockLog) {
-      this.dockLog.addEventListener("scroll", () => {
-        const nearBottom = this.dockLog.scrollHeight - this.dockLog.scrollTop - this.dockLog.clientHeight < 28;
-        if (this.jumpLatestBtn) this.jumpLatestBtn.hidden = nearBottom;
-      });
     }
 
     for (const button of document.querySelectorAll("[data-dialogue-filter]")) {
@@ -866,7 +845,6 @@ export class LevelFlowPlayGuide {
     if (this.tooltip) this.tooltip.hidden = true;
     if (this.badgeEl) { this.badgeEl.textContent = "0"; this.badgeEl.hidden = true; }
     if (this.countEl) this.countEl.textContent = "0 条";
-    this.dockLog?.replaceChildren();
     this.fullLog?.replaceChildren();
     Element("playChecklist")?.replaceChildren();
     const meta = Element("playObjectiveMeta");
@@ -1040,8 +1018,8 @@ export class LevelFlowPlayGuide {
       metaEl.hidden = !showMeta;
       if (showMeta) {
         const bearingText = target.canInteractNow
-          ? `★ ${target.label}（已就位）`
-          : `★ ${target.label} · ${target.relative}（${target.compass}）`;
+          ? `${target.label} · 已就位`
+          : `${target.compass} · ${target.relative}`;
         const distText = target.canInteractNow ? "按 F" : `${Math.round(target.distanceM)} m`;
         if (bearingEl.textContent !== bearingText) bearingEl.textContent = bearingText;
         if (distEl.textContent !== distText) distEl.textContent = distText;
@@ -1130,7 +1108,7 @@ export class LevelFlowPlayGuide {
         speaker.textContent = entry.name;
         const tag = document.createElement("span");
         tag.className = "lfDialogueTag";
-        tag.textContent = entry.order ? "指引" : "对白";
+        tag.textContent = entry.order ? "· 指引" : "· 对白";
         const meta = document.createElement("time");
         meta.textContent = `${entry.beatId.toUpperCase()} · ${FormatPlayClock(entry.elapsed)}`;
         head.append(speaker, tag, meta);
@@ -1140,16 +1118,10 @@ export class LevelFlowPlayGuide {
         row.append(head, body);
         container.append(row);
       }
-      if (wasNearBottom) {
-        container.scrollTop = container.scrollHeight;
-        if (container === this.dockLog && this.jumpLatestBtn) this.jumpLatestBtn.hidden = true;
-      } else if (container === this.dockLog && this.jumpLatestBtn) {
-        this.jumpLatestBtn.hidden = false;
-      }
+      if (wasNearBottom) container.scrollTop = container.scrollHeight;
     };
 
-    RenderInto(this.dockLog, this.history.entries, "进入战斗后，人物对白与指令会实时记录在这里。");
-    RenderInto(this.fullLog, filteredEntries, "当前筛选下暂无对话记录。");
+    RenderInto(this.fullLog, filteredEntries, "进入战斗后，人物对白与任务指引会实时记录在这里。");
   }
 
   Inspect() {

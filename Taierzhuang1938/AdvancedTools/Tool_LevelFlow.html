@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" data-interface-theme href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261126PlayGuide">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261126PlayGuideUi2">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -97,20 +97,25 @@
       <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
       <section id="playGuidePane" class="lfPlayGuidePane" aria-label="试玩 2D 地图与任务导览" hidden>
         <div id="playStatus" class="lfPlayStatus" hidden role="status">
-          <div class="lfPlayStatusHead"><strong id="playStatusTitle"></strong><span id="playStatusBadge" class="lfPlayBadge" data-kind="running">运行中</span></div>
+          <div class="lfPlayStatusMeta">
+            <span id="playStatusBadge" class="lfPlayBadge" data-kind="running">运行中</span>
+            <span id="playObjectiveMeta" class="lfPlayObjectiveMeta" hidden><span id="playTargetBearing" class="lfPlayTargetChip"></span><span id="playTargetDistance" class="lfPlayTargetDist"></span></span>
+          </div>
+          <strong id="playStatusTitle" class="lfPlayStatusTitle"></strong>
           <p id="playStatusTask"></p>
-          <div id="playObjectiveMeta" class="lfPlayObjectiveMeta" hidden><span id="playTargetBearing" class="lfPlayTargetChip"></span><span id="playTargetDistance" class="lfPlayTargetDist"></span></div>
           <ul id="playChecklist" class="lfPlayChecklist" aria-label="当前过关条件"></ul>
           <p id="playStatusHint"></p>
         </div>
         <div class="lfPlayMapSection">
           <div class="lfPlayMapBar" role="toolbar" aria-label="2D 地图控制">
-            <span class="lfPlayMapTitle">2D 战术地图</span>
             <div class="lfPlayMapActions">
               <button type="button" id="playMapFollow" aria-pressed="true" title="自动居中跟随顺子">跟随</button>
               <button type="button" id="playMapFit" title="同时框住顺子与当前任务目标">全览</button>
+              <span class="lfPlayMapSep" aria-hidden="true"></span>
               <button type="button" id="playMapRoutes" aria-pressed="true" title="显示当前节拍引导路线">路线</button>
               <button type="button" id="playMapLandmarks" aria-pressed="true" title="显示主要地名">地名</button>
+            </div>
+            <div class="lfPlayMapZoom">
               <button type="button" id="playMapZoomOut" aria-label="缩小地图" title="缩小">−</button>
               <button type="button" id="playMapZoomIn" aria-label="放大地图" title="放大">＋</button>
             </div>
@@ -127,16 +132,6 @@
             <span><i class="target"></i>目标</span>
             <span id="playMapUnitSummary" class="lfPlayUnitSummary"></span>
           </div>
-        </div>
-        <div class="lfPlayDialogueDock" aria-label="最近人物对话">
-          <div class="lfPlayDialogueHead">
-            <span>人物对话记录</span>
-            <div class="lfPlayDialogueTools">
-              <button type="button" id="playDialogueJumpLatest" hidden>↓ 最新</button>
-              <button type="button" id="playDialogueExpand" title="切换到完整对话历史页签">完整回溯 ↗</button>
-            </div>
-          </div>
-          <div id="playDialogueLog" class="lfPlayDialogueLog" role="log" aria-live="polite"></div>
         </div>
       </section>
       <section id="playDialoguePane" class="lfPlayDialoguePane" aria-label="试玩对话历史回溯" hidden>

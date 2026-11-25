@@ -194,13 +194,14 @@ try{
  assert.ok(await page.locator("#playGuidePane").isVisible(),"Play mode defaults right sidebar to the 2D tactical guide");
  assert.ok(await page.locator("#playStatus").isVisible());
  assert.ok(await page.locator("#playGuideMap").isVisible(),"Play mode renders the editor-side 2D minimap");
- assert.ok(await page.locator("#playDialogueLog").isVisible(),"Play mode shows the live dialogue history dock");
+ assert.equal(await page.locator("#playDialogueLog").count(),0,"Map guide tab stays dedicated to the 2D map without a duplicate dialogue dock");
  const playGuide=await page.evaluate(()=>LevelFlow.Play.Guide());
  assert.ok(playGuide?.active&&playGuide.mapDraw?.hasPlayerCone&&playGuide.mapDraw?.hasTargetMarker,"2D minimap draws live player facing cone and mission objective marker");
  assert.ok(playGuide.entities.some(e=>e.side==="friend")&&playGuide.entities.some(e=>e.side==="player"),"2D minimap tracks player and allies with live positions and headings");
  assert.ok(playGuide.dialogue.totalLines>0,"Play dialogue history captures active in-game instructions and dialogue");
  await page.click('[data-play-tab="dialogue"]');
  assert.ok(await page.locator("#playDialoguePane").isVisible(),"Dialogue history tab opens full scrollable log");
+ assert.ok(await page.locator("#playDialogueFullLog").isVisible());
  await page.click('[data-play-tab="script"]');
  assert.ok(await page.locator("#scriptPane").isVisible(),"Original script tab remains accessible during Play");
  await page.click('[data-play-tab="guide"]');
