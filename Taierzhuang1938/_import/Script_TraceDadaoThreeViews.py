@@ -81,7 +81,12 @@ def FitGuard(broad):
     return (outline + (left, 0)).tolist()
 
 
-def FitRing(broad, narrow):
+def Crossing(radii, values, i):
+    left, right = values[i - 1:i + 1]
+    return radii[i - 1] + (radii[i] - radii[i - 1]) * left / (left - right)
+
+
+def FitRing(broad, narrow, distance):
     patch = (~broad[246:396, 2081:2209]).astype(np.uint8)
     _, labels, stats, centroids = cv2.connectedComponentsWithStats(patch)
     holes = [(stats[i, cv2.CC_STAT_AREA], i) for i in range(1, len(stats))
@@ -93,15 +98,13 @@ def FitRing(broad, narrow):
     samples = []
     for angle in np.linspace(0, math.tau, 88, endpoint=False):
         ray = np.array([math.cos(angle), math.sin(angle)])
-        points = center + radii[:, None] * ray
-        x, y = np.rint(points).astype(int).T
-        inside = broad[y, x] & (x >= 2074)
-        entries = np.flatnonzero(inside & ~np.r_[False, inside[:-1]])
-        start = int(entries[0])
-        ends = np.flatnonzero(~inside[start + 1:])
-        end = start + 1 + int(ends[0]) if len(ends) else len(radii) - 1
-        inner = center + (radii[start] - .10) * ray
-        outer = center + (radii[end] - .10) * ray
+        points = (center + radii[:, None] * ray).astype(np.float32)
+        x, y = points.T
+        values = cv2.remap(distance, x[None, :], y[None, :], cv2.INTER_LINEAR)[0]
+        values = np.minimum(values, (x - 2074) * 2)
+        start, end = np.flatnonzero((values[1:] > 0) != (values[:-1] > 0))[:2] + 1
+        inner = center + Crossing(radii, values, start) * ray
+        outer = center + Crossing(radii, values, end) * ray
         u = (inner[0] + outer[0]) / 2
         low, high = [float(v) for v in EdgeAt(narrow, u)]
         samples.append([round(float(n), 2) for n in (*outer, *inner, low, high)])
@@ -128,7 +131,8 @@ def FitFrame(broad, edges):
 
 def Fit(source):
     _, front, side, reverse = ReadViews(source)
-    broad = (SignedDistance(front) + SignedDistance(reverse)) > 0
+    frontDistance, reverseDistance = SignedDistance(front), SignedDistance(reverse)
+    broad = (frontDistance + reverseDistance) > 0
     edges, depth = ColumnEdges(broad), ColumnEdges(side, 512)
     first = int(edges[0][0])
     # Follow the uninterrupted blade cross section up to the guard. Its curled
@@ -142,6 +146,9 @@ def Fit(source):
         column[section[-1]+1:] = False
     bladeEdges = ColumnEdges(blade)
     guardColumns = np.arange(1450, 1553)
+    # Balance the two observed overlaps at the tail ring before tracing its
+    # inner and outer edges at subpixel precision.
+    ringDistance = .96 * frontDistance + 1.04 * reverseDistance
     return {
         "referenceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
         "atlas": {"left": 116, "right": 2210, "top": 193, "bottom": 451, "sideTop": 728, "sideBottom": 817},
@@ -150,7 +157,7 @@ def Fit(source):
         "guard": FitGuard(broad),
         "guardDepth": SimplifyColumns(guardColumns, EdgeAt(depth, guardColumns), 30, 22, .60),
         "grip": FitRows(edges, depth, 1538, 2085, 18, 92),
-        "ring": FitRing(broad, depth),
+        "ring": FitRing(broad, depth, ringDistance),
     }
 
 

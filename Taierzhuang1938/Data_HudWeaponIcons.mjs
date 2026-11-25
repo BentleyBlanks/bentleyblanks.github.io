@@ -7,5 +7,5 @@ export const HUD_WEAPON_ICONS = {
   Zb26: { src: "Texture/Hud/Texture_HudWeapon_Zb26.png", w: 467, h: 131 },
   Type11: { src: "Texture/Hud/Texture_HudWeapon_Type11.png", w: 440, h: 103 },
   ServicePistol: { src: "Texture/Hud/Texture_HudWeapon_ServicePistol.png", w: 89, h: 52 },
-  Dadao: { src: "Texture/Hud/Texture_HudWeapon_Dadao.png?v=sichuan-dadao-three-views-20261126b", w: 361, h: 51 },
+  Dadao: { src: "Texture/Hud/Texture_HudWeapon_Dadao.png?v=sichuan-dadao-three-views-20261126c", w: 361, h: 51 },
 };
