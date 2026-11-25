@@ -14,7 +14,8 @@ import fs from "node:fs";
 import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFile, execFileSync } from "node:child_process";
+import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import http from "node:http";
 import { once } from "node:events";
@@ -24,7 +25,7 @@ import { SANDBOX_RANGE_KEYS } from "./Data_SandboxRanges.mjs";
 import { LocalControlCenterUrl } from "./Data_StartupRouting.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
 import { ControlCenterCards, CONTROL_CENTER_TITLE } from "./AdvancedTools/Script_ControlCenter.mjs";
-import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
+import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, PREVIEW_SCRIPT, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const toolsDir = path.join(projectDir, "AdvancedTools");
@@ -300,6 +301,49 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
     } else child2.kill();
     await new Promise((resolve) => (child2.exitCode !== null ? resolve() : child2.once("exit", resolve)));
     if (replaceable.listening) { replaceable.closeAllConnections(); await new Promise(resolve => replaceable.close(resolve)); }
+  }
+}
+
+// --- 6. 两个桌面入口共用已运行的服务，占用时不另开端口 ---------------------------
+{
+  const revision = PreviewRuntimeRevision(REPO_ROOT);
+  const sameRoot = http.createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({
+      app: "BlanksLocalPreview", root: REPO_ROOT, runtimeRevision: revision,
+    }));
+  });
+  const otherRoot = http.createServer((request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({
+      app: "BlanksLocalPreview", root: os.tmpdir(), runtimeRevision: revision,
+    }));
+  });
+  const Close = (server) => {
+    server.closeAllConnections();
+    return new Promise((resolve) => server.close(resolve));
+  };
+  sameRoot.listen(0, "127.0.0.1");
+  await once(sameRoot, "listening");
+  const existingPort = sameRoot.address().port;
+  const preferredPort = existingPort - 1;
+  try {
+    otherRoot.listen(preferredPort, "127.0.0.1");
+    await once(otherRoot, "listening");
+    const RunDesktop = (script, args) => promisify(execFile)(process.execPath, [script, ...args, "--no-open"], {
+      encoding: "utf8", env: { ...process.env, PREVIEW_PORT: String(preferredPort) }, timeout: 8000,
+    });
+    const [index, tools] = await Promise.all([
+      RunDesktop(PREVIEW_SCRIPT, ["--desktop"]),
+      RunDesktop(launcher, []),
+    ]);
+    Check("桌面预览复用同检出的相邻端口", index.stdout.includes(`:${existingPort}/__preview/`), index.stdout.trim());
+    Check("控制中心复用同一相邻端口", tools.stdout.includes(ControlCenterUrl(existingPort)), tools.stdout.trim());
+    await Close(sameRoot);
+    const refused = await RunDesktop(PREVIEW_SCRIPT, ["--desktop"]).catch((error) => error);
+    Check("另一检出占据首选端口时桌面入口提示占用，不递增端口",
+      refused.code === 1 && refused.stderr.includes(`:${preferredPort} 已被占用`), refused.stderr?.trim());
+  } finally {
+    if (sameRoot.listening) await Close(sameRoot);
+    if (otherRoot.listening) await Close(otherRoot);
   }
 }
 

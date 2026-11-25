@@ -1,14 +1,14 @@
 // AdvancedTool ControlCenter 启动器：双击桌面快捷方式 = 起本地预览服（已有就复用）并用默认浏览器打开控制中心。
 //
 //   node Taierzhuang1938/AdvancedTools/Script_ControlCenterLaunch.mjs              起服 / 复用，打开控制中心
-//   node ... 8090                                                                  从这个端口起找（默认 8080，PREVIEW_PORT 也认）
+//   node ... 8090                                                                  测试用：从指定端口起找
 //   node ... --no-open                                                             只确保服务在，不开浏览器
 //   node ... --dry-run                                                             只打印将要做的事（不起服、不开浏览器）
 //   node ... --shortcut                                                            在桌面建「AdvancedTool ControlCenter.lnk」（指向 node + 本脚本）
 //   node ... --shortcut-dir=<dir>                                                  把快捷方式建到 <dir>（测试 / 别处用）
 //
-// 复用规则同 scripts/Script_LocalPreview.mjs：端口上 /__preview/ping 报的根目录必须就是本脚本所在的仓库 / worktree，
-// 否则不算（8080 常被别的树占着，指到别人的代码上最难发现）。没有就后台起 Script_LocalPreview.mjs --no-open，端口以它的输出为准。
+// 桌面入口与本地预览快捷方式共用 Script_LocalPreview.mjs --desktop 的端口规则。
+// 显式传入数字端口时保留测试用的端口回退。
 // 由本脚本起的服务跟着本窗口走：关掉窗口即停服；复用已有服务时本脚本打开浏览器就退出。
 
 import fs from "node:fs";
@@ -118,7 +118,30 @@ async function Main(args) {
     return;
   }
   const portArg = args.find((arg) => /^\d+$/.test(arg));
-  const basePort = Number(portArg || process.env.PREVIEW_PORT || 8080);
+  if (!portArg) {
+    const flags = ["--desktop", "--control-center", open ? "--open" : "--no-open"];
+    if (dryRun) flags.push("--dry-run");
+    const child = spawn(process.execPath, [PREVIEW_SCRIPT, ...flags],
+      { cwd: REPO_ROOT, stdio: "inherit", windowsHide: true });
+    const Stop = () => child.kill();
+    process.once("SIGINT", Stop);
+    process.once("SIGTERM", Stop);
+    const code = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", resolve);
+    }).finally(() => {
+      process.off("SIGINT", Stop);
+      process.off("SIGTERM", Stop);
+    });
+    process.exitCode = code ?? 1;
+    if (code && open && process.stdin.isTTY) {
+      console.log("按回车关闭窗口。");
+      await new Promise((resolve) => process.stdin.once("data", resolve));
+      process.stdin.pause();
+    }
+    return;
+  }
+  const basePort = Number(portArg);
   const existing = await FindExisting(basePort);
   if (dryRun) {
     if (existing) console.log(`[dry-run] 复用 :${existing} 上服务本仓库（${REPO_ROOT}）的预览服`);

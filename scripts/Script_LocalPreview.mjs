@@ -67,6 +67,7 @@ import { ASSET_STANDARDS_REPO_PATH, ValidateAssetStandards, FormatAssetStandards
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
 const APP_ID = "BlanksLocalPreview";
+const PORT_SPAN = 60;
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -333,12 +334,12 @@ filter.addEventListener("input", () => {
 
 // ------------------------------------------------------------------ 端口
 
-function ListenFrom(server, startPort, host) {
+function ListenFrom(server, startPort, host, portSpan = PORT_SPAN) {
   return new Promise((resolve, reject) => {
     let port = startPort;
     const Attempt = () => {
       server.once("error", (error) => {
-        if (error.code === "EADDRINUSE" && port < startPort + 60) { port += 1; Attempt(); }
+        if (error.code === "EADDRINUSE" && port < startPort + portSpan) { port += 1; Attempt(); }
         else reject(error);
       });
       server.listen(port, host, () => resolve(port));
@@ -354,6 +355,26 @@ async function ProbeExisting(port) {
     const info = await response.json();
     return info.app === APP_ID ? info : null;
   } catch { return null; }
+}
+
+function SamePreviewRoot(info, rootDir) {
+  return typeof info?.root === "string" && path.resolve(info.root) === rootDir;
+}
+
+async function SelectDesktopPreview(basePort, rootDir, runtimeRevision) {
+  const preferred = await ProbeExisting(basePort);
+  const IsCurrent = (info) => SamePreviewRoot(info, rootDir) && info.runtimeRevision === runtimeRevision;
+  if (IsCurrent(preferred)) return { port: basePort, info: preferred };
+
+  const nearby = await Promise.all(Array.from({ length: Math.min(PORT_SPAN, 65535 - basePort) }, async (_, index) => {
+    const port = basePort + index + 1;
+    return { port, info: await ProbeExisting(port) };
+  }));
+  const sameRoot = [{ port: basePort, info: preferred }, ...nearby].filter(({ info }) => SamePreviewRoot(info, rootDir));
+  return sameRoot.find(({ info }) => IsCurrent(info))
+    ?? sameRoot.find(({ info }) => info.canShutdown)
+    ?? sameRoot[0]
+    ?? { port: basePort, info: preferred };
 }
 
 function IsLoopbackAddress(address) {
@@ -1061,7 +1082,7 @@ function CreateShortcut(rootDir) {
 
   if (process.platform === "darwin") {
     const file = path.join(desktop, `${label}.command`);
-    fs.writeFileSync(file, `#!/bin/sh\ncd "${rootDir}"\nexec node scripts/Script_LocalPreview.mjs --open "$@"\n`);
+    fs.writeFileSync(file, `#!/bin/sh\ncd "${rootDir}"\nexec node scripts/Script_LocalPreview.mjs --desktop --open "$@"\n`);
     fs.chmodSync(file, 0o755);
     console.log(`快捷方式已创建：${file}`);
     return;
@@ -1070,7 +1091,7 @@ function CreateShortcut(rootDir) {
   const file = path.join(desktop, "BlanksLocalPreview.desktop");
   fs.writeFileSync(file, [
     "[Desktop Entry]", "Type=Application", `Name=${label}`,
-    `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")} --open`,
+    `Exec=node ${path.join(rootDir, "scripts", "Script_LocalPreview.mjs")} --desktop --open`,
     `Path=${rootDir}`, `Icon=${path.join(rootDir, "scripts", "Icons", "Icon_LocalPreview.png")}`, "Terminal=true", "",
   ].join("\n"));
   fs.chmodSync(file, 0o755);
@@ -1084,6 +1105,7 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   node scripts/Script_LocalPreview.mjs --shortcut   在桌面放一个双击就起服的快捷方式，然后退出
   node scripts/Script_LocalPreview.mjs --lan        同时监听局域网（手机上验收）
   node scripts/Script_LocalPreview.mjs --open       明确要求打开默认浏览器
+  node scripts/Script_LocalPreview.mjs --desktop    桌面入口：复用同目录服务，起服时使用指定端口，不递增
   node scripts/Script_LocalPreview.mjs --no-open    强制不打开浏览器，优先于 --open（兼容旧调用）
   node scripts/Script_LocalPreview.mjs --root=<dir> 指定要服务的目录
 
@@ -1116,8 +1138,30 @@ async function Main() {
   const portArg = args.find((a) => /^\d+$/.test(a));
   const basePort = Number(portArg || process.env.PREVIEW_PORT || 8080);
   const host = lan ? "0.0.0.0" : "127.0.0.1";
+  const desktop = args.includes("--desktop");
+  const controlCenter = args.includes("--control-center");
 
   if (args.includes("--shortcut")) { CreateShortcut(rootDir); return; }
+  if (desktop && (!Number.isInteger(basePort) || basePort < 1 || basePort > 65535)) {
+    throw new Error(`预览端口无效：${basePort}`);
+  }
+
+  const runtimeRevision = PreviewRuntimeRevision(rootDir);
+  const { port: selectedPort, info: existing } = desktop
+    ? await SelectDesktopPreview(basePort, rootDir, runtimeRevision)
+    : { port: basePort, info: await ProbeExisting(basePort) };
+  const EntryUrl = (port) => `http://127.0.0.1:${port}${controlCenter ? "/Taierzhuang1938/AdvancedTools/ControlCenter.html" : "/__preview/"}`;
+  const ShowEntry = (port) => {
+    if (controlCenter) console.log(`控制中心：${EntryUrl(port)}`);
+    if (shouldOpen) OpenBrowser(EntryUrl(port));
+  };
+  if (desktop && args.includes("--dry-run")) {
+    const action = SamePreviewRoot(existing, rootDir)
+      ? (existing.runtimeRevision === runtimeRevision ? "复用" : (existing.canShutdown ? "原地更新" : "需要先停掉旧服务"))
+      : (existing ? "端口已被其他预览占用" : "启动或检查端口占用");
+    console.log(`[dry-run] ${action} :${selectedPort}，入口 ${EntryUrl(selectedPort)}`);
+    return;
+  }
 
   // 端口上已经有一份、而且服的**正是这棵树**，就复用它，不再起第二份服务。
   // 但桌面快捷方式的职责也包括「打开预览页」：已有实例时仍要打开浏览器，
@@ -1125,28 +1169,38 @@ async function Main() {
   //
   // 「正是这棵树」这个条件不能省：多个 agent 各在自己 worktree 里起预览时，
   // 8080 很可能被别人的树占着，无脑复用等于把浏览器指到别人的代码上，
-  // 而且看起来一切正常 —— 这种错最难发现。根不一样就往上让一个端口。
-  const existing = await ProbeExisting(basePort);
-  const sameRoot = existing && path.resolve(existing.root) === rootDir;
-  if (sameRoot && existing.runtimeRevision === PreviewRuntimeRevision(rootDir)) {
-    console.log(`已经在跑了：http://127.0.0.1:${basePort}/__preview/   （根：${existing.root}）`);
-    if (shouldOpen) OpenBrowser(`http://127.0.0.1:${basePort}/__preview/`);
-    return;
-  }
-  if (sameRoot) {
-    const replaced = await RequestGracefulShutdown(basePort, rootDir);
+  // 而且看起来一切正常。测试入口可以换端口，桌面入口复用同一检出或提示占用。
+  const ReuseCurrent = (port, info) => {
+    if (!SamePreviewRoot(info, rootDir) || info.runtimeRevision !== runtimeRevision) return false;
+    console.log(`已经在跑了：http://127.0.0.1:${port}/__preview/   （根：${info.root}）`);
+    ShowEntry(port);
+    return true;
+  };
+  if (ReuseCurrent(selectedPort, existing)) return;
+  if (SamePreviewRoot(existing, rootDir)) {
+    const replaced = (!desktop || existing.canShutdown) && await RequestGracefulShutdown(selectedPort, rootDir);
     if (replaced) {
-      console.log(`:${basePort} 上的旧版同仓预览服已平滑退出，原地重启最新服务。`);
+      console.log(`:${selectedPort} 上的旧版同仓预览服已平滑退出，原地重启最新服务。`);
+    } else if (desktop) {
+      if (ReuseCurrent(selectedPort, await ProbeExisting(selectedPort))) return;
+      throw new Error(`请先关闭 :${selectedPort} 上的旧版预览服务，再打开桌面快捷方式。`);
     } else {
-      console.log(`:${basePort} 上已有旧版预览（根：${existing.root}），为当前运行时另选端口。`);
+      console.log(`:${selectedPort} 上已有旧版预览（根：${existing.root}），为当前运行时另选端口。`);
     }
-  } else if (existing) {
-    console.log(`:${basePort} 上已有预览（根：${existing.root}），为当前运行时另选端口。`);
+  } else if (existing && !desktop) {
+    console.log(`:${selectedPort} 上已有预览（根：${existing.root}），为当前运行时另选端口。`);
   }
 
-  const context = { port: basePort, basePort, host, lanUrls: [] };
+  const context = { port: selectedPort, basePort: selectedPort, host, lanUrls: [] };
   const server = CreateServer(rootDir, context);
-  const port = await ListenFrom(server, basePort, host);
+  let port;
+  try {
+    port = await ListenFrom(server, selectedPort, host, desktop ? 0 : PORT_SPAN);
+  } catch (error) {
+    if (!desktop || error.code !== "EADDRINUSE") throw error;
+    if (ReuseCurrent(selectedPort, await ProbeExisting(selectedPort))) return;
+    throw new Error(`:${selectedPort} 已被占用。请释放该端口，或在测试时显式指定其他端口。`);
+  }
   context.port = port;
   context.basePort = port;
   context.lanUrls = lan ? LanAddresses(port) : [];
@@ -1163,7 +1217,7 @@ async function Main() {
   console.log(`  停服          :  关掉这个窗口，或按 Ctrl+C`);
   console.log(`  放桌面快捷方式:  node scripts/Script_LocalPreview.mjs --shortcut`);
   console.log("");
-  if (shouldOpen) OpenBrowser(`http://127.0.0.1:${port}/__preview/`);
+  ShowEntry(port);
 }
 
 Main().catch((error) => {

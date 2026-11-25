@@ -1,6 +1,6 @@
 @echo off
-rem The desktop shortcut points here. Double-click = start the local preview
-rem server and open the index page. This console window IS the server:
+rem The desktop shortcut points here. Double-click = reuse or start a local
+rem preview server and open the index. If this window starts the server,
 rem closing it stops the server.
 rem
 rem Keep this file ASCII-only. cmd.exe parses the batch text using whatever
@@ -21,5 +21,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node scripts\Script_LocalPreview.mjs --open %*
+node scripts\Script_LocalPreview.mjs --desktop --open %*
 if errorlevel 1 pause
