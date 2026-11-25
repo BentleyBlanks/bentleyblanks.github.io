@@ -439,7 +439,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakeType89LauncherSteel.py", bakeRecord: "_import/TextureBakes/Texture_Type89LauncherSteel.json",
     source: { provider: "imagegen", date: "2026-11-26", ref: "gpt-image-2 Images API edit from Mariners Museum steel close-ups",
       prompt: "_import/Prompts/Texture_Type89LauncherSteel.txt",
-      note: "Four reference-guided steel swatches. Barrel, stem, shoe and neck use measured photographs, with registered abrasion and oxidation placement. Knurl frequency comes from the close-up image spectrum. The API output is archived losslessly at _import/Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp." },
+      note: "Four reference-guided steel swatches. Barrel, stem, shoe, neck and both tab faces use measured photographs, with registered abrasion and oxidation placement. Knurl frequency comes from the close-up image spectrum. The API output is archived losslessly at _import/Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp." },
     consumers: [{ file: "Data_Meshes.mjs", token: "Type89LauncherSteel" }, { file: "Script_Actor.mjs", token: "Type89LauncherSteel" }],
     files: [["Texture_Type89LauncherSteelBase.webp", "Base", 2048, 2048],
       ["Texture_Type89LauncherSteelNormal.webp", "Normal", 2048, 2048], ["Texture_Type89LauncherSteelOrm.webp", "Orm", 1024, 1024]],

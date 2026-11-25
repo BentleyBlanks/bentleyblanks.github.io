@@ -27,7 +27,7 @@ FINISHES = {
     "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
-    "Tab": (2, (154, 151, 141), (66, 57, 48), .53, (.35, .66), (.97, .43), .74),
+    "Tab": (2, (158, 149, 136), (86, 73, 60), .51, (.35, .68), (.95, .41), .73),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
     "Neck": (2, (142, 138, 125), (60, 51, 43), .55, (.385, .70), (.94, .34), .77),
@@ -35,6 +35,8 @@ FINISHES = {
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
+    "TabBack": (2, (169, 163, 153), (80, 74, 66), .47, (.348, .65), (.96, .43), .71),
+    "RearEye": (2, (151, 141, 129), (66, 56, 45), .46, (.36, .67), (.95, .42), .56),
 }
 
 # Finish, coverage channel, roughness, metallic, blend strength and relief attenuation.
@@ -42,6 +44,8 @@ REGISTERED_FINISHES = {
     "Stem": ((177, 162, 144), "rubbedCoverage", .406, .84, .49, .43),
     "Saddle": ((121, 105, 82), "oxideCoverage", .74, .31, .65, .16),
     "Neck": ((124, 100, 75), "oxideCoverage", .708, .46, .65, .15),
+    "Tab": ((163, 149, 134), "rubbedCoverage", .425, .88, .59, .29),
+    "TabBack": ((174, 165, 151), "rubbedCoverage", .40, .90, .71, .28),
 }
 
 
@@ -186,9 +190,14 @@ def BakeRegion(name, sample, size, index, reference):
     warmth = (srgb[:, :, 0] - srgb[:, :, 2])
     warmth -= GaussianPeriodic(warmth, 65)
     closeup = reference["closeups"].get(name)
+    sampledV = vv
     if closeup:
-        measuredTone = ReferenceField(closeup, xx, vv, "relativeLuminance")
-        measuredWarmth = ReferenceField(closeup, xx, vv, "relativeWarmth")
+        if "outlineUV" in closeup:
+            u, lower, upper = np.asarray(closeup["outlineUV"], dtype=np.float32).T
+            minimum, maximum = np.interp(xx[0], u, lower), np.interp(xx[0], u, upper)
+            sampledV = (vv - minimum) / (maximum - minimum)
+        measuredTone = ReferenceField(closeup, xx, sampledV, "relativeLuminance")
+        measuredWarmth = ReferenceField(closeup, xx, sampledV, "relativeWarmth")
         oxidation += np.clip(-measuredTone / 207, -.13, .13) + np.clip(measuredWarmth / 240, -.08, .08)
         tonalDelta += measuredTone * .48
         warmth += measuredWarmth / 254
@@ -278,17 +287,26 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.735 - metal) * rubbed
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
-        weight = ReferenceField(closeup, xx, vv, channel) * influence / 100
+        weight = ReferenceField(closeup, xx, sampledV, channel) * influence / 100
         finish = SrgbToLinear(np.asarray(tint, dtype=np.float32) / 255)
         linear += (finish - linear) * weight[..., None]
         rough += (finishRoughness - rough) * weight
         metal += (finishMetal - metal) * weight
         heightField *= 1 - smoothing * weight
+    if name == "RearEye":
+        # The outer face in photograph 5 has a rubbed surface. The reverse
+        # in photograph 2 retains a duller finish, including around the tip.
+        wear = .88 * np.exp(-((xx - .25) / .124) ** 2)
+        rubbed = SrgbToLinear(np.array([203, 193, 177], dtype=np.float32) / 255)
+        linear += (rubbed - linear) * wear[..., None]
+        rough += (.375 - rough) * wear
+        metal += (.79 - metal) * wear
+        heightField *= 1 - .34 * wear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
-    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim"):
+    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye"):
         base = SeamBlend(base)
         heightField = SeamBlend(heightField[..., None])[..., 0]
         rough, metal, ao = np.moveaxis(SeamBlend(np.stack([rough, metal, ao], axis=-1)), -1, 0)

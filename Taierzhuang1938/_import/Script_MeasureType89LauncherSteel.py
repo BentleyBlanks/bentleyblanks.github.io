@@ -152,6 +152,37 @@ def NeckFinish(folder):
     return field
 
 
+def TabFinish(folder, number):
+    image, source = Photo(folder, number)
+    # UV bounds sampled through the artwork's curved face. Each photograph
+    # has its own strips of visible metal, in increasing local V order.
+    outline = [[.055, .5915, .9808], [.12, .4348, .9911], [.25, .2449, .5492],
+               [.382, .1146, .4066], [.51, .0328, .3716], [.66, .0139, .3719],
+               [.80, .007, .4302], [.902, .0019, .4542], [.946, .0218, .3694]]
+    strips = ([[168, 652, 745], [244, 581, 734], [376, 488, 654],
+               [550, 445, 577], [716, 435, 564], [916, 439, 572],
+               [1122, 467, 583], [1269, 449, 532], [1370, 384, 459]] if number == 5 else
+              [[895, 283, 246], [935, 307, 258], [1005, 346, 257],
+               [1100, 344, 270], [1200, 344, 268], [1280, 345, 257],
+               [1360, 347, 240], [1425, 354, 313], [1461, 351, 322]])
+    first, last = outline[0][0], outline[-1][0]
+    u = np.linspace(first, last, 33)
+    xs, starts, ends = (np.interp(u, np.asarray(outline)[:, 0], column) for column in np.asarray(strips).T)
+    samples = np.array([[Sample(image, x, y, radius=3) for y in np.linspace(start, end, 17)]
+                        for x, start, end in zip(xs, starts, ends)])
+    source["sampleStrips"] = strips
+    field = FinishMap(samples, source, {"uCenter": (first+last)/2, "uHalfSpan": (last-first)/2, "vRange": [0, 1]})
+    field["outlineUV"] = outline
+    lightness = samples @ LUMA
+    # Reflective rubbed edges are paired with the remainder of each strip.
+    # Restrict the bright-metal estimate to the less saturated areas.
+    body = np.median(lightness[:, 3:-3], axis=1, keepdims=True)
+    warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    exposed = np.clip((lightness - body - 7) / 34, 0, 1) * np.clip((.61-warmth)/.39, .2, 1)
+    field["rubbedCoverage"] = np.rint(100 * exposed).astype(int).tolist()
+    return field
+
+
 def KnurlFrequency(folder):
     image, source = Photo(folder, 3)
     x0, y0, x1, y1 = bounds = [665, 338, 883, 513]
@@ -177,7 +208,8 @@ def Main():
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     record["closeups"] = {"Barrel": BarrelFinish(args.photos), "Stem": StemFinish(args.photos),
-                          "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos)}
+                          "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
+                          "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["knurl"] = KnurlFrequency(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
     encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",

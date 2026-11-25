@@ -126,7 +126,7 @@ def Stem(collection):
     return MeshObject(collection, "FlutedSteelStem", vertices, faces, uvFaces, smooth)
 
 
-def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017):
+def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017, backTile=None):
     """Rounded, flat silhouette plate. Outline vertices are (height, along)."""
     count = len(outline)
     vertices = [(x, y, along) for x in (x0, x1) for y, along in outline]
@@ -134,8 +134,9 @@ def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017):
     faces.extend((i, (i + 1) % count, (i + 1) % count + count, i + count) for i in range(count))
     lowY, highY = min(y for y, _ in outline), max(y for y, _ in outline)
     lowS, highS = min(s for _, s in outline), max(s for _, s in outline)
-    projected = [AtlasUv(tile, (along - lowS) / (highS - lowS), (y - lowY) / (highY - lowY)) for y, along in outline]
-    uvFaces = [list(reversed(projected)), projected]
+    coords = [((along - lowS) / (highS - lowS), (y - lowY) / (highY - lowY)) for y, along in outline]
+    uvFaces = [[AtlasUv(backTile or tile, u, v) for u, v in reversed(coords)],
+               [AtlasUv(tile, u, v) for u, v in coords]]
     uvFaces.extend([AtlasUv(tile, (i + u) / count, v) for u, v in ((0, .4), (1, .4), (1, .6), (0, .6))] for i in range(count))
     obj = MeshObject(collection, name, vertices, faces, uvFaces, [False] * len(faces))
     modifier = obj.modifiers.new("ForgedEdgeRounds", "BEVEL")
@@ -229,10 +230,10 @@ def BuildExterior():
 
     FlatPart(collection, "CurvedRearTab", [(.017, .756), (.018, .721), (.025, .702), (.041, .683),
         (.056, .676), (.065, .680), (.066, .691), (.058, .697), (.052, .691), (.046, .694),
-        (.037, .708), (.034, .727), (.040, .752), (.030, .761)], -.010, .011)
+        (.037, .708), (.034, .727), (.040, .752), (.030, .761)], -.010, .011, backTile="TabBack")
     FlatPart(collection, "RearTabShoulder", [(.016, .711), (.031, .728), (.040, .751),
         (.034, .763), (.008, .766), (.003, .737)], -.020, .019, "Collar")
-    OvalLoop(collection, "RearTabEye", (0, .062, .684), .013, .010, .0029)
+    OvalLoop(collection, "RearTabEye", (0, .062, .684), .013, .010, .0029, tile="RearEye")
 
     profile = [(.734, .022), (.746, .026), (.753, .027), (.766, .0235)]
     for i in range(15):
