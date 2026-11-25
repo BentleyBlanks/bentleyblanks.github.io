@@ -21,7 +21,7 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 # API sample quadrant, polished sRGB, oxidized sRGB, oxide coverage,
 # polished / oxidized roughness, polished / oxidized metalness, relief strength.
 FINISHES = {
-    "Barrel": (0, (168, 165, 155), (74, 69, 61), .63, (.205, .53), (.99, .68), .64),
+    "Barrel": (0, (168, 165, 155), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
     "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
@@ -90,6 +90,19 @@ def ReferenceField(data, xx, vv, values):
     return (a * (1 - dv) + b * dv) * fade
 
 
+def BarrelGrain(closeup, xx, vv):
+    detail = closeup["detail"]
+    path = REFERENCE.with_name(detail["file"])
+    if Sha256(path) != detail["sha256"]:
+        raise ValueError(f"Barrel detail does not match the measured reference: {path}")
+    with Image.open(path) as image:
+        tone, warmth, confidence = np.asarray(image.convert("RGB"), dtype=np.float32).T
+    plate = {"footprint": closeup["footprint"], "tone": (tone - 128) / detail["toneScale"],
+             "warmth": (warmth - 128) / detail["warmthScale"], "confidence": confidence / 255}
+    coverage = ReferenceField(plate, xx, vv, "confidence")
+    return ReferenceField(plate, xx, vv, "tone"), ReferenceField(plate, xx, vv, "warmth"), coverage
+
+
 def CircumferentialAbrasion(luminance):
     """Extract long, irregular strokes across the turned finish."""
     height, width = luminance.shape
@@ -102,31 +115,7 @@ def CircumferentialAbrasion(luminance):
     return np.clip(strokes / max(strokes.std(), 1e-6), -2.8, 2.8)
 
 
-def Engraving(size, center, width, height):
-    """Shallow visible object serial 44023, as photographed near the collars."""
-    paths = {
-        "4": [[(.72, .06), (.05, .68), (.91, .68)], [(.70, .06), (.70, .94)]],
-        "0": [[(.50, .06), (.22, .13), (.11, .38), (.11, .72), (.26, .92), (.51, .95),
-               (.76, .88), (.88, .67), (.88, .32), (.72, .11), (.50, .06)]],
-        "2": [[(.15, .23), (.24, .12), (.50, .08), (.76, .16), (.84, .31), (.77, .48),
-               (.27, .72), (.12, .92), (.87, .92)]],
-        "3": [[(.14, .18), (.32, .08), (.64, .09), (.83, .20), (.79, .36), (.58, .47),
-               (.38, .49), (.63, .50), (.84, .65), (.85, .80), (.69, .91), (.38, .95), (.15, .84)]],
-    }
-    w, h = size
-    image = Image.new("L", size)
-    draw = ImageDraw.Draw(image)
-    step = width * w / 5
-    height *= h
-    x, y = center[0] * w - 2.5 * step, center[1] * h - height * .5
-    for index, digit in enumerate("44023"):
-        for stroke in paths[digit]:
-            closest = [(x + step * (index + px * .83), y + py * height) for px, py in stroke]
-            draw.line(closest, fill=255, width=max(1, round(height * .063)), joint="curve")
-    return np.asarray(image.filter(ImageFilter.GaussianBlur(max(.5, height * .022))), dtype=np.float32) / 255
-
-
-def TracedNeckStamp(data, xx, vv):
+def TracedStamp(data, xx, vv):
     trace = data["stampTrace"]
     left, top, right, bottom = trace["bounds"]
     scale = 3
@@ -226,10 +215,16 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += measuredTone * .48
         warmth += measuredWarmth / 254
     if name == "Barrel":
-        # Keep the axial contrast of the specimen's photographed patches.
-        # Reduce the synthetic intermediate-scale islands between those patches.
-        oxidation += .039 * medium + .038 * cloud
-        tonalDelta -= 1.55 * medium
+        # Reuse the API steel at a fine scale around the whole tube. The close
+        # photo supplies local variations where its surface can be registered.
+        finePits = UnitVariation(luminance, .38, 1.95)
+        photoPits, photoWarmth, photoCoverage = BarrelGrain(closeup, xx, vv)
+        apiPits = finePits * (1 - .78 * photoCoverage)
+        photoPits *= photoCoverage
+        photoWarmth *= photoCoverage
+        oxidation += .061 * medium + .079 * cloud + np.clip(.19 * photoWarmth, -.037, .054)
+        tonalDelta += 8.7 * apiPits + 174 * photoPits - 2.85 * medium
+        warmth += .41 * photoWarmth
         evidence = ReferenceField(reference, xx, vv, "relativeLuminance")
         heat = ReferenceField(reference, xx, vv, "relativeWarmth")
         oxidation += np.clip(-evidence / 183, -.13, .13) + np.clip(heat / 161, -.08, .08)
@@ -250,11 +245,8 @@ def BakeRegion(name, sample, size, index, reference):
     heightField = strength * (.23 * detail + .17 * medium - .22 * pits)
     roughnessDelta = np.zeros_like(luminance)
     if name == "Barrel":
-        heightField -= .066 * medium
-        clusteredPits = UnitVariation(luminance, 2.6, 9.4)
-        tonalDelta += 3.4 * clusteredPits
-        heightField += .158 * clusteredPits
-        roughnessDelta += .024 * clusteredPits
+        heightField = strength * (.13 * detail + .036 * medium - .112 * pits) + .102 * apiPits + .38 * photoPits
+        roughnessDelta += .023 * np.maximum(-apiPits, 0) + .17 * np.maximum(-photoPits, 0)
     if name == "SaddleRim":
         # A few exposed contact marks interrupt the dark forged edge.
         exposed = np.exp(-((xx - .088) / .071) ** 2) + .7 * np.exp(-((xx - .581) / .091) ** 2)
@@ -306,9 +298,9 @@ def BakeRegion(name, sample, size, index, reference):
         roughnessDelta -= .28 * grain
     if name in ("Barrel", "Collar"):
         brushing = CircumferentialAbrasion(luminance) * np.clip(.92 - oxidation, .08, .9)
-        tonalDelta += 4.8 * brushing
-        heightField += .23 * brushing
-        roughnessDelta -= .037 * brushing
+        tonalDelta += (3.6 if name == "Barrel" else 4.8) * brushing
+        heightField += (.106 if name == "Barrel" else .23) * brushing
+        roughnessDelta -= (.026 if name == "Barrel" else .037) * brushing
     if name == "Knurl":
         angular = reference["knurl"]["angularCycles"] * xx
         axial = reference["knurl"]["axialCycles"] * vv
@@ -325,8 +317,7 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += 18 * shadowRibs
         heightField += .31 * shadowRibs
     if name in ("Barrel", "Neck"):
-        stamp = (Engraving(size, (.398, .190), .245, .026) if name == "Barrel"
-                 else TracedNeckStamp(closeup, xx, vv))
+        stamp = TracedStamp(closeup, xx, vv)
         rim = GaussianPeriodic(stamp, 1.5) - stamp * .54
         if name == "Neck":
             heightField -= .84 * stamp
@@ -334,9 +325,10 @@ def BakeRegion(name, sample, size, index, reference):
             oxidation += .14 * stamp
             roughnessDelta += .044 * stamp
         else:
-            heightField -= .57 * stamp
-            tonalDelta += 6 * rim - 10 * stamp
-            oxidation += .15 * stamp
+            heightField -= .68 * stamp
+            tonalDelta += 6 * rim - 12.5 * stamp
+            oxidation += .11 * stamp
+            roughnessDelta += .027 * stamp
 
     oxidation = np.clip(oxidation, .025, .964)
     mix = oxidation[..., None].astype(np.float32)
@@ -349,10 +341,10 @@ def BakeRegion(name, sample, size, index, reference):
         # Rubbed bluing between bright ridges and opaque tarnish carries a
         # wider reflection than bare steel and keeps the ends of the range.
         rubbed = np.clip(1 - np.abs(oxidation - .575) / .34, 0, 1) * .66
-        rubbedColor = SrgbToLinear(np.array([130, 132, 126], dtype=np.float32) / 255)
+        rubbedColor = SrgbToLinear(np.array([127, 128, 123], dtype=np.float32) / 255)
         linear += (rubbedColor - linear) * rubbed[..., None]
-        rough += (.463 - rough) * rubbed
-        metal += (.735 - metal) * rubbed
+        rough += (.495 - rough) * rubbed
+        metal += (.715 - metal) * rubbed
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
         weight = ReferenceField(closeup, xx, sampledV, channel) * influence / 100
@@ -398,7 +390,8 @@ def BakeRegion(name, sample, size, index, reference):
         SeamBlend(surface.swapaxes(0, 1), pixels=10)
     rough, metal, ao = np.moveaxis(surface, -1, 0)
     relief = .00018 if name in ("RearEye", "Wheel") else .00012
-    normal = NormalFromHeight(GaussianPeriodic(heightField, .72), relief, .12, 1.0, "gl") * .5 + .5
+    smoothing = .55 if name == "Barrel" else .72
+    normal = NormalFromHeight(GaussianPeriodic(heightField, smoothing), relief, .12, 1.0, "gl") * .5 + .5
     orm = np.stack([ao, np.clip(rough, .17, .92), metal], axis=-1)
     return tuple(np.rint(255 * np.clip(arr, 0, 1)).astype(np.uint8) for arr in (base, normal, orm))
 
@@ -421,7 +414,7 @@ def Bake():
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
 
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 88, 87)):
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 86.5, 87)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)
@@ -431,6 +424,9 @@ def Bake():
     record = json.loads(recordPath.read_text(encoding="utf-8"))
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
+    detail = reference["closeups"]["Barrel"]["detail"]
+    record["reference"]["barrelDetail"] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
+                                          "sha256": detail["sha256"]}
     recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 

@@ -7,11 +7,12 @@ from pathlib import Path
 import re
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
+BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 
 
 def Photo(folder, number):
@@ -32,6 +33,14 @@ def Sample(image, x, y, radius=4):
     ix, iy = round(x), round(y)
     patch = image[iy-radius:iy+radius+1, ix-radius:ix+radius+1]
     return np.median(patch.reshape(-1, 3), axis=0)
+
+
+def SampleBilinear(image, x, y):
+    ix, iy = np.floor(x).astype(int), np.floor(y).astype(int)
+    dx, dy = x - ix, y - iy
+    above = (1 - dx) * image[iy, ix] + dx * image[iy, ix + 1]
+    below = (1 - dx) * image[iy + 1, ix] + dx * image[iy + 1, ix + 1]
+    return (1 - dy) * above + dy * below
 
 
 def FinishMap(samples, evidence, footprint, planar=False):
@@ -58,14 +67,81 @@ def FinishMap(samples, evidence, footprint, planar=False):
             "relativeWarmth": np.clip(np.rint(warmth), -18, 18).astype(int).tolist()}
 
 
+def BarrelDetail(image, projection, halfSpan):
+    photo = Image.fromarray(image.astype(np.uint8))
+    fine = np.asarray(photo.filter(ImageFilter.GaussianBlur(.58)), dtype=np.float32)
+    surround = np.asarray(photo.filter(ImageFilter.GaussianBlur(8.0)), dtype=np.float32)
+    lightness = fine @ LUMA
+    envelope = surround @ LUMA
+    tone = (lightness - envelope) / np.maximum(envelope, 35)
+    warmth = ((fine[..., 0] - fine[..., 2]) / np.maximum(lightness, 30)
+              - (surround[..., 0] - surround[..., 2]) / np.maximum(envelope, 30))
+
+    # The marks have their own relief in the model. Exclude them from the
+    # grain so their edges are not transferred again as corrosion.
+    marks = [[135, 170, 193, 249], [274, 176, 350, 265], [472, 183, 543, 281],
+             [628, 173, 710, 273], [762, 171, 848, 269], [148, 291, 197, 353],
+             [285, 300, 345, 359], [629, 286, 716, 358], [756, 284, 811, 346]]
+    valid = Image.new("L", photo.size, 255)
+    draw = ImageDraw.Draw(valid)
+    for box in marks:
+        draw.rectangle(box, fill=0)
+    confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(8)), dtype=np.float32) / 255
+    confidence *= np.clip((245 - lightness) / 30, 0, 1)
+
+    width, height = 292, 160
+    center, radius, first, last = projection
+    us, vs = np.meshgrid(np.linspace(0, 1, width * 2), np.linspace(0, 1, height * 2))
+    xs = center + radius * np.sin(2 * np.pi * halfSpan * (2 * us - 1))
+    ys = first + (last - first) * vs
+    edge = np.clip(14 * np.minimum(np.minimum(us, 1 - us), np.minimum(vs, 1 - vs)), 0, 1)
+    toneScale, warmthScale = 300, 520
+    channels = [128 + toneScale * SampleBilinear(tone, xs, ys),
+                128 + warmthScale * SampleBilinear(warmth, xs, ys),
+                255 * edge * SampleBilinear(confidence, xs, ys)]
+    encoded = np.rint(np.clip(np.stack(channels, axis=-1), 0, 255)).astype(np.uint8)
+    detail = Image.fromarray(encoded).resize((width, height), Image.Resampling.LANCZOS)
+    detail.save(BARREL_DETAIL, optimize=True)
+    return {"file": BARREL_DETAIL.name, "sha256": sha256(BARREL_DETAIL.read_bytes()).hexdigest(),
+            "toneScale": toneScale, "warmthScale": warmthScale, "excludedMarks": marks}
+
+
 def BarrelFinish(folder):
     image, source = Photo(folder, 7)
-    angles = np.linspace(-.154, .154, 21)
-    xs = 509 + 540 * np.sin(2 * np.pi * angles)
-    ys = np.linspace(23, 400, 19)
+    projection = [509, 540, 23, 400]
+    center, radius, first, last = projection
+    halfSpan = .154
+    angles = np.linspace(-halfSpan, halfSpan, 21)
+    xs = center + radius * np.sin(2 * np.pi * angles)
+    ys = np.linspace(first, last, 19)
     samples = np.array([[Sample(image, x, y, radius=9) for y in ys] for x in xs])
     source["sampleBounds"] = [int(xs[0]), int(ys[0]), int(xs[-1]), int(ys[-1])]
-    return FinishMap(samples, source, {"uCenter": .398, "uHalfSpan": .154, "vRange": [.722, .849]})
+    source["projection"] = projection
+    result = FinishMap(samples, source, {"uCenter": .398, "uHalfSpan": halfSpan, "vRange": [.722, .849]})
+    result["detail"] = BarrelDetail(image, projection, halfSpan)
+    result["stampTrace"] = {
+        "bounds": [130, 165, 852, 363], "imageCenter": center, "imageRadius": radius,
+        "imageYForVRange": [first, last], "axialCenterImageY": 223, "axialScale": 1,
+        "strokes": [
+            [5, [[168, 181], [159, 194], [147, 221], [155, 223], [180, 223]]],
+            [4, [[169, 182], [170, 205], [168, 238]]],
+            [6, [[324, 192], [308, 212], [291, 237], [293, 242], [309, 242], [335, 238]]],
+            [5, [[324, 192], [325, 213], [323, 239], [323, 254]]],
+            [4, [[510, 207], [498, 210], [489, 221], [485, 235], [487, 251], [494, 265],
+                 [505, 271], [519, 269], [529, 260], [534, 245], [533, 229], [527, 216], [519, 208], [510, 207]]],
+            [5, [[645, 210], [651, 200], [662, 194], [677, 193], [688, 198], [692, 206],
+                 [688, 217], [676, 230], [661, 245], [646, 258], [665, 259], [687, 257]]],
+            [4, [[787, 193], [795, 185], [809, 183], [819, 188], [824, 196], [823, 205],
+                 [815, 213], [800, 216], [811, 219], [817, 228], [817, 238], [811, 247],
+                 [802, 251], [792, 250], [787, 246], [785, 238]]],
+            [3, [[318, 314], [319, 333], [315, 347]]],
+            [3, [[307, 333], [326, 334], [333, 332]]],
+            [3, [[671, 303], [658, 307], [650, 321], [651, 334], [659, 342], [672, 346],
+                 [684, 343], [693, 334], [695, 321], [687, 309], [678, 304], [671, 303]]],
+            [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
+        ],
+    }
+    return result
 
 
 def StemFinish(folder):
@@ -207,12 +283,7 @@ def EyeEdgeFinish(image, trace):
     angles = np.linspace(-angularHalfSpan, angularHalfSpan, 63)
     xs = np.broadcast_to(centerX, (len(angles), len(fineV)))
     ys = centerY + np.sin(2 * np.pi * angles[:, None]) * widths
-    ix, iy = np.floor(xs).astype(int), np.floor(ys).astype(int)
-    tx, ty = xs - ix, ys - iy
-    photoTone = image @ LUMA
-    above = (1 - tx) * photoTone[iy, ix] + tx * photoTone[iy, ix + 1]
-    below = (1 - tx) * photoTone[iy + 1, ix] + tx * photoTone[iy + 1, ix + 1]
-    tone = (1 - ty) * above + ty * below
+    tone = SampleBilinear(image @ LUMA, xs, ys)
     blurred = Image.fromarray(np.rint(tone).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3.3))
     envelope = np.asarray(blurred, dtype=np.float32)
     contrast = np.clip(100 * (tone - envelope) / np.maximum(envelope, 45), -29, 29)
