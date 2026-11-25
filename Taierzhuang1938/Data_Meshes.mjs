@@ -174,10 +174,10 @@ export const MESHES = {
   },
   Grenade: {
     file: "Model_Grenade.tzm.json", category: "weapon",
-    version: "grenade20261126",
+    version: "grenade2026112602",
     triangles: 7872, meshBlocks: 1, nodes: 4, joints: 0,
     materials: ["grenade"], mounts: ["muzzle", "gripR"],
-    span: [0.06486,0.06485,0.22], lengthM: 0.220,
+    span: [0.06143,0.06143,0.22], lengthM: 0.220,
     draws: { high: 1, medium: 1, low: 1 },
     note: "战前国产巩式木柄手榴弹的外观复原。滕县守军使用手榴弹的记载明确，具体生产批次尚未确证。",
   },

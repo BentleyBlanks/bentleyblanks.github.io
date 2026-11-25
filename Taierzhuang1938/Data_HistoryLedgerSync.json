@@ -27,17 +27,22 @@
       "runtimeAsset": "Model/Model_Type24Grenade.glb",
       "assetContract": "docs/Data_GrenadeAsset.md",
       "scope": "Gongxian-pattern game exterior only. Preserve global review anchors and unrelated Notion cursors.",
-      "decision": "Creative exterior based on the factory display side view and the 1958 archive image. The documentation covers the visible profile without attributing a production batch or period color to Tengxian.",
+      "decision": "Creative exterior calibrated to the factory display side view and compared to two 1958 archive images. The documentation covers the visible profile without attributing a production batch or period color to Tengxian.",
+      "visibleOutlineAudit": {
+        "basis": "Factory display photograph and Blender orthographic sides normalized by visible length and center over 256 scanlines",
+        "previousCenteredIoU": 0.9081,
+        "currentCenteredIoU": 0.9795
+      },
       "notionSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-11-25T16:41:10.982Z",
-          "scope": "Verified the new creative exterior row and its two image source links."
+          "lastEdited": "2026-11-25T17:54:08.428Z",
+          "scope": "Verified the updated creative exterior row and its exhibit and two archive links."
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-11-25T16:41:12.361Z",
-          "scope": "Verified the player-facing creative exterior note."
+          "lastEdited": "2026-11-25T17:54:08.428Z",
+          "scope": "Verified the updated player-facing creative exterior note."
         }
       ]
     },

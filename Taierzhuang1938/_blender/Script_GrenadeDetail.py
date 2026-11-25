@@ -22,8 +22,9 @@ ATLAS_GUTTER = 12 / 1024
 MESH_NAME = "Model_GongxianGrenade"
 
 # Each point is (axial fraction, radius / total length). The visible side profile
-# follows the labeled factory display. The archival objects corroborate the broad
-# head, narrow waist and swollen grip. The continuous skin is just game geometry.
+# follows the labeled factory display. Side renders were overlaid on its traced
+# outline to refine the wood and visible head taper. The continuous skin is
+# game geometry.
 PROFILE = (
     # Heel, with a narrow edge and a dark face.
     ("iron", (0.195, 0.264), (
@@ -32,22 +33,22 @@ PROFILE = (
     )),
     # Wooden handle. The thicker ends frame a comparatively narrow center.
     ("wood", (0.032, 0.968), (
-        (0.052, 0.0524), (0.060, 0.0549), (0.078, 0.0633), (0.100, 0.0698),
-        (0.137, 0.0718), (0.171, 0.0704), (0.232, 0.0648), (0.295, 0.0583),
-        (0.364, 0.0544), (0.420, 0.0533), (0.467, 0.0560), (0.507, 0.0618),
-        (0.548, 0.0708), (0.578, 0.0816), (0.602, 0.0899), (0.606, 0.0905),
+        (0.052, 0.0524), (0.060, 0.0558), (0.078, 0.0592), (0.100, 0.0633),
+        (0.137, 0.0676), (0.171, 0.0697), (0.232, 0.0720), (0.295, 0.0696),
+        (0.364, 0.0640), (0.420, 0.0630), (0.467, 0.0647), (0.507, 0.0703),
+        (0.548, 0.0816), (0.578, 0.0940), (0.602, 0.1007), (0.606, 0.1012),
     )),
     # Short dark shoulder and recessed line under the head.
     ("iron", (0.300, 0.432), (
-        (0.606, 0.0905), (0.609, 0.0930), (0.615, 0.0970), (0.622, 0.0978),
-        (0.628, 0.0980), (0.634, 0.1020), (0.642, 0.1195), (0.650, 0.1325),
-        (0.661, 0.1395), (0.671, 0.1405),
+        (0.606, 0.1012), (0.609, 0.1025), (0.615, 0.1057), (0.622, 0.1075),
+        (0.628, 0.1082), (0.634, 0.1105), (0.642, 0.1157), (0.650, 0.1236),
+        (0.661, 0.1329), (0.671, 0.1374),
     )),
-    # Slightly flared dark head with softly broken edges.
+    # Broad dark head, with a slight taper toward the crown in the side view.
     ("iron", (0.470, 0.725), (
-        (0.671, 0.1405), (0.680, 0.1407), (0.725, 0.1421), (0.801, 0.1443),
-        (0.880, 0.1463), (0.949, 0.1474), (0.978, 0.1471), (0.988, 0.1464),
-        (0.995, 0.1445), (1.000, 0.1404),
+        (0.671, 0.1374), (0.680, 0.1394), (0.725, 0.1396), (0.801, 0.1380),
+        (0.880, 0.1348), (0.949, 0.1324), (0.978, 0.1318), (0.988, 0.1305),
+        (0.995, 0.1284), (1.000, 0.1247),
     )),
 )
 
