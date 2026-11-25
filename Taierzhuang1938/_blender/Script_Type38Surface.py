@@ -494,7 +494,7 @@ def MedallionRelief(doc, views, primitive, field, valid, padded):
     def Height(side,up):
         beads,_,radius = RearFace(side,up)
         lip = Ramp(.085,.177,radius)*(1-Ramp(.202,.294,radius))
-        return .00034*beads + .00165*lip + .0115*(1-np.minimum(radius,1.3)**2)
+        return .00029*beads + .00049*lip + .0078*(1-np.minimum(radius,1.3)**2)
     step = .000045
     gradX = (Height(side+step,up)-Height(side-step,up))/(2*step)
     gradY = (Height(side,up+step)-Height(side,up-step))/(2*step)
@@ -927,6 +927,8 @@ def Build(cache):
                 grainU,grainV = acrossSteel+.21,length*9.4+.17
             if handle:
                 grainU,grainV = side*5.4+.22,np.arctan2(up-.046,length+.102)/(2*np.pi)+.29
+            if collar:
+                grainU,grainV = acrossSteel+.17,length*26+.32
             brush = np.clip((Sample(source['Metal009Roughness'],grainU,grainV)-119)/24,-1.8,1.8)
             rough = (94 if bare or collar else 104) + 16*flow + 13*stain + 4*brush - 20*edge
             if lightTube:
@@ -947,11 +949,25 @@ def Build(cache):
                     color = Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
                     rough = 86+7*flow+5*stain+4*brush
             metal = 251 - oxidation*(22 if bare else 41)
+            if collar or backing or disk:
+                # The adjoining rear steel pieces share the same oxide and wear tones.
+                # Fine directional marks break up the highlight across each surface.
+                wear = np.clip(.58+.19*flow+.18*stain+.16*edge-.13*oxidation,.20,.94)
+                rearSteel = Tint([120,107,96],[182,173,159],wear+.035*brush)
+                color = rearSteel
+                rough = (145 if collar else 132)-19*wear+10*stain+10*brush
+                metal = 238+10*wear-11*oxidation
+                if collar:
+                    rim = Ramp(.13,.76,np.abs(normalLength))*np.clip(.74+.14*stain,.48,.95)
+                    color = Blend(color,np.array([118,109,99],dtype='f'),rim*.42)
+                    rough += 23*rim
+                    metal -= 9*rim
             if backing:
                 visibleHeel = Ramp(.034,.064,up)
-                color = Blend(Tint([63,60,55],[113,108,98],.48+.18*flow+.12*stain),color,visibleHeel)
-                rough += (1-visibleHeel)*(27-8*brush)
-                metal -= (1-visibleHeel)*(11+5*oxidation)
+                innerSteel = Tint([63,60,55],[113,108,98],.48+.18*flow+.12*stain)
+                color = Blend(innerSteel,rearSteel,visibleHeel)
+                rough += (1-visibleHeel)*(8-7*brush)
+                metal -= (1-visibleHeel)*(8+5*oxidation)
             if butt:
                 rim = 1-Ramp(.1,.89,np.abs(normalLength))
                 wear = rim*np.clip(.36+.24*stain+.18*grainSteel,0,.83)
@@ -999,18 +1015,29 @@ def Build(cache):
                 else:
                     knob = Ramp(.044,.054,side)
                     rub = np.clip(.49+.18*flow+.15*stain+.09*grain,0,1)
-                    bareOval = Tint([129,113,111],[193,183,181],.63+.085*speckle+.07*flow)
+                    bareOval = Tint([126,112,108],[190,176,172],.64+.092*speckle+.10*flow)
                     oval = Blend(bareOval,np.array([93,70,60],dtype='f'),pits*.54)
                     outward = Ramp(.030,.039,side)
-                    neck = Tint([188,161,151],[261,243,246],.34+.50*rub)
+                    neck = Tint([180,158,147],[250,234,231],.34+.50*rub)
                     neck = (neck+14.025)*(1.17-.33*outward[:,:,None])**(1/2.4)-14.025
                     color = Blend(neck,oval,knob)
-                    neckRough = 66-3*outward+4*brush+3*tarnish
-                    rough = neckRough+knob*(88.5+5*speckle+16*pits+3*grain-neckRough)
-                    neckMetal = 251-2*tarnish
+                    patina = Ramp(.07,.92,.42*tarnish+.31*grainSteel-.28*flow)
+                    color = Blend(color,Tint([68,60,54],[117,106,93],.53+.12*stain),patina*(.18+.39*knob))
+                    neckRough = 65-3*outward+5*brush+5*tarnish
+                    rough = neckRough+knob*(89.5+7*speckle+19*pits+3*grain-neckRough)
+                    rough += patina*(9+8*knob)
+                    # The shaded flank in the oblique photo is more worn and lightly oxidized.
+                    chartV = (np.arange(height,dtype='f')+.5)/height
+                    flank = Ramp(.48,.96,-np.sin((chartV-.02)*(2*np.pi/.96)))[:,None]*knob
+                    flank *= np.clip(.88+.13*stain+.09*grainSteel,.54,1)
+                    rough += 20*flank
+                    color *= (1-.026*flank)[:,:,None]
+                    neckMetal = 249-2*tarnish
                     outerEnd = Ramp(.875,.955,(np.arange(width,dtype='f')+.5)/width)
                     metal = neckMetal+knob*(251-49*pits-3*outerEnd-neckMetal)
                 relief = .15*scoring+.056*tarnish-.25*pits
+                if handle:
+                    relief -= .085*pits*knob
             if loop:
                 lowerArc = 1-Ramp(.0022,.0062,up)
                 wear = np.clip(lowerArc*(.82+.19*stain+.14*grainSteel)+.19*edge,0,1)
@@ -1021,14 +1048,18 @@ def Build(cache):
             if disk:
                 face = Ramp(.18,.69,normalLength)*Ramp(-.0547,-.0519,length)
                 beads,center,radius = RearFace(side,up)
-                centerPlate = 1-Ramp(.14,.22,radius)
+                centerPlate = 1-Ramp(.145,.227,radius)
                 wear = Ramp(.10,.62,beads)
-                diskColor = Tint([132,123,110],[232,224,207],.25+.63*wear+.25*center+.06*flow)
-                diskColor = Blend(diskColor,np.array([154,145,133],dtype='f'),centerPlate*.60)
+                diskColor = Tint([126,115,105],[224,213,198],.32+.56*wear+.09*center+.078*flow+.036*brush)
+                basin = Tint([85,76,68],[128,116,105],.55+.13*stain+.10*brush)
+                diskColor = Blend(diskColor,basin,centerPlate)
                 color = Blend(color,diskColor,face)
-                rough += (154-73*wear-53*center-15*centerPlate+9*stain-rough)*face
-                metal += (218+30*wear+9*center+9*centerPlate+4*flow-metal)*face
-                relief += face*(1.48*beads + .78*center)
+                diskRough = 177-63*wear-17*center+10*stain+7*brush
+                diskRough += centerPlate*(174+3*brush-diskRough)
+                rough += (diskRough-rough)*face
+                diskMetal = 215+26*wear+6*center-9*centerPlate+4*flow
+                metal += (diskMetal-metal)*face
+                relief += face*(.94*beads + .32*center)
             if part == 'Exterior_FoldedFrame12':
                 marks = FrameEngraving(Image.fromarray(Load(material['normalTexture'])))
                 color = Tint([108,104,97],[160,155,142],.50+.19*flow+.06*stain)
@@ -1099,7 +1130,7 @@ def Build(cache):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_RolledEdges17'
+    doc['asset']['extras']['version'] = 'Type38_AgedRearSteel18'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1107,7 +1138,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=19, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=20, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])

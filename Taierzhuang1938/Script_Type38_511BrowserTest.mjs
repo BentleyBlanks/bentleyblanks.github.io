@@ -160,6 +160,39 @@ try{
   const [stem,gap,outer,pole,wornFlank]=evidence.gripFinish.brushSamples;
   assert(stem[0]<75&&stem[1]>200&&stem[2]>180&&outer[0]>245&&outer[2]>235&&wornFlank[2]<160&&gap[2]<8&&pole[2]<8,
    'the brush direction must fade through the junction and close smoothly at the tip');
+  evidence.rearSteel=await page.evaluate(()=>{
+   let collar,face;
+   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
+    if(mesh.userData.type38Part==='T38_435F2_IndependentTailNeckExterior')collar=mesh.material.roughnessMap.image;
+    if(mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess')face=mesh.material;
+   });
+   const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+   const Read=image=>{
+    canvas.width=image.width;
+    canvas.height=image.height;
+    ctx.drawImage(image,0,0);
+   };
+   const Median=values=>values.sort((a,b)=>a-b)[Math.floor(values.length*.5)];
+   const Patch=(u,v,channel)=>{
+    const x=Math.floor(canvas.width*u),y=Math.floor(canvas.height*v);
+    const rgba=ctx.getImageData(x-3,y-3,7,7).data;
+    return Median(Array.from({length:49},(_,i)=>rgba[4*i+channel]));
+   };
+   Read(collar);
+   const rgba=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+   const rough=[];
+   for(let i=0;i<rgba.length;i+=28)if(rgba[i+1]>0&&rgba[i+2]>170)rough.push(rgba[i+1]);
+   const collarRough={count:rough.length,median:Median(rough)};
+   Read(face.map.image);
+   const cupColor=Patch(.408,.48,0),dotColor=Patch(.387,.28,0);
+   Read(face.roughnessMap.image);
+   return {collarRough,cupColor,dotColor,cupRough:Patch(.408,.48,1),dotRough:Patch(.387,.28,1)};
+  });
+  const {collarRough,cupColor,dotColor,cupRough,dotRough}=evidence.rearSteel;
+  assert(collarRough.count>100&&collarRough.median>120&&collarRough.median<165,
+   'the collar needs a broad satin highlight');
+  assert(dotColor-cupColor>55&&cupRough-dotRough>35,
+   'the recessed center and worn dot surface need distinct reflectance');
   evidence.foreFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_LongRound44')mat=mesh.material;});
