@@ -8,15 +8,19 @@
   <link rel="icon" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261122Channels">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261125Comparison">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
-  <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs"></script>
+  <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs?v=20261125Comparison"></script>
 </head>
 <body class="uiToolSurface edThemedSurface">
   <header class="tool-header">
     <h1>枪械检查台</h1>
+    <div class="layout-switch" role="group" aria-label="视口布局">
+      <button type="button" data-layout="single" aria-pressed="true" aria-controls="inspectionViews">单视口</button>
+      <button type="button" data-layout="split" aria-pressed="false" aria-controls="inspectionViews">双视口</button>
+    </div>
     <a id="controlCenter" class="edMenuMainMenu" href="./AdvancedTools/ControlCenter.html">← 控制中心</a>
   </header>
 
@@ -31,6 +35,28 @@
       </div>
       <div id="modelList" class="model-list"></div>
     </aside>
+
+    <div class="viewports" id="inspectionViews">
+    <section class="reference" id="referencePane" aria-label="原画视口" hidden>
+      <div class="reference-bar">
+        <button type="button" class="edBtn" id="addReferences">导入图片</button>
+        <input type="file" id="referenceFiles" accept="image/*,.avif,.webp,.svg" multiple hidden>
+        <div class="reference-zoom" role="group" aria-label="原画缩放">
+          <button type="button" class="edBtn" id="referenceZoomOut" aria-label="缩小">−</button>
+          <button type="button" class="edBtn" id="referenceZoomIn" aria-label="放大">＋</button>
+          <button type="button" class="edBtn" id="referenceFit">适配</button>
+        </div>
+      </div>
+      <div class="reference-stage" id="referenceView" tabindex="0" aria-label="原画预览，拖动平移，滚轮或正负号缩放，Home 适配">
+        <span class="reference-empty" id="referenceEmpty">拖入原画或贴图</span>
+        <output class="reference-info" id="referenceInfo" hidden></output>
+      </div>
+      <footer class="reference-footer">
+        <div id="referenceList" class="reference-list" role="group" aria-label="已导入图片"></div>
+        <button type="button" class="edBtn" id="removeReference" aria-label="移除当前图片" title="移除当前图片" hidden>×</button>
+        <p class="reference-status" id="referenceStatus" role="status" hidden></p>
+      </footer>
+    </section>
 
     <section id="inspectionBench" class="bench" aria-label="模型视口">
       <div class="view-bar" role="group" aria-label="渲染通道">
@@ -71,6 +97,7 @@
         </div>
       </footer>
     </section>
+    </div>
 
     <aside class="details" aria-labelledby="modelName">
       <header class="model-heading">
@@ -93,6 +120,7 @@
         </dl>
       </div>
       <p class="edNote warn" id="resourceNote" role="status" hidden></p>
+      <div id="modelInspector" hidden></div>
     </aside>
   </main>
 </body>

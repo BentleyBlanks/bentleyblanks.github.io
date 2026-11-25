@@ -212,7 +212,7 @@ try {
     const independent = await page.evaluate(() => ({
       name: window.name, opener: window.opener?.location.pathname, models: document.querySelectorAll("[data-model]").length,
       standalone: !window.ToolStudio && !window.Tengxian && !document.querySelector(".edMenuBar, .edPanel"),
-      noWrites: !document.querySelector("form, input:not([type=search]), [contenteditable]"),
+      noWrites: !document.querySelector("form, input:not([type=search], #referenceFiles[type=file]), [contenteditable]"),
     }));
     Check("控制中心启动有独立窗口名的只读枪械检查台",
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
@@ -434,6 +434,66 @@ try {
       return !stage.grid.visible && stage.model.blade.visible && !document.querySelector("#muzzleLabel").hidden;
     }));
 
+    await Inspect("HanYang");
+    const meshPicker = page.getByRole("combobox", { name: "网格", exact: true });
+    const materialPicker = page.getByRole("combobox", { name: "材质", exact: true });
+    Check("检查器显示真实网格与贴图缩略图", await page.evaluate(() => {
+      const inspector = document.querySelector("#modelInspector");
+      const count = window.WeaponInspection.scene.model.body.children[0].children.filter((child) => child.isMesh).length;
+      return inspector.querySelector('[aria-label="网格"]').options.length === count
+        && inspector.querySelectorAll(".texture-list img").length >= 3
+        && !!inspector.querySelector(".texture-info small").textContent.match(/\d+ × \d+ · (sRGB|线性) · UV\d/);
+    }));
+    await meshPicker.selectOption({ index: 1 });
+    const meshSlot = page.locator(".mesh-slot").first();
+    const expectedMaterial = await meshSlot.locator("span").textContent();
+    await meshSlot.click();
+    Check("子网格材质槽链接到对应材质", await materialPicker.locator("option:checked").textContent() === expectedMaterial);
+
+    const split = page.getByRole("button", { name: "双视口" });
+    const single = page.getByRole("button", { name: "单视口" });
+    const beforeSplit = await CameraState();
+    const originalWidth = await page.locator("#view").evaluate((view) => view.clientWidth);
+    await split.click();
+    Check("54 像素顶栏，桌面双视口左右对齐", await page.evaluate(() => {
+      const header = document.querySelector(".tool-header").getBoundingClientRect();
+      const ref = document.querySelector("#referenceView").getBoundingClientRect();
+      const model = document.querySelector(".stage").getBoundingClientRect();
+      return header.height === 54 && ref.right < model.left
+        && ref.top === model.top && ref.bottom === model.bottom && Math.abs(ref.width - model.width) < 2;
+    }));
+    const images = await Promise.all([
+      { name: "Concept.png", width: 1200, height: 640, background: "#a5835b" },
+      { name: "Surface.png", width: 640, height: 1200, background: "#546779" },
+    ].map(async ({ name, ...create }) => ({
+      name, mimeType: "image/png", buffer: await sharp({ create: { ...create, channels: 3 } }).png().toBuffer(),
+    })));
+    await page.locator("#referenceFiles").setInputFiles(images);
+    const reference = page.locator("#referenceView");
+    const referenceImage = reference.locator("img");
+    const imageWidth = () => referenceImage.evaluate((image) => image.getBoundingClientRect().width);
+    await referenceImage.waitFor({ state: "visible" });
+    const fitted = await imageWidth();
+    await reference.hover();
+    await page.mouse.wheel(0, -720);
+    await page.waitForFunction((width) => document.querySelector("#referenceView img").getBoundingClientRect().width > width * 2, fitted);
+    const zoomed = await imageWidth();
+    await page.getByRole("button", { name: "Surface.png" }).click();
+    await page.getByRole("button", { name: "Concept.png" }).click();
+    await single.click();
+    Check("回到单视口恢复显示宽度、保留 3D 朝向", await reference.isHidden()
+      && await page.locator("#view").evaluate((view) => view.clientWidth) === originalWidth
+      && (await CameraState()).slice(0, 3).join() === beforeSplit.slice(0, 3).join());
+    await split.click();
+    Check("多图导入并保留各自缩放", await page.locator("#referenceList button").count() === 2
+      && await referenceImage.getAttribute("alt") === "Concept.png" && Math.abs(await imageWidth() - zoomed) < 1);
+    await page.locator("#referenceFit").click();
+    Check("原画可复位", Math.abs(await imageWidth() - fitted) < 1);
+    await page.locator("#removeReference").click();
+    Check("移除当前图后选中剩余原画", await referenceImage.getAttribute("alt") === "Surface.png");
+    if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionSplit.png") });
+    await single.click();
+
     const search = page.locator("#modelSearch");
     await search.fill("zb26");
     Check("可按编号搜索，过滤仅影响模型列表", await page.locator("[data-model]").count() === 1
@@ -474,6 +534,14 @@ try {
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionMobile.png") });
     Check("窄窗口视口和控制可达、没有横向溢出", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
       && document.querySelector("#view").clientWidth > 280 && document.querySelector("#view").clientHeight > 220));
+    await split.click();
+    Check("窄窗口原画与模型上下排列，两个视口都可用", await page.evaluate(() => {
+      const ref = document.querySelector("#referenceView").getBoundingClientRect();
+      const model = document.querySelector(".stage").getBoundingClientRect();
+      return document.documentElement.scrollWidth <= innerWidth
+        && ref.bottom < model.top && ref.width === model.width && ref.height > 220 && model.height > 220;
+    }));
+    await single.click();
     await page.setViewportSize({ width: 280, height: 550 });
     Check("通道多行排列时保留可用视口", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
       && document.querySelector("#view").clientHeight > 220

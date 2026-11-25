@@ -296,7 +296,9 @@ export class WeaponInspectionScene {
     } else {
       const built = this.factory.WeaponGeometry(id, variant, { includeBayonet: false });
       for (const [key, geometry] of built.geometries) {
-        body.add(new THREE.Mesh(geometry, this.materials[key] || this.materials.steel));
+        const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
+        mesh.name = key;
+        body.add(mesh);
       }
       if (weapon.kind !== "melee" && weapon.kind !== "throwable") {
         muzzle = built.muzzle;

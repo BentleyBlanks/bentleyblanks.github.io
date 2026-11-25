@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { WEAPONS } from "../Data_Weapons.mjs";
 import { WeaponInspectionScene } from "./Script_WeaponInspectionScene.mjs";
+import { ShowWeaponModelInspector } from "./Script_WeaponModelInspector.mjs";
+import { BindWeaponReferenceViewport } from "./Script_WeaponReferenceViewport.mjs";
 
 const GROUPS = [
   ["枪械", ["boltRifle", "lmg", "hmg", "pistol"]],
@@ -32,6 +34,7 @@ function LabelNode(parent, tag, text) {
 const canvas = ById("view");
 const list = ById("modelList");
 const search = ById("modelSearch");
+const inspector = ById("modelInspector");
 const status = ById("stageStatus");
 const retry = ById("retryLoad");
 const gridButton = ById("gridToggle");
@@ -127,6 +130,8 @@ async function Select(id, variant = 0) {
   Text("modelKind", Kind(weapon));
   Text("modelSide", SIDE[weapon.side] || "待考");
   for (const key of ["modelFile", "modelTriangles", ...dimensionIds]) Text(key, "—");
+  ShowWeaponModelInspector(inspector, null);
+  inspector.closest(".details").scrollTop = 0;
   SetPressed(bladeButton, false);
   bladeButton.hidden = true;
   ById("resourceNote").hidden = true;
@@ -142,6 +147,7 @@ async function Select(id, variant = 0) {
     Text("modelFile", model.file);
     Text("modelTriangles", number.format(model.triangles));
     model.size.toArray().forEach((meters, i) => Text(dimensionIds[i], number.format(Math.round(meters * 1000))));
+    ShowWeaponModelInspector(inspector, model);
     SetStatus("ready");
     bladeButton.hidden = !model.blade;
     mountButton.hidden = !model.muzzle && !model.grip;
@@ -319,6 +325,7 @@ back.addEventListener("click", (event) => {
 });
 
 FilterCatalog();
+BindWeaponReferenceViewport();
 search.addEventListener("input", FilterCatalog);
 SetStatus("loading", "正在载入模型…");
 try {
