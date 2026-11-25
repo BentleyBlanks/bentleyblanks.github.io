@@ -7,7 +7,7 @@ from pathlib import Path
 import re
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
@@ -183,6 +183,45 @@ def TabFinish(folder, number):
     return field
 
 
+def EyeEdgeFinish(image, trace):
+    halfWidths = [32, 38, 37, 38, 39, 40, 37, 37]
+    angularHalfSpan = .16
+    angles = np.linspace(-angularHalfSpan, angularHalfSpan, 9)
+    crossOffsets = np.sin(2 * np.pi * angles)
+    samples = np.array([[Sample(image, x, y + width * offset) for offset in crossOffsets]
+                        for (_, x, y), width in zip(trace, halfWidths)])
+    lightness = samples @ LUMA
+    chroma = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    # The cooler patch is cut by the lighting stripe in the photograph. Use
+    # the change in oxide color and taper the coverage at the dull tip.
+    clean = np.clip((.46 - chroma) / .34, 0, 1)
+    positions = np.array([v for v, _, _ in trace])
+    clean *= np.clip((positions - .035) / .10, 0, 1)[:, None]
+    spaced = np.linspace(positions[0], positions[-1], 25)
+    coverage = np.array([np.interp(spaced, positions, column) for column in clean.T])
+
+    # Transfer the fine corrosion contrast without the broad lighting band.
+    fineV = np.linspace(positions[0], positions[-1], 93)
+    centerX, centerY = [np.interp(fineV, positions, column) for column in np.asarray(trace).T[1:]]
+    widths = np.interp(fineV, positions, halfWidths)
+    angles = np.linspace(-angularHalfSpan, angularHalfSpan, 63)
+    xs = np.broadcast_to(centerX, (len(angles), len(fineV)))
+    ys = centerY + np.sin(2 * np.pi * angles[:, None]) * widths
+    ix, iy = np.floor(xs).astype(int), np.floor(ys).astype(int)
+    tx, ty = xs - ix, ys - iy
+    photoTone = image @ LUMA
+    above = (1 - tx) * photoTone[iy, ix] + tx * photoTone[iy, ix + 1]
+    below = (1 - tx) * photoTone[iy + 1, ix] + tx * photoTone[iy + 1, ix + 1]
+    tone = (1 - ty) * above + ty * below
+    blurred = Image.fromarray(np.rint(tone).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3.3))
+    envelope = np.asarray(blurred, dtype=np.float32)
+    contrast = np.clip(100 * (tone - envelope) / np.maximum(envelope, 45), -29, 29)
+
+    return {"footprint": {"uCenter": 0, "uHalfSpan": angularHalfSpan, "vRange": [positions[0], positions[-1]]},
+            "sampleHalfWidths": halfWidths, "rubbedCoverage": np.rint(100 * coverage).astype(int).tolist(),
+            "relativeDetail": np.rint(contrast).astype(int).tolist()}
+
+
 def EyeFinish(folder):
     # V runs around the loop from its outer tip. Photo 5 shows the wire nearly
     # edge-on, giving an unsigned distance from the tip along the visible bar.
@@ -215,6 +254,8 @@ def EyeFinish(folder):
                         "sampleLuminance": np.rint(tone).astype(int).tolist(),
                         "sampleWarmth": np.round(warmth.astype(np.float64), 3).tolist(),
                         "rubbedCoverage": np.rint(100 * rubbed).astype(int).tolist()}
+        if side == "front":
+            result[side]["outerWire"] = EyeEdgeFinish(image, trace)
     return result
 
 

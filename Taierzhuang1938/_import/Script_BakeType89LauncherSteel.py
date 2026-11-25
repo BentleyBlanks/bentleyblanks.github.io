@@ -171,8 +171,12 @@ def EyeWear(reference, xx, vv):
     frontArc *= np.clip((.47 - tipDistance) / .09, 0, 1)
     reverseArc = np.interp(vv, reverse["v"], reverse["rubbedCoverage"], period=1) / 100
     reverseArc *= np.clip((abs(vv - .5) - .08) / .075, 0, 1)
-    # Use the observed arc profiles on opposite sides of the round wire.
+    # The near arc in the edge-on photograph is seen across the angular UV
+    # seam. Continue the worn steel from the face around the outer wire.
     frontWear = frontArc * np.exp(-((xx - .25) / .138) ** 2)
+    signedU = (xx + .5) % 1 - .5
+    outerWear = ReferenceField(front["outerWire"], signedU, vv, "rubbedCoverage") / 100
+    frontWear = np.maximum(frontWear, outerWear)
     reverseWear = reverseArc * np.exp(-((xx - .75) / .148) ** 2)
     return frontWear, reverseWear
 
@@ -260,6 +264,15 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += 14 * flecks - 17 * darkPits
         heightField -= .27 * darkPits
         roughnessDelta += .077 * darkPits - .03 * flecks
+    if name == "RearEye":
+        oxidation += .038 * medium + .036 * cloud
+        tonalDelta += 5.4 * flecks - 4.0 * darkPits - .92 * medium
+        outerWire = reference["ringFinish"]["front"]["outerWire"]
+        signedU = (xx + .5) % 1 - .5
+        measuredDetail = ReferenceField(outerWire, signedU, vv, "relativeDetail") / 100
+        tonalDelta += 172 * measuredDetail
+        heightField += .33 * measuredDetail
+        roughnessDelta -= .18 * measuredDetail
     if name == "Wheel":
         rim = reference["wheelFinish"]
         lip = np.interp(vv, rim["v"], rim["rubbedCoverage"]) / 100
@@ -348,9 +361,10 @@ def BakeRegion(name, sample, size, index, reference):
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
     if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
-        base = SeamBlend(base)
-        heightField = SeamBlend(heightField[..., None])[..., 0]
-        surface = SeamBlend(surface)
+        seamWidth = 6 if name == "RearEye" else 24
+        base = SeamBlend(base, pixels=seamWidth)
+        heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
+        surface = SeamBlend(surface, pixels=seamWidth)
     if name == "RearEye":
         # The wire and the length around the loop both wrap at their UV seams.
         SeamBlend(base.swapaxes(0, 1), pixels=10)
