@@ -93,6 +93,8 @@ const _addQ0 = new THREE.Quaternion(), _addQ1 = new THREE.Quaternion(), _addDelt
 const _idQuat = new THREE.Quaternion();
 const _aoTop = new THREE.Quaternion(), _aoBot = new THREE.Quaternion();
 const _aoModelQ = new THREE.Quaternion(), _aoModelQInv = new THREE.Quaternion();
+const _aimEuler = new THREE.Euler(0, 0, 0, "YXZ");
+const _curBarrel = new THREE.Vector3(), _wantBarrel = new THREE.Vector3();
 
 /** 开火 Additive 叠加仅作用上半身骨骼（双腿与 Hips 严格 0° 透明，跑动开火绝不锁腿滑步）。 */
 const XBOT_ADDITIVE_FIRE_BONES = new Set([
@@ -1221,7 +1223,8 @@ export class XBotSkin {
     // Always pass the actual pose mode into _Reanchor: when _Play falls back to _Mirror while a
     // Mixamo clip is still loading, this.current.mirror is true and this.pick is { mode: "mirror" }.
     const reanchorPick = this.current?.mirror ? this.pick : (pick.mode === "hold" ? this.pick || pick : pick);
-    this._Reanchor(reanchorPick, dt);
+    const aimCtx = live3C ? { aimWeight, lookYaw: intent.lookYaw || 0, lookPitch: intent.lookPitch || 0 } : null;
+    this._Reanchor(reanchorPick, dt, aimCtx);
     this._Remember(intent);
     // 倒地动作在画面里放到最后一帧、过渡也淡完：尸体定住了，SoldierView 之后不再推它。
     // 倒地动作没读到、照原身体换算（mirror）的：原身体倒完了，这一帧换算的就是最后的姿势
@@ -1884,7 +1887,7 @@ export class XBotSkin {
    *   · 手里的枪（_PlaceWeapon）：先定枪的位姿，再把 X Bot 的手 IK 到枪的握点上；
    *   · 其余挂件（背着的枪、钢盔、刀鞘、手里的道具）按原身体那根骨挪到 X Bot 同一根骨上（在 IK 之后，跟着手走）。
    */
-  _Reanchor(pick, dt = 0) {
+  _Reanchor(pick, dt = 0, aimCtx = null) {
     if (this.frame - this.attachScan > 30 || this.attachWeapon !== this.actor.weaponGroup) this._ScanAttachments();
     if (!this.sourceMatricesReady) this.rig.root.updateMatrixWorld(true);
     this.sourceMatricesReady = false;
@@ -1897,7 +1900,7 @@ export class XBotSkin {
     }
     const weapon = this._RifleInHands() ? this.attachments.find(a => a.holdsWeapon) : null;
     const weaponHeldByGore = !!this.actor.goreWeaponHold;
-    const placed = weapon && !weaponHeldByGore ? this._PlaceWeapon(weapon, pick, dt) : false;
+    const placed = weapon && !weaponHeldByGore ? this._PlaceWeapon(weapon, pick, dt, aimCtx) : false;
     if (!weapon) { this.lastMount = null; this.contact = null; for (const a of this.attachments) if (a.holdsWeapon) { a.looseDrop = null; a.handRel = null; } }
     if (!placed) { this.ikR = 0; this.ikL = 0; }
     for (const a of this.attachments) {
@@ -2130,7 +2133,7 @@ export class XBotSkin {
    * 各按各的）；换算动作的另一只手去原动作握的那个位置（拉栓、托枪照原样）。手本来离握点远（在指路、在干别的）就不拉，
    * 远近之间渐变；挂法变了（换动作、松手）XBOT_GRIP.blendS 秒内淡过去。
    */
-  _PlaceWeapon(a, pick, dt) {
+  _PlaceWeapon(a, pick, dt, aimCtx = null) {
     const actor = this.actor, w = actor.weaponGroup, object = a.object, parent = object.parent;
     if (!parent || !w.parent) return false;
     // 只挪枪本身，不挪游戏的挂点（RuntimeGrip_WeaponR 这类）：游戏每帧按挂点的位置重算枪在挂点里的位姿，
@@ -2208,6 +2211,9 @@ export class XBotSkin {
         mode = "hand" + side;
       }
     }
+    if (aimCtx && aimCtx.aimWeight > 0.15 && trackMode === "hand" && !this.rifleOnLeft && !this.down && !this.inMelee) {
+      this._AlignAimedRifle(W, aimCtx);
+    }
     // 挂法变了：从上一帧放的位姿淡过去。位姿记在 X Bot 胯的坐标系里：人走着不拖；片段交接换根时容器一帧挪几米、胯是接着淡的，
     // 记在容器里会跟着容器跳（11-02 取证：01-4 丁兵跳进沟那帧枪落到 2 m 以下）
     const frame = this.H("Hips").matrixWorld;
@@ -2258,6 +2264,32 @@ export class XBotSkin {
     w.updateMatrixWorld(true);
     this.lastMount = trackMode !== "hand" ? "rifle-" + trackMode : mode;
     return true;
+  }
+
+  /**
+   * 实机据枪瞄准时把正式外观（Mixamo / 日兵甲等不同骨比与蹲瞄片段）的枪管轴对准 AI 逻辑瞄向（yaw + lookYaw, lookPitch）：
+   * 仅绕右手握把旋转步枪并交给紧随其后的左手 IK 托护木，消除蹲瞄 / 不同体型带来的 18°–29° 枪管静态偏角，
+   * 既让枪口视觉真指向目标，又让 TryFire 的 6.88° 枪管朝向闸门可靠通过。
+   */
+  _AlignAimedRifle(W, aimCtx) {
+    const corrW = Smooth01((aimCtx.aimWeight - 0.15) / 0.65) * (this.addFireAge < 0.05 ? 0.35 : 1);
+    if (corrW <= 1e-4) return;
+    this.actor.root.updateWorldMatrix(true, false);
+    this.actor.root.getWorldQuaternion(_aoModelQ);
+    _aimEuler.set(Clamp(aimCtx.lookPitch || 0, -1.0, 0.9), Clamp(aimCtx.lookYaw || 0, -1.4, 1.4), 0, "YXZ");
+    _aimQ.setFromEuler(_aimEuler);
+    _wantBarrel.set(0, 0, -1).applyQuaternion(_aimQ).applyQuaternion(_aoModelQ).normalize();
+    W.decompose(_p, _q, _s);
+    _curBarrel.set(0, 0, -1).applyQuaternion(_q).normalize();
+    const dot = Clamp(_curBarrel.dot(_wantBarrel), -1, 1);
+    if (dot > 0.999995) return;
+    _aimQ2.setFromUnitVectors(_curBarrel, _wantBarrel);
+    const angle = Math.acos(dot);
+    const maxCorrRad = 0.95;
+    const t = angle > maxCorrRad ? corrW * (maxCorrRad / angle) : corrW;
+    _aimQ.identity().slerp(_aimQ2, t);
+    _q.premultiply(_aimQ).normalize();
+    W.compose(_p, _q, _s);
   }
 
   /** Cache a model-backed origin fit for the opted-in character, never mutate

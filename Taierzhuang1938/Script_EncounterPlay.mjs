@@ -228,7 +228,9 @@ export class EncounterPlay {
     if(this.disposed||!this.active)return;
     this.PreparePlayerLoadout();
     if(this.previousMissionCoverRules===undefined)this.previousMissionCoverRules=this.host.ai.missionCoverRules;
+    if(this.previousMissionReactions===undefined)this.previousMissionReactions=this.host.ai.missionReactions;
     this.host.ai.missionCoverRules=true;
+    this.host.ai.missionReactions=true;
     if(!this.isCampaign)this.host.audio.SetToolsVolume?.(ToolsVolumeLevel(LoadToolsVolume(this.host.audio.masterVolume??1)));
     this.stealth?.Reset();
     this.noFireShots=this.host.state.playerShots;
@@ -299,6 +301,7 @@ export class EncounterPlay {
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
     this.SyncEnvironment(frame,true);
     this.host.ai.missionCoverRules=true;
+    this.host.ai.missionReactions=true;
     this.noFireShots=this.host.state.playerShots;
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
@@ -368,6 +371,7 @@ export class EncounterPlay {
     this.openingActive=false;this.pendingOpening=false;this.combatStarted=false;
     if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
     if(this.previousMissionCoverRules!==undefined) this.host.ai.missionCoverRules=this.previousMissionCoverRules;
+    if(this.previousMissionReactions!==undefined) this.host.ai.missionReactions=this.previousMissionReactions;
     this.active=false;this.paused=false;this.ready=false;this.host.state.running=false;
     this.host.ctx.ReleasePointerLock();this.host.audio.ResetSession();this.host.audio.ctx?.suspend();
     this.retiredMaterials.Collect(()=>{
@@ -538,7 +542,12 @@ export class EncounterPlay {
     const spec=EncounterActorSpec(actor,null,this.variant),group=actor.group||this.plan.compiled.groups.find(g=>g.id===actor.groupId);
     let hash=2166136261;for(const c of actor.id)hash=Math.imul(hash^c.charCodeAt(0),16777619)>>>0;
     const variants=CHARACTER_RANDOM_VARIANTS_BY_KIND[spec.side];
-    const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,
+    const index=Number(actor.id.slice((actor.groupId||"").length+1))||0;
+    const combatEnemy=spec.side==="ija"&&(!group||(group.target!=="none"&&group.behavior!=="withdraw"));
+    const grenades=combatEnemy
+      ?(group?.grenadeInterval>0?2:(group&&["advance","bounds","flank","escort"].includes(group.behavior)&&index%2===0?1:0))
+      :0;
+    const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,grenades,
       navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),modelVariant:variants[hash%variants.length],...SpeakingCastOptions(spec.castId)});
     if(!soldier)return false;
     const skin=spec.castId||XBOT_FACTION_CHARACTERS[spec.side]?.length?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
@@ -553,7 +562,6 @@ export class EncounterPlay {
         elapsed:this.host.ai.time,lookYaw:0,lookPitch:0,
       });
     }
-    const index=Number(actor.id.slice((actor.groupId||"").length+1))||0;
     const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
     let routeIndex=0;
     if(route&&initial) {
@@ -570,38 +578,111 @@ export class EncounterPlay {
     const prior=initial?Math.max(0,this.plan.time-(group?.lives[index]?.born??this.plan.time)):0;
     const waitUntil=group?.id==="TempleSearch"?(this.templeEnteredAt??Infinity)+(member?.delay||0)
       :this.plan.elapsed+Math.max(0,deployment-prior);
+    let holdOffset=null;
+    if(spec.side==="ija"&&route&&route.length>=2&&group&&!member?.route&&(group.count||1)>1&&!/BridgeRush/i.test(group.id)) {
+      const end=route.at(-1),prev=route[route.length-2];
+      const fdx=end[0]-prev[0],fdz=end[1]-prev[1],flen=Math.hypot(fdx,fdz)||1;
+      const fx=fdx/flen,fz=fdz/flen,rx=-fz,rz=fx;
+      const lane=(index%3)-1,depth=Math.floor(index/3);
+      const ox=rx*lane*2.1-fx*depth*1.6,oz=rz*lane*2.1-fz*depth*1.6;
+      const gx=end[0]+ox,gz=end[1]+oz,gy=this.host.battlefield.GroundHeight(gx,gz);
+      if((ox||oz)&&!this.host.ai.Blocked(gx,gz,gy))holdOffset=[ox,oz];
+    }
     this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,engaged:!!actor.firing||["shoot","melee"].includes(actor.pose),
-      routeWaits:member?.waitSeconds||[],waitedIndex:-1,waitUntil});
+      routeWaits:member?.waitSeconds||[],waitedIndex:-1,waitUntil,holdOffset,provoked:false,lastHealth:soldier.health,spottedTime:0});
     if(!initial)this.plan.Spawned(actor);
     return true;
   }
   AliveIds(){return new Set([...this.entries].filter(([,entry])=>entry.soldier.alive).map(([id])=>id));}
+  AlertSquad(sourceEntry) {
+    sourceEntry.provoked=true;
+    const origin=sourceEntry.soldier.position;
+    for(const other of this.entries.values()) {
+      if(other===sourceEntry||other.spec.side!=="ija"||!other.soldier.alive)continue;
+      if((sourceEntry.actor.groupId&&other.actor.groupId===sourceEntry.actor.groupId)
+        ||other.soldier.position.distanceTo(origin)<=18) other.provoked=true;
+    }
+    const player=this.host.player;
+    this.host.ai.NoteStimulus("gunshot",player.position,{side:"nra",isPlayer:true,ref:player,loudnessM:28});
+  }
+  UpdateEnemyAwareness(frame,dt) {
+    if(!(dt>0))return;
+    const {player,battlefield}=this.host;
+    if(!player?.Alive)return;
+    const pPos=player.position;
+    const stealthHandlesSight=!!this.stealth&&!!frame.stealth?.active;
+    const from=new THREE.Vector3(),to=new THREE.Vector3(),dir=new THREE.Vector3();
+    for(const entry of this.entries.values()) {
+      if(entry.spec.side!=="ija")continue;
+      const soldier=entry.soldier;
+      if(!soldier.alive)continue;
+      if(soldier.health<entry.lastHealth) {
+        entry.lastHealth=soldier.health;
+        if(!entry.provoked)this.AlertSquad(entry);
+        continue;
+      }
+      entry.lastHealth=soldier.health;
+      if(entry.provoked||stealthHandlesSight)continue;
+      const group=entry.group;
+      const alreadyCombat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:entry.engaged;
+      if(alreadyCombat)continue;
+      const dx=pPos.x-soldier.position.x,dz=pPos.z-soldier.position.z,dist=Math.hypot(dx,dz);
+      if(dist>15){entry.spottedTime=Math.max(0,entry.spottedTime-dt*1.5);continue;}
+      const cosFront=dist>1e-4?(-Math.sin(soldier.yaw)*dx-Math.cos(soldier.yaw)*dz)/dist:1;
+      if(dist>5.0&&cosFront<0.42){entry.spottedTime=Math.max(0,entry.spottedTime-dt*1.5);continue;}
+      from.set(soldier.position.x,soldier.position.y+1.45,soldier.position.z);
+      let clear=false;
+      for(const h of [player.eyeHeight||1.5,(player.eyeHeight||1.5)*0.55]) {
+        to.set(pPos.x,pPos.y+h,pPos.z);
+        dir.subVectors(to,from);
+        const range=dir.length();
+        if(range<1e-4){clear=true;break;}
+        const hit=battlefield.Raycast(from,dir.divideScalar(range),range,{terrain:true});
+        if(!hit||(hit.t??hit.distance)>=range-0.12){clear=true;break;}
+      }
+      if(clear) {
+        entry.spottedTime+=dt*(dist<=5.0?3.5:dist<=9.0?2.0:1.0);
+        if(entry.spottedTime>=0.65)this.AlertSquad(entry);
+      } else {
+        entry.spottedTime=Math.max(0,entry.spottedTime-dt*1.2);
+      }
+    }
+  }
   Order(entry,frame) {
     const {soldier,group,route}=entry;
     const cfg=this.plan.config;
     const reachM=this.stealth&&entry.actor.id==="liu"&&["09a","09b"].includes(frame.beat.id)?0.18:cfg.routeReachM;
     if(!soldier.alive)return;
     const current=frame.actors.find(a=>a.id===entry.actor.id);
-    if(group?.id==="TempleSearch"&&this.templeEnteredAt===null&&!this.stealth?.state?.alarm) {
+    if(group?.id==="TempleSearch"&&this.templeEnteredAt===null&&!this.stealth?.state?.alarm&&!entry.provoked) {
       this.host.ai.DirectActor(soldier,{x:soldier.position.x,z:soldier.position.z,stance:1,combat:false,moving:false});
       return;
     }
-    let target=group&&!route?[entry.spec.x,entry.spec.z]:current?.p||[soldier.position.x,soldier.position.z],moving=false;
-    if(route) {
-      const arrived=Math.hypot(soldier.position.x-route[entry.routeIndex][0],soldier.position.z-route[entry.routeIndex][1])<cfg.routeReachM;
+    entry.engaged ||= !!current?.firing||current?.pose==="shoot"||current?.pose==="melee";
+    let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:entry.engaged;
+    if((this.stealth?.state?.alarm||entry.provoked) && entry.spec.side==="ija")combat=true;
+    const playerPos=this.host.player.position;
+    const playerDist=Math.hypot(playerPos.x-soldier.position.x,playerPos.z-soldier.position.z);
+    const closeEnemyAlert=combat&&entry.spec.side==="ija"&&playerDist<=12;
+    const holdWithdraw=entry.provoked&&group?.behavior==="withdraw";
+    let target=holdWithdraw?[soldier.position.x,soldier.position.z]:(group&&!route?[entry.spec.x,entry.spec.z]:current?.p||[soldier.position.x,soldier.position.z]),moving=false;
+    if(route&&!holdWithdraw) {
+      const endTarget=entry.routeIndex===route.length-1&&entry.holdOffset
+        ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
+        :route[entry.routeIndex];
+      const arrived=Math.hypot(soldier.position.x-endTarget[0],soldier.position.z-endTarget[1])<cfg.routeReachM;
       if(arrived&&entry.waitedIndex!==entry.routeIndex){
         entry.waitedIndex=entry.routeIndex;
         const boundWait=group?.behavior==="bounds"&&entry.routeIndex>0&&entry.routeIndex<route.length-1?(group.coverWaitSeconds??6.5):0;
         entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||boundWait));
       }
-      if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm)&&entry.routeIndex<route.length-1)entry.routeIndex++;
-      target=route[entry.routeIndex];
-      if(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm)target=[soldier.position.x,soldier.position.z];
+      if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm||closeEnemyAlert)&&entry.routeIndex<route.length-1)entry.routeIndex++;
+      target=entry.routeIndex===route.length-1&&entry.holdOffset
+        ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
+        :route[entry.routeIndex];
+      if(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm&&!closeEnemyAlert)target=[soldier.position.x,soldier.position.z];
     }
     moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
-    entry.engaged ||= !!current?.firing||current?.pose==="shoot"||current?.pose==="melee";
-    let combat=group?group.target!=="none"&&group.behavior!=="withdraw"&&this.plan.time>=group.engageAt:entry.engaged;
-    if(this.stealth?.state?.alarm && entry.spec.side==="ija")combat=true;
     if(group?.suppressedBy?.some(id=>[...this.entries.values()].some(e=>e.actor.groupId===id&&e.soldier.alive&&e.soldier.targetVisible))) {
       if(group.suppressionStop)target=group.suppressionStop;
       moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>cfg.routeReachM;
@@ -618,12 +699,19 @@ export class EncounterPlay {
       target=[soldier.position.x,soldier.position.z];moving=false;forceYaw=true;
       yaw=Math.atan2(-(this.host.player.position.x-soldier.position.x),-(this.host.player.position.z-soldier.position.z));
     }
-    const allowCover=combat&&!guide&&!frame.stealth?.active;
+    const allowCover=combat&&!guide;
+    const isEnemyCombat=combat&&!guide&&entry.spec.side==="ija";
+    const isBayonetRush=isEnemyCombat&&!!group&&/BridgeRush/i.test(group.id);
+    const isMgPost=isEnemyCombat&&!!group&&(["guard","suppress"].includes(group.behavior)||(group.weapon==="machineGun"&&!moving));
+    const tacticalRadiusM=isEnemyCombat
+      ?(isBayonetRush?24:isMgPost?8:group?.behavior==="flank"?16:group?.behavior==="bounds"?14:16)
+      :0;
     const authoredStance=guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"||current?.pose==="crouch"?1:0;
     this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
       stance:allowCover?null:authoredStance,
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
-      allowCover,coverSlackM:allowCover?8.5:0,suppressible:allowCover});
+      allowCover,coverSlackM:allowCover?8.5:0,suppressible:allowCover,
+      tacticalRadiusM,fixBayonet:isBayonetRush});
   }
   NoFireArmed(frame) {
     return !!frame.stealth?.noFire&&this.host.player.position.z>=(frame.stealth.armMinZ??-Infinity);
@@ -710,6 +798,7 @@ export class EncounterPlay {
     }
     for(const actor of frame.actors)if(this.IsSoldier(actor)&&!this.plan.groups.has(actor.groupId))this.Spawn(actor);
     for(const actor of this.plan.Spawns(alive))this.Spawn(actor);
+    this.UpdateEnemyAwareness(frame,dt);
     this.orderClock-=dt;
     if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=cfg.orderEveryS;}
     const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)&&!this.plan.groups.has(a.groupId)).map(a=>{
@@ -968,6 +1057,8 @@ export class EncounterPlay {
   }
   Dispose() {
     if(this.disposed)return;this.disposed=true;this.ready=false;
+    if(this.previousMissionCoverRules!==undefined)this.host.ai.missionCoverRules=this.previousMissionCoverRules;
+    if(this.previousMissionReactions!==undefined)this.host.ai.missionReactions=this.previousMissionReactions;
     this.opening?.Dispose();
     this.host.audio.Music(null,{fadeOut:0});this.host.audio.Dispose();this.view.Dispose();
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);

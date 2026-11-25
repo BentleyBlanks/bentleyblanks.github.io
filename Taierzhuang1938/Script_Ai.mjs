@@ -347,7 +347,7 @@ export class Soldier extends SoldierFieldAccessors {
       // 不能只给 Actor 一个持续 0.12 s 的 firing 布尔。500 rpm 机枪恰好每 0.12 s
       // 一发，布尔会从第一发起一直为 true，人物后坐只触发一次。序号让每发都有边沿。
       fireSequence: 0,
-      grenades: 0,           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
+      grenades: Number.isFinite(options.grenades) ? Math.max(0, options.grenades | 0) : 0,           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
       lastGrenadeAt: -99,
       /** 扳机从什么时候起「想打、弹在膛、有目标却一发没出去」（-1 = 没在空转；真打出一发 / 换目标清零）。 */
       triggerDrySince: -1,
@@ -1014,21 +1014,27 @@ export class AiDirector {
   }
 
   /** Scene director orders use the existing movement/combat components. */
-  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7, coverSlackM=0, suppressible=false, allowCover=false } = {}) {
+  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7, coverSlackM=0, suppressible=false, allowCover=false, tacticalRadiusM=0, fixBayonet=false } = {}) {
     if (!s?.alive) return;
-    const inContact = allowCover && combat && (!!s.target || s.suppression >= 0.35);
+    const closeVisible = !!(s.target && s.targetVisible && s.target.position
+      && Math.hypot(s.target.position.x - s.position.x, s.target.position.z - s.position.z) <= 18);
+    const inContact = combat && ((allowCover && (!!s.target || s.suppression >= 0.35)) || closeVisible);
     const tacticalAdvance = moving && inContact;
     const guidedMove = moving && !inContact;
+    const freeTactics = combat && tacticalRadiusM > 0;
+    const chargingNow = s.order === "charge" && this.time < (s.chargeUntil || -99);
     s.goal.set(x, this.ctx.battlefield.GroundHeight(x,z), z);
-    s.order=moving?"advance":"hold";
-    s.holdZone=moving?null:{x,z,radius:allowCover?2.5:1.5};
-    s.scriptDefensive=!moving&&combat;
-    s.scriptCoverSlackM=(!moving&&combat&&allowCover)?coverSlackM:0;
-    s.scriptSuppressible=!!suppressible;
-    s.scriptedNoncombatant=!combat;
-    s.p012Guided=guidedMove;
-    s.scriptMoveSpeedMps=guidedMove?speed:undefined;
-    s.scriptArrivalRadius=arrivalRadius;
+    if (!chargingNow) s.order = moving ? "advance" : "hold";
+    s.holdZone = moving ? null : { x, z, radius: freeTactics ? Math.max(allowCover ? 2.5 : 1.5, Math.min(tacticalRadiusM, 5)) : (allowCover ? 2.5 : 1.5) };
+    s.tacticalRadiusM = freeTactics ? tacticalRadiusM : undefined;
+    s.scriptDefensive = !moving && combat && !freeTactics;
+    s.scriptCoverSlackM = (!moving && combat && allowCover) ? Math.max(coverSlackM, freeTactics ? tacticalRadiusM : 0) : 0;
+    s.scriptSuppressible = !!suppressible;
+    s.scriptedNoncombatant = !combat;
+    s.p012Guided = guidedMove;
+    s.scriptMoveSpeedMps = guidedMove ? speed : undefined;
+    s.scriptArrivalRadius = arrivalRadius;
+    if (fixBayonet && combat && s.weapon?.bayonet && s.tacticalRole !== "support") s.bayonetFixed = true;
     // Do not snap yaw back every orderEveryS tick while AI is smoothly turning toward a
     // target, last-known position, or gunshot watch direction.
     const aiOwnsYaw = !forceYaw && (!!s.target
@@ -2378,7 +2384,8 @@ export class AiDirector {
         if (slot) {
           slot.aimedAt = aimed;
           // 被禁火的人在自卫距离外被指着：不 urgent（换过来也扣不了扳机，只会锁着玩家哑火）。
-          slot.urgent = aimedRank && this.time - s.aimedAtSince >= T.aimedAt.overrideLockS;
+          // 贴脸冲到 6.5 m 以内视为即时近身威胁，不等 3.8 s 目标锁期过期。
+          slot.urgent = (!held && d <= 6.5) || (aimedRank && this.time - s.aimedAtSince >= T.aimedAt.overrideLockS);
         }
       }
     } else s.aimedAtSince = -1;
@@ -2410,6 +2417,7 @@ export class AiDirector {
       } else {
         slot.moving = slot.ref.moveSpeed > BRAIN.movingSignal;
         slot.firingRecently = this.time - slot.ref.lastFire < BRAIN.firingRecentS;
+        if (slot.dist <= 5.0) slot.urgent = true;
       }
       cands[candCount] = slot;
       candCount += 1;
@@ -3256,9 +3264,11 @@ export class AiDirector {
       s.displaceUntil = -99;
       return false;
     }
-    if (this.time - s.displaceAt < WATCH.displaceMinDwellS) return false;
+    const dryBlocked = !!(s.target && s.targetVisible && s.ammo > 0
+      && s.triggerDrySince >= 0 && this.time - s.triggerDrySince >= 1.2);
+    if (this.time - s.displaceAt < (dryBlocked ? 1.2 : WATCH.displaceMinDwellS)) return false;
     const shots = s.fireSequence - s.displaceFireSeq;
-    if (s.stationaryS < WATCH.displaceAfterS && shots < WATCH.displaceAfterShots) return false;
+    if (!dryBlocked && s.stationaryS < WATCH.displaceAfterS && shots < WATCH.displaceAfterShots) return false;
     // 试过就记时刻：**找不到落点也算试过**，否则「四面都走不通」的人每拍都要
     // 把候选点重扫一遍（前沿几十个人就是每秒几百次空间散列查询）。
     s.displaceAt = this.time;
@@ -3422,6 +3432,13 @@ export class AiDirector {
     }
     const threat = this.ThreatPoint(s);
     if (!threat) { this.ReleaseCover(s); return false; }
+    const closeOpenThreat = !!(s.target && s.targetVisible && s.target.position
+      && Math.hypot(s.target.position.x - s.position.x, s.target.position.z - s.position.z) <= 5.5);
+    if (closeOpenThreat && s.suppression <= COVER.suppressionProneAt
+      && (!s.cover || s.coverPhase === "approach")) {
+      this.ReleaseCover(s);
+      return false;
+    }
     const now = this.time;
     // 【§20.11】身边的掩体都打不出去（连换几次都是瞎探）：这段时间不选掩体，就地跪着打；
     // 在空地上真打出去了就续（missionOpenKeepS），被压得要趴了就立刻回去找掩体。
@@ -3619,6 +3636,13 @@ export class AiDirector {
     if (force === "hide") {
       s.coverPhase = "hide";
       s.coverPhaseUntil = this.time + COVER_CYCLE.hideDwellMinS;
+    } else if (s.coverPhase === "hide" && s.target && s.targetVisible && s.target.position
+      && Math.hypot(s.target.position.x - s.position.x, s.target.position.z - s.position.z) <= 6.5) {
+      // 敌人已摸到 6.5 m 贴脸，立刻打破缩头读秒探身迎击，不能低头蹲着挨砍。
+      s.coverPhase = "peek";
+      s.coverPhaseUntil = this.time + COVER_CYCLE.peekMinS;
+      s.peekSaw = true;
+      s.peekFired = false;
     } else if (s.coverPhase !== "hide" && s.coverPhase !== "peek") {
       s.coverPhase = "hide";
       s.coverPhaseUntil = this.time
@@ -4056,10 +4080,13 @@ export class AiDirector {
     }
 
     let targetYaw = null;
+    const closeTargetDist = (s.target && s.targetVisible && s.target.position)
+      ? Math.hypot(s.target.position.x - s.position.x, s.target.position.z - s.position.z) : Infinity;
     // 战术侧移 / 掩体探头缩头时保持面向威胁（交由 2D 混合空间侧移/退步 + 朝向扭曲 + 脊柱瞄准表现），
     // 不再为了 0.55 m 探头或短距离换位把整个人拧开 90°、走两步停下再甩回 90°。长距离推进 / 冲向掩体 / 躲雷仍朝行进方向跑。
     const keepCombatFacing = !evading && (
       (s.state === STATE.COVER_ENGAGE && (s.coverPhase === "peek" || s.coverPhase === "hide"))
+      || (closeTargetDist <= 10 && s.moveSpeed < 0.65 && !s.p012Guided)
       || ((s.state === STATE.FIRE || s.state === STATE.SUPPRESS)
         && s.aimBlend > 0.35 && s.moveSpeed < 0.65
         && (this.time < s.displaceUntil || (Number.isFinite(s.moveArriveM) && s.moveArriveM <= 0.8)))
@@ -4108,8 +4135,8 @@ export class AiDirector {
       targetYaw = s.watchYaw;
       if (s.moveSpeed < 0.08) wantedYaw = targetYaw;
     }
-    // 人体不可能一帧转 180°。移动时略快，卧倒/受压时更慢；所有角度都走最短弧。
-    const turnRate = s.stance === 2 ? 2.4 : s.moveSpeed > 0.08 ? 5.0 : 3.4;
+    // 人体不可能一帧转 180°。移动或近身迎敌时略快（上限仍 ≤ 5.0 rad/s），卧倒/受压时更慢；所有角度都走最短弧。
+    const turnRate = s.stance === 2 ? 2.4 : (s.moveSpeed > 0.08 || closeTargetDist <= 8) ? 5.0 : 3.4;
     s.yaw = ApproachAngle(s.yaw, wantedYaw, turnRate * dt);
 
     // 枪口/上身偏航必须相对**这一帧真实的身体朝向**。旧版拿 wantedYaw 当基准，
@@ -5115,11 +5142,14 @@ export class AiDirector {
     if (s.missionSurfaceRest || (holdingTrigger && !s.missionFireSuppressOnly)) return;
     const suppressOnly = holdingTrigger && s.missionFireSuppressOnly;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
-    if (s.aimTime < aimNeeded * (1 + s.suppression)) return;
     // 枪口还没转过去就不能凭概率从侧后方命中。方向闸门也让「转身—瞄准—开火」
     // 成为能看懂的动作链，而不是身体原地转圈、子弹照样四面飞。
     const tx = s.target.position.x - s.position.x;
     const tz = s.target.position.z - s.position.z;
+    const targetDist = Math.hypot(tx, tz);
+    const closeAimScale = targetDist < 10 ? 0.35 + 0.65 * Math.max(0, (targetDist - 2) / 8) : 1;
+    const closeSuppScale = targetDist < 6 ? 0.35 : 1;
+    if (s.aimTime < aimNeeded * closeAimScale * (1 + s.suppression * closeSuppScale)) return;
     const targetYaw = Math.atan2(-tx, -tz);
     if (Math.abs(AngleDelta(s.yaw, targetYaw)) > 0.34) return;
 

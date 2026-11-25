@@ -179,10 +179,12 @@ export function ChargeOpportunity(soldier, now, attackers = 0) {
   if (!CanManeuver(soldier, now) || soldier.unarmed || soldier.tacticalRole === "support") return false;
   if (!soldier.weapon?.bayonet || !soldier.targetVisible || soldier.targetFromMemory || !soldier.target) return false;
   if (soldier.target.ref?.alive === false || !ManeuverAllowed(soldier, soldier.target.position)) return false;
-  if ((soldier.health ?? 100) < TACTICS.chargeHealthMin || soldier.suppression >= TACTICS.chargeSuppressionMax) return false;
-  if (now < (soldier.chargeCooldownUntil || 0) || attackers >= TACTICS.maxChargersPerTarget) return false;
-  if (soldier.stance !== 0 && now < soldier.stanceUntil) return false;
   const distance = Math.hypot(PosX(soldier)-soldier.target.position.x, PosZ(soldier)-soldier.target.position.z);
+  const pointBlank = distance <= 4.5;
+  const maxSupp = pointBlank ? Math.max(TACTICS.chargeSuppressionMax, 0.65) : TACTICS.chargeSuppressionMax;
+  if ((soldier.health ?? 100) < TACTICS.chargeHealthMin || soldier.suppression >= maxSupp) return false;
+  if (now < (soldier.chargeCooldownUntil || 0) || attackers >= TACTICS.maxChargersPerTarget) return false;
+  if (!pointBlank && soldier.stance !== 0 && now < soldier.stanceUntil) return false;
   if (distance <= TACTICS.chargeContactM) return true;
   const range = soldier.tacticalRole === "assault" ? TACTICS.chargeAssaultM
     : soldier.tacticalRole === "flank" ? TACTICS.chargeFlankM : TACTICS.chargeRifleM;
