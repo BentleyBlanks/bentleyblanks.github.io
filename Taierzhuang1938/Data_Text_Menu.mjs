@@ -388,7 +388,7 @@ export const TEXT = Object.freeze({
   // --- 设置 → 高级工具（右栏列出全部工具，清单在 Data_DevTools.TOOL_MENUS） ------
   "menu.tools.intro": "开发用的工作台。点下面的工具直接打开；也可以先进高级工具首页再挑。按 ` 随时打开 / 退出。",
   "menu.tools.open": "打开高级工具",
-  "menu.tools.tag.window": "独立窗口 ↗",
+  "menu.tools.tag.window": "新标签页 ↗",
   "menu.tools.tag.level": "先选关卡",
 
   // --- 设置 → Debug工具（id 与 Data_DevTools.DEBUG_TOOL_IDS 同一套） ------------

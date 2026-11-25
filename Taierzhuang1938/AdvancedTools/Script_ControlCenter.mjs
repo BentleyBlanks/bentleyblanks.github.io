@@ -1,11 +1,11 @@
 // AdvancedTool ControlCenter：本地「高级工具」总入口页（ControlCenter.html）。
 //
 // 版式照游戏内的工具首页 Script_EditorHome（World at War 主题：卡片网格、按 Data_DevTools.TOOL_MENUS 分六组）。
-// 卡片：
-//   · 独立窗口页：打开各自的页面，窗口参数取 TOOL_INFO.window；只在控制中心出现的独立工具（构件库预览、模型制作工作台）
+// 卡片（全部以普通浏览器标签页打开，不使用 popup 弹窗）：
+//   · 独立工具页：通过命名 target 在新标签页打开各自页面（复用同名标签页）；只在控制中心出现的独立工具
 //     取 Data_AdvancedTools.STANDALONE_TOOLS，按 slot 排在所属组游戏工具的前或后；
-//   · 摄影棚类工具：打开独立工具宿主 Tool_Studio.html?tool=<id>；
-//   · 留在游戏里的工具（标「游戏内」）：链到游戏现有入口——白盒 / Timeline / 环境用各自入口类的 Url()（与游戏内入口完全一致），
+//   · 摄影棚类工具：在新标签页打开独立工具宿主 Tool_Studio.html?tool=<id>；
+//   · 留在游戏里的工具（标「游戏内」）：在新标签页链到游戏现有入口——白盒 / Timeline 用各自入口类的 Url()（与游戏内入口完全一致），
 //     其余走 ../index.html?editor=tools&tool=<id>（需要选关卡的工具，游戏的工具首页会先弹「载入哪一关」）。
 // Debug工具不列。文案取 TOOL_INFO 的 label / hint。
 
@@ -26,14 +26,14 @@ const GAME_ENTRY = { blockout: BlockoutEntry, timeline: TimelineEditor };
 /**
  * 每个工具的卡片描述（纯数据，测试直接读）。
  * @param {string} pageHref 本页地址：游戏入口类的 Url() 以 ../index.html 为基准从它生成
- * → [{ group, groupLabel, id, kind: "window"|"studio"|"game", label, hint, href, target, features }]
+ * → [{ group, groupLabel, id, kind: "window"|"studio"|"game", label, hint, href, target }]
  */
 export function ControlCenterCards(pageHref = globalThis.location?.href || "http://localhost/Taierzhuang1938/AdvancedTools/ControlCenter.html") {
   const gameIndex = new URL(GAME_PAGE, pageHref).href;
   const cards = [];
   const Standalone = (menu, slot) => STANDALONE_TOOLS.filter((tool) => tool.group === menu.id && tool.slot === slot)
     .map((tool) => ({ group: menu.id, groupLabel: menu.label, id: tool.id, kind: "window", label: tool.label, hint: tool.hint,
-      href: new URL(tool.window.url, pageHref).href, target: tool.window.name, features: tool.window.features }));
+      href: new URL(tool.window.url, pageHref).href, target: tool.window.name }));
   for (const menu of TOOL_MENUS) {
     cards.push(...Standalone(menu, "lead"));
     for (const id of menu.items) {
@@ -43,12 +43,12 @@ export function ControlCenterCards(pageHref = globalThis.location?.href || "http
       if (WINDOW_TOOL_IDS.includes(id)) {
         // window.url 相对 Taierzhuang1938/ 根（形如 ./AdvancedTools/SceneEditor.html?v=…）
         Object.assign(card, { kind: "window", href: new URL(info.window.url, new URL("../", pageHref)).href,
-          target: info.window.name, features: info.window.features });
+          target: info.window.name });
       } else if (STUDIO_TOOL_IDS.includes(id)) {
-        Object.assign(card, { kind: "studio", href: new URL(StudioToolUrl(id), pageHref).href, target: STUDIO_WINDOW_NAME, features: "" });
+        Object.assign(card, { kind: "studio", href: new URL(StudioToolUrl(id), pageHref).href, target: STUDIO_WINDOW_NAME });
       } else if (GAME_TOOL_IDS.includes(id)) {
         const Entry = GAME_ENTRY[id];
-        Object.assign(card, { kind: "game", href: Entry ? Entry.Url(gameIndex) : new URL(GameToolUrl(id), pageHref).href, target: "_blank", features: "" });
+        Object.assign(card, { kind: "game", href: Entry ? Entry.Url(gameIndex) : new URL(GameToolUrl(id), pageHref).href, target: "_blank" });
       } else {
         throw new Error(`工具 ${id} 没有归到控制中心的任何一类（Data_AdvancedTools）`);
       }
@@ -59,7 +59,7 @@ export function ControlCenterCards(pageHref = globalThis.location?.href || "http
   return cards;
 }
 
-const TAGS = { window: ["↗ 独立窗口", "win"], studio: ["↗ 工具宿主", "studio"], game: ["游戏内", "game"] };
+const TAGS = { window: ["↗ 新标签页", "win"], studio: ["↗ 工具宿主", "studio"], game: ["游戏内", "game"] };
 
 /** 渲染卡片网格到 root，返回 { root, cards }。 */
 export function RenderControlCenter(cards = ControlCenterCards()) {
@@ -84,7 +84,8 @@ export function RenderControlCenter(cards = ControlCenterCards()) {
     const link = El("a", "edHomeTool");
     link.href = card.href;
     link.target = card.target;
-    link.rel = "noopener";
+    // _blank 保持 noopener；同源命名标签页不加 noopener，以便复用同名标签页并让「← 控制中心」可切回本标签页。
+    if (card.target === "_blank") link.rel = "noopener";
     link.dataset.homeTool = card.id;
     link.dataset.kind = card.kind;
     const top = El("span", "edHomeToolTop");
@@ -95,13 +96,6 @@ export function RenderControlCenter(cards = ControlCenterCards()) {
     top.appendChild(tag);
     link.appendChild(top);
     if (card.hint) link.appendChild(El("span", "edHomeToolHint", card.hint));
-    if (card.features) {
-      link.addEventListener("click", (event) => {
-        if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) return;
-        const opened = window.open(card.href, card.target, card.features);
-        if (opened) { event.preventDefault(); opened.focus(); }
-      });
-    }
     group.appendChild(link);
   }
   return { root, cards };

@@ -15,10 +15,9 @@ export class MotionCompareEditor {
       this.win = window.open(
         new URL(TOOL_INFO.motionCompare.window.url, GAME_BASE),
         TOOL_INFO.motionCompare.window.name,
-        TOOL_INFO.motionCompare.window.features,
       );
     }
-    if (!this.win) throw new Error("动作衔接对比窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("动作衔接对比标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

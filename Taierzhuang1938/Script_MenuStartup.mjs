@@ -62,11 +62,11 @@ function OpenSettings(id, options) {
   if (id === 'tools') return OpenTools();
   if (SETTINGS_PAGE_IDS.includes(id)) settings.Open(id, options);
 }
-// 设置页右栏里点的工具：独立窗口工具就地弹窗、留在设置页；弹窗被拦或不是窗口类工具，整页换到高级工具并直接打开它。
+// 设置页右栏里点的工具：独立页面工具直接在新标签页打开、留在设置页；被拦截或不是独立页工具，整页换到高级工具并直接打开它。
 function OpenTool(id) {
   if (!DEV_TOOLS_ENABLED || !TOOL_INFO[id]) return;
   const win = TOOL_INFO[id].window;
-  if (win && window.open(new URL(win.url, location.href), win.name, win.features)) return;
+  if (win && window.open(new URL(win.url, location.href), win.name)) return;
   const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('editor', 'tools'); url.searchParams.set('tool', id);
   location.assign(url.href);
 }

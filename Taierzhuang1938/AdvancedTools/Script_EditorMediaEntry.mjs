@@ -11,10 +11,10 @@ const GAME_BASE = new URL("../", import.meta.url);
 
 function OpenToolWindow(Entry, missingLabel) {
   if (!Entry.win || Entry.win.closed) {
-    const { url, name, features } = TOOL_INFO[Entry.id].window;
-    Entry.win = window.open(new URL(url, GAME_BASE), name, features);
+    const { url, name } = TOOL_INFO[Entry.id].window;
+    Entry.win = window.open(new URL(url, GAME_BASE), name);
   }
-  if (!Entry.win) throw new Error(`${missingLabel}窗口被拦截，请允许弹窗后重试`);
+  if (!Entry.win) throw new Error(`${missingLabel}标签页被拦截，请允许弹出页面后重试`);
   Entry.win.focus();
   return Entry.win;
 }

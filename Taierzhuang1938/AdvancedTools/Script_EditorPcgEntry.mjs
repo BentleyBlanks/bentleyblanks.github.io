@@ -11,9 +11,9 @@ class PcgEntry {
       for (const key of ["phase", "whitebox", "quality", "scale", "audio"]) {
         if (current.has(key)) url.searchParams.set(key, current.get(key));
       }
-      this.win = window.open(url, info.name, info.features);
+      this.win = window.open(url, info.name);
     }
-    if (!this.win) throw new Error(`${TOOL_INFO[this.id].label}窗口被拦截，请允许弹窗后重试`);
+    if (!this.win) throw new Error(`${TOOL_INFO[this.id].label}标签页被拦截，请允许弹出页面后重试`);
     this.win.focus();
     return this.win;
   }

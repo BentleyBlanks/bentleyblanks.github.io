@@ -16,10 +16,9 @@ export class MotionWorkbenchEditor {
       this.win = window.open(
         new URL(TOOL_INFO.motionWorkbench.window.url, GAME_BASE),
         TOOL_INFO.motionWorkbench.window.name,
-        TOOL_INFO.motionWorkbench.window.features
       );
     }
-    if (!this.win) throw new Error("AI 动作生成窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("AI 动作生成标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

@@ -35,7 +35,7 @@ function Main() {
     last = now;
     audio.SetListener(listener);
     editor.Update(dt);
-    shell.SetStatus(audio.Ready ? "独立窗口 · 引擎运行中" : "独立窗口 · 点击任意处启用声音");
+    shell.SetStatus(audio.Ready ? "独立页面 · 引擎运行中" : "独立页面 · 点击任意处启用声音");
   };
   requestAnimationFrame(Loop);
   window.AudioPreview = { audio, editor, listener, ready: true };

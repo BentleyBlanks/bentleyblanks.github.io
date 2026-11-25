@@ -80,7 +80,7 @@ try {
       title: document.title, brand: document.querySelector(".edMenuBrand")?.textContent,
       groups: [...document.querySelectorAll(".edHomeGroup")].map((group) => ({ id: group.dataset.group, label: group.querySelector(".edHomeGroupLabel")?.textContent })),
       cards: [...document.querySelectorAll("[data-home-tool]")].map((card) => ({
-        id: card.dataset.homeTool, kind: card.dataset.kind, href: card.href, target: card.target,
+        id: card.dataset.homeTool, kind: card.dataset.kind, href: card.href, target: card.target, rel: card.rel,
         name: card.querySelector(".edHomeToolName")?.textContent, hint: card.querySelector(".edHomeToolHint")?.textContent,
         tag: card.querySelector(".edHomeTag")?.textContent,
       })),
@@ -97,9 +97,10 @@ try {
       .every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
     for (const id of WINDOW_TOOL_IDS) {
       const expected = new URL(TOOL_INFO[id].window.url, `http://127.0.0.1:${port}/Taierzhuang1938/`).href;
-      Check(`${id} 卡片开自己的页面`, card(id).href === expected && card(id).target === TOOL_INFO[id].window.name, card(id).href);
+      Check(`${id} 卡片以新标签页开自己的页面`, card(id).href === expected && card(id).target === TOOL_INFO[id].window.name
+        && card(id).tag === "↗ 新标签页" && !card(id).rel, card(id).href);
     }
-    for (const id of STUDIO_TOOL_IDS) Check(`${id} 卡片开 Tool_Studio.html?tool=${id}`, card(id).href === `${base}Tool_Studio.html?tool=${id}`, card(id).href);
+    for (const id of STUDIO_TOOL_IDS) Check(`${id} 卡片开 Tool_Studio.html?tool=${id}`, card(id).href === `${base}Tool_Studio.html?tool=${id}` && !card(id).rel, card(id).href);
     for (const id of GAME_TOOL_IDS) {
       Check(`${id} 卡片标「游戏内」并链到游戏现有入口`, card(id).tag === "游戏内"
         && card(id).href.startsWith(`http://127.0.0.1:${port}/Taierzhuang1938/index.html?editor=`), card(id).href);

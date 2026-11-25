@@ -554,7 +554,7 @@ async function CheckInterface() {
     const {TOOL_MENUS}=await import('./Data_DevTools.mjs');
     const expected=TOOL_MENUS.flatMap(menu=>menu.items);
     Check('高级工具右栏按分组列出全部工具，数量与顺序同 TOOL_MENUS',expected.length===16&&!expected.includes('props')&&!expected.includes('assetStandards')&&listed.join()===expected.join(),listed.join());
-    Check('独立窗口与先选关卡工具带标签',await page.evaluate(()=>['sceneEditor','mixamoPreview','textures'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='独立窗口 ↗')
+    Check('新标签页与先选关卡工具带标签',await page.evaluate(()=>['sceneEditor','mixamoPreview','textures'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='新标签页 ↗')
       &&['splines','propPcg'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='先选关卡')));
     await page.screenshot({path:path.join(outDir,'Scene_InterfaceToolsPane.png')});
     await Promise.all([page.waitForURL(url=>url.searchParams.get('tool')==='vfx'&&url.searchParams.get('editor')==='tools',{timeout:60000}),page.locator('.mnToolItem[data-tool-id="vfx"]').click()]);

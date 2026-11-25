@@ -1,10 +1,10 @@
 // AdvancedTool ControlCenter 的目录表：纯值、零依赖（不 import 任何模块，node 测试与控制中心页都能直接读）。
 //
 // 分四类：
-//   · studio：共享独立工具宿主 Tool_Studio.html?tool=<id>；
-//   · window：独立窗口（页面地址与窗口参数在 Data_DevTools.TOOL_INFO.window）；
+//   · studio：共享独立工具宿主 Tool_Studio.html?tool=<id>（新标签页）；
+//   · window：独立工具页（页面地址与标签页目标名在 Data_DevTools.TOOL_INFO.window，均以普通浏览器标签页打开）；
 //   · game：留在游戏里的工具（白盒关卡与 Timeline），控制中心只列一张「游戏内」卡片链到游戏现有入口；
-//   · standalone：只在控制中心出现、游戏里完全不挂的独立页面（构件库预览、资产规范配置器、模型制作工作台），文案与窗口参数就写在这里。
+//   · standalone：只在控制中心出现、游戏里完全不挂的独立页面（构件库预览、资产规范配置器、模型制作工作台），文案与目标名就写在这里。
 // Debug工具不列。Tool_FirstLevelSpaceMap.html、Probe.html 不在这里。
 //
 // 路径口径：下面的地址都以 AdvancedTools/ 目录里的页面为基准（`./` = AdvancedTools/，`../` = Taierzhuang1938/）。
@@ -20,18 +20,18 @@ export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
 /**
  * 只在控制中心出现的独立工具：游戏的高级工具菜单、Data_DevTools.TOOL_INFO 与拆分边界里都没有它们。
  *   group 归哪一组（Data_DevTools.TOOL_MENUS 的 id）；slot "lead" 排在该组游戏工具之前，"tail" 排在之后；
- *   window.url 相对 AdvancedTools/。
+ *   window.url 相对 AdvancedTools/；不写 popup features，直接以普通标签页打开。
  */
 export const STANDALONE_TOOLS = Object.freeze([
   Object.freeze({ id: "props", group: "assets", slot: "lead", label: "构件库预览",
     hint: "只读浏览场景可布设的全部 Prop 与模型：尺寸、面数、来源",
-    window: Object.freeze({ url: "./Tool_PropLibrary.html", name: "TengxianPropLibrary", features: "popup,width=1600,height=1000" }) }),
+    window: Object.freeze({ url: "./Tool_PropLibrary.html", name: "TengxianPropLibrary" }) }),
   Object.freeze({ id: "assetStandards", group: "assets", slot: "lead", label: "资产规范与限制",
     hint: "资产导出规范的配置与合规预览：面数阈值、特例目标、逐件登记、贴图规则（存 AssetPipeline/Data_AssetStandards.json，不进游戏）",
-    window: Object.freeze({ url: "./Tool_AssetStandards.html", name: "TengxianAssetStandards", features: "popup,width=1600,height=1000" }) }),
+    window: Object.freeze({ url: "./Tool_AssetStandards.html", name: "TengxianAssetStandards" }) }),
   Object.freeze({ id: "modelWorkbench", group: "assets", slot: "tail", label: "3D 模型制作工作台",
     hint: "管理参考图、Blender 建模、同视角比对与独立验收",
-    window: Object.freeze({ url: "./Tool_ModelWorkbench.html?v=20261124", name: "TengxianModelWorkbench", features: "popup,width=1520,height=960" }) }),
+    window: Object.freeze({ url: "./Tool_ModelWorkbench.html?v=20261124", name: "TengxianModelWorkbench" }) }),
 ]);
 
 /** 控制中心页（相对游戏根目录 Taierzhuang1938/，Tool_Studio 的「返回控制中心」用）。 */

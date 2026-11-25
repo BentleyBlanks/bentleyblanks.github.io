@@ -10,10 +10,10 @@ export class WeaponInspectionEntry {
 
   static Open() {
     if (!this.win || this.win.closed) {
-      const { url, name, features } = TOOL_INFO.weapon.window;
-      this.win = window.open(new URL(url, GAME_BASE), name, features);
+      const { url, name } = TOOL_INFO.weapon.window;
+      this.win = window.open(new URL(url, GAME_BASE), name);
     }
-    if (!this.win) throw new Error("枪械检查台窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("枪械检查台标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

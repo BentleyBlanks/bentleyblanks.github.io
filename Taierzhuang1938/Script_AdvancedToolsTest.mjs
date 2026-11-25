@@ -90,7 +90,8 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     const url = new URL(opened.at(-1).url);
     Check(`${id} 入口类打开的是 AdvancedTools/${page}`,
       url.pathname.endsWith(`/Taierzhuang1938/AdvancedTools/${page}`) && fs.existsSync(path.join(toolsDir, page)), url.pathname);
-    Check(`${id} 窗口名与尺寸沿用 TOOL_INFO`, opened.at(-1).name === TOOL_INFO[id].window.name && opened.at(-1).features === TOOL_INFO[id].window.features);
+    Check(`${id} 以普通标签页打开（沿用目标名、不传 popup features）`,
+      opened.at(-1).name === TOOL_INFO[id].window.name && !opened.at(-1).features && !TOOL_INFO[id].window.features);
   }
   delete globalThis.window;
 }
@@ -155,10 +156,14 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
       && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_PropLibrary.html"))
     && cards.some((card) => card.id === "assetStandards" && card.kind === "window" && card.target === "TengxianAssetStandards"
       && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_AssetStandards.html")), assets.join(","));
+  Check("所有独立工具都不配置 popup features（以普通标签页打开）",
+    STANDALONE_TOOLS.every((tool) => !tool.window.features)
+    && WINDOW_TOOL_IDS.every((id) => !TOOL_INFO[id].window.features)
+    && cards.every((card) => !card.features));
   for (const id of WINDOW_TOOL_IDS) {
     const card = cards.find((entry) => entry.id === id);
     const expected = new URL(TOOL_INFO[id].window.url, "http://127.0.0.1:9/Taierzhuang1938/").href;
-    Check(`${id} 卡片开自己的页面（${card.target}）`, card.kind === "window" && card.href === expected && card.features === TOOL_INFO[id].window.features, card.href);
+    Check(`${id} 卡片开自己的页面（${card.target}）`, card.kind === "window" && card.href === expected && !card.features, card.href);
   }
   for (const id of STUDIO_TOOL_IDS) {
     const card = cards.find((entry) => entry.id === id);

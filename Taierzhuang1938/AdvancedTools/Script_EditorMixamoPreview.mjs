@@ -17,9 +17,9 @@ export class MixamoPreviewEditor {
   static win = null;
   static Open() {
     if (!this.win || this.win.closed) {
-      this.win = window.open(new URL(TOOL_INFO.mixamoPreview.window.url, GAME_BASE), TOOL_INFO.mixamoPreview.window.name, TOOL_INFO.mixamoPreview.window.features);
+      this.win = window.open(new URL(TOOL_INFO.mixamoPreview.window.url, GAME_BASE), TOOL_INFO.mixamoPreview.window.name);
     }
-    if (!this.win) throw new Error("动作预览窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("动作预览标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

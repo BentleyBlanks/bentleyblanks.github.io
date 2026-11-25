@@ -19,35 +19,35 @@ export const DEBUG_TOOL_IDS = Object.freeze([
 
 // split: true = 工具源码已拆到 AdvancedTools/（独立控制中心 / 工具宿主），游戏里的入口靠 Data_DevToolsSplit 决定留不留；
 // window.url 相对 Taierzhuang1938/ 根（入口类在 AdvancedTools/ 里，用 ../ 为基准解析）。
-// 高级工具清单（id -> 文案 / 独立窗口 / 是否先选关卡）。标题菜单列工具要用，编辑器的 static label / hint 与
-// window.open 参数也读这里，所以只放纯值、不 import 任何东西。
+// 高级工具清单（id -> 文案 / 独立页面标签页目标 / 是否先选关卡）。标题菜单列工具要用，编辑器的 static label / hint 与
+// 新标签页打开参数也读这里，所以只放纯值、不 import 任何东西；不写 popup/尺寸 features，默认作为普通浏览器标签页打开。
 export const TOOL_INFO = Object.freeze({
-  sceneEditor: { label: "场景编辑器", hint: "打开独立场景编辑器窗口：摆物件、改尺寸材质与开关、存回 Scenes 场景文件", split: true,
-    window: { url: "./AdvancedTools/SceneEditor.html", name: "TengxianSceneEditor", features: "popup,width=1600,height=1000" } },
-  splines: { split: true, window: { url: "./AdvancedTools/Tool_Pcg.html?tool=splines", name: "TengxianSplineTool", features: "popup,width=1280,height=720" }, label: "场景样条PCG", hint: "铁路/道路/大街/围墙的样条中心线：预览、拖点、调参、导出（数据仍在各源文件）" },
-  propPcg: { split: true, window: { url: "./AdvancedTools/Tool_Pcg.html?tool=propPcg", name: "TengxianPropPcgTool", features: "popup,width=1280,height=720" }, label: "PCG 撒点", hint: "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶" },
+  sceneEditor: { label: "场景编辑器", hint: "在新标签页打开场景编辑器：摆物件、改尺寸材质与开关、存回 Scenes 场景文件", split: true,
+    window: { url: "./AdvancedTools/SceneEditor.html", name: "TengxianSceneEditor" } },
+  splines: { split: true, window: { url: "./AdvancedTools/Tool_Pcg.html?tool=splines", name: "TengxianSplineTool" }, label: "场景样条PCG", hint: "铁路/道路/大街/围墙的样条中心线：预览、拖点、调参、导出（数据仍在各源文件）" },
+  propPcg: { split: true, window: { url: "./AdvancedTools/Tool_Pcg.html?tool=propPcg", name: "TengxianPropPcgTool" }, label: "PCG 撒点", hint: "按院落/矩形/样条规则自动布设生活用具与工事，并取证 GPU 实例桶" },
   blockout: { label: "白盒关卡编辑器", hint: "关卡白盒预览：分关卡的纯高度图场景、关键帧敌我布设与去向、俯视图与导航栏（打开后整页切换）" },
   timeline: { label: "Timeline 过场", hint: "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）" },
   levelFlow: { label: "Encounter Designer", hint: "多视口同步预演剧情，截图标注并通过本机会话提交修改需求", split: true,
-    window: { url: "./AdvancedTools/Tool_LevelFlow.html", name: "TengxianLevelFlow", features: "popup,width=1280,height=720" } },
+    window: { url: "./AdvancedTools/Tool_LevelFlow.html", name: "TengxianLevelFlow" } },
   actor: { label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换", split: true },
   facial: { label: "人物面部", hint: "配套对白、口型与表情近景检查", split: true },
-  mixamoPreview: { label: "Mixamo 动作预览", hint: "打开独立窗口：Mixamo 通用动作按分类与端枪 / 空手预览，角色默认带已配置的头发胡子及项目道具", split: true,
-    window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview", features: "popup,width=1600,height=1000" } },
-  motionCompare: { label: "动作衔接对比", hint: "打开独立窗口：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
-    window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare", features: "popup,width=1600,height=1000" } },
-  motionWorkbench: { label: "AI 动作生成", hint: "打开独立窗口：分镜出图（4 源切换）→ Seedance / MiniMax-H3 视频生成 → GEM-X 77 骨动捕提取与 Mixamo 3D 重定向", split: true,
-    window: { url: "./AdvancedTools/Tool_MotionWorkbench.html", name: "TengxianMotionWorkbench", features: "popup,width=1600,height=1000" } },
+  mixamoPreview: { label: "Mixamo 动作预览", hint: "在新标签页打开：Mixamo 通用动作按分类与端枪 / 空手预览，角色默认带已配置的头发胡子及项目道具", split: true,
+    window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview" } },
+  motionCompare: { label: "动作衔接对比", hint: "在新标签页打开：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
+    window: { url: "./AdvancedTools/Tool_MotionCompare.html", name: "TengxianMotionCompare" } },
+  motionWorkbench: { label: "AI 动作生成", hint: "在新标签页打开：分镜出图（4 源切换）→ Seedance / MiniMax-H3 视频生成 → GEM-X 77 骨动捕提取与 Mixamo 3D 重定向", split: true,
+    window: { url: "./AdvancedTools/Tool_MotionWorkbench.html", name: "TengxianMotionWorkbench" } },
   weapon: { label: "枪械检查台", hint: "查看模型外观、挂点和尺寸", split: true,
-    window: { url: "./AdvancedTools/Tool_WeaponInspection.html", name: "TengxianWeaponInspection", features: "popup,width=1440,height=900" } },
-  firstPerson: { label: "第一人称持枪检查", hint: "打开独立靶场窗口：第一人称持枪试射、真实装填与慢放逐帧、连射拉栓与移动惯性前后对比", split: true,
-    window: { url: "./AdvancedTools/Tool_FirstPersonInspection.html", name: "TengxianFirstPersonInspection", features: "popup,width=1480,height=920" } },
-  vfx: { label: "特效预览", hint: "打开独立窗口：查看火焰、烟雾、爆炸、命中、枪口焰与曳光；昼夜取环境预设", split: true,
-    window: { url: "./AdvancedTools/Tool_VfxPreview.html", name: "TengxianVfxPreview", features: "popup,width=1600,height=1000" } },
-  audio: { label: "音效音乐", hint: "打开独立窗口：全部配方的试听、混音参数与盲听指认", split: true,
-    window: { url: "./AdvancedTools/Tool_AudioPreview.html", name: "TengxianAudioPreview", features: "popup,width=1280,height=900" } },
-  textures: { label: "贴图管理", hint: "打开独立贴图管理窗口：导入设置、发布压缩与程序化预览", split: true,
-    window: { url: "./AdvancedTools/TextureManager.html", name: "TengxianTextureManager", features: "popup,width=1600,height=1000" } },
+    window: { url: "./AdvancedTools/Tool_WeaponInspection.html", name: "TengxianWeaponInspection" } },
+  firstPerson: { label: "第一人称持枪检查", hint: "在新标签页打开靶场：第一人称持枪试射、真实装填与慢放逐帧、连射拉栓与移动惯性前后对比", split: true,
+    window: { url: "./AdvancedTools/Tool_FirstPersonInspection.html", name: "TengxianFirstPersonInspection" } },
+  vfx: { label: "特效预览", hint: "在新标签页打开：查看火焰、烟雾、爆炸、命中、枪口焰与曳光；昼夜取环境预设", split: true,
+    window: { url: "./AdvancedTools/Tool_VfxPreview.html", name: "TengxianVfxPreview" } },
+  audio: { label: "音效音乐", hint: "在新标签页打开：全部配方的试听、混音参数与盲听指认", split: true,
+    window: { url: "./AdvancedTools/Tool_AudioPreview.html", name: "TengxianAudioPreview" } },
+  textures: { label: "贴图管理", hint: "在新标签页打开贴图管理：导入设置、发布压缩与程序化预览", split: true,
+    window: { url: "./AdvancedTools/TextureManager.html", name: "TengxianTextureManager" } },
 });
 
 // 菜单栏与工具首页的分组与顺序（Script_Editor 按它生成，缺编辑器类直接 throw）。

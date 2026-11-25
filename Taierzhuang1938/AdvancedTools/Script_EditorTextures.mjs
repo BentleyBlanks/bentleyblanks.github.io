@@ -10,9 +10,9 @@ export class TextureEditor {
   static win = null;
   static Open() {
     if (!this.win || this.win.closed) {
-      this.win = window.open(new URL(TOOL_INFO.textures.window.url, GAME_BASE), TOOL_INFO.textures.window.name, TOOL_INFO.textures.window.features);
+      this.win = window.open(new URL(TOOL_INFO.textures.window.url, GAME_BASE), TOOL_INFO.textures.window.name);
     }
-    if (!this.win) throw new Error("贴图管理窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("贴图管理标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

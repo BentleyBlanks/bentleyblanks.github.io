@@ -12,10 +12,10 @@ export class FirstPersonInspectionEntry {
 
   static Open() {
     if (!this.win || this.win.closed) {
-      const { url, name, features } = TOOL_INFO.firstPerson.window;
-      this.win = window.open(new URL(url, GAME_BASE), name, features);
+      const { url, name } = TOOL_INFO.firstPerson.window;
+      this.win = window.open(new URL(url, GAME_BASE), name);
     }
-    if (!this.win) throw new Error("第一人称持枪检查窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("第一人称持枪检查标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

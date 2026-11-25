@@ -49,7 +49,7 @@ try {
     return { href: link.href, kind: link.dataset.kind, tag: link.querySelector(".edHomeTag")?.textContent,
       group: group?.dataset.group, first: group?.querySelector("[data-home-tool]") === link };
   });
-  Check("控制中心「构件库预览」是资产组第一张独立窗口卡片", card.kind === "window" && card.tag === "↗ 独立窗口"
+  Check("控制中心「构件库预览」是资产组第一张新标签页卡片", card.kind === "window" && card.tag === "↗ 新标签页"
     && card.group === "assets" && card.first && card.href === `${base}Tool_PropLibrary.html`, JSON.stringify(card));
   const [page] = await Promise.all([center.waitForEvent("popup"), center.click('[data-home-tool="props"]')]);
   Watch(page);

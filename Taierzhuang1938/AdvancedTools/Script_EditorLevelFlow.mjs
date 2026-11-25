@@ -12,9 +12,9 @@ export class LevelFlowEntry {
   static Open() {
     if (!this.win || this.win.closed) {
       const info = TOOL_INFO.levelFlow.window;
-      this.win = window.open(new URL(info.url, GAME_BASE), info.name, info.features);
+      this.win = window.open(new URL(info.url, GAME_BASE), info.name);
     }
-    if (!this.win) throw new Error("Encounter Designer窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("Encounter Designer 标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }

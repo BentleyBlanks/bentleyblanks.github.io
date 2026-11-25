@@ -11,9 +11,9 @@ export class SceneEditorEntry {
   static win = null;
   static Open() {
     if (!this.win || this.win.closed) {
-      this.win = window.open(new URL(TOOL_INFO.sceneEditor.window.url, GAME_BASE), TOOL_INFO.sceneEditor.window.name, TOOL_INFO.sceneEditor.window.features);
+      this.win = window.open(new URL(TOOL_INFO.sceneEditor.window.url, GAME_BASE), TOOL_INFO.sceneEditor.window.name);
     }
-    if (!this.win) throw new Error("场景编辑器窗口被拦截，请允许弹窗后重试");
+    if (!this.win) throw new Error("场景编辑器标签页被拦截，请允许弹出页面后重试");
     this.win.focus();
     return this.win;
   }
