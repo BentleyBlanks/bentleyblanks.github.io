@@ -21,7 +21,7 @@
 
 import * as THREE from "three";
 // 视模那一份材质要重挂一次间接光补丁（去掉 SSR，见 CloneOwnedMaterial 的账）。
-import { ApplyPatches, IndirectLightingPatches, PatchesOf, SSR_PATCH_KEY } from "./Script_MaterialPatches.mjs";
+import { ApplyPatches, CloneMaterialBase, IndirectLightingPatches, PatchesOf, SSR_PATCH_KEY } from "./Script_MaterialPatches.mjs";
 import { OverrideVariants } from "./Script_OverrideVariants.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 
@@ -203,7 +203,7 @@ float FirstPersonSelfShadow() {
  * 第一次取键缺 `CSM_CONTACT` / `USE_MATERIAL_SKIN` 那一串，与渲染管线 §18.2 ③ 同一类孪生。
  */
 function CloneOwnedMaterial(material) {
-  const clone = material.clone();
+  const clone = CloneMaterialBase(material);
   clone.name = `${(material.name || material.type).replace(/_FirstPerson$/, "")}_FirstPerson`;
   if (material.defines) clone.defines = Object.assign({}, clone.defines, material.defines);
   clone.onBeforeCompile = material.onBeforeCompile;

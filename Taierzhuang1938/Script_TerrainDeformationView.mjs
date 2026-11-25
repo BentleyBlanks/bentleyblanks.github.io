@@ -9,7 +9,7 @@ import { TerrainDeformation } from "./Script_TerrainDeformation.mjs";
 import { CraterDebris } from "./Script_CraterDebris.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
-import { InsertAfterSurfacePatch } from "./Script_MaterialPatches.mjs";
+import { CloneMaterialBase, InsertAfterSurfacePatch } from "./Script_MaterialPatches.mjs";
 
 // How many renders a crater warm-up proxy may wait for its first shadow pass
 // before it retires anyway. Only a leak guard: on a level whose cascades bake
@@ -326,8 +326,8 @@ export class TerrainDeformationView {
       || /^(JieheGround_|CityPlatform$|OuterGround$|RangeGround$)/.test(m.name)));
     this.overlaySources = field.meshes.filter((m) => m.geometry && !m.isInstancedMesh
       && GROUND_OVERLAYS.test(m.name.split("|").pop().replace(/^Static_/, "")));
-    this.material = (this.sources[0]?.material || groundMaterial).clone();
     const sourceMaterial = this.sources[0]?.material || groundMaterial;
+    this.material = CloneMaterialBase(sourceMaterial);
     ConfigureCraterSurface(this.material, sourceMaterial, this.soilMaterial);
     // Overlay materials are cloned up front, not at the first crater on a road:
     // Warm() has to compile every crater program the level can ever need.
@@ -372,7 +372,7 @@ export class TerrainDeformationView {
   OverlayMaterial(source) {
     let material = this.overlayMaterials.get(source.material);
     if (!material) {
-      material = source.material.clone(); material.vertexColors = true;
+      material = CloneMaterialBase(source.material); material.vertexColors = true;
       ConfigureCraterSurface(material, source.material, this.soilMaterial);
       this.overlayMaterials.set(source.material, material);
     }

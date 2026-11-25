@@ -102,8 +102,8 @@ export class LevelFlowPlay {
     try{sessionStorage.setItem("tengxian1938_encounter_play_session_v1",JSON.stringify(payload));}
     catch(error){this.toast("Play 开局数据保存失败："+error.message,true);this.saved=null;return false;}
     this.previewDebug.CloseAll();
-    this.active=true;this.startedAt=performance.now();this.startTime=time;const generation=++this.generation;
-    this.deadline=setTimeout(()=>{if(this.active&&generation===this.generation){this.Stop();this.toast("Play 加载超时，已停止；可以重新尝试。",true);}},ENCOUNTER_PLAY_STARTUP.maxLoadMs);
+    this.active=true;this.startedAt=performance.now();this.startTime=time;this.lastLoadStep="";const generation=++this.generation;
+    this.ArmLoadTimeout(generation);
     for(const option of this.layout.options)option.hidden=option.disabled=Number(option.value)>2;
     this.layout.value="1";document.body.classList.add("lfPlayingGame");
     document.querySelector("#chatPane").inert=true;document.querySelector("#flowTimeline").inert=true;
@@ -117,6 +117,30 @@ export class LevelFlowPlay {
     });
     return true;
   }
+  ClearDeadlines() {
+    clearTimeout(this.deadline);clearTimeout(this.maxDeadline);this.deadline=0;this.maxDeadline=0;
+  }
+  ArmLoadTimeout(generation) {
+    this.ClearDeadlines();
+    const stallMs=ENCOUNTER_PLAY_STARTUP.maxLoadMs;
+    const totalMs=ENCOUNTER_PLAY_STARTUP.maxTotalLoadMs??stallMs*3;
+    this.deadline=setTimeout(()=>this.LoadTimeout(generation),stallMs);
+    this.maxDeadline=setTimeout(()=>this.LoadTimeout(generation),totalMs);
+  }
+  TouchLoadProgress(step) {
+    if(!this.active||!step||step===this.lastLoadStep)return;
+    this.lastLoadStep=step;
+    if(!this.deadline)return;
+    const generation=this.generation;
+    clearTimeout(this.deadline);
+    this.deadline=setTimeout(()=>this.LoadTimeout(generation),ENCOUNTER_PLAY_STARTUP.maxLoadMs);
+  }
+  LoadTimeout(generation) {
+    if(!this.active||generation!==this.generation)return;
+    const step=this.lastLoadStep||this.loading?.textContent?.trim()||"";
+    this.Stop();
+    this.toast(step?`Play 加载超时（停在：${step}），已停止；可以重新尝试。`:"Play 加载超时，已停止；可以重新尝试。",true);
+  }
   ShowLoading(text) {
     if(!this.host){
       this.host=document.createElement("div");this.host.className="lfPlayHost";
@@ -125,6 +149,7 @@ export class LevelFlowPlay {
     }
     this.host.className="lfPlayHost";this.host.hidden=false;
     this.loading.hidden=false;this.loading.textContent=text;
+    this.TouchLoadProgress(text);
   }
   async Launch(payload,generation) {
     const stamp=await this.SceneStamp();
@@ -153,15 +178,16 @@ export class LevelFlowPlay {
   }
   StartHost() {
     if(!this.active||this.launching||!this.frame)return;
-    const win=this.frame.contentWindow,game=win.Tengxian,api=game?.Debug?.EncounterPlay;
-    const step=win.document.getElementById("bootStep")?.textContent;if(step)this.loading.textContent=step;
+    const win=this.frame.contentWindow,game=win?.Tengxian,api=game?.Debug?.EncounterPlay;
+    const step=win?.document?.getElementById("bootStep")?.textContent;
+    if(step){this.loading.textContent=step;this.TouchLoadProgress(step);}
     if(step?.startsWith("启动失败")){this.LoadError(step);return;}
     if(api?.State().error){this.LoadError(api.State().error.split("\n")[0]);return;}
     if(!api?.State().ready)return;
     const button=win.document.getElementById("bootStart"),boot=win.document.getElementById("boot");
     if(!boot?.classList.contains("gone")&&button&&!button.disabled&&button.getClientRects().length)button.click();
     if(game.state.running) {
-      clearInterval(this.timer);clearTimeout(this.deadline);this.loading.hidden=true;this.state=api.State();this.loadMs=performance.now()-this.startedAt;
+      clearInterval(this.timer);this.ClearDeadlines();this.loading.hidden=true;this.state=api.State();this.loadMs=performance.now()-this.startedAt;
       this.onState?.(this.state);this.UpdateControls();this.frame.focus();
     }
   }
@@ -181,7 +207,7 @@ export class LevelFlowPlay {
     return true;
   }
   LoadError(message){
-    clearInterval(this.timer);clearTimeout(this.deadline);this.launching=false;
+    clearInterval(this.timer);this.ClearDeadlines();this.launching=false;
     this.state={ready:false,error:message,paused:false,timelineTime:this.startTime,hints:{title:"Play 加载失败",task:message,hint:"停止后可以重试"}};
     if(this.loading)this.loading.textContent=message;
     this.onState?.(this.state);this.UpdateControls();
@@ -198,7 +224,7 @@ export class LevelFlowPlay {
   }
   Stop() {
     if(!this.active)return;
-    this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
+    this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);this.ClearDeadlines();
     this.CloseDebugTools();
     const game=this.frame?.contentWindow.Tengxian,api=game?.Debug.EncounterPlay;
     if(game?.state.ready&&api?.State().initialized&&!api.State().starting&&!api.State().error){api.Suspend();this.host.hidden=true;this.host.className="lfPlayCache";this.ScheduleRelease();}

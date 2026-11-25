@@ -14,7 +14,7 @@ import { TextureBaker } from "./Script_TextureBaker.mjs";
 import { TextureImportOf, MobileTextureImportOf, ApplyTextureImport, PrepareImportedTexture, LoadKtxTexture, ResolveTextureImportUrl } from "./Script_TextureImports.mjs";
 import { SSR } from "./Data_Tuning_Graphics.mjs";
 import {
-  ApplyPatches, IndirectLightingPatches, FoldOrmMaps, PatchesOf, MakePatch,
+  ApplyPatches, CloneMaterialBase, IndirectLightingPatches, FoldOrmMaps, PatchesOf, MakePatch,
 } from "./Script_MaterialPatches.mjs";
 import { MakeMaterialShadingPatch, MakeShadingFeatures } from "./Script_MaterialShading.mjs";
 import {
@@ -218,7 +218,7 @@ export function InjectIndirectLighting(material,
 export function CloneShadedMaterial(material) {
   if (!material) return material;
   if (Array.isArray(material)) return material.map(CloneShadedMaterial);
-  const clone = material.clone();
+  const clone = CloneMaterialBase(material);
   clone.name = material.name;
   if (material.defines) clone.defines = Object.assign({}, clone.defines, material.defines);
   const patches = PatchesOf(material);

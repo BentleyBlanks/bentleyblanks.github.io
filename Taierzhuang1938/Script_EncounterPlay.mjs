@@ -28,7 +28,27 @@ import { DeathTime } from "./Script_PlayerDeath.mjs";
 import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
-const PaintFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+function NextTask() {
+  return new Promise(resolve=>{
+    const channel=new MessageChannel();
+    channel.port1.onmessage=()=>{channel.port1.close();channel.port2.close();resolve();};
+    channel.port2.postMessage(0);
+  });
+}
+// Background or occluded tabs stop firing rAF; match Script_Main.NextFrame so Play loading never deadlocks when hidden.
+function PaintFrame() {
+  if(typeof document==="undefined"||document.hidden||typeof requestAnimationFrame!=="function")return NextTask();
+  return new Promise(resolve=>{
+    let frame=0;
+    const finish=()=>{
+      cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange",finish);
+      resolve();
+    };
+    frame=requestAnimationFrame(finish);
+    document.addEventListener("visibilitychange",finish,{once:true});
+  });
+}
 
 function CreateSingleViewportStub(host) {
   return {

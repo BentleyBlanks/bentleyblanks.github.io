@@ -877,6 +877,8 @@ export class LevelFlowPlayGuide {
     if (!this.active) return;
     if (timestamp - this.lastPollAt < LIVE_POLL_INTERVAL_MS) return;
     this.lastPollAt = timestamp;
+    // Avoid 15 Hz Canvas2D minimap redraws on the shared main thread while Play is still booting.
+    if (!this.lastState?.ready && !this.ReadLiveRuntime()?.state?.ready) return;
     this.Refresh(false, timestamp);
   }
 

@@ -1049,3 +1049,33 @@ export function IndirectLightingPatches({
     ...(Array.isArray(shading) ? shading : [shading]),
   ].filter(Boolean);
 }
+
+const NON_SERIALIZABLE_USER_DATA_KEYS = ["ssaoUniforms", "giUniforms", "ssrUniforms"];
+
+/**
+ * 克隆材质时跳过 userData 里含 Texture 的共享 uniform 包：`Material.clone()` 会对
+ * `userData` 跑 `JSON.parse(JSON.stringify(...))`，刷屏 Unable to serialize Texture
+ * 并拖慢启动、同时把共享 uniform 对象拆成失活拷贝。克隆前摘下、克隆后原样挂回。
+ */
+export function CloneMaterialBase(material) {
+  if (!material) return material;
+  const userData = material.userData;
+  if (!userData) return material.clone();
+  const kept = {};
+  let hasKept = false;
+  for (const key of NON_SERIALIZABLE_USER_DATA_KEYS) {
+    if (key in userData) {
+      kept[key] = userData[key];
+      delete userData[key];
+      hasKept = true;
+    }
+  }
+  let clone;
+  try {
+    clone = material.clone();
+  } finally {
+    if (hasKept) Object.assign(userData, kept);
+  }
+  if (hasKept) Object.assign(clone.userData, kept);
+  return clone;
+}

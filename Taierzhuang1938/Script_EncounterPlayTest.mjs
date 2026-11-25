@@ -358,5 +358,15 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
   assert.equal(log.LineCount(),3,"After checkpoint retry, re-spoken lines append cleanly after the retry divider");
   assert.ok(log.entries.some(e=>e.kind==="divider"&&/检查点重来/.test(e.text)));
  }
+
+ // Play startup resilience: background/occluded tab must not deadlock PaintFrame, and progress resets stall deadline.
+ {
+  const playRuntimeSrc=fs.readFileSync(new URL("./Script_EncounterPlay.mjs",import.meta.url),"utf8");
+  const playHostSrc=fs.readFileSync(new URL("./AdvancedTools/Script_LevelFlowPlay.mjs",import.meta.url),"utf8");
+  assert.match(playRuntimeSrc,/function PaintFrame[\s\S]*document\.hidden[\s\S]*visibilitychange/,
+   "EncounterPlay PaintFrame must fall back when document.hidden is true so background/occluded tabs never deadlock Play loading");
+  assert.match(playHostSrc,/TouchLoadProgress\(step\)/,"LevelFlowPlay must reset the stall deadline as loading steps advance");
+  assert.match(playHostSrc,/Play 加载超时（停在：/,"LevelFlowPlay timeout toast must report the stalled step");
+ }
 }
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync, playtest 2D guide and independent scene");
