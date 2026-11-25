@@ -1,13 +1,13 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202611260120",
+  version: "202611260142",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x26292c,
   cameraNear: 0.05,
   cameraFar: 80,
-  exposure: 2.02,
-  depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .18, focusPadding: .025,
-    aperture: 4.5, maxRadius: 1.35,
+  exposure: 2.05,
+  depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .12, focusPadding: .025,
+    aperture: 10, maxRadius: 3.2,
     panelBlur: 7.5, transitionSeconds: .18 }),
   parallax: Object.freeze({ horizontal: .0425, vertical: .0225, focusDistance: 1.65, aimFollow: .28, responseSeconds: .045 }),
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
