@@ -305,6 +305,31 @@ try {
   await Step(4); await Shot("15_PofengCombined");
   console.log("PASS pofeng+drag", JSON.stringify(s.stats));
 
+  // ── 暂停敌军后，点「开始／重开」与切玩法保持暂停；恢复后再重开保持未暂停 ──
+  await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.Pause(true));
+  await page.getByRole("button", { name: "开始／重开", exact: true }).click();
+  await Step(4);
+  const pausedRestart = await page.evaluate(() => ({
+    paused: Taierzhuang.Debug.MeleeCombat.State().paused,
+    passive: Taierzhuang.ai.soldiers.every((e) => e.meleeTraining?.passive === true),
+    btn: document.querySelector(".meleeLab .mlPause")?.textContent,
+  }));
+  assert.equal(pausedRestart.paused, true, "restarting keeps enemy paused");
+  assert.equal(pausedRestart.passive, true, "restarted enemy remains passive when paused");
+  await page.getByRole("button", { name: "原版 · 砍中即退", exact: true }).click();
+  await Step(4);
+  assert.equal(await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.State().paused), true, "switching variant keeps enemy paused");
+  await page.evaluate(() => Taierzhuang.Debug.MeleeCombat.Pause(false));
+  await page.getByRole("button", { name: "开始／重开", exact: true }).click();
+  await Step(4);
+  const activeRestart = await page.evaluate(() => ({
+    paused: Taierzhuang.Debug.MeleeCombat.State().paused,
+    passive: Taierzhuang.ai.soldiers.every((e) => e.meleeTraining?.passive === false),
+  }));
+  assert.equal(activeRestart.paused, false, "restarting keeps enemy active when unpaused");
+  assert.equal(activeRestart.passive, true, "restarted enemy remains active when unpaused");
+  console.log("PASS pause preserved across restart", JSON.stringify({ pausedRestart, activeRestart }));
+
   assert.deepEqual(errors, []);
   console.log("PASS no page errors");
 } catch (error) { console.error("page errors:", errors.slice(0, 5)); throw error;

@@ -71,14 +71,14 @@ function ResetSoldierInPlace(s, p, spec) {
   if (!ctx.ai.ResetSoldier(s, { x: p.x, z: p.z, yaw: p.yaw })) return false;
   s.dummy = true;
   s.bayonetFixed = true;
-  s.meleeTraining = { kind: spec.kind, slot: p.slot, passive: false };
+  s.meleeTraining = { kind: spec.kind, slot: p.slot, passive: meleePaused };
   s.holdZone = null;
   return true;
 }
 
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
-  meleeScenario = spec.id; meleePaused = false; meleePreview = null;
+  meleeScenario = spec.id; meleePreview = null;
   ctx.post.hasPrev=false;ctx.post.hasTaaHistory=false;
   ctx.meleeCombat.Reset(); pendingGround = null;
   meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
@@ -115,7 +115,7 @@ function StartMeleeScenario(id) {
       });
       if (!soldier) continue;
       soldier.dummy = true; soldier.bayonetFixed = true; soldier.yaw = p.yaw;
-      soldier.meleeTraining = { kind: spec.kind, slot: p.slot, passive: false };
+      soldier.meleeTraining = { kind: spec.kind, slot: p.slot, passive: meleePaused };
       soldier.holdZone = null; soldier.goal.copy(soldier.position);
       meleeTargets.push({ soldier, id: p.id });
     }
@@ -154,8 +154,8 @@ function LoadEnemySkins(host) {
 }
 
 function SeedMeleeTargets() {
-  StartMeleeScenario(meleeScenario); meleePaused = true;
-  for (const entry of meleeTargets) entry.soldier.meleeTraining.passive = true;
+  meleePaused = true;
+  StartMeleeScenario(meleeScenario);
 }
 
 /** 白刃层每帧之前：喂这一帧的鼠标位移（拖拽挥砍带刀、出刀）；按着左键拖刀时视角只跟 viewFollow 倍。 */

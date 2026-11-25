@@ -123,7 +123,7 @@ try {
     const play=T.audio.Play.bind(T.audio),sounds=[];T.audio.Play=(id,...args)=>{sounds.push(id);return play(id,...args);};
     try{
       for(const route of ['sidestep','beat','switch','miss','environment']){
-        sounds.length=0;L.Select(route==='switch'?'DadaoTwo':route==='sidestep'?'ParryTiming':'DadaoOne');
+        sounds.length=0;L.Select(route==='switch'?'DadaoTwo':route==='sidestep'?'ParryTiming':'DadaoOne');L.Pause(false);
         const es=[...T.ai.soldiers],e=es[0];
         if(route==='sidestep'){
           Place(e,P.position.x,P.position.z-1.9);Step(1);
@@ -171,7 +171,7 @@ try {
     // 倒地抵抗 2026-11-23 起只由剧本触发：取证口 ScriptedGround 走同一个剧本入口（BeginScriptedGround）。
     const Begin=id=>{
       if(id.endsWith('Ground')){lab.Select(id.replace('Ground','One'));lab.Pause(true);Step(.3);lab.ScriptedGround();}
-      else{lab.Select(id);Step(.75);}
+      else{lab.Select(id);lab.Pause(false);Step(.75);}
       if(id.endsWith('Bind')){T.Debug.Mouse(0,true);Step(.45);T.Debug.Mouse(0,false);}
       for(let i=0;i<50&&!lab.State().active;i++)Step(.05);
       return lab.State();
@@ -203,7 +203,7 @@ try {
   for(const q of qtes)assert(q.markerError<=.501,'Control marker must move toward our side on the left');
   const surrounded=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat;
-    L.Select('DadaoTwo');T.player.debug.invincible=true;
+    L.Select('DadaoTwo');L.Pause(false);T.player.debug.invincible=true;
     C.KnockDown(T.player,T.ai.soldiers[0]);
     let blockedS=0,maxBlockedS=0,freeFrames=0;
     for(let i=0;i<1800;i++) {
@@ -221,7 +221,7 @@ try {
     const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat,out=[];
     for(const id of ['DadaoBind','BayonetGround']){
       if(id.endsWith('Ground')){L.Select('BayonetOne');L.Pause(true);T.StepFrames(20,1/60,false);L.ScriptedGround();}
-      else L.Select(id);
+      else{L.Select(id);L.Pause(false);}
       T.StepFrames(45,1/60,false);
       if(id.endsWith('Bind')){T.Debug.Mouse(0,true);T.StepFrames(28,1/60,false);T.Debug.Mouse(0,false);}
       for(let i=0;i<160&&!C.Active;i++)T.StepFrames(1,1/60,false);
@@ -244,7 +244,7 @@ try {
     const T=Taierzhuang,L=T.Debug.MeleeCombat;
     const results=[];
     for(const id of ['DadaoOne','DadaoTwo','DadaoThree','BayonetOne','BayonetTwo','AlliedDadao','AlliedBayonet']){
-      L.Select(id);T.StepFrames(60*3,1/60,false);
+      L.Select(id);L.Pause(false);T.StepFrames(60*3,1/60,false);
       // 多打一分工在真实 Soldier/StepBody 上成形：三秒时一人正面、其余侧翼且已离开正面弧。
       const mid=L.State(),P=T.player;
       const Bearing=(t)=>Math.atan2(-Math.cos(P.yaw)*(t.x-P.position.x)+Math.sin(P.yaw)*(t.z-P.position.z),-Math.sin(P.yaw)*(t.x-P.position.x)-Math.cos(P.yaw)*(t.z-P.position.z))*180/Math.PI;
