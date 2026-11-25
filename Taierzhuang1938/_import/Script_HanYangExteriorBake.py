@@ -7,7 +7,7 @@ import struct
 from pathlib import Path
 import moderngl
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
-from Script_HanYangBandProfiles import SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBandProfiles import FormRearBandRib, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
 import numpy as np
 from PIL import Image
@@ -16,23 +16,22 @@ from scipy import ndimage
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
 revision = archive / 'ExteriorFinish_20261122'
 outputDirectory = Path(os.environ.get('HANYANG_BAKE_OUTPUT_DIR', str(revision)))
+geometryDirectory = Path(os.environ.get('HANYANG_BAKE_GEOMETRY_DIR', revision))
 charts = json.loads((revision/'Data_Charts.json').read_text())
 detailMaps = np.load(revision/'Data_DetailUv.npz', allow_pickle=False)
-bevels = np.load(revision/'Data_InspectionBevels.npz', allow_pickle=False)
-contactFields = np.load(revision/'Data_ContactVisibility.npz', allow_pickle=False)
-timberHandling = np.load(revision/'Data_TimberHandling.npz', allow_pickle=False)
+bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=False)
+contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
+timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261125R27'
+version = '173R-20261126R28'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
-in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling;
-out vec3 point,faceNormal; out vec4 basis; out float visibility,woodExposure;
-void main(){gl_Position=vec4(uv*2.-1.,0.,1.);point=pos;faceNormal=normal;basis=tangent;visibility=access;woodExposure=handling;}
+in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
+out vec3 point,faceNormal; out vec4 basis; out float visibility,woodExposure,edgeWear;
+void main(){gl_Position=vec4(uv*2.-1.,0.,1.);point=pos;faceNormal=normal;basis=tangent;visibility=access;woodExposure=handling;edgeWear=rounded;}
 '''
 fragmentShader=Path(__file__).with_name('Shader_HanYangMaterial.frag').read_text(encoding='utf8')
 ordinaryProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader)
-bandProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader.replace('#version 330','#version 330\n#define BAND_FINISH',1))
-rearTrimProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader.replace('#version 330','#version 330\n#define BAND_FINISH\n#define REAR_TRIM_FINISH',1))
 stockProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader.replace('#version 330','#version 330\n#define STOCK_CREST_WEAR',1))
 
 
@@ -123,9 +122,6 @@ for node in doc['nodes']:
     detailChart=name+'_UV' in detailMaps
     bevelChart=name+'_indices' in bevels
     program=stockProgram if name.startswith('MainWood_') else ordinaryProgram
-    if name=='FrontBand_ContinuousEnvelopeContact':program=bandProgram
-    if name in ('RearBand_ControlledCrown','RearBand_ExternalAttachmentBridge','RearBand_ExternalAttachmentLoop'):
-        program=rearTrimProgram
     if name in charts or detailChart or bevelChart:
         update,meshBinary=(approvedDoc,approvedBinary) if name in charts else (doc,binary)
         incoming=update['meshes'][node['mesh']]['primitives'][0]
@@ -150,7 +146,9 @@ for node in doc['nodes']:
             streams={key:bevels[name+'_'+key] for key in streams}
             faceIndices=bevels[name+'_indices']
             modifiedSurfaces[name]=(streams['POSITION'],faceIndices)
-            beveledParts[name]={'before':before,'after':faceIndices.size//3}
+            edgeFaces = bevels[name+'_EDGE_WEAR'][faceIndices.reshape(-1,3)]
+            beveledParts[name]={'before':before,'after':faceIndices.size//3,
+                               'roundedFaces':int(np.count_nonzero(np.all(edgeFaces>.5,axis=1)))}
         if detailChart:
             sourceCorners=faceIndices.ravel()
             uv=detailMaps[name+'_UV']
@@ -163,6 +161,8 @@ for node in doc['nodes']:
             faceIndices=remap.astype(faceIndices.dtype).reshape(-1,1)
         if name in ('FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown'):
             streams=ShapeBandProfile(name,streams)
+            if name == 'RearBand_ControlledCrown':
+                streams, faceIndices = FormRearBandRib(streams, faceIndices)
             bandProfiles[name]=(streams['POSITION'],faceIndices)
         streams=SmoothRingFrames(name,streams,faceIndices)
         previousFaceCount=faceIndices.size//3
@@ -203,6 +203,9 @@ for node in doc['nodes']:
     accessBuffer=context.buffer(visibility.astype('<f4',copy=False).tobytes());resources.append(accessBuffer);bind.append((accessBuffer,'1f','access'))
     handling=timberHandling[name] if wood else visibility
     handlingBuffer=context.buffer(handling.astype('<f4',copy=False).tobytes());resources.append(handlingBuffer);bind.append((handlingBuffer,'1f','handling'))
+    rounded=bevels[name+'_EDGE_WEAR'] if bevelChart else np.zeros(vertexCount,'<f4')
+    assert rounded.shape == (vertexCount,), name
+    roundedBuffer=context.buffer(rounded.tobytes());resources.append(roundedBuffer);bind.append((roundedBuffer,'1f','rounded'))
     indexBuffer=context.buffer(ind);vao=context.vertex_array(program,bind,indexBuffer,index_element_size={5125:4,5123:2}[indices['componentType']]);resources.extend([vao,indexBuffer]);
     oiledStock=name.startswith('MainWood_')
     frontFilm=name.startswith('FrontWood_')
@@ -294,8 +297,9 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R27: seated wood under both bands, quieter steel patina, unmarked stock and rounded inspection edges.'
+report['rebake']='R28: scanned steel patina, geometry-based rim wear, a formed rear-band rib and broader exterior bevels.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
+report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)
 report['exteriorFinish']['ringPresentation']=ringPresentation
 report['exteriorFinish']['frontTrimPresentation']='Underside silhouette, rigid display pose estimated from the Lu profile photograph.'
 report['exteriorFinish']['closedFittings']={name:{'before':before,'after':faces.size//3} for name,(_,faces,before) in closedFittings.items()}

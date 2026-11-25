@@ -1,7 +1,7 @@
 #version 330
 in vec3 point,faceNormal;
 in vec4 basis;
-in float visibility,woodExposure;
+in float visibility,woodExposure,edgeWear;
 uniform bool wood,band,guard,disk,knob,buttCap,foreEnd,handguard,longShell,underTrim;
 uniform float seed,worn;
 uniform vec2 alongRange;
@@ -159,13 +159,6 @@ float crownBite(vec2 face,float phase){
  float hollow=max(1.-smoothstep(.005,.020,nearMark),1.-smoothstep(.004,.014,brokenMark));
  return hollow*(.64+.36*softNoise(face*vec2(170.,131.)+phase));
 }
-float impressions(vec2 p){
- float left=strokeDistance(p,vec2(-.83,.46),vec2(-.80,-.43));
- float arc=abs(length((p-vec2(.48,.18))*vec2(1.,.88))-.33);
- float tail=min(strokeDistance(p,vec2(.81,.18),vec2(.78,-.20)),strokeDistance(p,vec2(.78,-.20),vec2(.58,-.40)));
- tail=min(tail,strokeDistance(p,vec2(.58,-.40),vec2(.34,-.44)));
- return 1.-smoothstep(.035,.205,min(left,min(arc,tail)));
-}
 void layer(vec3 p,vec3 normal,vec3 axisU,vec3 axisV,vec2 scale,vec2 offset,float amount,inout vec3 color,inout vec2 surface,inout vec3 gradient){
  vec2 uv=vec2(dot(p,axisU),dot(p,axisV))*scale+offset;
  color+=amount*textureLod(pigmentMap,uv,0.).rgb;
@@ -174,13 +167,15 @@ void layer(vec3 p,vec3 normal,vec3 axisU,vec3 axisV,vec2 scale,vec2 offset,float
  vec3 slope=(detail.x*axisU+detail.y*axisV)/max(detail.z,.25);
  gradient+=amount*(slope-normal*dot(normal,slope));
 }
+float SteelNoise(vec3 point,vec3 weights){
+ return dot(weights,vec3(softNoise(point.yz+3.1),softNoise(point.xz-5.7),softNoise(point.xy+8.2)));
+}
 void main(){
  finishMask=vec4(0.,0.,0.,1.);
  vec3 p=artSpace(point),normal=normalize(artSpace(faceNormal));
  vec3 tangent=normalize(artSpace(basis.xyz)-normal*dot(normal,artSpace(basis.xyz)));
  vec3 bitangent=-normalize(cross(normal,tangent))*sign(basis.w);
  vec3 color=vec3(0),gradient=vec3(0);vec2 surface=vec2(0);
- vec3 fineColor=vec3(0),fineGradient=vec3(0);vec2 fineSurface=vec2(0);
  float rough,metal;
  vec3 visible;
  if(wood){
@@ -277,442 +272,90 @@ void main(){
    gradient+=.64*flank*(slope-normal*dot(slope,normal));
   }
  }else{
-  vec3 weights=pow(abs(normal),vec3(4));weights/=max(weights.x+weights.y+weights.z,.0001);
-  vec2 island=vec2(.119+.19*fract(seed*.71),.308+.053*fract(seed*.79));
-  float lengthwise=(p.x-alongRange.x)/max(.23,alongRange.y-alongRange.x);
-  vec3 swatchPoint=vec3(lengthwise*.145,p.y*.91,p.z*.91);
-  layer(swatchPoint,normal,along,up,vec2(1),island,weights.y,color,surface,gradient);
-  layer(swatchPoint,normal,along,across,vec2(1),island+vec2(0,.037),weights.z,color,surface,gradient);
-  layer(swatchPoint,normal,across,up,vec2(1),island+vec2(.038,0),weights.x,color,surface,gradient);
-  vec2 fineTile=vec2(.595,.096)+.012*fract(seed);
-  vec3 closePoint=vec3(p.x-alongRange.x,p.y,p.z*.85);
-  layer(closePoint,normal,along,up,vec2(6.1,6.9),fineTile,weights.y,fineColor,fineSurface,fineGradient);
-  layer(closePoint,normal,along,across,vec2(6.1,6.9),fineTile+.025,weights.z,fineColor,fineSurface,fineGradient);
-  layer(closePoint,normal,across,up,vec2(6.1,6.9),fineTile,weights.x,fineColor,fineSurface,fineGradient);
-  color=mix(color,fineColor,.42);surface=mix(surface,fineSurface,.37);gradient=mix(gradient,fineGradient,.62);
-  float cuff=(steelFamily==1||steelFamily==7)?1.:0.,tube=steelFamily==2?1.:0.,handled=steelFamily==4?1.:0.;
-  float height=clamp((p.z-heightRange.x)/max(.002,heightRange.y-heightRange.x),0.,1.);
-  float section=(p.x-alongRange.x)/max(.001,alongRange.y-alongRange.x);
-  vec2 uv=vec2(p.x,p.z+.43*p.y)+seed*.018;
-  float grain=softNoise(uv*1380.),islands=softNoise(uv*227.+.33*softNoise(uv*890.));
-  float breakup=.54*islands+.29*softNoise(uv*615.)+.17*grain;
-  float edge=band?1.-smoothstep(.0002,.0020,min(p.x-alongRange.x,alongRange.y-p.x)):0.;
-  float side=abs(normal.y);
-  if(guard)edge=.85*smoothstep(.10,.83,1.-side);
-  float shoulder=.706-.036*(section-.5);
-  float crown=smoothstep(shoulder-.008,shoulder+.008,height+.004*(islands-.5));
-  float facet=(1.-crown)*smoothstep(.15,.63,abs(p.y)/.017);
-  float rub=patch(vec3(section,0.,height),vec3(.70,0.,.60),vec3(.68,1.,.31));
-  float spot=patch(p,vec3(.145,.036,.041),vec3(.068,.030,.032));
-  float rubbed=clamp(edge*(.64+.25*breakup)+handled*(.21+.33*spot)+.08*worn,0.,1.);
-  float scuff=smoothstep(.48,.73,breakup)*(.32+.68*surface.y);
-  float steelWindow=cuff*facet*(.27+.44*rub)*(.80+.31*scuff);
-  rubbed=clamp(rubbed+steelWindow,0.,1.);
-  float stipple=softNoise(uv*3370.+16.7);
-  float oxideSpot=smoothstep(.57,.80,.32*breakup+.33*grain+.35*stipple+.12*(.7-surface.y));
-  float oxide=clamp((.25*(1.-surface.y)+oxideSpot*(.47+.41*cuff)+cuff*crown*.19)*(1.-.73*rubbed),0.,1.);
-  float pits=flecks(uv*1940.+seed)*(.35+.65*oxideSpot);
-  float streak=softNoise(vec2(uv.x*136.,uv.y*4650.));
-  gradient*=.64+.62*oxide-.22*rubbed;
-  vec2 pitSlope=vec2(flecks(uv*1940.+seed+vec2(.16,0))-flecks(uv*1940.+seed-vec2(.16,0)),
-                     flecks(uv*1940.+seed+vec2(0,.16))-flecks(uv*1940.+seed-vec2(0,.16)));
-  gradient+=vec3(pitSlope.x,.43*pitSlope.y,pitSlope.y)*(.10+.18*oxideSpot);
-  float variation=softNoise(uv*vec2(46.,138.)+vec2(1.6,7.2));
-  float abrasion=smoothstep(.49,.77,.69*variation+.23*islands+.08*grain);
-  float coat=clamp(.36+.46*(1.-variation)+.22*oxide-.40*rubbed,0.,1.);
-  vec3 blued=mix(vec3(.205,.198,.185),vec3(.246,.225,.192),.46*variation+.20*oxide);
-  if(guard)blued*=.89;
-  if(disk)blued*=.86;
-  float polish=clamp(.68*rubbed+.22*abrasion*(.25+.75*handled),0.,1.);
-  float mill=clamp((luma(fineColor)-.28)*1.3,-.11,.14);
-  visible=mix(blued*(.94+.14*variation+mill),vec3(.49,.463,.415),polish)*(1.-.22*pits);
-  rough=clamp(.478+.32*(surface.x-.65)+.13*coat+.058*(streak-.5)-.23*polish+.035*tube+.06*oxide,.27,.78);
-  metal=clamp(.887+.066*polish-.28*oxide-.078*pits,.41,.963);
-  float wornFilm=smoothstep(.48,.76,.44*variation+.33*islands+.23*grain);
-  float brokenFilm=smoothstep(.39,.74,.55*islands+.31*stipple+.14*streak);
-  float rubField=(.20+.29*handled+.10*side)*wornFilm*brokenFilm;
-  visible=mix(visible,vec3(.48,.459,.415),rubField)*(.94+.06*streak);
-  rough=clamp(rough+.056*(1.-wornFilm)-.12*rubField,.23,.78);
-  metal=clamp(metal+.056*rubField,.41,.973);
-  gradient*=.82+.32*oxide;
-  if(handled>.5||guard){
-   float oldFilm=smoothstep(.40,.72,.22*variation+.28*islands+.30*grain+.20*stipple);
-   visible=mix(visible,vec3(.176,.157,.122),.40*oldFilm)*(1.-.16*pits);
-   rough=clamp(rough+.063*oldFilm-.037*abrasion,.29,.75);
-   metal=clamp(metal-.048*oldFilm+.031*(1.-oldFilm),.40,.966);
-  }
-  vec2 agedSurface=vec2(0.);vec3 agedInk=vec3(0.),agedSlope=vec3(0.);
+  vec3 weights=pow(abs(normal),vec3(4.));
+  weights/=max(dot(weights,vec3(1.)),.0001);
+  vec3 samplePoint=p+vec3(.021,.049,.073)*seed;
+  vec3 agedColor=vec3(0.),agedSlope=vec3(0.),poreSlope=vec3(0.);
+  vec2 agedSurface=vec2(0.);
+  float pores=0.;
   for(int plane=0;plane<3;plane++){
-   vec3 axisU=plane==1?along:across,axisV=plane==2?along:up;
-   vec2 scale=mix(vec2(5.3,7.7),vec2(14.3,16.9),cuff);
-   vec2 sampleAt=vec2(dot(p,axisU),dot(p,axisV))*scale+vec2(.217,.083)+island;
-   agedInk+=weights[plane]*textureLod(wearColor,sampleAt,0.).rgb;
-   agedSurface+=weights[plane]*textureLod(wearSurface,sampleAt,0.).rg;
-   vec3 slopeTex=textureLod(wearNormal,sampleAt,0.).rgb*2.-1.;
-   vec3 slope=(slopeTex.x*axisU+slopeTex.y*axisV)/max(slopeTex.z,.4);
-   agedSlope+=weights[plane]*(slope-normal*dot(slope,normal));
+   vec3 axisU=plane==1?along:across;
+   vec3 axisV=plane==2?along:up;
+   vec2 uv=vec2(dot(samplePoint,axisU),dot(samplePoint,axisV));
+   float weight=weights[plane];
+   layer(p,normal,axisU,axisV,vec2(8.7,9.9),vec2(.318,.517)+.019*seed,weight,color,surface,gradient);
+   vec2 agedUv=uv*vec2(24.3,28.9)*(steelDetail==4?1.36:1.)+vec2(.37,.63);
+   agedColor+=weight*textureLod(wearColor,agedUv,0.).rgb;
+   agedSurface+=weight*textureLod(wearSurface,agedUv,0.).rg;
+   vec3 scan=textureLod(wearNormal,agedUv,0.).xyz*2.-1.;
+   agedSlope+=weight*(axisU*scan.x+axisV*scan.y)/max(scan.z,.34);
+   vec2 cell=uv*vec2(1550.,1470.)+vec2(2.4,8.1)*float(plane);
+   pores+=weight*flecks(cell);
+   poreSlope+=weight*(axisU*(flecks(cell-vec2(.14,0.))-flecks(cell+vec2(.14,0.)))
+                    +axisV*(flecks(cell-vec2(0.,.14))-flecks(cell+vec2(0.,.14))));
   }
-  float film=smoothstep(.22,.81,1.-agedSurface.y);
-  float abrasionValue=smoothstep(.20,.49,luma(agedInk));
-  if(cuff<.5){
-   float directional=softNoise(uv*vec2(76.,1480.)+vec2(.9,2.1));
-   float haze=.30*variation+.35*islands+.35*directional;
-   float polishPath=smoothstep(.32,.78,haze)*(.21+.46*handled+.18*tube+.15*rubbed);
-   float wornMask=polishPath*(.52+.48*smoothstep(.35,.74,breakup));
-   visible=mix(visible,vec3(.57,.561,.54),.43*wornMask+.078*(1.-oxide));
-   rough=clamp(rough-.13*wornMask+.027*(.5-haze),.25,.78);
-   metal=mix(metal,.967,wornMask);
-   visible*=1.-.12*film;
-   rough=clamp(rough+.19*(agedSurface.x-.62),.25,.78);
-   gradient+=agedSlope*(.11+.31*film);
-  }
-  if(guard||handled>.5){
-   vec2 oldUv=vec2(p.x*17.,(p.z+.61*p.y)*27.)+island;
-   vec3 plate=textureLod(wearColor,oldUv,0.).rgb;
-   vec2 marks=textureLod(wearSurface,oldUv,0.).rg;
-   vec3 oldNormal=textureLod(wearNormal,oldUv,0.).xyz*2.-1.;
-   float freckle=smoothstep(.21,.68,luma(plate));
-   float clearSteel=clamp(.78*marks.y+.22*freckle,0.,1.);
-   float quietWear=.60*clearSteel+.40*smoothstep(.20,.79,variation);
-   vec3 flankCoat=mix(vec3(.146,.131,.108),vec3(.277,.256,.230),quietWear);
-   float finishBlend=guard?.87*smoothstep(.15,.79,side):.74;
-   vec3 knobs=mix(vec3(.179,.161,.132),vec3(.483,.456,.402),clearSteel);
-   visible=mix(visible,guard?flankCoat:knobs,finishBlend);
-   rough=mix(rough,clamp(.36+.30*marks.x-.13*clearSteel,.30,.68),finishBlend);
-   vec3 mappedSlope=along*oldNormal.x+(up+.61*across)*oldNormal.y;
-   gradient=mix(gradient,.67*(mappedSlope-normal*dot(mappedSlope,normal)),finishBlend);
-  }
-  if(finishGroup!=0){
-   bool longRound=finishGroup==1;
-   bool midRound=finishGroup==2;
-   bool insetDisc=finishGroup==4;
-   float angle=atan(p.z-mix(heightRange.x,heightRange.y,.5),p.y);
-   vec2 continuous=vec2(p.x,angle*.009);
-   float drag=.54*softNoise(continuous*vec2(22.,1900.)+island)+.46*softNoise(continuous*vec2(91.,4900.)+island);
-   float fineOxide=smoothstep(.49,.80,.38*grain+.29*islands+.33*stipple);
-   float endRub=1.-smoothstep(.0,.12,min(section,1.-section));
-   float rubStrength=(midRound?.36:.15)+.19*endRub+.17*drag;
-   vec3 patina=mix(vec3(.174,.185,.191),vec3(.248,.245,.226),.31*variation+.33*fineOxide);
-   vec3 cleaned=mix(vec3(.277,.297,.309),vec3(.402,.386,.352),.28+.42*drag);
-   visible=mix(patina,cleaned,rubStrength)*(.95+.075*grain-.075*fineOxide);
-   rough=clamp((midRound?.375:.464)+.075*fineOxide+.068*(drag-.5)-.098*endRub,.27,.67);
-   metal=clamp(.903+.051*rubStrength-.052*fineOxide,.84,.966)*.972;
-   vec3 axialScratch=across*(-sin(angle))+up*cos(angle);
-   float microSlope=softNoise(continuous*vec2(170.,5300.)+vec2(0.,.21))-softNoise(continuous*vec2(170.,5300.)-vec2(0.,.21));
-   gradient=(axialScratch-normal*dot(axialScratch,normal))*microSlope*.075+.09*agedSlope+.10*fineGradient;
-   if(!longRound&&!midRound){
-    visible=mix(visible,vec3(.187,.179,.163),.36);
-    rough=clamp(.477+.097*fineOxide+.061*(streak-.5)-.058*endRub,.36,.67);
-    gradient=.17*agedSlope+.19*fineGradient;
-   }
-   if(insetDisc){
-    visible*=.83;
-    rough=clamp(rough+.074-.067*(1.-side),.38,.73);
-   }
-   float finePatina=smoothstep(.36,.78,.50*breakup+.31*grain+.19*drag);
-   visible=linearToDisplay(displayToLinear(visible)*(1.45-.12*finePatina));
-   rough=clamp(rough+.034*(finePatina-.5),.26,.74);
-   if(longRound||midRound){
-    float rubbedRail=smoothstep(.57,.84,height)*smoothstep(.11,.46,side);
-    float bluing=(1.-.72*rubbedRail)*(.64+.36*finePatina);
-    visible=mix(visible,visible*vec3(.72,.77,.80),bluing);
-    metal=mix(metal,.785,bluing*.78);
-    rough=clamp(rough+.086*bluing-.075*rubbedRail+.027*(drag-.5),.29,.71);
-    gradient+=.095*(1.-rubbedRail)*agedSlope;
-   }
-   if(finishGroup==2||finishGroup==3){
-    float thinSpot=smoothstep(.58,.83,.49*variation+.26*breakup+.25*drag);
-    vec3 layerTint=mix(vec3(.49,.60,.61),vec3(.79,.85,.82),.30*thinSpot+.16*endRub);
-    visible=linearToDisplay(displayToLinear(visible)*layerTint*(midRound?1.15:1.28));
-    rough=clamp(rough+.029+.026*finePatina-.037*thinSpot,.29,.73);
-    metal*=midRound?mix(.903,.982,thinSpot):mix(.993,1.,thinSpot);
-   }
-   if(longShell){
-    float exposedRun=smoothstep(.575,.628,p.x)*(1.-smoothstep(.899,.962,p.x));
-    float wornLine=smoothstep(.79,.95,height)*(.52+.48*drag);
-    float oldFilm=exposedRun*(.91+.066*variation)*(1.-.39*wornLine);
-    visible=linearToDisplay(displayToLinear(visible)*mix(vec3(1.),vec3(.286,.348,.392),oldFilm));
-    float felt=.54+.031*drag+.035*variation-.074*wornLine;
-    rough=clamp(mix(rough,felt,exposedRun*.91),.29,.76);
-    metal*=1.-.054*oldFilm;
-    gradient*=1.-.35*exposedRun;
-   }
-  }
-  if(trimFinish!=0){
-   bool loop=trimFinish==1;
-   bool strip=trimFinish==3;
-   float openArc=loop?(1.-smoothstep(.30,.82,height)):.0;
-   float rail=strip?smoothstep(.52,.93,abs(normal.z)):smoothstep(.29,.91,abs(normal.z));
-   float wearCloud=.46*softNoise(uv*vec2(91.,138.)+island)+.29*islands+.25*grain;
-   float exposed=clamp(.18+.46*openArc+.23*rail+.29*smoothstep(.34,.76,wearCloud)-.26*film,0.,1.);
-   if(strip)exposed=clamp(.16+.40*rail+.28*scuff+.15*edge,0.,1.);
-   if(trimFinish==2)exposed=.26*exposed;
-   vec3 patina=mix(vec3(.145,.136,.118),vec3(.250,.246,.222),wearCloud);
-   vec3 polishColor=mix(vec3(.360,.354,.325),vec3(.538,.526,.475),abrasionValue);
-   visible=mix(patina,polishColor,exposed)*(.95+.08*stipple);
-   rough=clamp(.568+.08*(agedSurface.x-.60)-.30*exposed+.046*(grain-.5),.25,.74);
-   metal=clamp(.87+.096*exposed-.052*film,.81,.974);
-   gradient=.17*agedSlope+.14*fineGradient;
-  }
-  if(buttCap){
-   vec2 capUv=vec2(p.y+.19*p.z,p.z)*vec2(26.,13.)+island;
-   vec3 freckles=textureLod(wearColor,capUv,0.).rgb;
-   vec2 layerFinish=textureLod(wearSurface,capUv,0.).rg;
-   vec3 layerNormal=textureLod(wearNormal,capUv,0.).rgb*2.-1.;
-   float exposedRim=1.-smoothstep(.36,.97,abs(normal.x));
-   float rubLayer=clamp(.65*layerFinish.y+.21*luma(freckles)+.14*grain,0.,1.);
-   visible=mix(vec3(.185,.167,.143),vec3(.376,.349,.306),.52*rubLayer+.24*exposedRim+.12*stipple);
-   rough=clamp(.39+.22*layerFinish.x+.063*(1.-rubLayer)-.17*exposedRim,.28,.74);
-   metal=clamp(.82+.14*rubLayer+.05*exposedRim,.79,.985);
-   vec3 capSlope=across*layerNormal.x+up*layerNormal.y;
-   gradient=(capSlope-normal*dot(capSlope,normal))*.52+.13*agedSlope;
-  }
-  if(knob){
-   vec3 sphere=normalize(normal);
-   float rubNoise=softNoise(vec2(sphere.x+.52*sphere.y,sphere.z-.23*sphere.y)*4.1+island);
-   float pocket=smoothstep(.22,.84,.52*film+.28*rubNoise+.20*breakup);
-   float polishArc=smoothstep(.22,.88,dot(sphere,normalize(vec3(.48,.71,.30)))+.17*(rubNoise-.5));
-   float microWear=softNoise(vec2(p.x*2940.,(p.z+.43*p.y)*3750.)+3.1*island);
-   float sharpWear=smoothstep(.23,.84,polishArc)*smoothstep(.26,.83,.24*abrasionValue+.33*rubNoise+.21*grain+.22*microWear);
-   float brightTrace=smoothstep(.48,.77,.45*islands+.31*grain+.24*rubNoise);
-   vec3 oldSkin=mix(vec3(.174,.151,.124),vec3(.365,.333,.284),.25*(1.-pocket)+.23*rubNoise+.52*sharpWear);
-   visible=oldSkin*(.89+.19*brightTrace);
-   rough=clamp(.563+.081*pocket-.141*sharpWear+.072*(microWear-.5),.40,.72);
-   gradient=.15*agedSlope+.15*fineGradient+(up-sphere*sphere.z)*(.12*(grain-.5)+.19*(microWear-.5));
-  }
-  if(steelFamily==7){
-   // The forward band shows a broad satin face and two rolled returns.
-   float rimDistance=min(section,1.-section);
-   float rim=1.-smoothstep(.017,.093,rimDistance);
-   float dirt=smoothstep(.32,.77,.61*film+.28*variation+.11*grain);
-   float flank=smoothstep(.30,.90,side);
-   float patchWear=patch(vec3(section,height,0.),vec3(.62,.54,0.),vec3(.44,.27,1.));
-   float wear=flank*patchWear*(.69+.31*variation);
-   float recess=smoothstep(.70,.94,height)*(.72+.28*dirt);
-   vec3 dark=mix(vec3(.156,.176,.184),vec3(.228,.237,.232),variation);
-   vec3 rubbedFace=mix(vec3(.305,.338,.350),vec3(.495,.515,.505),.28+.65*wear);
-   visible=mix(dark,rubbedFace,.27+.57*wear+.16*rim);
-   visible=mix(visible,vec3(.120,.123,.119),.43*recess+.11*dirt*(1.-wear));
-   float rollWear=rim*(.72+.28*variation);
-   float rubbing=wear*smoothstep(.28,.78,.65*abrasionValue+.35*variation);
-   rough=clamp(.488+.048*dirt+.066*(surface.x-.6)-.186*wear-.257*rollWear-.045*rubbing,.235,.62);
-   visible=mix(visible,vec3(.46,.48,.49),.31*rubbing);
-   metal=clamp(.947+.032*wear-.059*recess-.029*dirt,.85,.98);
-   vec3 shoulderNormal=normalize(normal+along*.22*(section-.5)*flank);
-   vec3 shoulderSlope=shoulderNormal/max(.55,dot(shoulderNormal,normal))-normal;
-   gradient=shoulderSlope+.045*fineGradient+.045*agedSlope*(.50+.50*dirt);
-   vec2 cheek=vec2(p.y>=0.?section:1.-section,height);
-   vec2 disturbed=cheek+.062*vec2(softNoise(cheek*11.+island)-.5,softNoise(cheek*13.-island)-.5);
-   float islandWear=patch(vec3(disturbed,0.),vec3(.46,.52,0.),vec3(.19,.17,1.))
-                   +.82*patch(vec3(disturbed,0.),vec3(.68,.47,0.),vec3(.16,.10,1.));
-   float exposed=flank*smoothstep(.16,.86,islandWear)*(.42+.58*smoothstep(.30,.75,.47*variation+.33*abrasionValue+.20*grain));
-   visible=mix(visible,vec3(.535,.561,.555),.63*exposed);
-   rough=mix(rough,.218+.045*grain,.84*exposed);
-   metal=mix(metal,.978,.75*exposed);
-   gradient+=.10*exposed*agedSlope;
-   float cap=smoothstep(.70,.85,height)*(.66+.34*dirt);
-   visible=mix(visible,vec3(.112,.122,.127),.47*cap);
-   rough=mix(rough,.58,.47*cap);
-#ifdef BAND_FINISH
-   // The satin face scatters a broad light while the rolled returns stay polished.
-   float broadFace=smoothstep(.05,.14,rimDistance)*(.32+.68*flank)
-                 *smoothstep(.07,.25,height)*(1.-smoothstep(.75,.94,height));
-   float gloss=1.-smoothstep(.28,.52,rough);
-   vec3 filmTint=mix(vec3(.83,.87,1.01),vec3(.67,.74,.83),gloss);
-   visible=linearToDisplay(displayToLinear(visible)*mix(vec3(1.),filmTint,broadFace));
-   rough+=broadFace*mix(.225,.185,gloss);
-   metal-=broadFace*mix(.085,.043,gloss);
-   vec3 satinNormal=normalize((normal+gradient)*vec3(1.,1.,.73));
-   gradient=mix(gradient,satinNormal/max(.42,dot(satinNormal,normal))-normal,broadFace);
-#endif
-  }else if(steelFamily==1){
-   // The near side carries a slim raised rib with a recessed return beside it.
+  float cloud=SteelNoise(samplePoint*(steelDetail==4?238.:162.),weights);
+  float mottling=SteelNoise(samplePoint*428.,weights);
+  float fine=SteelNoise(samplePoint*2170.,weights);
+  float film=smoothstep(.21,.82,.41*cloud+.38*mottling+.21*(1.-agedSurface.y));
+  if(steelDetail==4)film=mix(.46,film,.68);
+  float pitDepth=pores*(.33+.67*film);
+  float oxidation=smoothstep(.49,.78,.46*mottling+.32*film+.22*fine);
+  float pitting=clamp(.79*pitDepth+.21*oxidation,0.,1.);
+
+  float length=max(.001,alongRange.y-alongRange.x);
+  float section=clamp((p.x-alongRange.x)/length,0.,1.);
+  float height=clamp((p.z-heightRange.x)/max(.002,heightRange.y-heightRange.x),0.,1.);
+  float tip=min(section,1.-section)*length;
+  float rim=band?(1.-smoothstep(.00009,.00140,tip))*(.62+.38*fine):0.;
+  float shoulder=abs(normal.z);
+  float rub=.18+.09*worn+.09*cloud;
+  float edge=max(edgeWear,rim*(steelFamily==1||steelFamily==7?.91:.76));
+
+  if(steelFamily==1||steelFamily==7){
+   // Burnishing breaks into patches as it leaves the edge of the formed strap.
+   float cheek=smoothstep(.24,.85,abs(normal.y));
+   float turnHeight=height+.055*(mottling-.5);
+   float faceFade=smoothstep(.16,.35,turnHeight)*(1.-smoothstep(.60,.82,turnHeight));
+   float wearPatch=patch(vec3(section,height,0.),vec3(.69,.55,0.),vec3(.43,.30,1.));
+   float crest=steelFamily==1?patch(vec3(section,0.,0.),vec3(.51,0.,0.),vec3(.14,1.,1.)):0.;
+   float scuff=smoothstep(.24,.71,.58*mottling+.42*cloud);
+   float wiped=steelFamily==7?.31:.18;
+   rub=.13+cheek*faceFade*((.23+wiped)*wearPatch+.21*crest)*scuff;
    vec2 face=vec2(p.y>=0.?section:1.-section,height);
-   float frontFace=smoothstep(.15,.71,p.y/.015);
-   float cheek=smoothstep(.32,.84,abs(p.y)/.015)*smoothstep(.038,.20,height)*(1.-smoothstep(.86,.99,height));
-   float mottling=.46*islands+.30*film+.24*variation;
-   float relief=cheek*mix(.40,1.,frontFace);
-   float centre=.515+.02*(height-.53);
-   float ribPos=(section-centre)/.087;
-   float groovePos=(section-centre+.166)/.054;
-#ifdef REAR_TRIM_FINISH
-   float convergence=smoothstep(.135,.355,height);
-   float crestEnd=smoothstep(.137,.207,height);
-   float drift=.013*(softNoise(vec2(height*15.,seed+1.32))-.5);
-   float taperedSection=.563+(section-.563-drift)/mix(.52,1.,convergence);
-   ribPos=mix(ribPos,(taperedSection-centre)/.087,frontFace);
-   groovePos=mix(groovePos,(taperedSection-centre+.166)/.054,frontFace);
-   relief*=mix(1.,crestEnd,frontFace);
-#endif
-   float rib=exp(-ribPos*ribPos);
-   float groove=exp(-groovePos*groovePos);
-   float edgeRub=edge*(.61+.39*smoothstep(.32,.68,breakup));
-   float shoulderPatch=patch(vec3(face,0.),vec3(.764,.629,0.),vec3(.33,.135,1.));
-   float chipped=smoothstep(.35,.73,.46*grain+.29*islands+.25*abrasionValue);
-   float exposed=shoulderPatch*(.38+.62*chipped)*(1.-crown);
-   float crownOxide=crown*(.40+.60*mottling);
-   float grooveFilm=groove*relief*(.72+.28*film);
-   float burnish=clamp(rib*relief*.89+edgeRub*.74+exposed*.78,0.,1.);
-   vec3 patinated=mix(vec3(.155,.161,.161),vec3(.302,.283,.25),mottling);
-   vec3 wornFace=mix(vec3(.342,.360,.362),vec3(.555,.554,.522),chipped);
-   visible=mix(patinated,wornFace,burnish);
-   visible=mix(visible,vec3(.105,.099,.087),.51*crownOxide+.54*grooveFilm);
-   visible=mix(visible,vec3(.58,.56,.52),exposed*.70);
-   float rubbedShoulder=smoothstep(.20,.78,shoulderPatch)*(.54+.46*chipped)*(1.-crown);
-   visible=mix(visible,vec3(.538,.526,.480),.61*rubbedShoulder);
-   rough=clamp(.487+.073*mottling+.094*crownOxide+.086*grooveFilm-.255*burnish-.108*exposed-.13*rubbedShoulder-.073*edgeRub,.205,.78);
-   metal=clamp(.940+.034*burnish-.176*crownOxide-.085*grooveFilm,.68,.983);
-   vec3 flankPlane=normalize(sign(p.y)*across+up*(.09+.12*height));
-   vec3 flankTangent=normalize(along-flankPlane*dot(along,flankPlane));
-   vec3 formed=normalize(flankPlane+flankTangent*(1.93*ribPos*rib-1.12*groovePos*groove));
-   float rimGuard=smoothstep(.017,.093,min(section,1.-section));
-   gradient=mix(gradient*.34,formed/max(.25,dot(formed,normal))-normal,relief*rimGuard);
-   gradient+=agedSlope*(.10+.28*crownOxide)+.06*fineGradient;
-   vec2 glyph=vec2(section-.50,height-.505)*vec2(6.7,15.2);
-   float stamp=impressions(glyph)*frontFace;
-   vec2 incised=vec2(impressions(glyph+vec2(.05,0.))-impressions(glyph-vec2(.05,0.)),
-                     impressions(glyph+vec2(0.,.045))-impressions(glyph-vec2(0.,.045)));
-   gradient+=frontFace*(.47+.29*grain)*(incised.x*along+incised.y*up);
-   visible*=1.-.20*stamp;
-   rough+=.048*stamp;
-   float chippedCrown=crownBite(face,seed)*crown*side;
-   visible*=1.-.32*chippedCrown;
-   rough=mix(rough,.77,.57*chippedCrown);
-#ifdef BAND_FINISH
-   // Two differently worn flanks border the dark return in the Lu side photograph.
-   float wearZone=frontFace*cheek*(1.-smoothstep(.69,.84,height));
-   float lateral=section-.017*(height-.51);
-#ifdef REAR_TRIM_FINISH
-   lateral=taperedSection-.017*(height-.51);
-   wearZone*=crestEnd;
-#endif
-   float narrowWear=exp(-pow((lateral-.445)/.084,2.))*(.66+.34*smoothstep(.31,.57,height));
-   float wideWear=smoothstep(.650,.750,lateral)*(1.-smoothstep(.895,.979,lateral));
-   float darkReturn=1.-smoothstep(.024,.095,abs(lateral-.588));
-   float abrasion=.48*chipped+.32*abrasionValue+.20*grain;
-   float bare=wearZone*(.86*narrowWear+.78*wideWear)*(.71+.29*abrasion);
-   vec3 silver=mix(vec3(.395,.395,.365),vec3(.545,.529,.474),abrasion);
-   float unhandled=wearZone*(1.-smoothstep(.27,.416,lateral))*(1.-.67*edgeRub);
-   unhandled=max(unhandled,.60*wearZone*(1.-clamp(1.18*narrowWear+wideWear,0.,1.)));
-   vec3 plate=displayToLinear(visible)*mix(vec3(1.),vec3(.52,.55,.54),unhandled);
-   visible=linearToDisplay(mix(plate,displayToLinear(silver),bare));
-   visible=mix(visible,vec3(.101,.099,.086),.66*wearZone*darkReturn);
-   rough=mix(rough,.222+.073*mottling,bare*.85);
-   rough=mix(rough,.625,.69*wearZone*darkReturn);
-   float polishedReturn=wearZone*exp(-pow((lateral-.79)/.123,2.));
-   vec3 sheetNormal=normalize(normal+gradient+polishedReturn*(along*0.15-up*0.19));
-   gradient=sheetNormal/max(.30,dot(sheetNormal,normal))-normal;
-   visible=linearToDisplay(displayToLinear(visible)*mix(1.,0.84,polishedReturn));
-   metal=mix(metal,.982,.78*bare);
-#ifdef REAR_TRIM_FINISH
-   float quietFoot=frontFace*smoothstep(.18,.70,side)*(1.-smoothstep(.128,.231,height));
-   vec3 footPatina=mix(vec3(.155,.162,.161),vec3(.233,.207,.178),mottling);
-   visible=mix(visible,footPatina,.80*quietFoot);
-   rough=mix(rough,.548+.093*mottling,.72*quietFoot);
-   float intactFilm=wearZone*(1.-smoothstep(.17,.68,narrowWear+wideWear))*(.62+.38*film);
-   visible=linearToDisplay(displayToLinear(visible)*mix(vec3(1.),vec3(.64,.68,.72),intactFilm));
-   float brokenEdge=wearZone*(.32+.68*softNoise(vec2(height*74.,lateral*21.)+island))
-                   *smoothstep(.15,.65,wideWear)*(1.-smoothstep(.72,.97,wideWear));
-   rough=clamp(rough+.075*brokenEdge,.205,.79);
-#endif
-#endif
-  }else{
-   // Worn bluing on the round and flat steel shares a cool undertone.
-   // Keep the relief of scanned corrosion primarily in the surviving finish.
-   float coating=smoothstep(.23,.86,.40*film+.37*variation+.23*islands);
-   float contact=clamp(.36*edge+.19*abrasionValue+.16*(1.-film),0.,1.);
-   float bluing=clamp(.64+.29*coating-.46*contact,0.,1.);
-   if(trimFinish!=0||buttCap)bluing*=.64;
-   if(knob){
-    float smoothWear=.67+.33*variation;
-    visible=mix(visible,vec3(.225,.237,.239),smoothWear*.72);
-    rough=clamp(.430+.088*coating-.086*contact,.34,.57);
-    gradient*=.37;
-   }
-   vec3 neutral=vec3(luma(visible));
-   visible=mix(visible,neutral,bluing*.47);
-   vec3 tint=mix(vec3(.91,.93,.92),vec3(.43,.53,.57),bluing);
-   visible=linearToDisplay(displayToLinear(visible)*tint);
-   float drawMarks=softNoise(uv*vec2(64.,3210.)+island);
-   float streakWear=smoothstep(.51,.84,drawMarks)*(.43+.57*contact);
-   rough=clamp(rough-.051*bluing-.048*streakWear+.021*coating,.24,.81);
-   metal=clamp(metal+.027*(1.-coating),.40,.986);
-   gradient*=.68+.25*coating;
-   if(!knob&&!underTrim&&trimFinish==0){
-    // Thin oxide carries a little diffuse light through the dark game environment.
-    visible=linearToDisplay(displayToLinear(visible)*1.76);
-    metal*=finishGroup==3?.990:.958;
-   }
-   if(guard){
-    // The protected broad face is darker than the exposed rolled edge.
-    float plane=smoothstep(.52,.96,side)*(.71+.29*smoothstep(.29,.49,section));
-    float patina=mix(.39,.29,coating);
-    visible=linearToDisplay(displayToLinear(visible)*mix(1.,patina,plane));
-    rough=clamp(rough+plane*(.098+.027*coating),.24,.80);
-   }
-   if(underTrim){
-    float depth=clamp((p.y-acrossRange.x)/max(.001,acrossRange.y-acrossRange.x),0.,1.);
-    float returnWear=smoothstep(.46,.88,depth)*(.81+.19*abrasionValue);
-    visible=mix(vec3(.175,.184,.188),vec3(.493,.502,.485),returnWear);
-    rough=.498+.047*coating-.217*returnWear;
-    metal=.92+.059*returnWear;
-    gradient=.10*fineGradient+.07*agedSlope;
-    float border=(depth-.61)/.104;
-    float pressed=exp(-border*border)*(1.-abs(normal.y));
-    visible*=1.-.38*pressed;
-    rough=mix(rough,.64,.57*pressed);
-    gradient+=(across-normal*normal.y)*(-1.52*border*pressed);
-    float lip=smoothstep(.71,.86,depth)*(.74+.26*abrasionValue);
-    visible=mix(visible,vec3(.58,.60,.58),.66*lip);
-    rough=mix(rough,.245,.77*lip);
-   }
-#ifdef REAR_TRIM_FINISH
-   if(trimFinish==2){
-    float broad=smoothstep(.42,.90,side);
-    float corner=smoothstep(.22,.78,1.-side)*(.52+.48*abrasionValue);
-    float oxide=smoothstep(.27,.76,.58*film+.27*variation+.15*grain);
-    vec3 heel=mix(vec3(.190,.183,.163),vec3(.32,.307,.275),.42+.36*variation-.25*oxide);
-    visible=mix(heel,vec3(.477,.469,.438),.69*corner);
-    rough=clamp(.54+.067*oxide+.040*(grain-.5)-.240*corner,.26,.69);
-    metal=clamp(.914+.061*corner-.065*oxide,.82,.982);
-    gradient=.19*agedSlope+.077*fineGradient*(.72+.28*broad);
-   }else if(trimFinish==1){
-    float handledArc=(1.-smoothstep(.24,.79,height))*(.68+.32*abrasionValue);
-    visible=mix(visible,vec3(.545,.536,.494),.46*handledArc);
-    rough=clamp(rough-.070*handledArc,.235,.72);
-    metal=mix(metal,.978,.62*handledArc);
-   }
-#endif
+   film=max(film,.52*crownBite(face,seed)*smoothstep(.71,.89,height));
+  }else if(steelDetail==1){
+   rub=.37+.20*smoothstep(.18,.78,normal.z)+.12*mottling;
+  }else if(steelDetail==2){
+   rub=.32+.25*smoothstep(.32,.75,cloud)+.09*shoulder;
+  }else if(steelDetail==3){
+   rub=.15+.14*smoothstep(.30,.84,normal.z);
+  }else if(steelDetail==4){
+   rub=.14+.08*shoulder+.07*cloud;
   }
-  if(steelDetail!=0){
-   // Keep the oxide and minute pits continuous around the turned surfaces.
-   // Broad changes in sheen follow the exposed faces and the protected ends.
-   float cloudy=.38*softNoise((p.xy+island)*vec2(288.,331.))
-               +.36*softNoise((p.xz+island)*vec2(302.,287.))
-               +.26*softNoise((p.yz+island)*vec2(319.,303.));
-   float tarnish=smoothstep(.47,.78,.56*cloudy+.25*film+.19*stipple);
-   float polishZone=steelDetail==1?.47+.26*normal.z:
-                    steelDetail==2?.69-.23*abs(normal.x):.27+.26*normal.z;
-   float burnish=clamp(polishZone+.18*(cloudy-.5)-.22*tarnish,0.,1.);
-   vec3 oxideTint=steelDetail==3?vec3(.174,.174,.163):vec3(.190,.194,.185);
-   vec3 steelTint=mix(vec3(.275,.282,.274),vec3(.328,.331,.313),float(steelDetail==2));
-   visible=mix(oxideTint,steelTint,burnish)*(.92+.13*cloudy-(.11+.07*tarnish)*pits);
-   rough=clamp(.505-.225*burnish+.092*tarnish+.058*(grain-.5),.31,.59);
-   metal=clamp(.887+.082*burnish-.056*tarnish-.027*pits,.84,.972);
-   gradient=.115*fineGradient+.105*agedSlope+
-            vec3(pitSlope.x,.43*pitSlope.y,pitSlope.y)*(.045+.062*tarnish);
-   if(steelDetail==4){
-    // Broad sight faces retain their old oxide. The small rolled sections
-    // carry a tighter highlight under the inspection light.
-    float upTurn=abs(normal.z);
-    float rolled=4.*upTurn*(1.-upTurn);
-    float rubbedEdge=rolled*(.72+.28*cloudy)*(1.-.32*tarnish);
-    vec3 oxide=mix(vec3(.134,.127,.114),vec3(.191,.182,.161),cloudy);
-    visible=mix(oxide,vec3(.255,.237,.210),.49*rubbedEdge)*(1.-.12*pits);
-    rough=clamp(.61+.041*tarnish+.047*(grain-.5)-.185*rubbedEdge,.39,.66);
-    metal=clamp(.887+.068*rubbedEdge-.039*tarnish,.86,.955);
-   }
+
+  if(knob)rub=.26+.30*smoothstep(.25,.77,cloud);
+  if(guard)rub=.07+.20*smoothstep(.28,.84,1.-abs(normal.y));
+  if(disk)rub*=.69;
+  if(buttCap)rub=.16+.18*(1.-abs(normal.x))+.08*mottling;
+  if(trimFinish!=0)rub=.11+.16*(1.-smoothstep(.20,.81,height))+.12*shoulder;
+  if(underTrim){
+   float depth=clamp((p.y-acrossRange.x)/max(.001,acrossRange.y-acrossRange.x),0.,1.);
+   rub=.10+.32*smoothstep(.51,.90,depth);
   }
+  if(longShell)rub*=.79;
+  // Real rounded faces provide the edge mask for the receiver and the sight.
+  // Break up the wear with the scan and keep the surface normal at its baked scale.
+  float polish=clamp(rub+.64*edge*(.68+.32*mottling)-.19*film,0.,.92);
+  float mineral=clamp(.60*luma(agedColor)+.40*luma(color),0.,1.);
+  vec3 oxide=mix(vec3(.143,.134,.119),vec3(.239,.227,.209),.48*cloud+.36*mineral+.16*mottling);
+  if(finishGroup==1||finishGroup==3)oxide*=vec3(.96,1.01,1.035);
+  vec3 bare=mix(vec3(.288,.282,.266),vec3(.388,.377,.349),.35*cloud+.65*fine);
+  visible=mix(oxide,bare,polish)*(1.-.23*pitting-.083*oxidation);
+  rough=clamp(.484+.112*film+.085*pitting+.037*(agedSurface.x-.5)
+                   +.04*(surface.x-.5)-.265*polish,.32,.72);
+  metal=clamp(.915+.075*polish-.088*film-.134*pitting,.70,.985);
+  gradient=gradient*(.16+.064*film)+agedSlope*(.14+.13*film)+poreSlope*(.060+.105*film);
  }
  base=vec4(visible,1.);
  orm=vec4(visibility,rough,metal,1.);

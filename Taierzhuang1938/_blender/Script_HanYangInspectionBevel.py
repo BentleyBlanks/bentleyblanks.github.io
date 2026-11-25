@@ -1,4 +1,4 @@
-"""Round the exposed ridges of four cosmetic meshes and repack their UVs."""
+"""Round the exposed ridges of the cosmetic meshes and repack their UVs."""
 import hashlib
 import json
 import math
@@ -13,6 +13,7 @@ import numpy as np
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
 revision = archive / 'ExteriorFinish_20261122'
+geometryDirectory = Path(os.environ.get('HANYANG_BAKE_GEOMETRY_DIR', revision))
 assert not bpy.data.filepath or Path(bpy.data.filepath).resolve().parent == revision.resolve()
 
 
@@ -44,7 +45,7 @@ def ExposedEdge(name, edge, width):
     if not edge.is_contiguous or not edge.is_convex or length < .16:
         return False
     flank = min(2*face.calc_area()/length for face in edge.link_faces)
-    if flank < width*.65:
+    if flank < width*.51:
         return False
     first, second = (vert.co * .001 for vert in edge.verts)
     midpoint = (first + second) / 2
@@ -53,8 +54,10 @@ def ExposedEdge(name, edge, width):
         # Ring edges on the two front steps and the rear of the raised shell.
         step = any(abs(midpoint.z - centre) < halfWidth for centre, halfWidth in
                    ((-.265, .002), (-.25855, .00025), (-.25467, .00035), (-.22125, .00045)))
-        return (step and midpoint.y > .042 and abs(first.z - second.z) < .00065
-                and math.radians(25) < turn < math.radians(115))
+        return (step and midpoint.y > .039 and abs(first.z - second.z) < .00080
+                and math.radians(19) < turn < math.radians(115))
+    if name == 'HandleRoot':
+        return midpoint.x > .0075 and length > 1. and turn > math.radians(21.8)
     return turn > math.radians(25)
 
 
@@ -73,6 +76,7 @@ def RoundedMesh(name, source, width):
     edit = bmesh.new()
     try:
         edit.from_mesh(mesh)
+        rounded = edit.faces.layers.float.new('rounded')
         flatAngle = 1.3 if name == 'ReceiverOuterCollar' else .75
         bmesh.ops.dissolve_limit(edit, angle_limit=math.radians(flatAngle),
                                  verts=list(edit.verts), edges=list(edit.edges))
@@ -82,6 +86,9 @@ def RoundedMesh(name, source, width):
         bevel = bmesh.ops.bevel(edit, geom=edges, offset=width*1000, segments=3, profile=.5,
                                 affect='EDGES', clamp_overlap=False, loop_slide=False)
         assert bevel['faces'], name
+        for face in bevel['faces']:
+            if face.is_valid:
+                face[rounded] = 1.
         bmesh.ops.dissolve_degenerate(edit, dist=.001, edges=list(edit.edges))
         bmesh.ops.triangulate(edit, faces=list(edit.faces), quad_method='BEAUTY', ngon_method='BEAUTY')
         slivers = [face for face in edit.faces
@@ -191,11 +198,15 @@ def Atlas(name, source, width):
         lengths = np.linalg.norm(tangent, axis=1)
         assert np.all(lengths > 1e-6) and np.isfinite(lengths).all(), name
         tangent /= lengths[:, None]
+        faceWear = np.empty(len(mesh.polygons), dtype='<f4')
+        mesh.attributes['rounded'].data.foreach_get('value', faceWear)
+        assert np.count_nonzero(faceWear), name
+        edgeWear = np.repeat(faceWear, 3)
         keys = np.column_stack((corners, normal.view('<u4'), uv.view('<u4'),
-                                tangent.view('<u4'), sign.view('<u4')))
+                                tangent.view('<u4'), sign.view('<u4'), edgeWear.view('<u4')))
         _, first, indices = np.unique(keys, axis=0, return_index=True, return_inverse=True)
         return {'POSITION': points[corners[first]]*.001, 'NORMAL': normal[first], 'TEXCOORD_0': uv[first],
-                'TANGENT': np.column_stack((tangent[first], sign[first])),
+                'TANGENT': np.column_stack((tangent[first], sign[first])), 'EDGE_WEAR': edgeWear[first],
                 'indices': indices.astype('<u4').reshape(-1, 1)}
     finally:
         if obj.mode != 'OBJECT':
@@ -206,10 +217,11 @@ def Atlas(name, source, width):
 
 base = Sources('Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
 approved = Sources('Input_ExteriorGeometry.glb', 'e125056b12391f022f7e22969bb3acdf192295be711995b6ac43b958b31f47ec')
-plans = [('ReceiverOuterCollar', approved, .00025),
-         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00023),
-         ('Sight_LowCrossPiece', base, .00028),
-         ('Sight_ShallowRoundSeat', base, .00020)]
+plans = [('ReceiverOuterCollar', approved, .00029),
+         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00030),
+         ('Sight_LowCrossPiece', base, .00033),
+         ('Sight_ShallowRoundSeat', base, .00027),
+         ('HandleRoot', approved, .00017)]
 selection = list(bpy.context.selected_objects)
 active = bpy.context.view_layer.objects.active
 output = {}
@@ -221,4 +233,5 @@ finally:
     for obj in selection:
         obj.select_set(True)
     bpy.context.view_layer.objects.active = active
-np.savez_compressed(revision / 'Data_InspectionBevels.npz', **output)
+geometryDirectory.mkdir(parents=True, exist_ok=True)
+np.savez_compressed(geometryDirectory / 'Data_InspectionBevels.npz', **output)

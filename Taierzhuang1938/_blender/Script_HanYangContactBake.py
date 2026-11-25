@@ -75,12 +75,13 @@ def MeasureContact(name, parts, radius, directions):
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
 revision = archive/'ExteriorFinish_20261122'
+geometryDirectory = Path(os.environ.get('HANYANG_BAKE_GEOMETRY_DIR', revision))
 assert not bpy.data.filepath or Path(bpy.data.filepath).resolve().parent == revision.resolve()
 importDirectory=Path.cwd()/'Taierzhuang1938/_import'
 assert (importDirectory/'Script_HanYangTimberFrames.py').is_file(),'Start the owned Blender session from the worktree root'
 sys.path.insert(0,str(importDirectory))
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
-from Script_HanYangBandProfiles import SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBandProfiles import FormRearBandRib, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 incoming = ReadMesh(revision/'Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
 approved = ReadMesh(revision/'Input_ExteriorGeometry.glb', 'e125056b12391f022f7e22969bb3acdf192295be711995b6ac43b958b31f47ec')
 charts = json.loads((revision/'Data_Charts.json').read_text())
@@ -119,14 +120,16 @@ for name in timber:
         timber[name] = streams.pop('handling')
     streams = SeatRearBandTimber(name, streams)
     parts[name] = streams['POSITION'], streams['NORMAL'], faces.reshape(-1, 3)
-np.savez_compressed(revision/'Data_TimberHandling.npz', **timber)
-with np.load(revision/'Data_InspectionBevels.npz', allow_pickle=False) as bevels:
+np.savez_compressed(geometryDirectory/'Data_TimberHandling.npz', **timber)
+with np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=False) as bevels:
     name = 'ReceiverOuterCollar'
     parts[name] = bevels[name+'_POSITION'], bevels[name+'_NORMAL'], bevels[name+'_indices'].reshape(-1, 3)
 for name in ('FrontBand_ContinuousEnvelopeContact', 'RearBand_ControlledCrown'):
     positions, normals, faces = parts[name]
     shaped = ShapeBandProfile(name, {'POSITION': positions, 'NORMAL': normals})
-    parts[name] = shaped['POSITION'], shaped['NORMAL'], faces
+    if name == 'RearBand_ControlledCrown':
+        shaped, faces = FormRearBandRib(shaped, faces)
+    parts[name] = shaped['POSITION'], shaped['NORMAL'], faces.reshape(-1, 3)
 result = {name: MeasureContact(name, parts, .004, directions) for name in parts}
-np.savez_compressed(revision/'Data_ContactVisibility.npz', **result)
+np.savez_compressed(geometryDirectory/'Data_ContactVisibility.npz', **result)
 print('Fixed exterior contact fields:', {name: (len(value), int(np.sum(value<.90))) for name, value in result.items()})
