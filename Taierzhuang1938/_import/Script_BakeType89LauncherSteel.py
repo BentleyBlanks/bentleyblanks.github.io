@@ -154,13 +154,16 @@ def TracedNeckStamp(data, xx, vv):
     return mask.astype(np.float32)
 
 
-def SampleTile(sample, width, height, index):
+def SampleTile(sample, width, height, index, vFraction=1):
     # Select different crops inside each sample and keep the original broad
     # variation continuous across a region.
     edge = sample.width // 6
     if index:
         x, y = index * 97 % edge, index * 73 % edge
         sample = sample.crop((x, y, x + sample.width - edge, y + sample.height - edge))
+    if vFraction < 1:
+        inset = round(sample.height * (1 - vFraction) * .5)
+        sample = sample.crop((0, inset, sample.width, sample.height - inset))
     return np.asarray(sample.resize((width, height), Image.Resampling.LANCZOS), dtype=np.float32) / 255
 
 
@@ -193,7 +196,10 @@ def BakeRegion(name, sample, size, index, reference):
     vv = 1 - yy
     # The photographed grip sample carries its original glare and perspective.
     # Use its microtexture, with the diamond scale and lighting rebuilt in UVs.
-    srgb = SampleTile(sample[0 if name == "Knurl" else sourceIndex], width, height, index)
+    # U spans several teeth while V crosses the short edge. Keep the source
+    # pits compact when that strip is wrapped around the wheel.
+    srgb = SampleTile(sample[0 if name == "Knurl" else sourceIndex], width, height, index,
+                      vFraction=.34 if name == "Wheel" else 1)
     luminance = srgb @ LUMA
     grainLuma = luminance
     if name == "Knurl":
@@ -276,13 +282,28 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Wheel":
         rim = reference["wheelFinish"]
         lip = np.interp(vv, rim["v"], rim["rubbedCoverage"]) / 100
-        # The exposed corners carry narrower reflections than the pitted
-        # recessed facets. The sides of the teeth retain dark oxidation.
-        crown = .5 + .5 * np.cos(2 * np.pi * (12 * xx - .125))
-        oxidation += .19 * (1 - crown) - .14 * lip
+        wheelU = ATLAS["wheelPatterns"] * xx
+        phase = wheelU % 1
+        steel = ReferenceField(rim["rim"], phase, vv, "wornSteel") / 100
+        rust = ReferenceField(rim["rim"], phase, vv, "oxide") / 100
+        swatches = rim["rim"]["toothDetail"]
+        tooth = wheelU.astype(int) % len(swatches)
+        grain = np.zeros_like(luminance)
+        for i, pattern in enumerate(swatches):
+            surface = {"footprint": rim["rim"]["footprint"], "detail": pattern}
+            grain += (tooth == i) * ReferenceField(surface, phase, vv, "detail") / 100
+        trough = np.maximum(0, -np.cos(2 * np.pi * (phase - .125))) ** 1.25
+        # Keep the source's pitting, reducing the large bands that only look
+        # continuous because the UV wraps the whole rim. Photo chroma separates
+        # rubbed steel at the crown from oxide in the recess.
+        oxidation += .072 * medium + .09 * cloud + .22 * rust + .13 * trough - .17 * steel
+        tonalDelta += 94 * grain - 3.7 * medium
+        warmth *= .48
         shoulders = np.maximum(np.exp(-((vv - .20) / .057) ** 2), .86 * np.exp(-((vv - .82) / .059) ** 2))
-        wheelWear = np.maximum(.64 * lip, .94 * shoulders) * (.38 + .62 * crown)
-        wheelWear *= 1 - .43 * darkPits
+        wheelWear = np.clip(.87 * steel + .19 * lip * shoulders * (1 - trough), 0, 1)
+        wheelWear *= 1 - .51 * darkPits
+        heightField += strength * (.093 * detail - .127 * medium) + .25 * grain
+        roughnessDelta -= .28 * grain
     if name in ("Barrel", "Collar"):
         brushing = CircumferentialAbrasion(luminance) * np.clip(.92 - oxidation, .08, .9)
         tonalDelta += 4.8 * brushing
@@ -351,17 +372,22 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.79 - metal) * front + (.80 - metal) * reverse
         heightField *= 1 - .24 * (front + reverse)
     if name == "Wheel":
-        bareRim = SrgbToLinear(np.array([217, 202, 180], dtype=np.float32) / 255)
+        recess = SrgbToLinear(np.array([45, 28, 16], dtype=np.float32) / 255)
+        retainedOxide = .52 * trough * rust
+        linear += (recess - linear) * retainedOxide[..., None]
+        bareRim = SrgbToLinear(np.array([224, 216, 200], dtype=np.float32) / 255)
         linear += (bareRim - linear) * wheelWear[..., None]
-        rough += (.29 - rough) * wheelWear
-        metal += (.84 - metal) * wheelWear
+        rough += (.327 - rough) * wheelWear
+        metal += (.82 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
+    if name == "Wheel":
+        ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
     if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
-        seamWidth = 6 if name == "RearEye" else 24
+        seamWidth = 6 if name in ("RearEye", "Wheel") else 24
         base = SeamBlend(base, pixels=seamWidth)
         heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
         surface = SeamBlend(surface, pixels=seamWidth)

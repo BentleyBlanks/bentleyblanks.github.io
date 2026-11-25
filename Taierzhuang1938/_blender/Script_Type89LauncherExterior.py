@@ -67,6 +67,7 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
         angles += [pi / 2 - 0.032, pi / 2 + 0.032]
         angles.sort()
     count = len(angles)
+    patternFacets = ATLAS["wheelPatterns"] * 4
     cx, cy = center
     vertices = []
     for along, radius in profile:
@@ -87,12 +88,16 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
             if ring == paintBand and abs((angle + stopAngle) / 2 - pi / 2) < 0.032:
                 band = "Stripe"
             u0, u1 = angle / (2 * pi), stopAngle / (2 * pi)
+            if toothed:
+                patternFacet = i % patternFacets
+                u0, u1 = patternFacet / patternFacets, (patternFacet + 1) / patternFacets
             if band == "Stripe":
                 u0, u1 = ((a - pi / 2 + .032) / .064 for a in (angle, stopAngle))
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
             smooth.append(not toothed)
-    for ring, capTile in ((0, (bandTiles or {}).get(0, tile)), (len(profile) - 1, tile)):
+    endTile = "Edge" if toothed else tile
+    for ring, capTile in ((0, (bandTiles or {}).get(0, endTile)), (len(profile) - 1, endTile)):
         order = list(range(count)) if ring else list(reversed(range(count)))
         faces.append(tuple(ring * count + i for i in order))
         uvFaces.append([AtlasUv(capTile, 0.5 + 0.47 * cos(angles[i]), 0.5 + 0.47 * sin(angles[i])) for i in order])

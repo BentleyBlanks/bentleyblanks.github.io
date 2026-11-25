@@ -272,9 +272,43 @@ def WheelFinish(folder):
         warmth.append(np.median((pixels[..., 0] - pixels[..., 2]) / np.maximum(lightness, 25)))
     rubbed = np.clip((.49 - np.array(warmth)) / .17, 0, 1)
     source.update({"columns": columns, "sampleY": [top, bottom]})
+
+    # Register each complete tooth separately. The rows run toward the top of
+    # the photo from the lower crown break, through the crown and the recess.
+    toothRows = [[358, 335, 326, 307, 299], [425, 399, 385, 368, 358],
+                 [498, 474, 451, 431, 425], [554, 535, 521, 504, 498]]
+    phase = np.linspace(0, 1, 25)
+    across = np.linspace(.09, .91, 17)
+    swatches = []
+    for rows in toothRows:
+        yy = np.interp(phase, [0, .25, .50, .75, 1], rows)
+        lo = np.interp(yy, [265, 410, 560, 613], [267, 269, 271, 272])
+        hi = np.interp(yy, [265, 410, 560, 613], [326, 328, 328, 329])
+        xx = lo[:, None] + (hi - lo)[:, None] * across
+        swatches.append([[Sample(image, x, y, radius=2) for x in line] for y, line in zip(yy, xx)])
+    swatches = np.asarray(swatches)
+    lightness = swatches @ LUMA
+    chroma = np.median((swatches[..., 0] - swatches[..., 2]) / np.maximum(lightness, 25), axis=0)
+    worn = np.clip((.57 - chroma) / .46, 0, 1)
+    rust = np.clip((chroma - .185) / .55, 0, 1)
+    for field in (worn, rust):
+        field[0] = field[-1] = (field[0] + field[-1]) * .5
+    # Suppress the common reflection at each angular station before keeping
+    # small tone changes across a tooth. Keep the four swatches independent.
+    fine = []
+    for tile in lightness:
+        smooth = np.asarray(Image.fromarray(np.rint(tile).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.7)))
+        residual = (tile - smooth) / np.maximum(smooth, 45)
+        residual -= np.median(residual, axis=1, keepdims=True)
+        residual[[0, -1]] = 0
+        fine.append(np.rint(np.clip(100 * residual, -28, 28)).astype(int).tolist())
+    source["toothRows"] = toothRows
     return {"source": source, "v": np.linspace(.06, .94, len(columns)).round(4).tolist(),
             "sampleWarmth": np.round(np.asarray(warmth, dtype=np.float64), 3).tolist(),
-            "rubbedCoverage": np.rint(100 * rubbed).astype(int).tolist()}
+            "rubbedCoverage": np.rint(100 * rubbed).astype(int).tolist(),
+            "rim": {"footprint": {"uCenter": .5, "uHalfSpan": .5, "vRange": [.09, .91]},
+                    "wornSteel": np.rint(100 * worn).astype(int).tolist(),
+                    "oxide": np.rint(100 * rust).astype(int).tolist(), "toothDetail": fine}}
 
 
 def KnurlFrequency(folder):

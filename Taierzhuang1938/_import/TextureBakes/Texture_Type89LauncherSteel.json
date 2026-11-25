@@ -19,49 +19,49 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 335420,
-      "sha256": "1ffeebfc2bc0cdbc2f0d63148f659694c7380bc67b9f7245a34ef3158e7af0ce"
+      "bytes": 339140,
+      "sha256": "299e45ed2e4137ac5edf73d5e1264d1d38ed7534ec9c98222bbb4a550f730c5a"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 504580,
-      "sha256": "772c7f59c09f28098de9fe1fae4a4394de96adc9d17a9bcdbd284d7f8b0b90a5"
+      "bytes": 507568,
+      "sha256": "415a4b398649a30f224ba0be2711c6d911c03a52ddf76d8e1c3e86b8ca6b6f87"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 63066,
-      "sha256": "7043ba37804791df7df0d2ddcefee092e3471554250ef12fdcc5e741a777e25d"
+      "bytes": 66346,
+      "sha256": "eef735d19eb6436dc502b85ae90340f0c841e329a61134c95f6db67ed5bfeb98"
     }
   ],
-  "totalBytes": 903066,
+  "totalBytes": 913054,
   "metrics": {
     "meanSrgb": [
-      0.4454,
+      0.4455,
       0.4392,
       0.4101
     ],
     "luma": 0.4316,
-    "lumaStd": 0.0887,
-    "sat": 0.0792,
+    "lumaStd": 0.0897,
+    "sat": 0.0796,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.0892,
-    "seam": 0.1007,
-    "interior": 0.0155,
-    "seamRatio": 6.491,
-    "border": 0.957,
-    "swing": 0.076,
+    "lowFreq": 0.0896,
+    "seam": 0.1004,
+    "interior": 0.0187,
+    "seamRatio": 5.369,
+    "border": 0.951,
+    "swing": 0.0756,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "f1699ec31e5ffaa115193455a23ba1d82365a31bc6542bddf8580b0097e61c9e"
+    "sha256": "e884ebcd6b5114115101e9a07291b89ed5885422682473a67ba0d5c994b9bb52"
   }
 }
