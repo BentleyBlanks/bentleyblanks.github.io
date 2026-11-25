@@ -10,7 +10,7 @@ import { FLOW_SOURCE_EXCERPTS } from "./AdvancedTools/Data_LevelFlowSource.mjs";
 import { FLOW_PREVIOUS_CORNER, FLOW_DRAG_REARGUARD, FLOW_FRIEND_REINFORCEMENTS } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { BuildEncounterTerrain } from "./AdvancedTools/Script_LevelFlowTerrain.mjs";
 import { EncounterRaster } from "./AdvancedTools/Script_LevelFlowRaster.mjs";
-import { IsEncounterCover } from "./AdvancedTools/Script_LevelFlowView.mjs";
+import { IsEncounterCover, ClipPolyline } from "./AdvancedTools/Script_LevelFlowView.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 import { EncounterSceneControls } from "./AdvancedTools/Script_LevelFlowControls.mjs";
 import { L0610_LANE, L0610_SOUTH_LANE } from "./Data_EditorBlockoutFirstLevel0610Space.mjs";
@@ -1877,4 +1877,24 @@ assert.equal(migratedBeishahe.groups.find(group=>group.id==="GroundWest").count,
 assert.ok(!migratedBeishahe.groups.some(group=>group.id==="GroundEast"));
 assert.equal(migratedBeishahe.groups.filter(group=>Number(group.beat.slice(0,2))>=11).length,9);
 assert.deepEqual(UpgradeEncounterDocument(migratedBeishahe,defaults),migratedBeishahe,"repeat loads preserve new edits and deletions");
+
+{
+  const box=[0,0,100,100];
+  const inside=[[10,10],[50,20],[90,80]];
+  assert.deepEqual(ClipPolyline(inside,box),[{points:inside,offset:0}],"polyline inside the clip box is returned whole with offset 0");
+  const excursion=[[10,50],[50,50],[150,50],[150,60],[50,60],[10,60]];
+  const runs=ClipPolyline(excursion,box);
+  assert.equal(runs.length,2,"leaving and re-entering the clip box splits the polyline");
+  assert.deepEqual(runs[0].points,[[10,50],[50,50],[100,50]]);
+  assert.equal(runs[0].offset,0);
+  assert.deepEqual(runs[1].points,[[100,60],[50,60],[10,60]]);
+  assert.ok(Math.abs(runs[1].offset-(40+100+10+50))<1e-9,"dash phase continues along the original polyline");
+  const far=ClipPolyline([[50,50],[1e6,50]],box);
+  assert.deepEqual(far,[{points:[[50,50],[100,50]],offset:0}],"an endpoint a million pixels away is clipped to the box edge");
+  assert.deepEqual(ClipPolyline([[-50,-50],[-10,-200],[-300,-20]],box),[],"polyline outside the clip box vanishes");
+  const dirty=ClipPolyline([[10,10],[NaN,20],[30,30],[Infinity,5],[40,40],[60,60]],box);
+  assert.ok(dirty.every(run=>run.points.flat().every(Number.isFinite)&&Number.isFinite(run.offset)),"non-finite points never reach the output");
+  assert.deepEqual(dirty.map(run=>run.points),[[[40,40],[60,60]]],"non-finite points break the polyline");
+  assert.deepEqual(ClipPolyline([[5,5]],box),[],"a single point draws nothing");
+}
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

@@ -3,6 +3,9 @@ import {ENCOUNTER_DEFAULT_VARIANT_ID} from "../Data_EncounterVariants.mjs";
 import {ENCOUNTER_PLAY_STARTUP} from "../Data_Tuning_EncounterPlayStartup.mjs";
 import {ReadCastLibrary} from "./Script_EncounterCastLibrary.mjs";
 
+function SetProperty(element,name,value){if(element[name]!==value)element[name]=value;}
+function SetAttribute(element,name,value){if(element.getAttribute(name)!==value)element.setAttribute(name,value);}
+
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
   constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug,getVariant}) {
@@ -42,14 +45,14 @@ export class LevelFlowPlay {
   UpdateControls() {
     const variant=this.ActiveVariant();
     const allowed=this.menu.value==="beginning"||EncounterCanPlay(this.cursorTime,variant||undefined);
-    this.button.disabled=this.active?!this.paused&&!this.state?.failed:!allowed;
-    this.button.title=!allowed&&!this.active?"镜头动画段暂不支持 Play":this.state?.failed?"从检查点重新开始":this.paused?"继续 Play":"播放";
-    this.button.setAttribute("aria-label",this.state?.failed?"重新开始 Play":"Play");
-    this.button.setAttribute("aria-pressed",String(this.active&&!this.paused));
-    this.pauseButton.disabled=!this.active||!this.state?.ready||this.launching;
-    this.pauseButton.setAttribute("aria-pressed",String(this.paused));this.pauseButton.title=this.paused?"继续":"暂停";
-    this.stopButton.disabled=!this.active;this.menu.disabled=this.active;
-    this.releaseButton.hidden=this.active||!this.frame;
+    SetProperty(this.button,"disabled",this.active?!this.paused&&!this.state?.failed:!allowed);
+    SetProperty(this.button,"title",!allowed&&!this.active?"镜头动画段暂不支持 Play":this.state?.failed?"从检查点重新开始":this.paused?"继续 Play":"播放");
+    SetAttribute(this.button,"aria-label",this.state?.failed?"重新开始 Play":"Play");
+    SetAttribute(this.button,"aria-pressed",String(this.active&&!this.paused));
+    SetProperty(this.pauseButton,"disabled",!this.active||!this.state?.ready||this.launching);
+    SetAttribute(this.pauseButton,"aria-pressed",String(this.paused));SetProperty(this.pauseButton,"title",this.paused?"继续":"暂停");
+    SetProperty(this.stopButton,"disabled",!this.active);SetProperty(this.menu,"disabled",this.active);
+    SetProperty(this.releaseButton,"hidden",this.active||!this.frame);
     const canDebug=!this.active||!!this.DebugEditor();
     for(const button of this.debugButtons){
       const label=button.getAttribute("aria-label");

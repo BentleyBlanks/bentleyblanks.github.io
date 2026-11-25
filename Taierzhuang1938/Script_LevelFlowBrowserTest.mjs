@@ -453,7 +453,7 @@ try {
       roads:[{points:[[-4,0],[4,0]],width:1,caps:['from']}],labels:[{name:'测试掩体',p:[0,0]}]};
     const view=new FlowMapView(canvas,map);view.center=[0,0];view.scale=5;
     const frame={...LevelFlow.Evaluate(384),actors:[{id:'player',pose:'stand',p:[10000,10000],side:'player'}],effects:[],triggers:[],groups:[]};
-    const background=view.baseCanvas.getContext('2d'),fillText=background.fillText.bind(background);
+    const background=canvas.getContext('2d'),fillText=background.fillText.bind(background);
     let labels=[];background.fillText=(text,...args)=>{labels.push(text);fillText(text,...args);};
     view.Draw(frame,{landmarks:true},null);const shown=canvas.toDataURL(),initial=[...labels];
     labels=[];view.Draw(frame,{landmarks:false},null);const hidden=canvas.toDataURL(),off=[...labels];

@@ -1,5 +1,5 @@
 import { PickEncounterBody } from "./Script_LevelFlowPicking.mjs";
-import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Label } from "./Script_LevelFlowView.mjs";
+import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Line, Label } from "./Script_LevelFlowView.mjs";
 import { LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
@@ -674,7 +674,7 @@ export class FlowPerspectiveView extends FlowMapView {
     const vertices=this.FaceVertices(outline.map(point=>[point[0],this.Ground(point)+0.03,point[1]]));
     if(vertices.length<3) return;
     const points=vertices.map(point=>[point.x,point.y]),p=this.ToScreen(area.center);
-    context.setLineDash(selection?[]:[5,4]);Polygon(context,points,color+"12",color);context.setLineDash([]);
+    Polygon(context,points,color+"12");Line(context,[...points,points[0]],color,0.8,selection?[]:[5,4]);
     this.hits.push({...hit,screen:p,radius:12,area});
     if(label) Label(context,label,p[0]+10,p[1]-10,color,11,true);
 

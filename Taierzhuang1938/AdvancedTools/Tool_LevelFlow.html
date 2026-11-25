@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" data-interface-theme href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261123AgentPicker">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261125FpsStatus">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -58,6 +58,7 @@
       <button type="button" data-debug-tool="frameDebugger" aria-label="Frame Debugger" title="Frame Debugger · 编辑器加载中" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M15.5 8.5v7"/><path fill="currentColor" stroke="none" d="M8 8.5v7l5.5-3.5z"/></svg></button>
     </div>
     <span id="saveStatus" class="lfSrOnly" role="status">本机草稿</span>
+    <output id="fpsStatus" class="lfFpsStatus" data-level="idle" title="编辑器视口实际重绘帧率，每 0.5 秒更新；「静止」表示画面没有变化、没有重绘">— FPS</output>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
   <template id="viewportLegend"><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div></template>

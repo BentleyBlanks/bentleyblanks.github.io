@@ -6,6 +6,7 @@ import { IsMainlineLandmark, LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
 import { MakeRoadPath } from "../Script_RoadPath.mjs";
 
+const LINE_CLIP_PAD=32,BASE_OVERSCAN=0.2,BASE_SCALE_TOLERANCE=0.05;
 const roadSplineCache = new WeakMap();
 function SplinePoints(points, step = 2.5) {
   if (!Array.isArray(points) || points.length < 3) return points;
@@ -90,11 +91,55 @@ function SmoothLine(context,points,color,width) {
   context.strokeStyle=color;context.lineWidth=width;context.stroke();
 }
 
+function ClipSegment(a,b,[minX,minY,maxX,maxY]) {
+  const dx=b[0]-a[0],dy=b[1]-a[1];
+  let t0=0,t1=1;
+  const edges=[[-dx,a[0]-minX],[dx,maxX-a[0]],[-dy,a[1]-minY],[dy,maxY-a[1]]];
+  for(const [p,q] of edges) {
+    if(p===0) {if(q<0) return null;continue;}
+    const t=q/p;
+    if(p<0) {if(t>t1) return null;if(t>t0) t0=t;}
+    else {if(t<t0) return null;if(t<t1) t1=t;}
+  }
+  return t0>t1?null:[t0,t1];
+}
+
+export function ClipPolyline(points,bounds) {
+  const runs=[];
+  let run=null,travelled=0;
+  for(let index=1;index<points.length;index++) {
+    const a=points[index-1],b=points[index];
+    if(![a[0],a[1],b[0],b[1]].every(Number.isFinite)) {run=null;continue;}
+    const length=Math.hypot(b[0]-a[0],b[1]-a[1]),span=ClipSegment(a,b,bounds);
+    if(span) {
+      const [t0,t1]=span;
+      const start=t0===0?a:[a[0]+(b[0]-a[0])*t0,a[1]+(b[1]-a[1])*t0];
+      const end=t1===1?b:[a[0]+(b[0]-a[0])*t1,a[1]+(b[1]-a[1])*t1];
+      if(run&&t0===0) run.points.push(end);
+      else {run={points:[start,end],offset:travelled+length*t0};runs.push(run);}
+      if(t1<1) run=null;
+    } else run=null;
+    travelled+=length;
+  }
+  return runs;
+}
+
 export function Line(context,points,color,width=1,dash=[]) {
   if(!points.length) return;
+  context.strokeStyle=color;context.lineWidth=width;
+  if(context.lineClip&&dash.length) {
+    context.setLineDash(dash);
+    for(const run of ClipPolyline(points,context.lineClip)) {
+      context.beginPath();context.moveTo(...run.points[0]);
+      for(let index=1;index<run.points.length;index++) context.lineTo(...run.points[index]);
+      context.lineDashOffset=run.offset;context.stroke();
+    }
+    context.lineDashOffset=0;context.setLineDash([]);
+    return;
+  }
   context.beginPath();context.moveTo(...points[0]);
   for(const point of points.slice(1)) context.lineTo(...point);
-  context.strokeStyle=color;context.lineWidth=width;context.setLineDash(dash);context.stroke();context.setLineDash([]);
+  context.setLineDash(dash);context.stroke();context.setLineDash([]);
 }
 export function Polygon(context,points,color,stroke) {
   if(!points.length) return;
@@ -153,6 +198,19 @@ export class FlowMapView {
   }
 
   ProjectPath(points) {return [points.map(point=>this.ToScreen(point))];}
+
+  BaseSource(width,height,ratio) {
+    const base=this.baseView;
+    if(!base||base.ratio!==ratio||Math.abs(this.scale/base.scale-1)>BASE_SCALE_TOLERANCE) return null;
+    const Axis=(size,baseSize,axis)=>{
+      const start=((0-size/2)/this.scale+this.center[axis]-base.center[axis])*base.scale+baseSize/2;
+      return [start,size*base.scale/this.scale];
+    };
+    const [sx,sw]=Axis(width,base.width,0),[sy,sh]=Axis(height,base.height,1);
+    const slack=1e-6;
+    if(sx<-slack||sy<-slack||sx+sw>base.width+slack||sy+sh>base.height+slack) return null;
+    return [sx*ratio,sy*ratio,sw*ratio,sh*ratio];
+  }
 
   DrawPath(context,points,color,width=1,dash=[]) {
     for(const path of this.ProjectPath(points)) Line(context,path,color,width,dash);
@@ -255,11 +313,15 @@ export class FlowMapView {
     const Screen=(point)=>[(point[0]-this.center[0])*scale+width/2,(point[1]-this.center[1])*scale+height/2];
     context.fillStyle="#e7e2d2";context.fillRect(0,0,width,height);
     for(const zone of map.fieldZones) {
+      const corners=zone.poly.map(Screen);
+      if(corners.every(point=>point[0]<0)||corners.every(point=>point[0]>width)||corners.every(point=>point[1]<0)||corners.every(point=>point[1]>height)) continue;
       context.save();context.beginPath();
-      zone.poly.map(Screen).forEach((point,index)=>index?context.lineTo(...point):context.moveTo(...point));
+      corners.forEach((point,index)=>index?context.lineTo(...point):context.moveTo(...point));
       context.closePath();context.clip();
       for(const field of map.fields.filter((item)=>item.zone===zone.id)) {
         const center=Screen([field.x,field.z]);
+        const reach=Math.hypot(Math.max(...field.strips.map(strip=>Math.max(Math.abs(strip.from),Math.abs(strip.to)))),field.d/2)*scale;
+        if(center[0]+reach<0||center[0]-reach>width||center[1]+reach<0||center[1]-reach>height) continue;
         context.save();context.translate(...center);context.rotate(-field.angleDeg*Math.PI/180);
         context.globalAlpha=0.48;
         for(const strip of field.strips) {
@@ -368,8 +430,11 @@ export class FlowMapView {
       const point=Screen(marker.p);
       Line(context,[[point[0]-3,point[1]],[point[0]+3,point[1]]],marker.kind==="window"?"#487e9e":"#9b6329",2);
     }
-    if(scale>1.4) for(const road of map.roads) for(const cap of road.caps||[]) {
-      const point=Screen(cap==="from"?road.points[0]:road.points.at(-1));
+  }
+
+  DrawScreenMarks(context,width,height,layers) {
+    if(this.scale>1.4) for(const road of this.mapData.roads) for(const cap of road.caps||[]) {
+      const point=this.ToScreen(cap==="from"?road.points[0]:road.points.at(-1));
       if(point[0]<10||point[0]>width-35||point[1]<20||point[1]>height-20) continue;
       Line(context,[[point[0]-4,point[1]-4],[point[0]+4,point[1]+4]],"#a7503f",1.5);
       Line(context,[[point[0]-4,point[1]+4],[point[0]+4,point[1]-4]],"#a7503f",1.5);
@@ -500,25 +565,40 @@ export class FlowMapView {
     const pixelWidth=Math.max(1,Math.round(width*ratio)),pixelHeight=Math.max(1,Math.round(height*ratio));
     if(this.canvas.width!==pixelWidth||this.canvas.height!==pixelHeight) {this.canvas.width=pixelWidth;this.canvas.height=pixelHeight;}
     const context=this.canvas.getContext("2d");context.setTransform(ratio,0,0,ratio,0,0);
-    const key=JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,LandmarkMode(layers),
-      frame.signals,Math.round((frame.nightBlend||0)*FLOW_DUSK.steps)]);
+    context.lineClip=[-LINE_CLIP_PAD,-LINE_CLIP_PAD,width+LINE_CLIP_PAD,height+LINE_CLIP_PAD];
+    const planar=!this.raster;
+    const nightStep=Math.round((frame.nightBlend||0)*FLOW_DUSK.steps);
+    const key=planar
+      ?JSON.stringify([pixelWidth,pixelHeight,frame.beat.id,this.cameraKey,frame.signals,nightStep])
+      :JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,LandmarkMode(layers),frame.signals,nightStep]);
     cpu?.End();
-    if(trace?.redrawBase||key!==this.baseKey) {
-      cpu?.Begin(this.raster?"3D 底图":"2D 底图");
+    let source=null;
+    if(planar&&!trace?.redrawBase&&key===this.baseKey) source=this.BaseSource(width,height,ratio);
+    if(!source&&(trace?.redrawBase||key!==this.baseKey||planar)) {
+      cpu?.Begin(planar?"2D 底图":"3D 底图");
       const started=trace?.capturing?performance.now():0;
-      if(this.baseCanvas.width!==pixelWidth||this.baseCanvas.height!==pixelHeight) {this.baseCanvas.width=pixelWidth;this.baseCanvas.height=pixelHeight;}
+      const marginX=planar?Math.round(width*BASE_OVERSCAN):0,marginY=planar?Math.round(height*BASE_OVERSCAN):0;
+      const baseWidth=width+marginX*2,baseHeight=height+marginY*2;
+      const basePixelWidth=planar?Math.max(1,Math.round(baseWidth*ratio)):pixelWidth,basePixelHeight=planar?Math.max(1,Math.round(baseHeight*ratio)):pixelHeight;
+      if(this.baseCanvas.width!==basePixelWidth||this.baseCanvas.height!==basePixelHeight) {this.baseCanvas.width=basePixelWidth;this.baseCanvas.height=basePixelHeight;}
       const background=this.baseCanvas.getContext("2d");background.setTransform(ratio,0,0,ratio,0,0);
+      background.lineClip=[-LINE_CLIP_PAD,-LINE_CLIP_PAD,baseWidth+LINE_CLIP_PAD,baseHeight+LINE_CLIP_PAD];
       // Fractional CSS sizes leave a partially covered last pixel. Clear the
       // full backing surface without reallocating it, preventing edge trails.
-      background.clearRect(0,0,pixelWidth/ratio,pixelHeight/ratio);
-      this.DrawBase(background,width,height,frame,layers,trace);this.baseKey=key;
+      background.clearRect(0,0,basePixelWidth/ratio,basePixelHeight/ratio);
+      this.DrawBase(background,baseWidth,baseHeight,frame,layers,trace);this.baseKey=key;
+      if(planar) this.baseView={center:[...this.center],scale:this.scale,width:baseWidth,height:baseHeight,ratio};
       cpu?.End();
-      if(trace?.capturing&&!this.raster) trace.Canvas("绘制 2D 底图",this.baseCanvas,started);
+      if(trace?.capturing&&planar) trace.Canvas("绘制 2D 底图",this.baseCanvas,started);
+      if(planar) source=this.BaseSource(width,height,ratio);
     }
 
     let started=trace?.capturing?performance.now():0;
     cpu?.Begin("合成底图");
-    context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);this.hits=[];
+    if(source) context.drawImage(this.baseCanvas,...source,0,0,width,height);
+    else context.drawImage(this.baseCanvas,0,0,pixelWidth,pixelHeight,0,0,width,height);
+    this.hits=[];
+    if(planar) this.DrawScreenMarks(context,width,height,layers);
     cpu?.End();
     if(trace?.capturing) {trace.Canvas("合成视口底图",this.canvas,started);started=performance.now();}
     this.BeginOverlay?.(context);

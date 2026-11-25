@@ -325,9 +325,10 @@ export class EncounterViewports {
       debug?.BeginCpu("encounterViewport/视口状态");
       if(entry.defaultCamera) this.DefaultCamera(entry,frame);
       const perspective=!["plan","battle"].includes(entry.type);
-      entry.target.hidden=!perspective||entry.type==="scene";entry.gizmo.hidden=!perspective;
-      entry.cameraSettings.hidden=entry.type!=="scene";
-      entry.legend.hidden=!entry.layers.hud;
+      const hide=(element,value)=>{if(element.hidden!==value)element.hidden=value;};
+      hide(entry.target,!perspective||entry.type==="scene");hide(entry.gizmo,!perspective);
+      hide(entry.cameraSettings,entry.type!=="scene");
+      hide(entry.legend,!entry.layers.hud);
       if(entry.mode==="follow") entry.map.Follow(frame);
       for(const button of entry.pane.querySelectorAll("[data-framing]")) {
         const pressed=String(button.dataset.framing===entry.mode);

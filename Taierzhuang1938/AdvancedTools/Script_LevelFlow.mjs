@@ -540,6 +540,7 @@ function RequestRender() { renderPending = true; }
 function Render(tick = null) {
   if (!map || !workspace) return;
   renderPending = false;
+  fpsMeter.rendered = true;
   const debug = !gamePlay?.active && (previewDebug?.profiler?.recording || previewDebug?.capture.state === "armed") ? previewDebug : null;
   let failure = null;
   debug?.BeginFrame(tick?.time ?? performance.now(), tick);
@@ -738,7 +739,24 @@ function BindControls() {
     if (event.key === "Escape") { SetNavigationTool("select"); Render(); }
   });
 }
+const fpsMeter = { frames: 0, windowStart: 0, text: "", level: "", rendered: false };
+function CountFpsFrame(timestamp, forceCount) {
+  const meter = fpsMeter;
+  if (meter.rendered || forceCount) meter.frames++;
+  meter.rendered = false;
+  if (!meter.windowStart) { meter.windowStart = timestamp; return; }
+  const windowMs = timestamp - meter.windowStart;
+  if (windowMs < 500) return;
+  const frames = meter.frames;
+  meter.frames = 0; meter.windowStart = timestamp;
+  const level = !frames ? "idle" : frames * 1000 / windowMs >= 50 ? "good" : frames * 1000 / windowMs >= 30 ? "warn" : "bad";
+  const text = frames ? `${Math.round(frames * 1000 / windowMs)} FPS · ${(windowMs / frames).toFixed(1)} ms` : "静止";
+  const output = Element("fpsStatus");
+  if (meter.text !== text) { meter.text = text; output.textContent = text; }
+  if (meter.level !== level) { meter.level = level; output.dataset.level = level; }
+}
 function Tick(timestamp) {
+  CountFpsFrame(timestamp, !!gamePlay?.active);
   if (gamePlay?.active) { lastTimestamp = timestamp; requestAnimationFrame(Tick); return; }
   const elapsed = lastTimestamp ? Math.max(0, (timestamp - lastTimestamp) / 1000) : 0;
   const measuring = !!previewDebug.profiler?.recording;

@@ -148,7 +148,11 @@ textarea { resize: vertical; min-height: 64px; }
 .lfToolbar .lfDebugTools button { display: grid; place-items: center; width: 36px; height: 30px; padding: 4px; }
 .lfDebugTools svg { display: block; width: 19px; height: 19px; pointer-events: none; }
 .lfExport { margin-left: auto; }
-.lfBack { margin-left: auto; font-size: 13px; color: var(--ed-text-3); white-space: nowrap; }
+.lfFpsStatus { margin-left: auto; box-sizing: border-box; min-width: 128px; padding: 3px 9px; border: 1px solid var(--ed-edge); border-radius: 999px; background: var(--ed-field); color: var(--ed-text-3); font: 12px/1.4 ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.lfFpsStatus[data-level="good"] { color: #7fd48a; }
+.lfFpsStatus[data-level="warn"] { color: #e6b450; }
+.lfFpsStatus[data-level="bad"] { color: #ef6b62; }
+.lfBack { font-size: 13px; color: var(--ed-text-3); white-space: nowrap; }
 
 /* Fine separators distinguish viewports, the reading pane and editing controls. */
 .lfWorkspace { display: grid; grid-template-columns: minmax(0, 1fr) var(--lf-inspector-width, 390px); gap: 12px; padding: 12px 12px 0; flex: 1; min-height: 0; }
@@ -322,6 +326,7 @@ textarea { resize: vertical; min-height: 64px; }
   .lfViewBar { gap: 3px; padding: 4px 5px; }
   .lfViewBar > span { display: none; }
   .lfBack { font-size: 12px; }
+  .lfFpsStatus { min-width: 112px; font-size: 11px; padding: 2px 7px; }
 }
 @media (max-width: 850px) {
   .lfToolbar { height: auto; min-height: 52px; flex-wrap: wrap; gap: 6px; }
