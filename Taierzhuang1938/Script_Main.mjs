@@ -7090,7 +7090,8 @@ function UpdateContextualActionPrompts() {
     hud.SetActionPrompts(prompts);
     return;
   }
-  const interaction = interact?.Query(player) || null;
+  // 测试场的剧本动作此刻占着 F（遭遇试玩的撤门板等）：不再给地上的枪挂 F 提示，按下去也不会捡。
+  const interaction = sandbox?.OwnsInteractKey?.() ? null : interact?.Query(player) || null;
   // 下面各分支里凡是 Space 仍然是「翻越 / 跳跃」的，都在最前面挂一条翻越提示；
   // 架枪与抬东西的分支不挂（那会儿提示条被它们整段接管）。
   const traverse = TraversePrompt();

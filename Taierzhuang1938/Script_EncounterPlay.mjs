@@ -952,8 +952,11 @@ export class EncounterPlay {
       }
       return true;
     }
-    if(detail.code==="KeyF"&&detail.down!==false&&this.plan.gate.action)return this.Interact();
+    if(detail.code==="KeyF"&&detail.down!==false&&this.plan.gate.action&&!this.AimedPickup())return this.Interact();
   }
+  // A gun the player is looking straight at keeps F for pickup/swap inside a beat action area, as in the main game.
+  AimedPickup(){const c=this.host.interact?.Query(this.host.player);return c?.kind==="pickup"&&c.aimed?c:null;}
+  OwnsInteractKey(){const p=this.host.player.position;return this.active&&this.ready&&!this.openingActive&&this.plan.CanInteract([p.x,p.z])&&!this.AimedPickup();}
   ObjectiveText() {
     if(this.openingActive||!this.combatStarted)return "";
     if(!this.hudInfo)return this.plan.beat.task||"";
@@ -975,10 +978,10 @@ export class EncounterPlay {
       :this.failed?ui.dead:stealthState?.alarm?ui.stealthAlarm:stealthState?.suspicion>0?ui.stealthSuspicion:this.plan.completed?ui.complete:task;
     const p=this.host.player.position,end=this.plan.gate.retreat&&this.plan.interacted.has(this.plan.beat.id)?this.plan.beat.p.at(-1):this.plan.Area().center,distance=Math.hypot(p.x-end[0],p.z-end[1]);
     const hint=this.failed&&(stealthState?.active||this.noFireFailure)?ui.stealthRetry:stealthState?.locked?ui.stealthPull:this.stealth&&frame.beat.id==="09b"&&distance<=reachM&&!this.PartyAtEndpoint()?ui.waitParty:stealthState?.active&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed===null?ui.stealthWait:this.failed?ui.retry:this.plan.completed?ui.stop:
-      this.plan.CanInteract([p.x,p.z])?ui.interact:
+      this.OwnsInteractKey()?ui.interact:
       this.plan.waiting==="combat"?ui.clear:this.plan.waiting==="event"?ui.event:this.plan.waiting==="escort"?ui.escort:this.plan.waiting==="departure"?ui.departure:distance>reachM?ui.reach+" "+distance.toFixed(0)+" m":"";
     const dialogue=EncounterDialogueLines(this.plan,frame,{failed:this.failed,exit:!!(this.stealth&&this.stealth.exitStartedElapsed!==null),
-      interact:this.plan.CanInteract([p.x,p.z])});
+      interact:this.OwnsInteractKey()});
     this.speech.Set(frame,dialogue);
     const actions=this.host.hud.el?.actions?.textContent?.trim()||"";
     const notice=this.host.hud.el?.hint?.classList.contains("on")?this.host.hud.el.hint.textContent.trim():"";
