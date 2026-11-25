@@ -215,7 +215,7 @@ class GpuRaster {
       uniform bool terrainLayered;
       uniform sampler2D groundColor,distantColor,splatMap,macroTintMap;
       uniform highp sampler2DArray layerAlbedo,layerSurface;
-      uniform vec4 groundBounds,distantBounds;
+      uniform vec4 groundBounds,distantBounds,riverParams;
       uniform vec4 layerTileNear,layerTileFar,layerNormalScale,layerHeightOffset;
       uniform vec4 layerAlbedoMean0,layerAlbedoMean1,layerAlbedoMean2,layerAlbedoMean3;
       uniform vec4 layerSurfaceMean0,layerSurfaceMean1,layerSurfaceMean2,layerSurfaceMean3;
@@ -284,6 +284,81 @@ class GpuRaster {
           oStubble=mix(oStubble,0.16,bund);
           oTint=mix(oTint,vec3(1.04,0.98,0.86),bund);
         }
+      }
+      float SegDist2(vec2 p,vec2 a,vec2 b) {
+        vec2 ab=b-a;
+        float t=clamp(dot(p-a,ab)/max(dot(ab,ab),1e-6),0.0,1.0);
+        return length(p-(a+ab*t));
+      }
+      float ShaheCenterZ(float x,float zShift) {
+        float baseZ=870.3+zShift-(x+160.0)*0.26041667;
+        float outX=x<-160.0?(-160.0-x):(x>320.0?(x-320.0):0.0);
+        if(outX<=0.0) return baseZ;
+        float m=smoothstep(0.0,240.0,outX);
+        float meander=sin(x*0.0023+0.45)*48.0+sin(x*0.0061-1.15)*16.0;
+        return baseZ+meander*m;
+      }
+      vec4 SampleShaheRiver(vec2 p,float zShift) {
+        float cz=ShaheCenterZ(p.x,zShift);
+        float edgeJitter=(TerrainNoise(p*0.036+vec2(4.2,9.1))-0.5)*2.8+(TerrainNoise(p*0.11-vec2(2.7,5.3))-0.5)*1.1;
+        float d=max(0.0,abs(p.y-cz)+edgeJitter);
+        float wMod=1.0+0.16*sin(p.x*0.0075+1.1)+0.08*cos(p.x*0.019-0.6);
+        float halfWater=9.0*wMod;
+        float halfDamp=14.5*wMod;
+        float halfBed=36.0*wMod;
+        float bankOuter=halfBed+18.0;
+        if(d>=bankOuter) return vec4(0.0);
+        float bankT=1.0-smoothstep(halfBed,bankOuter,d);
+        float sandT=1.0-smoothstep(halfBed-2.5,halfBed+3.5,d);
+        float dampT=1.0-smoothstep(halfDamp-2.0,halfDamp+4.5,d);
+        float waterT=1.0-smoothstep(halfWater-1.4,halfWater+1.6,d);
+        return vec4(waterT,dampT,sandT,bankT);
+      }
+      vec2 SampleBranchCreek(vec2 p,bool isMerged,float zShift) {
+        float dist=1e9;
+        float halfWater=5.0,halfBed=8.6,bankW=7.0;
+        if(p.y>320.0&&p.y<940.0+zShift&&p.x>-240.0&&p.x<90.0) {
+          if(isMerged) {
+            const vec2 ms[21]=vec2[21](
+              vec2(35.0,355.0),vec2(27.0,366.0),vec2(15.0,376.0),vec2(-2.0,384.0),vec2(-22.0,390.0),
+              vec2(-44.0,397.0),vec2(-64.0,404.0),vec2(-80.0,412.0),vec2(-99.0,424.0),vec2(-117.0,440.0),
+              vec2(-133.0,460.0),vec2(-146.0,484.0),vec2(-155.0,512.0),vec2(-159.0,545.0),vec2(-158.0,585.0),
+              vec2(-155.0,635.0),vec2(-152.0,695.0),vec2(-154.0,755.0),vec2(-153.0,805.0),vec2(-148.0,842.0),vec2(-144.0,870.0)
+            );
+            for(int i=1;i<21;i++) dist=min(dist,SegDist2(p,ms[i-1],ms[i]));
+          } else {
+            const vec2 es[16]=vec2[16](
+              vec2(34.5,574.0),vec2(24.0,596.0),vec2(6.0,624.0),vec2(-16.0,654.0),vec2(-40.0,686.0),
+              vec2(-68.0,720.0),vec2(-98.0,758.0),vec2(-125.0,800.0),vec2(-144.0,850.0),vec2(-154.0,910.0),
+              vec2(-157.0,985.0),vec2(-155.0,1070.0),vec2(-152.0,1155.0),vec2(-150.0,1225.0),vec2(-146.0,1278.0),vec2(-140.0,1320.0)
+            );
+            for(int i=1;i<16;i++) dist=min(dist,SegDist2(p,es[i-1],es[i]));
+          }
+        }
+        if(p.y<320.0&&p.y>-520.0&&p.x<60.0) {
+          const vec2 ne[12]=vec2[12](
+            vec2(-1800.0,-440.0),vec2(-1450.0,-330.0),vec2(-1120.0,-230.0),vec2(-820.0,-135.0),
+            vec2(-560.0,-40.0),vec2(-360.0,48.0),vec2(-235.0,118.0),vec2(-155.0,158.0),
+            vec2(-96.0,178.0),vec2(-44.0,187.0),vec2(4.0,191.0),vec2(30.0,196.0)
+          );
+          for(int i=1;i<12;i++) dist=min(dist,SegDist2(p,ne[i-1],ne[i]));
+          const vec2 fe[7]=vec2[7](
+            vec2(-1200.0,120.0),vec2(-860.0,168.0),vec2(-540.0,214.0),vec2(-310.0,246.0),
+            vec2(-170.0,266.0),vec2(-84.0,278.0),vec2(-18.0,286.0)
+          );
+          float df=1e9;
+          for(int i=1;i<7;i++) df=min(df,SegDist2(p,fe[i-1],fe[i]));
+          if(df<dist) {dist=df;halfWater=3.2;halfBed=5.6;bankW=5.2;}
+        }
+        float creekJitter=(TerrainNoise(p*0.055+vec2(7.3,1.9))-0.5)*1.6;
+        dist=max(0.0,dist+creekJitter);
+        float outer=halfBed+bankW;
+        if(dist>=outer) return vec2(0.0);
+        float bankT=1.0-smoothstep(halfBed,outer,dist);
+        float waterT=1.0-smoothstep(halfWater-0.9,halfWater+1.2,dist);
+        float bridgeZ=isMerged?860.0:1310.0;
+        float railProt=(p.y>=355.0&&p.y<=bridgeZ-18.0)?(1.0-smoothstep(4.5,9.5,abs(p.x+80.0))):0.0;
+        return vec2(waterT*(1.0-railProt*0.95),bankT*(1.0-railProt));
       }
       vec4 TerrainVpMix(vec4 a,vec4 b,float t,vec4 mean) {
         float s=inversesqrt(max((1.0-t)*(1.0-t)+t*t,0.5));
@@ -394,6 +469,47 @@ class GpuRaster {
                 macroRgb=mix(macroRgb,vec3(1.04,0.98,0.86),seamBund);
               }
             }
+            // Real SRTM foothill slopes (NE/E Tengzhou-Longshan hills): transition irrigated strips
+            // into natural Lunan loess & dry foothill scrub on elevated or steeper hillsides.
+            if(outDist>8.0) {
+              float hillSlope=smoothstep(0.014,0.065,1.0-geomN.y);
+              float hillElev=smoothstep(5.5,24.0,worldPosition.y);
+              float hillMix=clamp(max(hillSlope*0.85,hillElev*0.65),0.0,0.92)*smoothstep(8.0,85.0,outDist);
+              if(hillMix>0.001) {
+                float scrubNoise=TerrainNoise(txz*0.018+7.1)*0.6+TerrainNoise(txz*0.055-3.4)*0.4;
+                vec3 hillTint=mix(vec3(0.96,0.89,0.74),vec3(0.82,0.86,0.67),smoothstep(0.35,0.72,scrubNoise));
+                wTrack=mix(wTrack,0.04,hillMix);
+                wSpoil=mix(wSpoil,mix(0.42,0.18,scrubNoise),hillMix);
+                stubbleRaw=mix(stubbleRaw,mix(0.32,0.66,scrubNoise),hillMix);
+                macroRgb=mix(macroRgb,hillTint,hillMix);
+              }
+            }
+          }
+
+          float riverWaterT=0.0;
+          if(riverParams.x>0.5) {
+            vec4 shahe=SampleShaheRiver(txz,riverParams.y);
+            vec2 branch=SampleBranchCreek(txz,riverParams.z>0.5,riverParams.y);
+            float outsideMask=smoothstep(0.0,6.0,outDist);
+            // Outside bounds: full widened sandy riverbed + banks; inside bounds: smoothly widen main stream & continuous branch creek
+            float sandMask=max(shahe.z*outsideMask,branch.y*(outDist>0.0?1.0:(riverParams.z>0.5?smoothstep(348.0,360.0,txz.y):smoothstep(568.0,582.0,txz.y))));
+            float northExtMask=branch.y*(txz.y<198.0||txz.x<-18.0?1.0:0.0);
+            sandMask=max(sandMask,northExtMask);
+            if(sandMask>0.001) {
+              float barNoise=TerrainNoise(txz*0.032+5.7)*0.6+TerrainNoise(txz*0.11-2.3)*0.4;
+              vec3 sandTint=mix(vec3(1.10,1.03,0.88),vec3(1.20,1.14,0.98),barNoise);
+              wTrack=mix(wTrack,0.12,sandMask);
+              wSpoil=mix(wSpoil,0.82,sandMask);
+              stubbleRaw=mix(stubbleRaw,0.06,sandMask);
+              macroRgb=mix(macroRgb,sandTint,sandMask);
+            }
+            float dampMask=max(shahe.y*max(outsideMask,0.65),branch.y*0.75);
+            if(dampMask>0.001) {
+              macroRgb*=mix(1.0,0.78,dampMask);
+            }
+            float shaheWater=shahe.x*max(outsideMask,0.85);
+            float branchWater=branch.x*(outDist>0.0?1.0:((txz.y<198.0||txz.x<-18.0||txz.y>(riverParams.z>0.5?352.0:570.0))?1.0:0.0));
+            riverWaterT=clamp(max(shaheWater,branchWater),0.0,1.0);
           }
 
           float wRest=max(0.0,1.0-wTrack-wSpoil);
@@ -492,6 +608,23 @@ class GpuRaster {
           float tAo=clamp(tSurface.a,0.0,1.0);
           float aoKeep=mix(1.0,0.55,farT);
           terrainAo=mix(1.0,tAo,0.72*aoKeep);
+
+          if(riverWaterT>0.001) {
+            float rip1=TerrainNoise(txz*0.42+vec2(1.7,3.1))-0.5;
+            float rip2=TerrainNoise(txz*1.15-vec2(4.2,2.8))-0.5;
+            vec3 waterN=normalize(vec3((rip1*0.07+rip2*0.035),1.0,(rip1*0.05-rip2*0.035)));
+            vec3 viewDir=normalize(eye-worldPosition);
+            float fresnel=pow(1.0-clamp(dot(waterN,viewDir),0.0,1.0),3.2);
+            // Linear-space March 1938 Lunan river tones: murky slate-olive depth + muted sky glint
+            vec3 shallowMud=vec3(0.11,0.12,0.095);
+            vec3 deepWater=vec3(0.055,0.098,0.118);
+            vec3 skyRefl=vec3(0.165,0.225,0.255);
+            vec3 coreCol=mix(deepWater,skyRefl,0.18+0.42*fresnel);
+            vec3 waterCol=mix(shallowMud,coreCol,smoothstep(0.0,0.65,riverWaterT));
+            layeredLinear=mix(layeredLinear,waterCol,riverWaterT);
+            litNormal=normalize(mix(litNormal,waterN,riverWaterT));
+            terrainAo=mix(terrainAo,1.0,riverWaterT);
+          }
         }
 
         float visibility=1.0;
@@ -572,7 +705,7 @@ class GpuRaster {
     this.lightingUniforms=Object.fromEntries(['lit','shadowMap','shadowCenter','shadowRight','shadowUp','sun','shadowSettings','lightBalance'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.surfaceUniforms=Object.fromEntries([
       'terrainSurface','terrainLayered','groundColor','distantColor','splatMap','macroTintMap',
-      'layerAlbedo','layerSurface','groundBounds','distantBounds',
+      'layerAlbedo','layerSurface','groundBounds','distantBounds','riverParams',
       'layerTileNear','layerTileFar','layerNormalScale','layerHeightOffset',
       'layerAlbedoMean0','layerAlbedoMean1','layerAlbedoMean2','layerAlbedoMean3',
       'layerSurfaceMean0','layerSurfaceMean1','layerSurfaceMean2','layerSurfaceMean3',
@@ -828,6 +961,8 @@ class GpuRaster {
         gl.uniform3fv(uniforms[`layerTint${i}`],pack.tints[i]);
       }
       gl.uniform1f(uniforms.layerAlbedoScale,pack.albedoScale);
+      const geo=surface.geo;
+      gl.uniform4f(uniforms.riverParams,geo?1:0,geo?geo.riverZShift:0,geo&&geo.isMerged?1:0,0);
     }
     gl.activeTexture(gl.TEXTURE0);
   }

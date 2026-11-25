@@ -606,7 +606,7 @@ class SceneEditorApp {
     if (this.style === "formal" || doc.look?.terrainLayers) this.terrainReady = this.DressFormalTerrain(this.terrain);
 
     const bd = doc.backdrop;
-    this.backdropAt = bd ? BackdropGroundSampler(bd, this.sampler, bd.siteBounds || doc.bounds) : null;
+    this.backdropAt = bd ? BackdropGroundSampler(bd, this.sampler, bd.siteBounds || doc.bounds, this.sceneId) : null;
     if (bd?.ground) {
       const r = bd.ground.radiusM || 3000;
       const cx = (doc.bounds.minX + doc.bounds.maxX) / 2, cz = (doc.bounds.minZ + doc.bounds.maxZ) / 2;

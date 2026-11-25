@@ -18,8 +18,9 @@ import { FetchResolvedScene } from "./Script_SceneInherit.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
 import { TERRAIN_RUTS } from "./Data_Tuning_Terrain.mjs";
 import {
-  EncounterFarmlandForScene, CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor,
+  EncounterFarmlandForScene, CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor, TrenchClearingPaintItems,
 } from "./Script_EncounterFarmland.mjs";
+import { BeishaheGeoContext, SampleBeishaheOuterHeight } from "./Script_BeishaheGeography.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
 import { SCENE_ASSETS } from "./Data_SceneAssets.mjs";
@@ -463,6 +464,8 @@ export function BuildSceneGroundSurface(doc, sampler) {
       if (line.length >= 2) items.push({ line, halfW: S.road.halfW, feather: S.road.feather, rgb: [S.road.track, 0, 0] });
     }
   }
+  const trenchClear = isEncounter ? TrenchClearingPaintItems(doc.trenchPlan?.trenches || doc.trenches?.segments || [], doc.paint) : null;
+  if (trenchClear) items.push(...trenchClear.splatItems);
   for (const line of doc.ways?.trenches || []) {
     if (line.length >= 2) items.push({ line, halfW: S.trench.halfW, feather: S.trench.feather, rgb: [0, 1, 0] });
   }
@@ -502,6 +505,7 @@ export function BuildSceneGroundSurface(doc, sampler) {
       ? explicit : (isEncounter ? PaintMacroTintFor(item) : null);
     return rgb ? [{ ...item, rgb }] : [];
   });
+  if (trenchClear) tintItems.push(...trenchClear.tintItems);
   const tint = tintItems.length ? BuildGroundPaint(tintItems, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
   const w = [0, 0, 0], rs = [0, 1], step = S.slope.stepM, span = S.slope.to - S.slope.from;
   // 场景壕沟：翻土层跟着样条的实际沟沿走，沿弃土垄再铺一层（同现行第一关 SampleMissionTerrain 那一段）
@@ -709,14 +713,16 @@ export const BLOCKOUT_CAMERA_FAR = 650;
  * 「边上最近那一点的场地高」往 ground.y 过渡，smoothstep(o / blendM)。接缝上两边一样高，往外慢慢落到 ground.y。
  * → (x, z) => y。纯函数（编辑器的远景地面、远景里的树、测试共用）。
  */
-export function BackdropGroundSampler(backdrop, terrainSampler, bounds) {
+export function BackdropGroundSampler(backdrop, terrainSampler, bounds, sceneId = "") {
   const g = backdrop.ground, blend = Number.isFinite(g.blendM) ? g.blendM : 0;
   const { minX, maxX, minZ, maxZ } = bounds;
+  const geoCtx = BeishaheGeoContext(sceneId, bounds);
   return (x, z) => {
     const cx = x < minX ? minX : x > maxX ? maxX : x, cz = z < minZ ? minZ : z > maxZ ? maxZ : z;
     const edge = terrainSampler(cx, cz);
     const o = Math.hypot(x - cx, z - cz);
     if (o <= 0) return edge;
+    if (geoCtx) return SampleBeishaheOuterHeight(x, z, edge, o, geoCtx);
     return edge + (g.y - edge) * BackdropBlend(o, blend);
   };
 }
@@ -827,7 +833,7 @@ export function LayoutFromSceneDoc(doc) {
     // 可选 backdrop（2026-10-20）：远景层，只看不走——不进 blocks / gates（不碰撞、不进寻路），bounds 不变（玩家走不出去）；
     // 编辑器按它画远景（Script_EditorBlockoutBackdrop），相机远平面拉到 cameraFar。没写 = null，cameraFar 照旧。
     backdrop,
-    backdropGroundAt: backdrop ? BackdropGroundSampler(backdrop, sampler, doc.bounds) : null,
+    backdropGroundAt: backdrop ? BackdropGroundSampler(backdrop, sampler, doc.bounds, doc.id || doc.scene || "") : null,
     cameraFar: backdrop ? Math.max(BLOCKOUT_CAMERA_FAR, backdrop.far) : BLOCKOUT_CAMERA_FAR,
     bounds: { ...doc.bounds },
     ground: layeredGround ? { ...ground, pbr: MISSION_LAYOUT.ground.pbr, pbrOptions: { ...MISSION_LAYOUT.ground.pbrOptions },

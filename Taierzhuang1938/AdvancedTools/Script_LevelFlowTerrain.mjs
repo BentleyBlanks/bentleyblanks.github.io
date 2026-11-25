@@ -8,8 +8,11 @@ import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "../Data_SceneGroundLayers.mjs";
 import { TERRAIN_RUTS } from "../Data_Tuning_Terrain.mjs";
 import {
-  CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor,
+  CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor, TrenchClearingPaintItems,
 } from "../Script_EncounterFarmland.mjs";
+import {
+  BeishaheGeoContext, SampleBeishaheOuterHeight, SampleShaheChannel, SampleBranchCreek,
+} from "../Script_BeishaheGeography.mjs";
 
 const ROAD_TIER_ORDER = { footpath: 0, villageAlley: 1, villageStreet: 2, guandao: 3 };
 const SmoothStep = (edge0, edge1, x) => {
@@ -221,6 +224,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   const datum=scene.trenches?.datum&&datumBytes?DecodeTrenchDatum(scene.trenches.datum,datumBytes):[];
   const plan=CompileSceneTrenches(scene.trenches,{datum,pre:preAt});
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
+  const geoCtx=BeishaheGeoContext(scene,bounds);
   const paintSettings={cellM:FLOW_RENDERING.terrainSurface.texelM,maxCells:FLOW_RENDERING.terrainSurface.maxPixels};
   const groundPaint = prepared?HydrateGroundPaint(prepared.groundPaint):BuildGroundPaint(scene.paint, bounds, paintSettings);
   const backdropPaint = prepared?prepared.backdropPaint:RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
@@ -297,10 +301,17 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     const distance=Math.hypot(x-edgeX,z-edgeZ);
     const height=preAt(edgeX,edgeZ);
     if(distance>0) {
+      if(geoCtx) return SampleBeishaheOuterHeight(x,z,height,distance,geoCtx);
       const blend=Clamp(distance/(backdrop.blendM||160),0,1),smooth=blend*blend*(3-2*blend);
       return height+(backdrop.y-height)*smooth;
     }
-    return plan?plan.Apply(x,z,height,plan.natural?plan.natural(x,z):height):height;
+    let y=plan?plan.Apply(x,z,height,plan.natural?plan.natural(x,z):height):height;
+    // Upstream/west branch creek continuation inside bounds (strictly clear of frontline trenches z <= 158)
+    if(geoCtx&&z>158&&z<355) {
+      const branch=SampleBranchCreek(x,z,geoCtx,{includeNorth:true,includeSouth:false});
+      if(branch.carveM>0.01) y=Math.min(y,y-branch.carveM*0.85);
+    }
+    return y;
   };
   const lane=map.trenches.find(trench=>trench.id==="SunkenLane");
   const PocketHeight=(z)=>{
@@ -425,8 +436,18 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       && z <= backdropPaint.minZ + backdropPaint.height * backdropPaint.texelM;
     // Sample the original relief throughout the scene, including features away
     // from the trench network that a coarse cell's center can miss entirely.
+    let outerRiverDetail = false;
+    if (geoCtx && !inScene && size > 16 && size <= 128 && Math.abs(cx) < 2600 && cz > -1400 && cz < 2800) {
+      const sh = SampleShaheChannel(cx, cz, geoCtx.riverZShift);
+      const br = SampleBranchCreek(cx, cz, geoCtx);
+      if (sh.dist < size * 0.9 + 55 || br.dist < size * 0.9 + 25) outerRiverDetail = true;
+    }
+    const outerHillDetail = geoCtx && !inScene && size > 16 && Math.abs(cx) < 3600 && cz > -2400 && cz < 3200
+      && Math.abs(center - average) > 0.35;
     const split = size > 1 && near || size > FLOW_RENDERING.terrainSceneCellM && inScene
-      || size > FLOW_RENDERING.terrainBackdropCellM && painted || size > 2 && Math.abs(center-average) > 0.18
+      || size > FLOW_RENDERING.terrainBackdropCellM && painted
+      || (inScene ? size > 2 : size > 16) && Math.abs(center-average) > 0.18
+      || outerRiverDetail || outerHillDetail
       || size > 1 && size <= FLOW_RENDERING.terrainSceneCellM && inScene && NeedsReliefDetail(x,z,size)
       || slopeDetail;
     const cell={x,z,size,near,painted,corners,centerHeight:center};
@@ -736,16 +757,17 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const tintRgb = PaintMacroTintFor(item);
       if (tintRgb) tintPaintItems.push({ ...item, rgb: tintRgb });
     }
-    // Non-road trenches (gullies, AT ditches, firing trenches): tight spoil floor & bank,
-    // no 3-metre airbrush mud fog over adjacent roads or farmland.
+    // Military trenches & outer defense earthworks: clear adjacent farmland into trampled bare earth & spoil.
+    const trenchClear = TrenchClearingPaintItems(scene.trenches?.segments, scene.paint);
+    splatPaintItems.push(...trenchClear.splatItems);
+    tintPaintItems.push(...trenchClear.tintItems);
+    // Non-road legacy map trenches (gullies, AT ditches, firing trenches)
     for (const trench of map.trenches || []) {
       if (trench.id === "SunkenLane" || !Array.isArray(trench.points) || trench.points.length < 2) continue;
-      splatPaintItems.push({
-        line: trench.points.map(([px, pz]) => ({ x: px, z: pz })),
-        halfW: Math.max(0.8, (trench.width || 3.2) * 0.45),
-        feather: 1.0,
-        rgb: [0, 1, 0],
-      });
+      const pts = trench.points.map(([px, pz]) => ({ x: px, z: pz }));
+      splatPaintItems.push({ line: pts, halfW: Math.max(4.2, (trench.width || 3.2) * 0.5 + 3.0), feather: 6.5, rgb: [0.16, 0.34, 0.50] });
+      tintPaintItems.push({ line: pts, halfW: Math.max(4.2, (trench.width || 3.2) * 0.5 + 3.0), feather: 6.5, rgb: [0.97, 0.93, 0.85] });
+      splatPaintItems.push({ line: pts, halfW: Math.max(1.2, (trench.width || 3.2) * 0.48), feather: 1.8, rgb: [0, 1, 0] });
     }
     const splatPaint = splatPaintItems.length ? BuildGroundPaint(splatPaintItems, bounds, paintSettings) : null;
     const tintPaint = tintPaintItems.length ? BuildGroundPaint(tintPaintItems, bounds, paintSettings) : null;
@@ -878,6 +900,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       backdrop: backdropPaint,
       splat: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: splatData },
       macroTint: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: macroTintData },
+      geo: geoCtx ? { riverZShift: geoCtx.riverZShift, isMerged: geoCtx.isMerged } : null,
     };
     return surfaceMaps;
   };

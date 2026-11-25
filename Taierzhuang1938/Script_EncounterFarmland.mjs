@@ -115,21 +115,21 @@ export function MergedFieldZones(maxZ = 990) {
   return [
     { id: "MergedWestRailN", poly: [[-160, 206], [-83.2, 206], [-83.2, 530], [-122, 538], [-160, 532]] },
     { id: "MergedWestRailS", poly: [[-160, 532.6], [-122, 538.6], [-83.2, 530.6], [-83.2, 822], [-160, 834]] },
-    { id: "MergedNorthWest", poly: [[-75.5, 206], [94.8, 206], [94.8, 474], [58, 480], [26, 471], [-20, 478], [-75.5, 474]] },
-    { id: "MergedNorthEast", poly: [[105.5, 206], [320, 206], [320, 482], [268, 474], [228, 482], [192, 475], [156, 472], [105.5, 474]] },
+    { id: "MergedNorthWest", poly: [[-75.5, 206], [94.8, 206], [94.8, 444], [52, 442], [18, 456], [-20, 476], [-75.5, 474]] },
+    { id: "MergedNorthEast", poly: [[105.5, 206], [320, 206], [320, 480], [268, 472], [244, 464], [218, 446], [156, 438], [105.5, 444]] },
     {
       id: "MergedWestPlainN",
       poly: [
-        [-75.5, 474.6], [-20, 478.6], [26, 471.6], [56, 480.6],
-        [47, 502], [53, 526], [62, 548], [52, 566], [44, 594], [54, 624], [58, 638],
-        [14, 642], [-30, 633], [-75.5, 639],
+        [-75.5, 474.6], [-20, 476.6], [14, 476],
+        [14, 514], [16, 560], [14, 608], [18, 638],
+        [-30, 633], [-75.5, 639],
       ],
     },
     {
       id: "MergedWestPlainS",
       poly: [
-        [-75.5, 639.6], [-30, 633.6], [14, 642.6], [58, 638.6],
-        [61, 658], [52, 682], [38, 704], [48, 728], [56, 748],
+        [-75.5, 639.6], [-30, 633.6], [18, 638.6],
+        [20, 678], [26, 712], [44, 748],
         [20.5, 756], [18, 796], [-44, 798], [-75.5, 804],
       ],
     },
@@ -137,15 +137,15 @@ export function MergedFieldZones(maxZ = 990) {
     {
       id: "MergedEastPlainN",
       poly: [
-        [228, 482.6], [268, 474.6], [320, 482.6], [320, 626], [272, 632],
-        [214, 624], [224, 588], [220, 566], [209, 544], [216, 518], [228, 498],
+        [254, 474.6], [268, 472.6], [320, 480.6], [320, 626], [276, 632],
+        [258, 624], [258, 568], [258, 514],
       ],
     },
     {
       id: "MergedEastPlainS",
       poly: [
-        [214, 624.6], [272, 632.6], [320, 626.6], [320, 766], [256, 750],
-        [218, 732], [222, 692], [214, 668], [207, 648],
+        [258, 624.6], [276, 632.6], [320, 626.6], [320, 766], [262, 750],
+        [248, 742], [258, 696], [258, 656],
       ],
     },
     { id: "MergedSouthBankW", poly: [[-160, 876], [-83.2, 876], [-83.2, maxZ], [-160, maxZ]] },
@@ -611,6 +611,60 @@ export function PaintMacroTintFor(item) {
   if (/^SandBedDamp/.test(id)) return [0.82, 0.82, 0.78];
   if (/^(ThreshingFloor|Village_InnerGardenMid|VillageFringe_W2|GateYard)/.test(id)) return [1.08, 1.03, 0.92];
   if (/^(Village|Lizihang|RailSecYard_Base|BridgeSouthHamlet_Base)$/.test(id)) return [1.05, 1.01, 0.93];
+  if (/^Cleared/.test(id)) return [0.97, 0.93, 0.85];
+  if (/^AtDitch/.test(id)) return [0.96, 0.91, 0.82];
   if (/^Field_/.test(id)) return SoftTintFromHex(item.color, 0.56, 0.55);
   return null;
+}
+
+/**
+ * 为军事战壕、外围防线、反坦克沟生成清场与翻土带（Splat 权重 + 宏观去绿调色）：
+ * 壕沟及周边射界/铁丝网带不再出现农田条块，过渡为踩实黄土与翻掘生土，并标记 authored=1 阻止界外程序农田侵入。
+ */
+export function TrenchClearingPaintItems(segments = [], paintItems = []) {
+  const splatItems = [];
+  const tintItems = [];
+  const ToLine = (pts) => (pts || []).map((pt) => (Array.isArray(pt) ? { x: pt[0], z: pt[1] } : { x: pt.x, z: pt.z }));
+
+  for (const seg of segments || []) {
+    const pts = ToLine(seg?.points);
+    if (pts.length < 2) continue;
+    const id = String(seg.id || "");
+    const floorW = Number.isFinite(seg.floorW) ? seg.floorW : (Number.isFinite(seg.halfFloor) ? seg.halfFloor * 2 : 1.4);
+    const isRoadDitch = /^RoadDitch/i.test(id);
+    const isPerimeter = /^(Village|Front|OldFire|Camp|Ambush)/i.test(id);
+
+    if (isRoadDitch) {
+      splatItems.push({ line: pts, halfW: Math.max(1.8, floorW * 0.5 + 1.4), feather: 2.6, rgb: [0.06, 0.82, 0.12] });
+      tintItems.push({ line: pts, halfW: Math.max(2.2, floorW * 0.5 + 1.8), feather: 3.0, rgb: [0.97, 0.93, 0.85] });
+      continue;
+    }
+
+    const apronHalfW = isPerimeter ? Math.max(9.5, floorW * 0.5 + 9.0) : Math.max(4.6, floorW * 0.5 + 3.6);
+    const apronFeather = isPerimeter ? 11.5 : 6.8;
+    const coreHalfW = isPerimeter ? Math.max(2.4, floorW * 0.5 + 1.8) : Math.max(1.8, floorW * 0.5 + 1.2);
+    const coreFeather = isPerimeter ? 3.2 : 2.4;
+
+    // 外圈清场压实与碎土带（清除麦田/草茬/田埂，无农田概念）
+    splatItems.push({ line: pts, halfW: apronHalfW, feather: apronFeather, rgb: [0.18, 0.30, 0.52] });
+    tintItems.push({ line: pts, halfW: apronHalfW, feather: apronFeather, rgb: [0.97, 0.93, 0.85] });
+    // 内圈战壕与胸墙翻土带（新鲜生土）
+    splatItems.push({ line: pts, halfW: coreHalfW, feather: coreFeather, rgb: [0.04, 0.92, 0.04] });
+    tintItems.push({ line: pts, halfW: coreHalfW, feather: coreFeather, rgb: [0.98, 0.95, 0.88] });
+  }
+
+  // 反坦克沟与既有壕沟涂色外扩清场土带
+  for (const item of paintItems || []) {
+    const id = String(item?.id || "");
+    if (!/^AtDitch/i.test(id)) continue;
+    if (item.poly?.length >= 3) {
+      splatItems.push({ poly: item.poly, feather: Math.max(12.0, (item.feather || 2) + 10.0), rgb: [0.16, 0.36, 0.48] });
+      tintItems.push({ poly: item.poly, feather: Math.max(12.0, (item.feather || 2) + 10.0), rgb: [0.96, 0.91, 0.82] });
+    } else if (item.line?.length >= 2) {
+      splatItems.push({ line: item.line, halfW: (item.halfW || 2.5) + 9.5, feather: 11.0, rgb: [0.16, 0.36, 0.48] });
+      tintItems.push({ line: item.line, halfW: (item.halfW || 2.5) + 9.5, feather: 11.0, rgb: [0.96, 0.91, 0.82] });
+    }
+  }
+
+  return { splatItems, tintItems };
 }

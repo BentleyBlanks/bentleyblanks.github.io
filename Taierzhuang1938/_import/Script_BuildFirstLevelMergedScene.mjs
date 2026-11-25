@@ -21,6 +21,9 @@ import {
 import { DecodeTrenchDatum, EncodeTrenchDatum } from "../Script_SceneTrenches.mjs";
 import { ResolveInheritedScene } from "../Script_SceneInherit.mjs";
 import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
+import {
+  BeishaheGeoContext, HECHAZI_MERGED_SOUTH, SampleBranchCreek, SampleBeishaheRelief, SampleShaheChannel,
+} from "../Script_BeishaheGeography.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(dirHere, "..");
@@ -2113,7 +2116,18 @@ function BuildMergedScene() {
 
   ownPaint.unshift(
     {
-      // S2 史料规模犬牙凹凸自然村界（与东西农田片区锯齿咬合，柔化边缘过渡 feather=5.5，彻底打破直线框！）
+      // 外围战壕与铁丝网防御清场带（村北反坦克沟/伐木射界 + 东西折回战壕及铁丝网外沿 + 东南桥头警戒壕，无田地概念）
+      id: "Cleared_VillagePerimeter",
+      poly: [
+        { x: 10, z: 462 }, { x: 42, z: 438 }, { x: 102, z: 434 }, { x: 172, z: 434 }, { x: 232, z: 448 }, { x: 256, z: 484 },
+        { x: 258, z: 544 }, { x: 258, z: 614 }, { x: 258, z: 688 }, { x: 244, z: 742 },
+        { x: 204, z: 758 }, { x: 158, z: 766 }, { x: 96, z: 778 }, { x: 44, z: 774 },
+        { x: 26, z: 726 }, { x: 14, z: 676 }, { x: 10, z: 610 }, { x: 10, z: 536 },
+      ],
+      feather: 12.0, color: "#b8aa8c", strength: 0.96,
+    },
+    {
+      // S2 史料规模犬牙凹凸自然村界（与外围战壕清场带衔接，柔化边缘过渡 feather=5.5）
       id: "Village",
       poly: [
         { x: 47, z: 502 }, { x: 64, z: 486 }, { x: 104, z: 484 }, { x: 158, z: 480 }, { x: 208, z: 482 }, { x: 228, z: 498 },
@@ -2125,12 +2139,8 @@ function BuildMergedScene() {
       ],
       feather: 5.5, color: "#c6b99c",
     },
-    // 村缘不规则菜园/土场过渡带（骑在村界凹凸口上，使村与田自然渗透）
-    { id: "VillageFringe_W1", poly: [{ x: 46, z: 536 }, { x: 64, z: 538 }, { x: 62, z: 556 }, { x: 44, z: 552 }], feather: 2.4, color: "#809362", strength: 0.56 },
-    { id: "VillageFringe_W2", poly: [{ x: 40, z: 580 }, { x: 54, z: 582 }, { x: 52, z: 604 }, { x: 38, z: 598 }], feather: 2.2, color: "#cfc2a2", strength: 0.62 },
-    { id: "VillageFringe_W3", poly: [{ x: 48, z: 644 }, { x: 76, z: 648 }, { x: 74, z: 666 }, { x: 46, z: 660 }], feather: 2.4, color: "#7c8f5f", strength: 0.58 },
-    { id: "VillageFringe_E1", poly: [{ x: 204, z: 532 }, { x: 222, z: 536 }, { x: 218, z: 556 }, { x: 202, z: 552 }], feather: 2.4, color: "#7f9262", strength: 0.56 },
-    { id: "VillageFringe_E2", poly: [{ x: 202, z: 636 }, { x: 220, z: 642 }, { x: 218, z: 662 }, { x: 200, z: 656 }], feather: 2.4, color: "#819364", strength: 0.54 },
+    // 村缘土场过渡带（原东西战壕内绿菜园已随外围壕沟清场撤除，仅保留西侧土场与村内院落小菜园）
+    { id: "VillageFringe_W2", poly: [{ x: 42, z: 580 }, { x: 56, z: 582 }, { x: 54, z: 604 }, { x: 40, z: 598 }], feather: 2.2, color: "#cfc2a2", strength: 0.62 },
     ...bombScorchPaint,
     {
       id: "ThreshingFloor",
@@ -2320,6 +2330,136 @@ function BuildMergedScene() {
     { id: "LmMergedWoundedAlcove", name: "堤后伤员避弹窝", x: -93.5, z: 885.0, kind: "place" },
     { id: "LmMergedSouthHamlet", name: "桥南小庄", x: -27.0, z: 932.0, kind: "place" },
   ];
+
+  // ---------------------------------------------------------------------------
+  // 5B) 河汊子支流南延（z=355..870，绕过北沙河村与铁路涵洞汇入沙河）+ 开阔农田真实 SRTM 微起伏
+  //     严格构建固定 Y 物件 / 村落 / 铁路 / 道路 / 壕沟安全保护掩码，确保零浮空、零埋入、零穿墙。
+  // ---------------------------------------------------------------------------
+  const geoCtx = BeishaheGeoContext("FirstLevelMerged", { minX, maxX: minX + cols * cellM, minZ: INHERIT_MAX_Z, maxZ: INHERIT_MAX_Z + outRows * cellM });
+  // 1) 河汊子南延水体与铁路涵洞端墙（跳过 x≈-80 铁路路基涵洞段）
+  const branchPts = HECHAZI_MERGED_SOUTH;
+  for (let i = 1; i < branchPts.length; i++) {
+    const [ax, az] = branchPts[i - 1], [bx, bz] = branchPts[i];
+    const segLen = Math.hypot(bx - ax, bz - az);
+    const steps = Math.max(1, Math.ceil(segLen / 18));
+    for (let s = 0; s < steps; s++) {
+      const t0 = s / steps, t1 = (s + 1) / steps;
+      const mx = ax + (bx - ax) * (t0 + t1) * 0.5;
+      const mz = az + (bz - az) * (t0 + t1) * 0.5;
+      if (Math.abs(mx - (-80)) < 7.5 && mz < 450) continue; // 铁路路基涵洞内不摆水面块
+      const len = segLen / steps + 1.8;
+      const yawDeg = Fix(Math.atan2(bx - ax, bz - az) * 180 / Math.PI);
+      ownObjects.push({
+        id: `HechaBranchWater_${i}_${s}`,
+        asset: "Whitebox/Box",
+        material: "Whitebox/Water",
+        pos: [Fix(mx), -1.68, Fix(mz)],
+        size: [9.6, 0.5, Fix(len)],
+        yawDeg,
+        solid: false,
+        group: "08–13合并/地形水系",
+      });
+    }
+  }
+  // 铁路路基两侧石砌涵洞端墙（x = -74.8 / -85.2, z = 412）
+  for (const [side, cx] of [["E", -74.6], ["W", -85.4]]) {
+    ownObjects.push({
+      id: `HechaRailCulvert_${side}`,
+      asset: "Whitebox/Box",
+      material: "Whitebox/Structure",
+      pos: [cx, 0.2, 412],
+      size: [1.1, 2.2, 9.2],
+      yawDeg: 0,
+      solid: true,
+      group: "08–13合并/地形水系",
+    });
+  }
+
+  // 2) 安全保护栅格（2 m 一格）：所有固定 Y 物件、村落、铁路、路网、壕沟、水体周边保持原始精确高程
+  const maskStep = 2.0;
+  const maskW = Math.ceil((cols * cellM) / maskStep) + 1;
+  const maskH = Math.ceil((outRows * cellM) / maskStep) + 1;
+  const protect = new Float32Array(maskW * maskH);
+  const MarkProtect = (cx, cz, rx, rz, feather = 12) => {
+    const ix0 = Math.max(0, Math.floor((cx - rx - feather - minX) / maskStep));
+    const ix1 = Math.min(maskW - 1, Math.ceil((cx + rx + feather - minX) / maskStep));
+    const iz0 = Math.max(0, Math.floor((cz - rz - feather - INHERIT_MAX_Z) / maskStep));
+    const iz1 = Math.min(maskH - 1, Math.ceil((cz + rz + feather - INHERIT_MAX_Z) / maskStep));
+    for (let iz = iz0; iz <= iz1; iz++) {
+      const wz = INHERIT_MAX_Z + iz * maskStep;
+      const dz = Math.max(0, Math.abs(wz - cz) - rz);
+      for (let ix = ix0; ix <= ix1; ix++) {
+        const wx = minX + ix * maskStep;
+        const dx = Math.max(0, Math.abs(wx - cx) - rx);
+        const d = Math.hypot(dx, dz);
+        if (d >= feather) continue;
+        const p = 1 - (d / feather) * (d / feather) * (3 - 2 * (d / feather));
+        const at = iz * maskW + ix;
+        if (p > protect[at]) protect[at] = p;
+      }
+    }
+  };
+  // 保护北沙河村、李子行、铁路路基、拼接过渡带
+  MarkProtect(135, 625, 108, 160, 22); // 北沙河村及防线
+  MarkProtect(-10, 775, 42, 34, 18);   // 李子行
+  MarkProtect(-80, 672, 16, 330, 14);  // 津浦铁路路基与桥圈
+  for (const obj of ownObjects) {
+    if (!obj.pos || obj.pos[1] === null || obj.tag === "airWall") continue;
+    const hw = (obj.size?.[0] || 2) * 0.5 + 3, hd = (obj.size?.[2] || 2) * 0.5 + 3;
+    MarkProtect(obj.pos[0], obj.pos[2], hw, hd, 10);
+  }
+  for (const seg of ownSegments) {
+    for (let i = 1; i < (seg.points?.length || 0); i++) {
+      const [ax, az] = seg.points[i - 1], [bx, bz] = seg.points[i];
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 8));
+      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, 5, 5, 10);
+    }
+  }
+  for (const r of ownRoadRibbons) {
+    const pts = r.points || [];
+    for (let i = 1; i < pts.length; i++) {
+      const ax = pts[i - 1][0] ?? pts[i - 1].x, az = pts[i - 1][1] ?? pts[i - 1].z;
+      const bx = pts[i][0] ?? pts[i].x, bz = pts[i][1] ?? pts[i].z;
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 10));
+      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, (r.width || 4) * 0.6, (r.width || 4) * 0.6, 8);
+    }
+  }
+
+  // 3) 写入河汊子南延河床下切 + 适度拓宽北沙河主河槽 + 开阔农田真实 SRTM 缓坡微起伏
+  const refRelief = SampleBeishaheRelief(100, 560, geoCtx);
+  for (let iz = 0; iz <= outRows; iz++) {
+    const wz = INHERIT_MAX_Z + iz * cellM;
+    const rowOff = iz * width;
+    const northFade = iz < 6 ? (iz / 6) : 1;
+    const miz = Math.min(maskH - 1, Math.max(0, Math.round((wz - INHERIT_MAX_Z) / maskStep)));
+    const reliefNorthFade = iz <= SafeMinIz ? 0 : Math.min(1, (wz - (INHERIT_MAX_Z + SafeMinIz * cellM)) / 24);
+    for (let ix = 0; ix <= cols; ix++) {
+      const wx = minX + ix * cellM;
+      const at = rowOff + ix;
+      // 河汊子南延河床下切（z = 355 起无缝衔接北段，铁路涵洞处自动保持路基不塌）
+      const br = SampleBranchCreek(wx, wz, geoCtx, { includeNorth: false, includeSouth: true });
+      if (br.carveM > 0.005) {
+        const targetBed = Math.min(ownHeights[at], 0.25 - br.carveM * 1.05);
+        const blendC = Math.min(1, br.bankT * 1.15) * (iz === 0 ? 0 : northFade);
+        ownHeights[at] = ownHeights[at] + (targetBed - ownHeights[at]) * blendC;
+      }
+      // 北沙河主河道在非村落/非桥墩处适度加深主水槽（与界外宽化主河道平顺对接）
+      const sh = SampleShaheChannel(wx, wz, 0);
+      if (sh.waterT > 0.01 && Math.abs(wx - (-80)) > 8.5) {
+        const targetStream = Math.min(ownHeights[at], -2.65 - sh.waterT * 0.35);
+        ownHeights[at] = ownHeights[at] + (targetStream - ownHeights[at]) * (sh.waterT * 0.65);
+      }
+      // 开阔无人/无建筑农田叠加真实 SRTM N35E117 相对起伏（±1.25 m，零影响固定物件）
+      if (reliefNorthFade > 0.001 && sh.bankT < 0.05 && br.bankT < 0.05) {
+        const mix = Math.min(maskW - 1, Math.max(0, Math.round((wx - minX) / maskStep)));
+        const openW = (1 - protect[miz * maskW + mix]) * reliefNorthFade;
+        if (openW > 0.01) {
+          const delta = Math.max(-1.1, Math.min(1.45, (SampleBeishaheRelief(wx, wz, geoCtx) - refRelief) * 0.32));
+          ownHeights[at] += delta * openW;
+        }
+      }
+    }
+  }
 
   const maxZ = INHERIT_MAX_Z + outRows * cellM; // 990
   const mergedDoc = {

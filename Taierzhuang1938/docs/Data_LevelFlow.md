@@ -189,6 +189,11 @@ Timeline 小窗右上角的箭头可收起或展开时间轴，默认展开，�
 
 ## 维护与验证
 
+- 2026-11-26 北沙河真实 SRTM N35E117 高度图同步、水系拓宽延伸与外围战壕清场：
+  - 基于 AWS Open Data SRTM 30 m（`N35E117.hgt.gz`）以 OSM 核实的北沙河铁路桥（`35.145029°N, 117.106797°E`，基准海拔 65 m）为中心，由 `Script_BeishaheDemCli.mjs` 离线生成 257×257 覆盖 12.288 km 范围的 `Heightmap/Data_BeishaheDem.mjs` 与 16 位灰度图 `Heightmap/Texture_BeishaheDem.png`（东北滕州–龙山低山丘陵至西南微山湖冲积平原真实高差 46.1–120.3 m）。
+  - 新增纯 JS 地理模块 `Script_BeishaheGeography.mjs`，叠加亚 30 m 鲁南黄土岗脊/河谷阶地细节并贯通拓宽北沙河主河道（东西平滑延伸出视距）与河汊子支流（北延出视距、南延经铁路涵洞绕北沙河村西侧于铁路桥西汇入沙河），统一接入遭遇设计编辑器（`Script_LevelFlowTerrain.mjs` / `Script_LevelFlowGpuRaster.mjs`）、场景编辑器与 Play 远景地面（`Script_EditorBlockoutLevels.mjs`）及 `FirstLevelMerged` 构建脚本（固定 Y 物件/村落/铁路/道路/壕沟全保护）。
+  - 在 `Script_EncounterFarmland.mjs` 新增 `TrenchClearingPaintItems` 并同步至 `FirstLevelMerged` 的 `Cleared_VillagePerimeter`，外围战壕、反坦克沟及铁丝网防线带统一清除农田条块与绿菜园，过渡为踩实黄土与翻掘生土。
+
 - 2026-11-25 遭遇设计编辑器与遭遇白盒场景地形贴图混合统一（方案 A）：
   - 提取纯 JS 模块 `Script_EncounterFarmland.mjs` 统一管理鲁南条田分区与条带（含 `L0610_FIELD_ZONES` / `L0610_FIELDS` 与 `MergedFieldZones` / `MergedPaperFields`）、道路 Splat 权重与连续带符号车辙横向坐标（`BuildRoadSplatRaster`）及低频宏观调色（`PaintMacroTintFor`）。
   - `Script_LevelFlowTerrain.mjs` 在保留 `surfaceMaps.scene` 供软件回退与既有测试兼容的基础上，新增 0.5 m/texel 的 `splat`（R 车道 `CartTrack`、G 翻土/陡坡 `SpoilEarth`、B 草茬 `DryStubble`、A 连续带符号车辙坐标）与 `macroTint`（RGB 宏观调色、A 实绘覆盖度）烘焙，移除 0.5 m 硬烘焙细条纹、道路糊泥与 3 m `SoilMixAt` 喷枪雾；`Script_LevelFlowGpuRaster.mjs` 在 WebGL2 片段着色器中复用外部 `TERRAIN_SETS.MissionPlain` 四层无缝贴图，完成远近双尺度防重复平铺、Height Lerp 高度混合、陡坡双平面侧投影、解析双道车辙与宏观条田分色（模型保持白盒），并对 `groundBounds` 之外及未实绘空旷平原统一走同一套四层材质 + 程序化鲁南 Voronoi 条田与自然田埂收口，消除地图矩形边界断层。

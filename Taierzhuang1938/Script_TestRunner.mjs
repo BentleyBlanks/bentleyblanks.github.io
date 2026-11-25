@@ -1109,7 +1109,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterVariants|EncounterFarmland|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|ArchivedP012Split|SceneSurface/ },
+  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterVariants|EncounterFarmland|BeishaheDem|BeishaheGeography|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|ArchivedP012Split|SceneSurface/ },
   { domain: "advancedTools", pattern: /AssetStandards|AssetPipeline|AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},
