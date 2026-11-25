@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterPuppetYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterPuppetYaw, EncounterInitialActorYaw, EncounterOrderYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
 export { ResolveEncounterStageStart };
 import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
 import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
@@ -567,7 +567,27 @@ export class EncounterPlay {
     const grenades=combatEnemy
       ?(group?.grenadeInterval>0?2:(group&&["advance","bounds","flank","escort"].includes(group.behavior)&&index%2===0?1:0))
       :0;
-    const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spec.yawDeg*Math.PI/180,grenades,
+    const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
+    let routeIndex=0;
+    if(route&&initial) {
+      let nearest=Infinity;
+      for(let i=1;i<route.length;i++){
+        const a=route[i-1],b=route[i],dx=b[0]-a[0],dz=b[1]-a[1],length=dx*dx+dz*dz;
+        const t=length?Math.max(0,Math.min(1,((spec.x-a[0])*dx+(spec.z-a[1])*dz)/length)):0;
+        const d=Math.hypot(a[0]+t*dx-spec.x,a[1]+t*dz-spec.z);
+        if(d<nearest){nearest=d;routeIndex=t<.001?i-1:i;}
+      }
+    }
+    let futureActor=null;
+    if(actor.heading===undefined&&!route) {
+      const lookAheadTime=Math.min(this.plan.beat.end,this.plan.time+0.5);
+      if(lookAheadTime>this.plan.time+0.01) {
+        futureActor=this.plan.variant.evaluate(lookAheadTime,this.plan.document).actors.find(a=>a.id===actor.id)||null;
+      }
+    }
+    const spawnYaw=EncounterInitialActorYaw(actor,{route,routeIndex,futureActor,beat:this.plan.beat});
+    spec.yawDeg=spawnYaw*180/Math.PI;
+    const soldier=this.host.ai.Spawn(spec.side,spec.x,spec.z,{weapon:spec.weapon,ry:spawnYaw,grenades,
       navPlacement:"authored",squadId:"Encounter_"+(actor.groupId||actor.id),modelVariant:variants[hash%variants.length],...SpeakingCastOptions(spec.castId)});
     if(!soldier)return false;
     const skin=spec.castId||XBOT_FACTION_CHARACTERS[spec.side]?.length?this.puppets.xbot.Attach(soldier.actor,{faction:spec.side,castId:spec.castId,unitId:actor.id}):null;
@@ -581,17 +601,6 @@ export class EncounterPlay {
         grounded:true,dead:spec.state==="down",dying:spec.state==="down"?1:0,
         elapsed:this.host.ai.time,lookYaw:0,lookPitch:0,
       });
-    }
-    const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
-    let routeIndex=0;
-    if(route&&initial) {
-      let nearest=Infinity;
-      for(let i=1;i<route.length;i++){
-        const a=route[i-1],b=route[i],dx=b[0]-a[0],dz=b[1]-a[1],length=dx*dx+dz*dz;
-        const t=length?Math.max(0,Math.min(1,((spec.x-a[0])*dx+(spec.z-a[1])*dz)/length)):0;
-        const d=Math.hypot(a[0]+t*dx-spec.x,a[1]+t*dz-spec.z);
-        if(d<nearest){nearest=d;routeIndex=t<.001?i-1:i;}
-      }
     }
     const member=group?.memberPlans?.[index%(group?.maxAlive||1)];
     const deployment=(group?.deployDelay||0)+(member?.delay||0);
@@ -707,18 +716,21 @@ export class EncounterPlay {
       if(group.suppressionStop)target=group.suppressionStop;
       moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>cfg.routeReachM;
     }
-    let yaw=current?.heading===undefined?entry.spec.yawDeg*Math.PI/180:-current.heading;
-    if(group?.afterRouteLookAt&&route&&entry.routeIndex===route.length-1&&!moving&&!combat) {
-      yaw=Math.atan2(soldier.position.x-group.afterRouteLookAt[0],soldier.position.z-group.afterRouteLookAt[1]);
-    }
     const guide=!!this.stealth&&entry.actor.id==="liu"&&frame.beat.id==="09a";
     const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):group?.speed||2.6;
-    if(guide&&moving)yaw=Math.atan2(soldier.position.x-target[0],soldier.position.z-target[1]);
-    let forceYaw=false;
-    if(this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId) {
-      target=[soldier.position.x,soldier.position.z];moving=false;forceYaw=true;
-      yaw=Math.atan2(-(this.host.player.position.x-soldier.position.x),-(this.host.player.position.z-soldier.position.z));
-    }
+    const suspicionObserver=this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId;
+    if(suspicionObserver){target=[soldier.position.x,soldier.position.z];moving=false;}
+    const {yaw,forceYaw}=EncounterOrderYaw({
+      currentHeading:current?.heading,
+      afterRouteLookAt:group?.afterRouteLookAt,
+      position:soldier.position,
+      moving,
+      combat,
+      routeFinished:!!route&&entry.routeIndex===route.length-1,
+      guide,
+      target,
+      suspicionPlayer:suspicionObserver?this.host.player.position:null,
+    });
     const allowCover=combat&&!guide;
     const isEnemyCombat=combat&&!guide&&entry.spec.side==="ija";
     const isBayonetRush=isEnemyCombat&&!!group&&/BridgeRush/i.test(group.id);

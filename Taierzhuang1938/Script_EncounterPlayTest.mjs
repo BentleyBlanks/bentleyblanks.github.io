@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,EncounterPuppetYaw,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,EncounterPuppetYaw,EncounterInitialActorYaw,EncounterOrderYaw,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
 import {FLOW_TIMELINE,DEFAULT_ENCOUNTER_DOCUMENT,BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import {FIRST_LEVEL_MUSIC_CUES} from "./Data_FirstLevelMissionMusic.mjs";
 import {WEAPONS} from "./Data_Weapons.mjs";
@@ -240,6 +240,30 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
  const still={x:3,z:4,yawDeg:37};
  assert.equal(EncounterPuppetYaw(still,{x:3.001,z:4,yawDeg:0},dt),37,"Idle jitter keeps the last facing");
  assert.equal(EncounterPuppetYaw(still,{x:30,z:4,yawDeg:0},dt),37,"Teleports keep the last facing");
+}
+{
+ // 07c 随车南下友军（罗班长/何有田/刘文财/幺娃）：编排未写 heading 时，出生面向南行方向，且停步时 Order 不得强行掰回正北(0 rad)。
+ const merged=CompileEncounterVariant(FIRST_LEVEL_CAMPAIGN_VARIANT_ID),beat=merged.BeatById("07c");
+ const nowFrame=merged.evaluate(beat.start),futureFrame=merged.evaluate(beat.start+0.5);
+ for(const id of ["luo","he","liu","yao"]) {
+  const actor=nowFrame.actors.find(a=>a.id===id),future=futureFrame.actors.find(a=>a.id===id);
+  assert.ok(actor&&future,`07c includes ally ${id}`);
+  assert.equal(actor.heading,undefined,`07c ally ${id} has no authored heading`);
+  const spawnYaw=EncounterInitialActorYaw(actor,{futureActor:future,beat});
+  const dx=future.p[0]-actor.p[0],dz=future.p[1]-actor.p[1],dist=Math.hypot(dx,dz);
+  assert.ok(dist>0.1,`07c ally ${id} advances during beat`);
+  assert.ok((-Math.sin(spawnYaw)*dx-Math.cos(spawnYaw)*dz)/dist>0.8,`07c ally ${id} spawns facing travel direction instead of north`);
+  const pausedOrder=EncounterOrderYaw({currentHeading:actor.heading,position:{x:actor.p[0],z:actor.p[1]},moving:false,combat:false});
+  assert.equal(pausedOrder.yaw,undefined,`07c ally ${id} keeps movement facing when pausing within reachM`);
+  assert.equal(pausedOrder.forceYaw,false);
+ }
+ const authoredOrder=EncounterOrderYaw({currentHeading:Math.PI/2,position:{x:0,z:0},moving:false,combat:false});
+ assert.ok(Math.abs(authoredOrder.yaw+Math.PI/2)<1e-6,"Authored heading still applies when explicitly present");
+ const lookAtOrder=EncounterOrderYaw({currentHeading:undefined,afterRouteLookAt:[10,0],position:{x:0,z:0},moving:false,combat:false,routeFinished:true});
+ assert.ok(Math.abs(lookAtOrder.yaw+Math.PI/2)<1e-6,"afterRouteLookAt applies after route completion");
+ const suspicionOrder=EncounterOrderYaw({currentHeading:undefined,position:{x:0,z:0},moving:false,combat:false,suspicionPlayer:{x:0,z:10}});
+ assert.equal(suspicionOrder.forceYaw,true,"Stealth suspicion forces yaw toward player");
+ assert.ok(Math.abs(Math.abs(suspicionOrder.yaw)-Math.PI)<1e-6,"Stealth suspicion faces player south");
 }
 {
  // 08 沟北九四式：离开官道碾过东侧铁丝网，停在反坦克沟北沿（上口 z≈468.3），不堵板桥北头，不与老乡、架桥组、沟北火力组相撞。

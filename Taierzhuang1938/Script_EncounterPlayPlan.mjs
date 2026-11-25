@@ -92,6 +92,56 @@ export function EncounterPuppetYaw(previous, spec, dt, facing = CONFIG.puppetFac
   return (current + Math.max(-limit, Math.min(limit, delta))) * 180 / Math.PI;
 }
 
+// Initial yaw for AI soldiers without an authored heading: prefer route direction, then
+// near-future authored motion, then the beat's own travel direction, so allies never spawn
+// facing north (-Z) while marching south (+Z).
+export function EncounterInitialActorYaw(actor, { route = null, routeIndex = 0, futureActor = null, beat = null } = {}) {
+  if (Number.isFinite(actor?.heading)) return -actor.heading;
+  if (Array.isArray(route) && route.length >= 2) {
+    const idx = Math.max(0, Math.min(route.length - 1, routeIndex | 0));
+    const from = idx < route.length - 1 ? route[idx] : route[idx - 1];
+    const to = idx < route.length - 1 ? route[idx + 1] : route[idx];
+    const dx = to[0] - from[0], dz = to[1] - from[1];
+    if (Math.hypot(dx, dz) > 0.05) return Math.atan2(-dx, -dz);
+  }
+  if (actor?.p && futureActor?.p) {
+    const dx = futureActor.p[0] - actor.p[0], dz = futureActor.p[1] - actor.p[1];
+    if (Math.hypot(dx, dz) > 0.05) return Math.atan2(-dx, -dz);
+  }
+  if (beat) return EncounterPlayerYaw(beat);
+  return 0;
+}
+
+// Order yaw for AI soldiers. Leave yaw undefined when the authored frame specifies no
+// heading so DirectActor preserves the soldier's natural movement facing instead of
+// snapping them back to north (0 rad) every time they pause within reachM.
+export function EncounterOrderYaw({
+  currentHeading = undefined,
+  afterRouteLookAt = null,
+  position = null,
+  moving = false,
+  combat = false,
+  routeFinished = false,
+  guide = false,
+  target = null,
+  suspicionPlayer = null,
+} = {}) {
+  if (suspicionPlayer && position) {
+    return {
+      yaw: Math.atan2(-(suspicionPlayer.x - position.x), -(suspicionPlayer.z - position.z)),
+      forceYaw: true,
+    };
+  }
+  let yaw = Number.isFinite(currentHeading) ? -currentHeading : undefined;
+  if (afterRouteLookAt && routeFinished && !moving && !combat && position) {
+    yaw = Math.atan2(position.x - afterRouteLookAt[0], position.z - afterRouteLookAt[1]);
+  }
+  if (guide && moving && target && position) {
+    yaw = Math.atan2(position.x - target[0], position.z - target[1]);
+  }
+  return { yaw, forceYaw: false };
+}
+
 // Authored time is a director clock. Gameplay facts, not preview lifetimes,
 // decide deaths, area triggers and reinforcement slots after the chosen keyframe.
 export class EncounterPlayPlan {
