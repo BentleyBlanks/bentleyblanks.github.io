@@ -366,15 +366,18 @@ world.node_tree.nodes["Background"].inputs["Strength"].default_value=layout['wor
 bpy.ops.object.light_add(type="AREA",location=(-1.5,1.86,2.6))
 light=bpy.context.object;light.name="WindowSky";light.location=sceneCalibration@backdropTransform@light.location
 light.data.energy=230*scale*scale*layout['windowSkyMultiplier'];light.data.shape="RECTANGLE";light.data.size=1.54*scale;light.data.size_y=1.85*scale
+if 'windowSkyColor' in layout: light.data.color=tuple(layout['windowSkyColor'])
 light.rotation_euler=(sceneCalibration@Vector((.3,-.7,.8))-light.location).to_track_quat("-Z","Y").to_euler()
 # Diffuse daylight at the camera-side entrance keeps the unlit wall
 # readable. It is outside the room opening, with no second directional sun.
 bpy.ops.object.light_add(type='AREA',location=(entry['centerX'],roomBounds['frontY']-.18,entry['heightM']/2))
 entryLight=bpy.context.object;entryLight.name='EntranceSky';entryLight.data.energy=entry['skyWatts']
+if 'color' in entry: entryLight.data.color=tuple(entry['color'])
 entryLight.data.shape='RECTANGLE';entryLight.data.size=entry['widthM'];entryLight.data.size_y=entry['heightM']
 entryLight.rotation_euler=Vector((0,1,0)).to_track_quat('-Z','Y').to_euler()
 bpy.ops.object.light_add(type="SUN",location=(-3,5,5))
 sun=bpy.context.object;sun.name="LeftWindowSun";sun.data.energy=layout['sunStrength'];sun.data.angle=.05
+if 'sunColor' in layout: sun.data.color=tuple(layout['sunColor'])
 sun.rotation_euler=Vector(layout['sunDirection']).to_track_quat("-Z","Y").to_euler()
 # Camera is a real glTF camera; reference matching is evaluated from render.
 bpy.ops.object.camera_add(location=calibratedCameraPosition)

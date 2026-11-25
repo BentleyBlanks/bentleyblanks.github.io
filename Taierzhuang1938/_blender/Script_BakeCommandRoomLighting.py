@@ -56,7 +56,7 @@ for mat in bpy.data.materials:
     tree=mat.node_tree
     for node in tree.nodes:node.select=False
     node=tree.nodes.new('ShaderNodeTexImage');node.name='CommandRoomBakedLighting';node.image=atlas;node.select=True;tree.nodes.active=node
-scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=384;scene.cycles.use_denoising=True
+scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=512;scene.cycles.use_denoising=True
 scene.render.bake.use_pass_direct=True;scene.render.bake.use_pass_indirect=True;scene.render.bake.use_pass_color=False
 scene.render.bake.margin=3;scene.render.bake.margin_type='EXTEND';scene.render.bake.use_clear=True
 # Sewing thread is below the atlas texel size. Baking its hairline shadow creates
@@ -103,7 +103,7 @@ for mat in bpy.data.materials:
 bpy.ops.export_scene.gltf(filepath=str(GAME/'Model'/'Model_CommandRoom.glb'),export_format='GLB',use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True,export_texcoords=True,export_image_format='NONE',export_vertex_color='ACTIVE')
 for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Scene_CommandRoom.blend'))
-record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':384,'encoding':'sRGB(linear diffuse irradiance / 32)','scale':32,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'relativeTexelDensity':density}
+record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':512,'encoding':'sRGB(linear diffuse irradiance / 32)','scale':32,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'relativeTexelDensity':density}
 (GAME/'_shots'/'CommandRoom'/'Data_CommandRoomLighting.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
 print(json.dumps(record))
 result=record
