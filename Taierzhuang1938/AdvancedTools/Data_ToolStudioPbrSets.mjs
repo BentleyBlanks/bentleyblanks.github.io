@@ -24,7 +24,7 @@ export const PBR_SETS = [
     normal: "./Texture/Texture_GrenadeNormal.webp?v=grenadePatina20261126",
     orm: "./Texture/Texture_GrenadeOrm.webp?v=grenadePatina20261126" },
   { name: "DadaoPbr",
-    albedo: "./Texture/Texture_DadaoBase.webp?v=3",
+    albedo: "./Texture/Texture_DadaoBase.webp?v=4",
     normal: "./Texture/Texture_DadaoNormal.webp?v=3",
     orm: "./Texture/Texture_DadaoOrm.webp?v=3" },
   { name: "HandcartWood", fallback: "WoodBeam",

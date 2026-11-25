@@ -131,8 +131,16 @@ def Fit(source):
     broad = (SignedDistance(front) + SignedDistance(reverse)) > 0
     edges, depth = ColumnEdges(broad), ColumnEdges(side, 512)
     first = int(edges[0][0])
-    # Carry the blade shoulder inward from its visible end so it meets the guard.
-    bladeEdges = tuple(field[:len(edges[0][edges[0] <= 1448])] for field in edges)
+    # Follow the uninterrupted blade cross section up to the guard. Its curled
+    # ends are traced on their own so they do not fill the gaps at the shoulder.
+    blade = broad[:, :1475].copy()
+    for column in blade.T[1440:]:
+        occupied = np.flatnonzero(column)
+        runs = np.split(occupied, np.flatnonzero(np.diff(occupied) > 1) + 1)
+        section = max(runs, key=len)
+        column[:section[0]] = False
+        column[section[-1]+1:] = False
+    bladeEdges = ColumnEdges(blade)
     guardColumns = np.arange(1450, 1553)
     return {
         "referenceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),

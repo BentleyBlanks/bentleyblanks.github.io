@@ -16,8 +16,8 @@
       "file": "Texture_DadaoBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 605206,
-      "sha256": "aed5ad061d97faf2938473bdb3cabd803b4743f938289b78a1e677bf6cf7e063"
+      "bytes": 555532,
+      "sha256": "cc3daab28f5bbd9ca95b3e570f3247b6b1654d90519d5ccf0e056d457dc9da5e"
     },
     {
       "channel": "Normal",
@@ -36,24 +36,24 @@
       "sha256": "780f324634d350f72b29c107292d63b042d19e1bed2d3d4a3ea87bc736f117cd"
     }
   ],
-  "totalBytes": 655220,
+  "totalBytes": 605546,
   "metrics": {
     "meanSrgb": [
-      0.362,
-      0.2949,
-      0.2371
+      0.3634,
+      0.2965,
+      0.2383
     ],
-    "luma": 0.298,
-    "lumaStd": 0.0919,
-    "sat": 0.3451,
+    "luma": 0.2994,
+    "lumaStd": 0.0931,
+    "sat": 0.3442,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.1819,
-    "seam": 0.0837,
-    "interior": 0.0621,
-    "seamRatio": 1.347,
-    "border": 0.505,
-    "swing": 0.2827,
+    "lowFreq": 0.1821,
+    "seam": 0.085,
+    "interior": 0.0609,
+    "seamRatio": 1.395,
+    "border": 0.512,
+    "swing": 0.287,
     "texelsPerMeter": null
   },
   "gateProblems": []

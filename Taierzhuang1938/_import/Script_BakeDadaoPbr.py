@@ -14,6 +14,7 @@ from Script_TraceDadaoThreeViews import ReadViews
 
 ROOT = Path(__file__).resolve().parents[1]
 FIT = ROOT / "_blender" / "Data_SichuanDadaoThreeViewFit.json"
+DIFFUSE_FIT = ROOT / "_import" / "Reference" / "SichuanDadao" / "Texture_DadaoDiffuseFit.png"
 BASE_SIZE = 2048
 DATA_SIZE = 1024
 # Diffuse gains measured against the approved sheet in the neutral comparison studio.
@@ -81,13 +82,27 @@ def DataMaps(color, wrap):
     return .5 + .5 * normal, np.stack((ao, rough, metal), axis=2)
 
 
+def LinearSrgb(color):
+    return np.where(color <= .04045, color / 12.92, ((color + .055) / 1.055) ** 2.4)
+
+
+def EncodeSrgb(linear):
+    return np.where(linear <= .0031308, linear * 12.92, 1.055 * linear ** (1 / 2.4) - .055)
+
+
 def CalibrateDiffuse(color, wrap, gains):
     iron, cotton = np.array(gains, dtype=np.float32)
     weight = wrap[..., None]
     factor = iron * (1 - weight) + cotton * weight
-    linear = np.where(color <= .04045, color / 12.92, ((color + .055) / 1.055) ** 2.4)
-    linear *= factor
-    return np.where(linear <= .0031308, linear * 12.92, 1.055 * linear ** (1 / 2.4) - .055)
+    return EncodeSrgb(LinearSrgb(color) * factor)
+
+
+def ApplyDiffuseFit(color, source):
+    with Image.open(source) as image:
+        # The calibration atlas stores neutral gain at 128 and a 1/202 step.
+        fit = image.convert("RGB").resize((BASE_SIZE, BASE_SIZE), Image.Resampling.BILINEAR)
+    factor = 1 + (np.asarray(fit, dtype=np.float32) - 128) / 202
+    return EncodeSrgb(LinearSrgb(color) * factor)
 
 
 def Save(color, path, quality):
@@ -96,7 +111,7 @@ def Save(color, path, quality):
     print(f"{path.name} {rgb.shape[1]}×{rgb.shape[0]}, {path.stat().st_size:,} bytes")
 
 
-def Bake(source, swatches, output):
+def Bake(source, swatches, output, diffuseFit=DIFFUSE_FIT):
     fit = json.loads(FIT.read_text(encoding="utf-8"))
     if hashlib.sha256(source.read_bytes()).hexdigest() != fit["referenceSha256"]:
         raise ValueError("Retrace the contours before baking from a different reference sheet")
@@ -117,7 +132,8 @@ def Bake(source, swatches, output):
     base = [CalibrateDiffuse(color, WrapWeight(atlas, shape), gains)
             for color, gains in zip(colors, LIGHTING_GAINS)]
     output.mkdir(parents=True, exist_ok=True)
-    Save(PackStrips(base, BASE_SIZE), output / "Texture_DadaoBase.webp", 92)
+    packedBase = ApplyDiffuseFit(PackStrips(base, BASE_SIZE), diffuseFit)
+    Save(packedBase, output / "Texture_DadaoBase.webp", 91)
     Save(PackStrips([normal for normal, _ in surfaces], DATA_SIZE), output / "Texture_DadaoNormal.webp", 88)
     Save(PackStrips([orm for _, orm in surfaces], DATA_SIZE), output / "Texture_DadaoOrm.webp", 87)
 
@@ -127,5 +143,6 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path, help="Approved three-view PNG")
     parser.add_argument("swatches", type=Path, help="Image 2.6 max unseen-surface PNG")
     parser.add_argument("--out", type=Path, default=ROOT / "Texture")
+    parser.add_argument("--diffuse-fit", type=Path, default=DIFFUSE_FIT, help="Observed local diffuse gain atlas")
     args = parser.parse_args()
-    Bake(args.source, args.swatches, args.out)
+    Bake(args.source, args.swatches, args.out, args.diffuse_fit)

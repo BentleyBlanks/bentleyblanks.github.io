@@ -183,8 +183,8 @@ export const MESHES = {
   },
   Dadao: {
     file: "Model_Dadao.tzm.json", category: "weapon",
-    version: "sichuan-dadao-three-views-20261126",
-    triangles: 9635, meshBlocks: 1, nodes: 5, joints: 0,
+    version: "sichuan-dadao-three-views-20261126b",
+    triangles: 9261, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
     span: [0.03242, 0.12726, 0.90018], lengthM: 0.900, bladeM: 0.576,
     draws: { high: 1, medium: 1, low: 1 },

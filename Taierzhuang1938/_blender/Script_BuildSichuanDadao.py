@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 
 import bmesh
+from mathutils import Vector
 
 from TzmCore import Node
 
@@ -103,15 +104,27 @@ def BuildGrip():
     return CompletePart(LoftFaces(mesh, rows))
 
 
+def InsetGuard(outline):
+    points = [Vector(point) for point in outline]
+    pairs = list(zip(points, points[1:] + points[:1]))
+    winding = math.copysign(1, sum(a.x * b.y - a.y * b.x for a, b in pairs))
+    normals = [Vector((a.y - b.y, b.x - a.x)).normalized() * winding for a, b in pairs]
+    # Inset each edge along the perimeter so the caps stay clear of the notches.
+    return [
+        point + 1.25 * (left + right) / max(.48, 1 + left.dot(right))
+        for point, left, right in zip(points, normals[-1:] + normals[:-1], normals)
+    ]
+
+
 def BuildGuard():
     mesh = bmesh.new()
-    centerU, centerV = 1504, 320
-    rows = []
-    for depth, inset in ((0, .96), (.17, 1), (.83, 1), (1, .96)):
-        rows.append([mesh.verts.new((depth, centerV + (v - centerV) * inset,
-                                     centerU + (u - centerU) * inset))
-                     for u, v in FIT["guard"]])
+    outline = FIT["guard"]
+    cap = InsetGuard(outline)
+    rows = [[mesh.verts.new((depth, v, u)) for u, v in perimeter]
+            for depth, perimeter in ((0, cap), (.17, outline), (.83, outline), (1, cap))]
     LoftFaces(mesh, rows)
+    # The concave caps need their planar normals before tessellation.
+    mesh.normal_update()
     bmesh.ops.triangulate(mesh, faces=list(mesh.faces))
     depthControls = FIT["guardDepth"]
     for u, _, _ in depthControls[1:-1]:

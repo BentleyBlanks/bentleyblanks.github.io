@@ -602,11 +602,11 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Model_Dadao.tzm.json",
-   "triangles": 9635,
+   "triangles": 9261,
    "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 205992,
+   "bytes": 192496,
    "materials": [
     "dadao"
    ],
