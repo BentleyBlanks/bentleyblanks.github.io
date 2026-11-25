@@ -1,0 +1,6 @@
+Use case: historical-scene
+Asset type: two flat, unlit source swatches for a 1938 Chinese military museum prop in a browser game.
+Make a borderless two-panel material sheet with a vertical split at the exact midpoint of the image width. Both panels are shown face-on in neutral diffuse light. Fill each half completely with its own continuous texture.
+Left half: aged hand-finished dark gray iron with muted brown oxide in tiny pores, fine horizontal hand-abrasion, subtle irregular cloudy gray-brown undertones, and a few fine gray scuffs. It should still read as solid iron. Small-scale authentic mottling and fine detail without orange rust or pitted craters.
+Right half: tightly woven coarse gray-tan cotton, with tiny uneven warp and weft, a few loose microfibers, dirt settled into the weave, and subtle charcoal-gray abrasion. Quiet, weathered khaki and gray-brown colors. Flat cloth texture with no folds, threads in relief only at fiber scale.
+No recognizable object, blade, handle, geometry, edges, labels, dividers, borders, seams, directional shadows, hot highlights, sheen, fabric folds, logos, watermark, or text.

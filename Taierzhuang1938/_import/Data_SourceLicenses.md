@@ -85,33 +85,17 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
   构建时只排除两块空白展示 Cube，完整枪体、冷却套、瞄具与三脚架不减面地进入游戏。
 - 集束手榴弹、八九式重掷弹筒：程序化模型仍按史料特征建好；集束的去柄副弹与绑绳不能由单枚来源模型替代。
 
-## 大刀（付费源，**不随仓库分发**）
+## 大刀
+
+现用模型以建川博物馆供图中的一柄实物为外观样本。几何由仓库里的 Blender 脚本重建，材质源图由 OpenAI Image API 生成，成品 PBR 随游戏交付。来源与重建方法见 [川军大刀外观考据](Reference/SichuanDadao/Data_SichuanDadaoReferences.md)。
+
+### 旧版 CGMOL 资产
 
 | 游戏内武器 | 源文件 | 作者 | 许可 | 史实对应 |
 |---|---|---|---|---|
 | 大刀 `Dadao` | `<SourceAssets>/Weapons/CgmolDadao/Model_CgmolDadao.fbx` | [逍姚子不逍遥 — PBR 次世代二十九军战刀](https://www.cgmol.com/model/3/88472.html)（摩尔网 CGMOL） | 付费购买，页面版权声明「不限用途」 | 二十九军/西北军那一路的制式：宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环。全长按史实 0.900 m，刃宽 55→88 mm、刀背 5.7 mm。 |
 
-**这份源模不进公开仓库。** bentleyblanks.github.io 是公开站点；买来的原始文件
-只授权用在成品里，不等于可以把 FBX 本身当素材再分发。仓库里只有它派生出的
-`Model/Model_Dadao.tzm.json`（选定源几何低于 30k，保留 4,199 三角）和从源包压制的 1K 成品 PBR
-`Texture/Texture_Dadao{Base,Normal,Orm}.webp`。原始 4K PNG、FBX 与 .blend 都不分发；
-成品贴图保留原 UV，ORM 遵循 R=AO、G=roughness、B=metalness。做法与本文件末尾
-Vefects 素材那条一致。
-
-源模存放位置按下面顺序解析（`ImportWeapons._ExternalRoot()`）：
-
-1. 环境变量 `TZ1938_SOURCE_ASSETS`，直接指向存放 `CgmolDadao/` 的那一级
-   （也就是 `<某处>/Taierzhuang1938SourceAssets/Weapons`）；
-2. 从 `_blender/` 逐级向上找同名兄弟目录 `Taierzhuang1938SourceAssets/Weapons`
-   （主仓库与 `.claude/worktrees/` 下的工作树都能命中）。
-
-`CgmolDadao/` 内的可重建源包含 `Model_CgmolDadao.fbx` 与 `tex/None_*.png`；
-`_import/Script_BakeDadaoPbr.py` 只读取这份外部源并写出上述 1K 成品图。
-
-**找不到源就自动退回程序化几何**：`ImportWeapons.BuilderFor("Dadao")` 返回 None，
-`BuildAll` 改用 `BuildWeapons.BuildDadao`。没有这份素材的人 clone 下来照样能跑通
-构建，只是重建出的刀会退回旧式样 —— 仓库里已提交的 `Model_Dadao.tzm.json` 是用付费源
-建的那一版，别拿没有源的机器去覆盖它。
+旧成品有 4,199 三角与专用 1K PBR，保存在 Git 历史中。原始 FBX、4K PNG 和 .blend 适用购买许可，留在本地素材库。
 
 本机原始下载包另存于
 `C:\Users\Bentl\OneDrive\AI\Models\211555_556082_7op5ujvchqffnj3\`（含 4K 贴图与 .blend）。

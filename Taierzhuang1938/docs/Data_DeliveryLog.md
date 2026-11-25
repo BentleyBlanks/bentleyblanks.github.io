@@ -18,6 +18,8 @@
 
 ## 条目
 
+- **川军大刀外观复原（2026-11-26）**。刀身、护手、布缠柄和尾环按建川博物馆供图上方一柄的侧面重建。运行时资产为 5,248 三角、单一材质，复用现有挂点，拾取剪影随成品重新生成。OpenAI Image API 生成钢面和棉布源图并烘焙成 1K PBR。史实边界见 [大刀实物照片与重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)。
+
 - **八九式重掷弹筒馆藏外观复原（2026-11-26）**。用 BlenderMCP 重建当前 `Type89Launcher`，单材质 9,700 三角。依据同件馆藏的八张照片和同期原照调整筒身比例、钢制支柱与弧形驻钣，OpenAI Images API 生成钢材底图。日军角色和白盒预演共用模型及既有挂点。 [照片、重建和贴图记录](Data_Type89Launcher.md)
 
 - **白刃实验场汉阳造持枪高度与 R26 材质亮度修复（2026-11-25）**。修复两项回归：① **大刀测试场汉阳造拿得过高遮挡准心**：`Viewmodel._UpdateRifleView` 原先未对 `meleeCombat` 与 `bayonetCarry` 让出 `rifleViewPivot`（`+0.0759 m` 抬高 / `+0.2501 m` 贴脸），与刺刀白刃 `BayonetGuard` 烘焙偏移（`+0.055 m`）和 `BAYONET_CARRY` 叠高，把枪与左臂顶到准心线上；现让 `rifleViewPivot` 按 `max(meleeViewFade, bayonetCarry)` 平滑退让，移除 `Bayonet` 白刃的旧 `+0.055 m` 抬举、微调 `BAYONET_CARRY` 下移，并在 `Script_FpsSkeletalAnimation` 持刺刀时禁用未上刀待机覆盖，同时将 `_StabilizeMeleeArms` 的抬臂下拉限定为近战刀类／滚转／卡刀，不再拉扯刺刀步枪肩臂；② **R25/R26 更新后汉阳造在游戏内过暗**：R26 原生贴图按多灯摄影棚校准（木头线性亮度 ~3.2%、`specular=0.17`，钢件 ~3.6–4.2%），在游戏 `0.62` 曝光与 `meleeLabDay` 侧光下木头 81–95%、钢件 75% 像素低于 `8/255`。现不改 60 MB GLB 字节，于 `Data_HanYang173R.calibratedGain` / `Script_HanYang173R` 配置运行时线性校准（木头 `[2.2, 2.45, 2.85]`、`specularIntensity=0.45`，钢件 `2.8`），使游戏内木托回到清晰深胡桃木（`meleeLabDay` 黑占比 95% → 0.7%）、钢件保持发蓝层次且枪械检查台外观一致。同步更新 `HanYang173RAssetTest`、`HanYang173RBrowserTest`、`AdvancedToolsBrowserTest`。

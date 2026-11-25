@@ -183,13 +183,13 @@ export const MESHES = {
   },
   Dadao: {
     file: "Model_Dadao.tzm.json", category: "weapon",
-    triangles: 4199, meshBlocks: 1, nodes: 5, joints: 0,
+    version: "sichuan-dadao-20261126",
+    triangles: 5248, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.0232, 0.1106, 0.8988], lengthM: 0.900, bladeM: 0.625,
+    span: [0.02408, 0.12391, 0.900], lengthM: 0.900, bladeM: 0.576,
     draws: { high: 1, medium: 1, low: 1 },
-    note: "二十九军战刀式样（CGMOL 付费源，见 _import/Data_SourceLicenses.md）。"
-      + "刀身 55→88 mm、刃线外鼓上翘、刀背 5.7 mm 厚，圆盘卡扣 + 缠柄 + 柄尾大铁环。"
-      + "保留原 UV、逐角法线与压缩后的专用 PBR，不再套用枪械共享钢/木材质。",
+    note: "建川博物馆供图上方一柄的侧面轮廓。刀身两侧、缠布与铁件共用一张 UV 图集。"
+      + "资料与游戏复原见 _import/Reference/SichuanDadao/。",
   },
 
   // --- 刺刀（独立模型，socket 挂点扣到枪口；见 _blender/ImportBayonets.py）----

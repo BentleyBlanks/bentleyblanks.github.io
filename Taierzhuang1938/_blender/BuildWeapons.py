@@ -34,7 +34,8 @@
 
 import math
 
-from TzmCore import BooleanDifference, Box, Join, Lathe, Loft, Node, RibbonYz, Ring, Transform, TubeY
+from TzmCore import Box, Join, Lathe, Loft, Node, RibbonYz, Ring, Transform, TubeY
+from Script_BuildSichuanDadao import BuildDadao
 
 PI = math.pi
 BORE = 0.035          # 膛线轴高
@@ -476,116 +477,6 @@ def BuildGrenade():
     """Shared authored exterior, preserving the same TZM hand-grip coordinates."""
     from Script_GrenadeDetail import BuildGeometry, TzmRoot
     return TzmRoot(BuildGeometry())
-
-
-# ---------------------------------------------------------------------------
-# 大刀 0.90 m（参考右侧实物：宽刃、短护手、带孔全茎柄）
-# ---------------------------------------------------------------------------
-
-# 外轮廓直接抄参考图右侧那把：(z, 刀背 y, 刃口 y)。刀根窄、前段明显放宽，
-# 刃口是一整条外鼓弧；刀背到最后约 90 mm 才下切，刀尖保留一小段钝口。
-# 旧版最后收成一个极点，又配 S 护手和外置大铁环，整体更像左侧那把/影视道具，
-# 与用户点名的右侧带孔全茎柄不是同一型制。
-DADAO_EDGE = [
-    # z,      刀背 y,   刃口 y      (刃宽 mm)
-    (0.026, 0.010, -0.010),      # 20  刀茎插进吞口与柄
-    (-0.012, 0.014, -0.026),     # 40  刀根
-    (-0.105, 0.014, -0.032),     # 46
-    (-0.215, 0.012, -0.041),     # 53
-    (-0.330, 0.008, -0.052),     # 60
-    (-0.430, 0.001, -0.064),     # 65
-    (-0.515, -0.008, -0.075),    # 67  劈砍重心处最宽
-    (-0.565, -0.020, -0.079),    # 59  刀背开始下切
-    (-0.602, -0.043, -0.079),    # 36
-    (-0.624, -0.060, -0.075),    # 15  保留钝口，不收成剑尖
-]
-
-# 刀身半厚（沿 z 与 DADAO_EDGE 一一对应）。5—6 mm 的宽厚背是西北军大刀的特征，
-# 往刀尖收到 1 mm。截面用 power=1.7 的超椭圆：接近菱形，上下两头是尖的，
-# 于是"下面这条边看得出是开了锋的"——power=3 那种圆角矩形截面渲出来是把铁尺。
-DADAO_THICK = [0.0030, 0.0030, 0.0029, 0.0028, 0.0027,
-               0.0026, 0.0024, 0.0021, 0.0017, 0.0012]
-
-
-def BuildDadao():
-    """第 29 军带出来、第 31 师照做的大刀。
-
-    按用户参考图右侧那把锁定四处：
-      · 柄尾是**全茎柄上的圆孔**，不是另焊一只大铁环；
-      · 护手只是一道窄吞口与红色束带，不做左侧那把显眼的 S 形护手；
-      · 刀身 40 → 67 mm，前宽后窄，刃线外鼓；
-      · 刀背末段斜切，尖端仍有 15 mm 钝口，不收成剑尖。
-
-    这三段（刀身 / 吞口 / 全茎柄）**必须互相插进去**：刀茎穿过吞口一直露到柄尾。
-    照这个结构建，接缝自然就没了；
-    照"各自摆各自的坐标"建，构建期自检会逐块报"零件飘着"。
-    """
-    root = Node("root")
-    body = root.Child("body")
-
-    # 刀身：把两条边线折算成 Loft 要的 (中心 cz, 半高 rz)。
-    # rx 是横向半厚、rz 是竖向半宽 —— LoftZ 转过 -90° 之后 ring 的 z 就是竖直方向。
-    blade = []
-    for (z, back, edge), thick in zip(DADAO_EDGE, DADAO_THICK):
-        half = (back - edge) * 0.5
-        mid = (back + edge) * 0.5
-        if half < 1e-4:
-            blade.append(Ring(z, rx=0.0, rz=0.0, cz=mid))       # 刀尖收成一个极点
-        else:
-            blade.append(Ring(z, rx=thick, rz=half, cz=mid, power=1.7))
-    body.Add("blade", LoftZ(blade, 8, smooth=False), tile=T_STEEL)
-
-    # 刀背棱：沿刀背再压一条略厚的圆棱（半厚 3.6 mm > 刀身的 3.0 mm）。
-    # 有了它，刀从侧面看是"背厚刃薄"的楔子；没有它，power=1.7 的菱形截面
-    # 会把刀背也削成尖的，读起来是一把双刃剑。到斜切段就收掉，别爬上刀尖。
-    spine = []
-    rows = list(zip(DADAO_EDGE, DADAO_THICK))[:9]
-    for i, ((z, back, _edge), thick) in enumerate(rows):
-        # 最后两站把棱收掉：让它在斜切段"化"进刀身，别在刀背上留一道断头的台阶
-        fade = 1.0 if i < len(rows) - 2 else (0.55 if i == len(rows) - 2 else 0.15)
-        spine.append(Ring(z, rx=thick * 1.2 * fade, rz=0.0055 * fade,
-                          cz=back - 0.0045 * fade, power=2.4))
-    body.Add("blade", LoftZ(spine, 6, smooth=True), tile=T_STEEL)
-
-    # 右侧实物没有夸张护手，只有一片略宽于刀根的吞口。短、扁、两头圆，
-    # 让轮廓保持“民国军用大刀”而不是欧洲剑或左侧那把 S 护手刀。
-    collar = Box(0.016, 0.054, 0.018, bevel=0.004)
-    Transform(collar, z=0.001)
-    body.Add("blade", collar, tile=T_STEEL)
-
-    # 全茎柄：钢茎一直露到柄尾并加宽，末端直接开孔。参考图右侧最醒目的就是这只孔，
-    # 不能再用悬在柄外面的 Torus 假装。布尔只做这一刀，洞就是造型本身。
-    tang = LoftZ([
-        Ring(-0.006, rx=0.0048, rz=0.020, power=3.4),
-        Ring(0.090, rx=0.0048, rz=0.021, power=3.4),
-        Ring(0.185, rx=0.0048, rz=0.022, power=3.2),
-        Ring(0.225, rx=0.0048, rz=0.026, power=2.5),
-        Ring(0.270, rx=0.0048, rz=0.022, power=2.2),
-    ], 12, smooth=False)
-    hole = TubeY(0.010, 0.010, 0.020, 16, cap=True, smooth=True)
-    Transform(hole, rz=PI * 0.5, z=0.244)
-    body.Add("blade", BooleanDifference(tang, hole), tile=T_STEEL)
-
-    # 两片干净木质握片压在全茎两侧，四周留出 3—4 mm 钢边；末端圆孔完整露出。
-    body.Add("grip", LoftZ([
-        Ring(0.205, rx=0.0064, rz=0.0175, power=3.2),
-        Ring(0.145, rx=0.0066, rz=0.0185, power=3.2),
-        Ring(0.075, rx=0.0066, rz=0.0185, power=3.2),
-        Ring(0.020, rx=0.0062, rz=0.0170, power=3.2),
-    ], 10), tile=T_WOOD)
-
-    # 参考图吞口后是一道窄红束带；它是分色节点，不再在柄尾挂红绸。
-    wrap = Box(0.016, 0.044, 0.013, bevel=0.002)
-    Transform(wrap, z=0.019)
-    body.Add("red", wrap, tile=T_CLOTH)
-
-    # 刀尖：近战判定与第一人称深度预算都读它（见 Script_Viewmodel 的 muzzle）。
-    # y 跟着 DADAO_EDGE 的弯度走 —— 刀身沉下去了，尖也就不在轴线上了。
-    body.Child("muzzle", t=(0.0, -0.068, -0.624))
-    # 双手都退到吞口后面：手位在 z=0 时拳头不能啃进红束带
-    body.Child("gripR", t=(0.0, 0.0, 0.030))
-    body.Child("gripL", t=(0.0, 0.0, 0.155))
-    return root
 
 
 WEAPON_BUILDERS = {

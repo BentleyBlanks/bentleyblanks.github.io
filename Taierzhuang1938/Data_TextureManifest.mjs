@@ -72,6 +72,7 @@ export const TEXTURE_TIERS = Object.freeze({
 export const TEXTURE_PROVIDERS = Object.freeze({
   lovart: { generative: true, label: "Lovart（本轮用户指定）" },
   imagegen: { generative: true, label: "OpenAI 内置 imagegen" },
+  openaiImageApi: { generative: true, label: "OpenAI Image API" },
   jimeng: { generative: true, label: "即梦 Seedream" },
   polyhaven: { generative: false, label: "Poly Haven（CC0）" },
   cc0: { generative: false, label: "其它 CC0 下载" },
@@ -501,12 +502,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "Dadao", kind: "material", tier: "boot",
     toneClass: null,
-    toneReason: "作者 UV 图集（刀身/缠柄/铁环），不是平铺材质",
+    toneReason: "刀身两侧、布缠柄与铁件共用的 UV 图集",
     metersPerTile: null,
     bake: "_import/Script_BakeDadaoPbr.py",
     bakeRecord: "_import/TextureBakes/Texture_Dadao.json",
-    source: { provider: "sourcePack", date: "2026-08-26", ref: "CGMOL 逍姚子不逍遥《PBR 次世代二十九军战刀》，源包不分发（_import/Data_SourceLicenses.md）", license: "付费购买，页面声明不限用途" },
-    consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" }],
+    source: { provider: "openaiImageApi", date: "2026-11-26", ref: "gpt-image-2，1536 × 1024 钢面与棉布源图",
+      prompt: "_import/Reference/SichuanDadao/Prompt_SichuanDadaoSurfaces.txt" },
+    consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" },
+      { file: "AdvancedTools/Data_ToolStudioPbrSets.mjs", token: "Texture_DadaoBase" }],
     files: [
       ["Texture_DadaoBase.webp", "Base", 1024, 1024],
       ["Texture_DadaoNormal.webp", "Normal", 1024, 1024],
@@ -1406,7 +1409,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     source: { provider: "procedural", date: "2026-09-13", ref: "Script_HudWeaponSilhouette.mjs 从武器模型渲剪影" },
     consumers: [{ file: "Data_HudWeaponIcons.mjs", token: "Texture_HudWeapon_" }],
     files: [
-      ["Hud/Texture_HudWeapon_Dadao.png", "Image", 360, 45],
+      ["Hud/Texture_HudWeapon_Dadao.png", "Image", 361, 50],
       ["Hud/Texture_HudWeapon_HanYang.png", "Image", 501, 78],
       ["Hud/Texture_HudWeapon_ServicePistol.png", "Image", 89, 52],
       ["Hud/Texture_HudWeapon_Type11.png", "Image", 440, 103],

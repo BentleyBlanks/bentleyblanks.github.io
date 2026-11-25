@@ -283,8 +283,7 @@ const helmetClearance = HeadgearClearanceMm(ijaDoc, "head", "helmet");
 Report(helmetClearance !== null && helmetClearance >= 1.0,
   `九〇式钢盔扣得住颅骨（最小余量 ${helmetClearance === null ? "量不出来" : helmetClearance.toFixed(2) + " mm"} ≥ 1.00 mm）`);
 
-// CGMOL 大刀靠原模型的 UV atlas 才能正确读取专用法线/粗糙度。退回盒投影时
-// UV 会跑到 -20..20；只看三角数与包围盒完全发现不了，必须锁定这里。
+// 大刀的刀面、布柄和铁件从同一张图集取样。
 const dadaoPath = path.join(projectDir, "Model", MESHES.Dadao.file);
 const dadaoDoc = JSON.parse(fs.readFileSync(dadaoPath, "utf8"));
 const dadaoMaterials = new Set(dadaoDoc.meshes.map((mesh) => mesh.material));
@@ -293,13 +292,12 @@ const dadaoUvAuthored = dadaoDoc.meshes.every((mesh) => {
   return mesh.uvMin.every((value) => value >= -0.01)
     && uvMax.every((value) => value <= 1.01);
 });
-Report(dadaoMaterials.size === 1 && dadaoMaterials.has("dadao") && dadaoUvAuthored,
-  "CGMOL 大刀保留 0–1 源 UV，并使用单一 dadao 材质桶");
+Report(dadaoDoc.meshes.length === 1 && dadaoMaterials.has("dadao") && dadaoUvAuthored,
+  "大刀的 0–1 UV 图集使用单一 dadao 材质桶");
+Report(dadaoDoc.triangles === MESHES.Dadao.triangles && dadaoDoc.triangles <= 10000,
+  "大刀成品三角数与清单一致，且在 1 万预算内");
 
-// FBX 刀片 751 个角里有 543 个自定义分裂法线，不等同于 Blender 按 smooth
-// 重算的顶点法线。导入时若经 BMesh 丢掉它们，法线贴图的切线基底就会错，刀面
-// 在 Debug Rendering 里重新出现大块三角明暗。量化后的同位置多法线点不少于
-// 100 个，既锁住逐角法线，也会抓住枪械通用补倒角再次改坏原拓扑的回归。
+// 刀背、刃缘和端盖保留分裂法线，以免平滑跨过金属边缘。
 const dadaoSplitNormalPositions = dadaoDoc.meshes.reduce((total, mesh) => {
   const positions = Buffer.from(mesh.pos, "base64");
   const normals = Buffer.from(mesh.nrm, "base64");
@@ -315,7 +313,7 @@ const dadaoSplitNormalPositions = dadaoDoc.meshes.reduce((total, mesh) => {
   return total + [...byPosition.values()].filter((values) => values.size > 1).length;
 }, 0);
 Report(dadaoSplitNormalPositions >= 100,
-  `CGMOL 大刀保留 FBX 逐角法线（同位置多法线点 ${dadaoSplitNormalPositions}）`);
+  `大刀保留金属边缘与端盖的分裂法线（同位置多法线点 ${dadaoSplitNormalPositions}）`);
 
 // ---------------------------------------------------------------------------
 // 第二关：真浏览器

@@ -199,28 +199,6 @@ SOURCES = {
         "note": "CC-BY-4.0 ZB26（Sketchfab / Larkien）→ 捷克式。保留上置弹匣、"
                 "两脚架、木托与机匣的来源轮廓；排除重复枪管壳后低于 30k，不做通用减面。",
     },
-    "Dadao": {
-        # **付费素材，源文件不在仓库里**（见 _ExternalRoot 与 Data_SourceLicenses.md）。
-        # 没有这份源就自动退回 BuildWeapons.BuildDadao 的程序化几何。
-        "external": True,
-        "file": os.path.join("CgmolDadao", "Model_CgmolDadao.fbx"),
-        "lengthM": 0.900,
-        "kind": "melee",
-        # 整刀一个材质（材质.002），靠部件名分桶只为减面时保住细小握柄零件。
-        # 写 TZM 时两桶重新并回专用 dadao 材质，并保留源 UV；运行时绑定从原包
-        # 4K 贴图压成的 1K PBR。大刀的刀脊、刃口与缠柄都靠这套专用法线，不能
-        # 再绑枪械共享的平铺钢/木纹。
-        "nameBucket": {"刀把": "wood"},
-        "noDetails": True,
-        # 原包已经有完整的刃口/刀脊/护手倒角。枪械通用补倒角会再次切拓扑，
-        # 不但徒增三角，还会把 FBX 的逐角法线插值坏。
-        "sourcePbr": True,
-        # 保留源模的 smooth 法线：专用法线贴图就是按这套切线基底烘焙的。
-        # 这里若再按角度强制打硬边，刀面会被切成大块三角明暗。
-        "note": "CGMOL 付费「PBR 次世代二十九军战刀」（作者 逍姚子不逍遥，版权：不限用途）"
-                "→ 大刀。宽刃前展、上翘削尖、圆盘卡扣、缠柄、柄尾大铁环，"
-                "正是二十九军/西北军那一路的制式；全长按史实 0.900 m。",
-    },
     "ServicePistol": {
         "file": os.path.join("Model_PolyHavenServicePistol", "service_pistol_1k.gltf"),
         "lengthM": 0.222,
@@ -1101,7 +1079,6 @@ def BuildImported(name):
                        color_split=spec.get("colorSplit", False),
                        metal_split=spec.get("metalSplit", False),
                        metal_image=metal_image,
-                       source_normals=spec.get("sourcePbr", False),
                        mechanisms={"bolt_action_rifle_7_62_bolt_a": 1, "bolt_action_rifle_7_62_bolt_b": 1}
                          if name == "ZhongZheng" else {"Bolt_Part": 1} if name == "Type38" else None)
     if "steel" not in buckets:
@@ -1176,16 +1153,9 @@ def BuildImported(name):
             ads_near.Add("steel", near_steel, tile=T_STEEL)
         else:
             near_steel.free()
-    if spec.get("sourcePbr"):
-        # 原包是一张完整 UV atlas：钢件和缠柄必须采样同一套贴图。材质桶合成
-        # 一个 draw call，但仍让减面阶段按部件分开，避免小圆环先被大刀面吃掉预算。
-        if wood is not None:
-            body.Add("dadao", wood, tile="sourceUv")
-        body.Add("dadao", steel, tile="sourceUv")
-    else:
-        if wood is not None:
-            body.Add("wood", wood, tile=T_WOOD)
-        body.Add("steel", steel, tile=T_STEEL)
+    if wood is not None:
+        body.Add("wood", wood, tile=T_WOOD)
+    body.Add("steel", steel, tile=T_STEEL)
     _Mounts(body, spec["lengthM"], spec["kind"], lo, hi, spec, steel)
     if name in ('HanYang', 'ZhongZheng', 'Type38'):
         feed = {'HanYang': (0,.041,-.187), 'ZhongZheng': (0,.040,-.170), 'Type38': (0,.047,-.185)}[name]

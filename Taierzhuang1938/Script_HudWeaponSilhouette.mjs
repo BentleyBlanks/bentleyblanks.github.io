@@ -5,7 +5,7 @@
 // 所有枪按同一个「米 / 像素」拍，HUD 按像素宽换算显示宽度 —— 长枪长、短枪短，
 // 比例和真枪一致（见 Data_HudWeaponIcons.mjs）。
 //
-// 用法：node Taierzhuang1938/Script_HudWeaponSilhouette.mjs
+// 用法：node Taierzhuang1938/Script_HudWeaponSilhouette.mjs [--only=Dadao]
 // 产出：Texture/Hud/Texture_HudWeapon_<id>.png + Data_HudWeaponIcons.mjs
 
 import path from "node:path";
@@ -13,6 +13,8 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { MESHES } from "./Data_Meshes.mjs";
+import { HUD_WEAPON_ICONS } from "./Data_HudWeaponIcons.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -20,6 +22,8 @@ const outDir = path.join(projectDir, "Texture", "Hud");
 
 /** 能从地上 / 尸体上捡起来的那几把。 */
 const IDS = ["ZhongZheng", "HanYang", "Type38", "Zb26", "Type11", "ServicePistol", "Dadao"];
+const selectedId = process.argv.find((arg) => arg.startsWith("--only="))?.slice("--only=".length);
+if (selectedId && !IDS.includes(selectedId)) throw new Error("未知的武器剪影：" + selectedId);
 /** 1 像素 = 2.5 毫米：一米二的步枪约 500 px 宽，HUD 上缩到 7em 左右仍然清楚。 */
 const METERS_PER_PX = 0.0025;
 const FILL = "#ece3cc";
@@ -34,8 +38,8 @@ try {
     { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.WeaponInspection !== undefined, null, { timeout: 60000 });
 
-  const icons = {};
-  for (const id of IDS) {
+  const icons = selectedId ? { ...HUD_WEAPON_ICONS } : {};
+  for (const id of selectedId ? [selectedId] : IDS) {
     const shot = await page.evaluate(async ({ id, metersPerPx, fill }) => {
       const THREE = await import("three");
       const model = await window.WeaponInspection.Select(id);
@@ -111,7 +115,9 @@ try {
     if (!shot) { console.log(`skip ${id}: 台架上没有几何`); continue; }
     const file = `Texture_HudWeapon_${id}.png`;
     fs.writeFileSync(path.join(outDir, file), Buffer.from(shot.png.split(",")[1], "base64"));
-    icons[id] = { src: `Texture/Hud/${file}`, w: shot.w, h: shot.h };
+    const revision = MESHES[id]?.version;
+    const query = revision ? `?v=${revision}` : "";
+    icons[id] = { src: `Texture/Hud/${file}${query}`, w: shot.w, h: shot.h };
     console.log(`ok  ${id}: ${shot.w}×${shot.h}`);
   }
 

@@ -52,7 +52,7 @@ const LEGACY_IDS = new Set([
 // 运行时源码里写死、没带 ?v= 戳的贴图 URL（"文件|URL"，2026-09-28 首次登记）。**只许变短**：
 // 补上戳（改图就改戳，否则线上玩家拿到缓存旧图）就把那一行删掉。
 const UNSTAMPED_PENDING = new Set([
-  ...["ZhongZheng", "HanYang", "Type38", "Zb26", "Type11", "ServicePistol", "Dadao"]
+  ...["ZhongZheng", "HanYang", "Type38", "Zb26", "Type11", "ServicePistol"]
     .map((id) => `Data_HudWeaponIcons.mjs|Texture/Hud/Texture_HudWeapon_${id}.png`),
   "Data_OpeningSet0103.mjs|Texture/Texture_BunkerPosterDefendShandong.webp",
   "Script_TzmShot.mjs|Texture/Texture_Type89Orm.webp",

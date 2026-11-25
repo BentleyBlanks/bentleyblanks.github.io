@@ -1,83 +1,106 @@
-"""Bake compact browser PBR maps from the purchased CGMOL dadao source.
+"""Bake the OpenAI material swatches into the runtime dadao UV atlas."""
 
-The paid 4K PNGs stay outside the public repository. This deterministic baker
-preserves the authored UV atlas, downsamples it to 1K, renormalizes the tangent-
-space normal map, and packs AO/roughness/metalness into glTF ORM order.
-"""
-
+import argparse
 from pathlib import Path
-import os
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter, ImageOps
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXTURE = ROOT / "Texture"
+SIZE = 1024
+PAD_X = 16
+PAD_Y = 20
+TILE_SIZE = (SIZE - 2 * PAD_X, SIZE // 4 - 2 * PAD_Y)
 
 
-def _external_root() -> Path:
-    configured = os.getenv("TZ1938_SOURCE_ASSETS")
-    if configured and Path(configured).is_dir():
-        return Path(configured)
-    node = Path(__file__).resolve().parent
-    for parent in (node, *node.parents):
-        candidate = parent / "Taierzhuang1938SourceAssets" / "Weapons"
-        if candidate.is_dir():
-            return candidate
-    raise FileNotFoundError("Taierzhuang1938SourceAssets/Weapons not found")
+def ReadSwatch(image, box, repeats=(1, 1)):
+    swatch = image.crop(box)
+    repeatU, repeatV = repeats
+    tiled = Image.new("RGB", (swatch.width * repeatU, swatch.height * repeatV))
+    for row in range(repeatV):
+        for column in range(repeatU):
+            tile = ImageOps.mirror(swatch) if column % 2 else swatch
+            tile = ImageOps.flip(tile) if row % 2 else tile
+            tiled.paste(tile, (column * swatch.width, row * swatch.height))
+    return np.asarray(tiled.resize(TILE_SIZE, Image.Resampling.LANCZOS), dtype=np.float32)
 
 
-def _resize_rgb(path: Path) -> Image.Image:
-    return Image.open(path).convert("RGB").resize((1024, 1024), Image.Resampling.LANCZOS)
+def Luminance(rgb):
+    return rgb @ np.array([.2126, .7152, .0722], dtype=np.float32)
 
 
-def _normal(path: Path) -> Image.Image:
-    encoded = np.asarray(_resize_rgb(path), dtype=np.float32) / 255.0
-    vector = encoded * 2.0 - 1.0
-    length = np.maximum(np.linalg.norm(vector, axis=2, keepdims=True), 1e-6)
-    vector /= length
-    return Image.fromarray(np.uint8(np.clip((vector * 0.5 + 0.5) * 255.0, 0, 255)), "RGB")
+def NormalAndGrain(rgb, strength):
+    luma = Luminance(rgb)
+    lowPass = np.asarray(Image.fromarray(luma.astype(np.uint8))
+                         .filter(ImageFilter.GaussianBlur(3)), dtype=np.float32)
+    grain = (luma - lowPass) / 255
+    dy, dx = np.gradient(grain * strength)
+    # Pixel rows run downward. The OpenGL tangent V axis runs upward.
+    normal = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
+    normal /= np.linalg.norm(normal, axis=2, keepdims=True)
+    return 127.5 * (normal + 1), grain
 
 
-def main() -> None:
-    source = _external_root() / "CgmolDadao" / "tex"
-    required = {
-        "base": source / "None_Base_color.png",
-        "normal": source / "None_Normal_OpenGL.png",
-        "ao": source / "None_Mixed_AO.png",
-        "roughness": source / "None_Roughness.png",
-        "metallic": source / "None_Metallic.png",
-    }
-    missing = [str(path) for path in required.values() if not path.is_file()]
-    if missing:
-        raise FileNotFoundError("Missing CGMOL dadao textures: " + ", ".join(missing))
+def MetalMaps(rgb, blade):
+    normal, grain = NormalAndGrain(rgb, 2.6)
+    base = 1.03 * rgb + np.array([29, 22, 15])
+    roughness = .65 - .55 * grain
+    metalness = .76 + .65 * grain
+    if blade:
+        # A narrow change in polish follows the existing bevel UV. Let the
+        # generated steel grain continue across that transition.
+        across = np.linspace(0, 1, rgb.shape[0], dtype=np.float32)[:, None]
+        bevel = np.clip((across - .84) / .14, 0, 1) ** 1.5
+        base += bevel[..., None] * np.array([26, 30, 34])
+        roughness -= .13 * bevel
+        metalness += .10 * bevel
+    else:
+        base *= .86
+        roughness += .07
+    ao = np.ones_like(grain) * .98
+    return base, normal, 255 * np.stack((ao, roughness, metalness), axis=2)
 
-    TEXTURE.mkdir(parents=True, exist_ok=True)
-    _resize_rgb(required["base"]).save(
-        TEXTURE / "Texture_DadaoBase.webp", "WEBP", quality=94, method=6
+
+def CottonMaps(rgb):
+    normal, grain = NormalAndGrain(rgb, 3.35)
+    base = .93 * rgb + np.array([13, 9, 5])
+    length = np.linspace(0, 1, rgb.shape[1], dtype=np.float32)[None, :]
+    around = np.linspace(0, 1, rgb.shape[0], dtype=np.float32)[:, None]
+    lap = (.5 + .5 * np.cos(np.pi * 2 * (length * (85 / 6.4) - around + .16))) ** 8
+    base *= 1 - .09 * lap[..., None]
+    ao = .96 - .06 * lap + .40 * np.minimum(grain, 0)
+    roughness = np.clip(.89 - .30 * grain, .82, .95)
+    metalness = np.zeros_like(grain)
+    return base, normal, 255 * np.stack((ao, roughness, metalness), axis=2)
+
+
+def Bake(source, output):
+    with Image.open(source) as image:
+        image = image.convert("RGB")
+    if image.size != (1536, 1024):
+        raise ValueError(f"Expected the 1536 × 1024 OpenAI swatch, got {image.size}")
+    strips = (
+        MetalMaps(ReadSwatch(image, (34, 70, 729, 342)), blade=True),
+        MetalMaps(ReadSwatch(image, (35, 397, 730, 669)), blade=True),
+        CottonMaps(ReadSwatch(image, (812, 308, 1480, 550), repeats=(3, 2))),
+        MetalMaps(ReadSwatch(image, (50, 697, 720, 976)), blade=False),
     )
-    _normal(required["normal"]).save(
-        TEXTURE / "Texture_DadaoNormal.webp", "WEBP", quality=95, method=6
-    )
-
-    ao = np.asarray(Image.open(required["ao"]).convert("L").resize(
-        (1024, 1024), Image.Resampling.LANCZOS
-    ))
-    roughness = np.asarray(Image.open(required["roughness"]).convert("L").resize(
-        (1024, 1024), Image.Resampling.LANCZOS
-    ))
-    metallic = np.asarray(Image.open(required["metallic"]).convert("L").resize(
-        (1024, 1024), Image.Resampling.LANCZOS
-    ))
-    Image.fromarray(np.dstack((ao, roughness, metallic)), "RGB").save(
-        TEXTURE / "Texture_DadaoOrm.webp", "WEBP", quality=95, method=6
-    )
-
-    for stem in ("Base", "Normal", "Orm"):
-        path = TEXTURE / f"Texture_Dadao{stem}.webp"
-        print(f"ok   {path.name}  {path.stat().st_size / 1024:.0f} KB")
+    output.mkdir(parents=True, exist_ok=True)
+    for channel, (stem, quality) in enumerate((("Base", 86), ("Normal", 84), ("Orm", 86))):
+        atlas = np.concatenate([
+            np.pad(maps[channel], ((PAD_Y, PAD_Y), (PAD_X, PAD_X), (0, 0)), mode="edge")
+            for maps in strips
+        ])
+        path = output / f"Texture_Dadao{stem}.webp"
+        image = Image.fromarray(np.uint8(np.clip(np.rint(atlas), 0, 255)))
+        image.save(path, "WEBP", quality=quality, method=6)
+        print(f"{path.name} {path.stat().st_size:,} bytes")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path, help="OpenAI-generated Texture_DadaoSource.png")
+    parser.add_argument("--out", type=Path, default=ROOT / "Texture")
+    args = parser.parse_args()
+    Bake(args.source, args.out)

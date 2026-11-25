@@ -5,6 +5,23 @@
   "repoCommit": "9cce1761ab97e25208af5badf05b5b35a49802e1",
   "assetReviews": [
     {
+      "asset": "Dadao",
+      "date": "2026-11-26",
+      "runtimeAsset": "Model/Model_Dadao.tzm.json",
+      "assetContract": "_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md",
+      "decision": "The upper object in the Jianchuan group photograph supplies the visible profile. The 1938 Taierzhuang museum object corroborates the presence of a broad head and pommel ring on contemporary military dadao. The 122nd Division specimen and its unseen surfaces remain unverified.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-25T16:54:57.940Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-25T16:54:59.416Z"
+        }
+      ]
+    },
+    {
       "asset": "GongxianGrenade",
       "date": "2026-11-26",
       "runtimeAsset": "Model/Model_Type24Grenade.glb",
