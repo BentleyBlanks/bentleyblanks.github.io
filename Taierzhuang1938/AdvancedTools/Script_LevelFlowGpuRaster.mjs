@@ -236,6 +236,55 @@ class GpuRaster {
         return mix(mix(TerrainHash(i),TerrainHash(i+vec2(1.0,0.0)),f.x),
                    mix(TerrainHash(i+vec2(0.0,1.0)),TerrainHash(i+vec2(1.0,1.0)),f.x),f.y);
       }
+      vec2 TerrainHash2(vec2 p) {
+        return vec2(TerrainHash(p),TerrainHash(p+vec2(37.2,17.9)));
+      }
+      // Procedural continuation of March 1938 Lunan strip-farmland beyond groundBounds
+      // so the camera never sees a sharp rectangular boundary against flat backdrop color.
+      void SampleOuterFarmland(vec2 xz,out float oTrack,out float oSpoil,out float oStubble,out vec3 oTint) {
+        const float cellM=92.0;
+        vec2 g=xz/cellM;
+        vec2 ig=floor(g),fg=fract(g);
+        float d1=9.0,d2=9.0;
+        vec2 bestId=ig,bestCenter=vec2(0.0);
+        for(int oy=-1;oy<=1;oy++) for(int ox=-1;ox<=1;ox++) {
+          vec2 id=ig+vec2(float(ox),float(oy));
+          vec2 jitter=0.18+0.64*TerrainHash2(id);
+          vec2 diff=vec2(float(ox),float(oy))+jitter-fg;
+          float d=length(diff);
+          if(d<d1) {
+            d2=d1;d1=d;bestId=id;bestCenter=(id+jitter)*cellM;
+          } else if(d<d2) {
+            d2=d;
+          }
+        }
+        float hAng=TerrainHash(bestId+vec2(11.7,3.1));
+        float hTurn=TerrainHash(bestId+vec2(29.3,7.9));
+        float ang=(hAng-0.5)*0.46+(hTurn<0.25?1.5707963:0.0);
+        float ca=cos(ang),sa=sin(ang);
+        vec2 rel=xz-bestCenter;
+        float u=rel.x*ca-rel.y*sa;
+        float stripW=11.0+TerrainHash(bestId+vec2(53.1,19.4))*13.0;
+        float stripId=floor(u/stripW);
+        float stripF=fract(u/stripW);
+        float k=TerrainHash(bestId*1.37+vec2(stripId*7.13,stripId*3.17));
+        if(k<0.22) {oTrack=0.0;oSpoil=0.0;oStubble=0.88;oTint=vec3(0.75,0.96,0.63);}
+        else if(k<0.42) {oTrack=0.0;oSpoil=0.0;oStubble=0.78;oTint=vec3(0.83,0.98,0.69);}
+        else if(k<0.54) {oTrack=0.0;oSpoil=0.04;oStubble=0.66;oTint=vec3(0.92,0.98,0.74);}
+        else if(k<0.68) {oTrack=0.0;oSpoil=0.44;oStubble=0.05;oTint=vec3(0.89,0.79,0.69);}
+        else if(k<0.80) {oTrack=0.0;oSpoil=0.34;oStubble=0.09;oTint=vec3(0.94,0.84,0.73);}
+        else if(k<0.92) {oTrack=0.04;oSpoil=0.06;oStubble=0.52;oTint=vec3(1.07,0.99,0.81);}
+        else {oTrack=0.06;oSpoil=0.08;oStubble=0.22;oTint=vec3(1.02,0.97,0.88);}
+        float tractBund=smoothstep(1.8,0.45,(d2-d1)*cellM);
+        float stripBund=smoothstep(0.60,0.14,min(stripF,1.0-stripF)*stripW)*0.65;
+        float bund=max(tractBund,stripBund);
+        if(bund>0.001) {
+          oTrack=mix(oTrack,0.42,bund);
+          oSpoil=mix(oSpoil,0.12,bund);
+          oStubble=mix(oStubble,0.16,bund);
+          oTint=mix(oTint,vec3(1.04,0.98,0.86),bund);
+        }
+      }
       vec4 TerrainVpMix(vec4 a,vec4 b,float t,vec4 mean) {
         float s=inversesqrt(max((1.0-t)*(1.0-t)+t*t,0.5));
         return mean+((a-mean)*(1.0-t)+(b-mean)*t)*s;
@@ -293,7 +342,8 @@ class GpuRaster {
           float tDist=max(distanceToCamera,0.0);
           vec2 groundSize=vec2(textureSize(splatMap,0));
           vec2 groundUv=(txz-groundBounds.xy)/groundBounds.zw;
-          bool inGround=all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)));
+          vec2 outVec=max(groundBounds.xy-txz,txz-(groundBounds.xy+groundBounds.zw));
+          float outDist=length(max(outVec,vec2(0.0)));
           vec2 clampedUv=(clamp(groundUv,0.0,1.0)*(groundSize-1.0)+0.5)/groundSize;
           vec4 splat=texture(splatMap,clampedUv);
           vec4 macroTex=texture(macroTintMap,clampedUv);
@@ -302,121 +352,146 @@ class GpuRaster {
           float farT=smoothstep(12.0,48.0,tDist);
           float variant=TerrainNoise(txz*(1.0/5.3))*8.0;
 
-          if(inGround) {
-            float wTrack=splat.r;
-            float wSpoil=splat.g*(1.0-wTrack);
-            float wRest=max(0.0,1.0-wTrack-wSpoil);
-            float stubbleNoise=TerrainNoise(txz*0.042)*0.62+TerrainNoise(txz*0.115+11.3)*0.23+TerrainNoise(txz*0.26+5.1)*0.15;
-            float stubble=clamp(splat.b*mix(0.76,1.12,smoothstep(0.28,0.72,stubbleNoise)),0.0,1.0);
-            vec4 tW=vec4(wRest*(1.0-stubble),wTrack,wRest*stubble,wSpoil);
-
-            vec4 tAlb0=layerAlbedoMean0,tSurf0=layerSurfaceMean0;
-            vec4 tAlb1=layerAlbedoMean1,tSurf1=layerSurfaceMean1;
-            vec4 tAlb2=layerAlbedoMean2,tSurf2=layerSurfaceMean2;
-            vec4 tAlb3=layerAlbedoMean3,tSurf3=layerSurfaceMean3;
-            vec4 tH=vec4(0.0);
-            if(tW.x>=0.004) {SampleLayerNearFar(0.0,txz,twDx.xz,twDy.xz,layerTileNear.x,layerTileFar.x,farT,variant,layerAlbedoMean0,layerSurfaceMean0,tAlb0,tSurf0);tH.x=clamp(tAlb0.a,0.0,1.0)+layerHeightOffset.x;}
-            if(tW.y>=0.004) {SampleLayerNearFar(1.0,txz,twDx.xz,twDy.xz,layerTileNear.y,layerTileFar.y,farT,variant,layerAlbedoMean1,layerSurfaceMean1,tAlb1,tSurf1);tH.y=clamp(tAlb1.a,0.0,1.0)+layerHeightOffset.y;}
-            if(tW.z>=0.004) {SampleLayerNearFar(2.0,txz,twDx.xz,twDy.xz,layerTileNear.z,layerTileFar.z,farT,variant,layerAlbedoMean2,layerSurfaceMean2,tAlb2,tSurf2);tH.z=clamp(tAlb2.a,0.0,1.0)+layerHeightOffset.z;}
-            if(tW.w>=0.004) {SampleLayerNearFar(3.0,txz,twDx.xz,twDy.xz,layerTileNear.w,layerTileFar.w,farT,variant,layerAlbedoMean3,layerSurfaceMean3,tAlb3,tSurf3);tH.w=clamp(tAlb3.a,0.0,1.0)+layerHeightOffset.w;}
-
-            vec4 tMask=step(vec4(0.004),tW);
-            vec4 tHw=(tH+tW)*tMask;
-            float tTop=max(max(tHw.x,tHw.y),max(tHw.z,tHw.w))-0.20;
-            vec4 tB=max(tHw-tTop,0.0)*tMask;
-            tB/=max(dot(tB,vec4(1.0)),1e-4);
-
-            vec3 tAlbedo=tAlb0.rgb*tB.x+tAlb1.rgb*tB.y+tAlb2.rgb*tB.z+tAlb3.rgb*tB.w;
-            vec4 tSurface=tSurf0*tB.x+tSurf1*tB.y+tSurf2*tB.z+tSurf3*tB.w;
-            vec2 tNxy=(tSurf0.rg*2.0-1.0)*(layerNormalScale.x*tB.x)
-              +(tSurf1.rg*2.0-1.0)*(layerNormalScale.y*tB.y)
-              +(tSurf2.rg*2.0-1.0)*(layerNormalScale.z*tB.z)
-              +(tSurf3.rg*2.0-1.0)*(layerNormalScale.w*tB.w);
-            vec3 tPerturb=vec3(tNxy.x,0.0,tNxy.y);
-
-            vec3 tAbsN=abs(geomN);
-            float sideT=(1.0-smoothstep(0.50,0.78,tAbsN.y))*(1.0-smoothstep(55.0,95.0,tDist));
-            if(sideT>0.004) {
-              bool alongX=tAbsN.x>tAbsN.z;
-              vec2 sm=alongX?vec2(worldPosition.z,-worldPosition.y):vec2(worldPosition.x,-worldPosition.y);
-              vec2 sdx=alongX?vec2(twDx.z,-twDx.y):vec2(twDx.x,-twDx.y);
-              vec2 sdy=alongX?vec2(twDy.z,-twDy.y):vec2(twDy.x,-twDy.y);
-              vec3 sAlb=vec3(0.0);vec4 sSurf=vec4(0.0);vec2 sNxy=vec2(0.0);vec4 sa,ss;
-              if(tB.x>0.0) {SampleTerrainLayer(0.0,sm,sdx,sdy,layerTileNear.x,variant,layerAlbedoMean0,layerSurfaceMean0,sa,ss);sAlb+=sa.rgb*tB.x;sSurf+=ss*tB.x;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.x*tB.x);}
-              if(tB.y>0.0) {SampleTerrainLayer(1.0,sm,sdx,sdy,layerTileNear.y,variant,layerAlbedoMean1,layerSurfaceMean1,sa,ss);sAlb+=sa.rgb*tB.y;sSurf+=ss*tB.y;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.y*tB.y);}
-              if(tB.z>0.0) {SampleTerrainLayer(2.0,sm,sdx,sdy,layerTileNear.z,variant,layerAlbedoMean2,layerSurfaceMean2,sa,ss);sAlb+=sa.rgb*tB.z;sSurf+=ss*tB.z;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.z*tB.z);}
-              if(tB.w>0.0) {SampleTerrainLayer(3.0,sm,sdx,sdy,layerTileNear.w,variant,layerAlbedoMean3,layerSurfaceMean3,sa,ss);sAlb+=sa.rgb*tB.w;sSurf+=ss*tB.w;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.w*tB.w);}
-              tAlbedo=mix(tAlbedo,sAlb,sideT);
-              tSurface=mix(tSurface,sSurf,sideT);
-              vec3 sidePerturb=alongX?vec3(0.0,-sNxy.y,sNxy.x):vec3(sNxy.x,-sNxy.y,0.0);
-              tPerturb=mix(tPerturb,sidePerturb,sideT);
-            }
-
-            float rutRaw=clamp((splat.a*255.0/254.0)*2.0-1.0,-1.0,1.0);
-            float rutS=rutRaw*4.0;
-            float rutSw=rutS+(TerrainNoise(txz*0.105+3.3)-0.5)*0.20;
-            float rutU=(abs(rutSw)-0.72)/0.26;
-            float rutPixelM=(abs(rutD.x)+abs(rutD.y))*8.0;
-            float rutRoad=tB.y*step(abs(rutRaw),0.92);
-            float rutBandFade=rutRoad*(1.0-smoothstep(110.0,240.0,tDist))*(1.0-smoothstep(0.24,0.62,rutPixelM));
-            float rutGrooveFade=rutRoad*(1.0-smoothstep(60.0,145.0,tDist))*(1.0-smoothstep(0.12,0.32,rutPixelM));
-            float gRut=0.0;float rutSlope=0.0;
-            float rutBandU=rutU/2.4;
-            if(abs(rutBandU)<1.0&&rutBandFade>0.001) {
-              float along=mix(0.62,1.0,TerrainNoise(txz*0.21+9.1));
-              float qb=1.0-rutBandU*rutBandU;
-              gRut=qb*qb*0.42*rutBandFade*along;
-              if(abs(rutU)<1.0&&rutGrooveFade>0.001) {
-                float q=1.0-rutU*rutU;
-                gRut=max(gRut,q*q*rutGrooveFade*along);
-                rutSlope=-4.0*rutU*q*0.075/0.26*sign(rutSw)*rutGrooveFade*along;
-              }
-            }
-            if(rutSlope!=0.0) {
-              vec2 rutGrad=TerrainGradXZ(rutD*8.0,twDx.xz,twDy.xz);
-              rutGrad/=max(length(rutGrad),1e-4);
-              tPerturb+=vec3(rutGrad.x,0.0,rutGrad.y)*rutSlope;
-            }
-
-            vec3 tMeanAlb=layerAlbedoMean0.rgb*tB.x+layerAlbedoMean1.rgb*tB.y+layerAlbedoMean2.rgb*tB.z+layerAlbedoMean3.rgb*tB.w;
-            float tContrast=mix(1.0,0.45,smoothstep(25.0,120.0,tDist));
-            tAlbedo=tMeanAlb+(tAlbedo-tMeanAlb)*tContrast;
-
-            vec3 tTint=layerTint0*tB.x+layerTint1*tB.y+layerTint2*tB.z+layerTint3*tB.w;
-            tAlbedo*=tTint;
-
-            float m0=TerrainNoise(txz*(1.0/7.3)+3.7)-0.5;
-            float m1=TerrainNoise(txz*(1.0/31.0)+17.31)-0.5;
-            float m2=TerrainNoise(txz*(1.0/117.0)+41.7)-0.5;
-            vec3 tMacro=(1.0+2.0*(m0*0.05+m1*0.075+m2*0.06))*(1.0+vec3(0.9,0.25,-0.8)*m2*0.10);
-            tAlbedo*=tMacro*(1.0-0.22*gRut);
-
-            vec3 macroRgb=macroTex.rgb*(255.0/128.0);
-            vec3 macroLin=pow(max(macroRgb,vec3(0.05)),vec3(2.2));
-            layeredLinear=max(tAlbedo*macroLin*layerAlbedoScale,vec3(0.0));
-
-            float nFade=mix(1.0,0.28,smoothstep(10.0,140.0,tDist));
-            tPerturb*=nFade;
-            tPerturb-=geomN*dot(geomN,tPerturb);
-            litNormal=normalize(geomN+tPerturb);
-            float tAo=clamp(tSurface.a,0.0,1.0);
-            float aoKeep=mix(1.0,0.55,farT);
-            terrainAo=mix(1.0,tAo,0.72*aoKeep);
-          } else {
-            vec3 bg=vec3(198.0,207.0,169.0)/255.0;
+          float wTrack=splat.r;
+          float wSpoil=splat.g*(1.0-wTrack);
+          float stubbleRaw=splat.b;
+          vec3 macroRgb=macroTex.rgb*(255.0/128.0);
+          float authoredCov=macroTex.a;
+          if(outDist>0.0||authoredCov<0.995) {
+            float oTrack,oSpoil,oStubble;vec3 oTint;
+            SampleOuterFarmland(txz,oTrack,oSpoil,oStubble,oTint);
             vec2 distantUv=(txz-distantBounds.xy)/distantBounds.zw;
             if(all(greaterThanEqual(distantUv,vec2(0.0)))&&all(lessThanEqual(distantUv,vec2(1.0)))) {
-              vec4 paint=texture(distantColor,distantUv);
-              bg=mix(bg,paint.rgb,paint.a);
+              vec4 paint=textureGrad(distantColor,distantUv,twDx.xz/distantBounds.zw,twDy.xz/distantBounds.zw);
+              if(paint.a>0.01) {
+                float gScore=clamp((paint.g-paint.r*0.86)*5.0,0.0,1.0);
+                float roadScore=clamp((min(paint.r,paint.g)-0.58)*3.5,0.0,1.0);
+                float bpTrack=roadScore*0.68;
+                float bpSpoil=(1.0-gScore)*(1.0-roadScore)*0.26;
+                float bpStubble=mix(0.24,0.84,gScore)*(1.0-bpTrack);
+                vec3 bpTint=clamp(paint.rgb/vec3(0.56,0.50,0.39),vec3(0.58),vec3(1.22));
+                oTrack=mix(oTrack,bpTrack,paint.a);
+                oSpoil=mix(oSpoil,bpSpoil,paint.a);
+                oStubble=mix(oStubble,bpStubble,paint.a);
+                oTint=mix(oTint,bpTint,paint.a);
+              }
             }
-            vec3 farAt=vec3(txz*layerTileFar.x,0.0);
-            vec3 farTex=textureGrad(layerAlbedo,farAt,twDx.xz*layerTileFar.x,twDy.xz*layerTileFar.x).rgb;
-            vec3 detail=clamp(farTex/max(layerAlbedoMean0.rgb,vec3(0.05)),0.72,1.32);
-            float m1=TerrainNoise(txz*(1.0/31.0)+17.31)-0.5;
-            float m2=TerrainNoise(txz*(1.0/117.0)+41.7)-0.5;
-            float macro=1.0+2.0*(m1*0.06+m2*0.05);
-            layeredLinear=pow(max(bg,vec3(0.001)),vec3(2.2))*mix(vec3(1.0),detail,0.55)*macro*0.60;
+            float outerT=smoothstep(0.0,2.4,outDist);
+            float procT=max(outerT,1.0-authoredCov);
+            float edgeFeatKeep=1.0-smoothstep(0.0,3.2,outDist);
+            wTrack=mix(wTrack*edgeFeatKeep,oTrack,procT);
+            wSpoil=mix(wSpoil*edgeFeatKeep,oSpoil,procT);
+            stubbleRaw=mix(stubbleRaw,oStubble,procT);
+            macroRgb=mix(macroRgb,oTint,procT);
+            // Where authored inner farmland meets outer Voronoi farmland at groundBounds,
+            // finish the seam as a crisp 1.2 m Lunan dirt field-headland bund instead of a blurry band.
+            if(outDist>0.0&&outDist<2.2&&authoredCov>0.5) {
+              float seamBund=smoothstep(1.3,0.35,abs(outDist-0.55))*smoothstep(0.0,0.2,outDist)*(1.0-smoothstep(0.25,0.60,max(splat.r,oTrack)))*authoredCov;
+              if(seamBund>0.001) {
+                wTrack=mix(wTrack,0.42,seamBund);
+                wSpoil=mix(wSpoil,0.12,seamBund);
+                stubbleRaw=mix(stubbleRaw,0.16,seamBund);
+                macroRgb=mix(macroRgb,vec3(1.04,0.98,0.86),seamBund);
+              }
+            }
           }
+
+          float wRest=max(0.0,1.0-wTrack-wSpoil);
+          float stubbleNoise=TerrainNoise(txz*0.042)*0.62+TerrainNoise(txz*0.115+11.3)*0.23+TerrainNoise(txz*0.26+5.1)*0.15;
+          float stubble=clamp(stubbleRaw*mix(0.76,1.12,smoothstep(0.28,0.72,stubbleNoise)),0.0,1.0);
+          vec4 tW=vec4(wRest*(1.0-stubble),wTrack,wRest*stubble,wSpoil);
+
+          vec4 tAlb0=layerAlbedoMean0,tSurf0=layerSurfaceMean0;
+          vec4 tAlb1=layerAlbedoMean1,tSurf1=layerSurfaceMean1;
+          vec4 tAlb2=layerAlbedoMean2,tSurf2=layerSurfaceMean2;
+          vec4 tAlb3=layerAlbedoMean3,tSurf3=layerSurfaceMean3;
+          vec4 tH=vec4(0.0);
+          if(tW.x>=0.004) {SampleLayerNearFar(0.0,txz,twDx.xz,twDy.xz,layerTileNear.x,layerTileFar.x,farT,variant,layerAlbedoMean0,layerSurfaceMean0,tAlb0,tSurf0);tH.x=clamp(tAlb0.a,0.0,1.0)+layerHeightOffset.x;}
+          if(tW.y>=0.004) {SampleLayerNearFar(1.0,txz,twDx.xz,twDy.xz,layerTileNear.y,layerTileFar.y,farT,variant,layerAlbedoMean1,layerSurfaceMean1,tAlb1,tSurf1);tH.y=clamp(tAlb1.a,0.0,1.0)+layerHeightOffset.y;}
+          if(tW.z>=0.004) {SampleLayerNearFar(2.0,txz,twDx.xz,twDy.xz,layerTileNear.z,layerTileFar.z,farT,variant,layerAlbedoMean2,layerSurfaceMean2,tAlb2,tSurf2);tH.z=clamp(tAlb2.a,0.0,1.0)+layerHeightOffset.z;}
+          if(tW.w>=0.004) {SampleLayerNearFar(3.0,txz,twDx.xz,twDy.xz,layerTileNear.w,layerTileFar.w,farT,variant,layerAlbedoMean3,layerSurfaceMean3,tAlb3,tSurf3);tH.w=clamp(tAlb3.a,0.0,1.0)+layerHeightOffset.w;}
+
+          vec4 tMask=step(vec4(0.004),tW);
+          vec4 tHw=(tH+tW)*tMask;
+          float tTop=max(max(tHw.x,tHw.y),max(tHw.z,tHw.w))-0.20;
+          vec4 tB=max(tHw-tTop,0.0)*tMask;
+          tB/=max(dot(tB,vec4(1.0)),1e-4);
+
+          vec3 tAlbedo=tAlb0.rgb*tB.x+tAlb1.rgb*tB.y+tAlb2.rgb*tB.z+tAlb3.rgb*tB.w;
+          vec4 tSurface=tSurf0*tB.x+tSurf1*tB.y+tSurf2*tB.z+tSurf3*tB.w;
+          vec2 tNxy=(tSurf0.rg*2.0-1.0)*(layerNormalScale.x*tB.x)
+            +(tSurf1.rg*2.0-1.0)*(layerNormalScale.y*tB.y)
+            +(tSurf2.rg*2.0-1.0)*(layerNormalScale.z*tB.z)
+            +(tSurf3.rg*2.0-1.0)*(layerNormalScale.w*tB.w);
+          vec3 tPerturb=vec3(tNxy.x,0.0,tNxy.y);
+
+          vec3 tAbsN=abs(geomN);
+          float sideT=(1.0-smoothstep(0.50,0.78,tAbsN.y))*(1.0-smoothstep(55.0,95.0,tDist));
+          if(sideT>0.004) {
+            bool alongX=tAbsN.x>tAbsN.z;
+            vec2 sm=alongX?vec2(worldPosition.z,-worldPosition.y):vec2(worldPosition.x,-worldPosition.y);
+            vec2 sdx=alongX?vec2(twDx.z,-twDx.y):vec2(twDx.x,-twDx.y);
+            vec2 sdy=alongX?vec2(twDy.z,-twDy.y):vec2(twDy.x,-twDy.y);
+            vec3 sAlb=vec3(0.0);vec4 sSurf=vec4(0.0);vec2 sNxy=vec2(0.0);vec4 sa,ss;
+            if(tB.x>0.0) {SampleTerrainLayer(0.0,sm,sdx,sdy,layerTileNear.x,variant,layerAlbedoMean0,layerSurfaceMean0,sa,ss);sAlb+=sa.rgb*tB.x;sSurf+=ss*tB.x;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.x*tB.x);}
+            if(tB.y>0.0) {SampleTerrainLayer(1.0,sm,sdx,sdy,layerTileNear.y,variant,layerAlbedoMean1,layerSurfaceMean1,sa,ss);sAlb+=sa.rgb*tB.y;sSurf+=ss*tB.y;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.y*tB.y);}
+            if(tB.z>0.0) {SampleTerrainLayer(2.0,sm,sdx,sdy,layerTileNear.z,variant,layerAlbedoMean2,layerSurfaceMean2,sa,ss);sAlb+=sa.rgb*tB.z;sSurf+=ss*tB.z;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.z*tB.z);}
+            if(tB.w>0.0) {SampleTerrainLayer(3.0,sm,sdx,sdy,layerTileNear.w,variant,layerAlbedoMean3,layerSurfaceMean3,sa,ss);sAlb+=sa.rgb*tB.w;sSurf+=ss*tB.w;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.w*tB.w);}
+            tAlbedo=mix(tAlbedo,sAlb,sideT);
+            tSurface=mix(tSurface,sSurf,sideT);
+            vec3 sidePerturb=alongX?vec3(0.0,-sNxy.y,sNxy.x):vec3(sNxy.x,-sNxy.y,0.0);
+            tPerturb=mix(tPerturb,sidePerturb,sideT);
+          }
+
+          float rutRaw=clamp((splat.a*255.0/254.0)*2.0-1.0,-1.0,1.0);
+          float rutS=rutRaw*4.0;
+          float rutSw=rutS+(TerrainNoise(txz*0.105+3.3)-0.5)*0.20;
+          float rutU=(abs(rutSw)-0.72)/0.26;
+          float rutPixelM=(abs(rutD.x)+abs(rutD.y))*8.0;
+          float rutRoad=tB.y*step(abs(rutRaw),0.92)*(1.0-smoothstep(0.0,2.0,outDist));
+          float rutBandFade=rutRoad*(1.0-smoothstep(110.0,240.0,tDist))*(1.0-smoothstep(0.24,0.62,rutPixelM));
+          float rutGrooveFade=rutRoad*(1.0-smoothstep(60.0,145.0,tDist))*(1.0-smoothstep(0.12,0.32,rutPixelM));
+          float gRut=0.0;float rutSlope=0.0;
+          float rutBandU=rutU/2.4;
+          if(abs(rutBandU)<1.0&&rutBandFade>0.001) {
+            float along=mix(0.62,1.0,TerrainNoise(txz*0.21+9.1));
+            float qb=1.0-rutBandU*rutBandU;
+            gRut=qb*qb*0.42*rutBandFade*along;
+            if(abs(rutU)<1.0&&rutGrooveFade>0.001) {
+              float q=1.0-rutU*rutU;
+              gRut=max(gRut,q*q*rutGrooveFade*along);
+              rutSlope=-4.0*rutU*q*0.075/0.26*sign(rutSw)*rutGrooveFade*along;
+            }
+          }
+          if(rutSlope!=0.0) {
+            vec2 rutGrad=TerrainGradXZ(rutD*8.0,twDx.xz,twDy.xz);
+            rutGrad/=max(length(rutGrad),1e-4);
+            tPerturb+=vec3(rutGrad.x,0.0,rutGrad.y)*rutSlope;
+          }
+
+          vec3 tMeanAlb=layerAlbedoMean0.rgb*tB.x+layerAlbedoMean1.rgb*tB.y+layerAlbedoMean2.rgb*tB.z+layerAlbedoMean3.rgb*tB.w;
+          float tContrast=mix(1.0,0.45,smoothstep(25.0,120.0,tDist));
+          tAlbedo=tMeanAlb+(tAlbedo-tMeanAlb)*tContrast;
+
+          vec3 tTint=layerTint0*tB.x+layerTint1*tB.y+layerTint2*tB.z+layerTint3*tB.w;
+          tAlbedo*=tTint;
+
+          float m0=TerrainNoise(txz*(1.0/7.3)+3.7)-0.5;
+          float m1=TerrainNoise(txz*(1.0/31.0)+17.31)-0.5;
+          float m2=TerrainNoise(txz*(1.0/117.0)+41.7)-0.5;
+          vec3 tMacro=(1.0+2.0*(m0*0.05+m1*0.075+m2*0.06))*(1.0+vec3(0.9,0.25,-0.8)*m2*0.10);
+          tAlbedo*=tMacro*(1.0-0.22*gRut);
+
+          vec3 macroLin=pow(max(macroRgb,vec3(0.05)),vec3(2.2));
+          layeredLinear=max(tAlbedo*macroLin*layerAlbedoScale,vec3(0.0));
+
+          float nFade=mix(1.0,0.28,smoothstep(10.0,140.0,tDist));
+          tPerturb*=nFade;
+          tPerturb-=geomN*dot(geomN,tPerturb);
+          litNormal=normalize(geomN+tPerturb);
+          float tAo=clamp(tSurface.a,0.0,1.0);
+          float aoKeep=mix(1.0,0.55,farT);
+          terrainAo=mix(1.0,tAo,0.72*aoKeep);
         }
 
         float visibility=1.0;

@@ -728,6 +728,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     const tintPaintItems = [];
     for (const item of scene.paint || []) {
       if (!item.poly && !item.line) continue;
+      // Generic blank backdrop filler ("Fields" in FirstLevelEncounter z=557..1440) leaves
+      // authoredCoverage=0 so GPU procedural Lunan farmland flows across the map border seamlessly.
+      if (item.id === "Fields") continue;
       const w = ClassWeights(item.id);
       if (w) splatPaintItems.push({ ...item, rgb: w });
       const tintRgb = PaintMacroTintFor(item);
@@ -768,6 +771,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
 
     const inv2Step = 1 / (2 * texelM);
     const slopeFrom = S.slope.from, slopeSpan = Math.max(1e-3, S.slope.to - S.slope.from);
+    const hasGengjiazhuang = (map.fieldZones || []).some((zone) => zone.id === "M" || zone.id === "SE");
     const pw = [0, 0, 0], rs = [0, 1], tint = [1, 1, 1];
     for (let row = 0; row < height; row++) {
       const z = bounds.minZ + row * texelM;
@@ -785,6 +789,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
 
         // Physically grounded splat weights & low-frequency macro tint
         let track = 0, spoil = 0, stubble = 0.55;
+        let authored = 0;
         tint[0] = 1; tint[1] = 1; tint[2] = 1;
 
         const strip = SampleFarmlandStrip(farmlandGrid, x, z);
@@ -792,7 +797,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
           const p = strip.preset;
           track = p.track; spoil = p.spoil; stubble = p.stubble;
           tint[0] = p.tint[0]; tint[1] = p.tint[1]; tint[2] = p.tint[2];
+          authored = 1;
         }
+        if (hasGengjiazhuang && x >= 36 && x <= 246 && z >= 372 && z <= 558) authored = 1;
 
         if (splatPaint) {
           pw[0] = 0; pw[1] = 0; pw[2] = 0;
@@ -804,9 +811,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
             spoil = spoil * (1 - a) + pw[1];
             const authoredStubble = Math.max(0, 1 - pTrack - pSpoil - pSoil);
             stubble = stubble * (1 - a) + authoredStubble * a;
+            if (a > authored) authored = a;
           }
         }
-        tintPaint?.Blend(x, z, tint);
+        if (tintPaint) {
+          const ta = tintPaint.Blend(x, z, tint);
+          if (ta > authored) authored = ta;
+        }
 
         let rutCoord = 1;
         if (roadSplat) {
@@ -820,6 +831,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
             tint[0] += (1 - tint[0]) * protect;
             tint[1] += (1 - tint[1]) * protect;
             tint[2] += (1 - tint[2]) * protect;
+            if (protect > authored) authored = protect;
           }
         }
 
@@ -847,6 +859,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
           tint[0] += (1 - tint[0]) * protect;
           tint[1] += (1 - tint[1]) * protect;
           tint[2] += (1 - tint[2]) * protect;
+          if (protect > authored) authored = protect;
         }
 
         splatData[offset] = Math.round(Clamp(track, 0, 1) * 255);
@@ -857,7 +870,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         macroTintData[offset] = Clamp(Math.round(tint[0] * 128), 0, 255);
         macroTintData[offset + 1] = Clamp(Math.round(tint[1] * 128), 0, 255);
         macroTintData[offset + 2] = Clamp(Math.round(tint[2] * 128), 0, 255);
-        macroTintData[offset + 3] = 255;
+        macroTintData[offset + 3] = Math.round(Clamp(authored, 0, 1) * 255);
       }
     }
     surfaceMaps = {
