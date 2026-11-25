@@ -639,13 +639,14 @@ export class FlowPerspectiveView extends FlowMapView {
         const b = top[3].map((value, axis) => value + (top[2][axis] - value) * fraction);
         Stroke(a, b, FLOW_COVER_COLORS.mark, 1.5);
       }
-      const center = top[0].map((value, axis) => (value + top[2][axis]) / 2);
+      const center = top[0].map((value, axis) => (value + top[2][axis]) / 2 + (axis === 1 ? 0.08 : 0));
       const vertex = this.Vertex(center);
+      const probeDepth = Math.max(this.near, vertex.depth - 0.12);
       const corners = top.map(point => this.Vertex(point));
       const span = Math.max(...corners.map(point => point.x)) - Math.min(...corners.map(point => point.x));
-      if (vertex.depth >= this.near && vertex.depth <= this.far && span >= 8 && (context?.DepthOverlay||!this.raster.Occluded(vertex)) && !this.raster.collectingDepth) {
+      if (vertex.depth >= this.near && vertex.depth <= this.far && span >= 8 && (context?.DepthOverlay||!this.raster.Occluded({...vertex, depth: probeDepth})) && !this.raster.collectingDepth) {
         if(context?.DepthOverlay) context.DepthOverlay.Billboard("cover",vertex.x-7,vertex.y-7,14,16,
-          ctx=>DrawCoverSymbol(ctx,[7,7]),[vertex.x,vertex.y,vertex.depth,0]);
+          ctx=>DrawCoverSymbol(ctx,[7,7]),[vertex.x,vertex.y,probeDepth,0]);
         else DrawCoverSymbol(context, [vertex.x, vertex.y]);
       }
     }
