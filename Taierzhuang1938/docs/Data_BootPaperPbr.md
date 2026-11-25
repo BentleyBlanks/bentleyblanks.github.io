@@ -1,6 +1,8 @@
 # 加载报纸的轻微褶皱材质
 
-2026-10-06：11 期史料原图保持逐字节不变，每张独立生成一张 UV 对齐的 OpenGL +Y 法线，并烘出配套粗糙度。印刷文字和照片不转高度，不改史料内容。
+2026-10-06 为 11 期剪报生成 UV 对齐的 OpenGL +Y 法线与粗糙度。印刷文字和照片独立于纸面的凹凸。
+
+2026-11-26 更新《密勒氏评论报》、《战事画刊》第 4 期与《救国时报》。法线分别按文汇报、画刊第 1 期、立报的同一张参考纸面重新烘焙，纸面覆盖由各自的新底图计算。
 
 - 清单与参数：`Data_BootPapers.mjs` 的 `BootPaperPbrUrls`、`BOOT_PAPER_PBR`；颜色沿用原图的 sRGB，Normal 与 RoughnessMask 均为线性数据。
 - 路径：`Texture/Menu/BootPaper/Texture_BootPaper<id>Normal.webp`、`Texture_BootPaper<id>RoughnessMask.webp`。数据图长边 512，按原图宽高比缩放，不平铺；两者是无损 WebP。RoughnessMask 的 RGB 是同值粗糙度，A 是纸面覆盖，避免纸外黑底反光。黑色印刷用边界连通填充区分，不挖空正文与照片。

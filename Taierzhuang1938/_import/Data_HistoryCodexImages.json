@@ -1,5 +1,5 @@
 {
-  "method": "Native dimensions; memoir scans lossless, JPEG-origin photos/press WebP quality 95; portrait rectangle crop only",
+  "method": "Native scan dimensions for portraits, memoir and photos. The Xinhua Daily front page is placed on a restored paper surface.",
   "files": [
     {
       "file": "Menu/History/Texture_HistoryWangMingzhangImage.webp",
@@ -147,11 +147,11 @@
     },
     {
       "file": "Menu/History/Texture_HistoryXinhuaDaily19380408Image.webp",
-      "width": 550,
-      "height": 465,
-      "bytes": 101836,
+      "width": 775,
+      "height": 1152,
+      "bytes": 218978,
       "lossless": false,
-      "sha256": "a9a0e4f7ebad06313e8b733f5c66793ce7422e0454c7ac30aaf638ade241f226"
+      "sha256": "3ec741592ff08f61d13525c0367d017a3e147c20ce571cd5e87e5ad4b2f7e0f9"
     },
     {
       "file": "Menu/History/Texture_HistoryWuhanMemorialImage.webp",

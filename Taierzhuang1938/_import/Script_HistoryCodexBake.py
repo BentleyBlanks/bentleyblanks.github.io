@@ -1,4 +1,4 @@
-"""Extract historical scans for the DOM archive, without generative alterations or resampling.
+"""Extract archival scans and record the approved composited newspaper image.
 
 Usage: python Script_HistoryCodexBake.py --source-dir <downloaded-reference-directory>
 Sources and original URLs are documented in docs/Data_HistoryCodex.md.
@@ -20,14 +20,20 @@ def Main():
     project = Path(__file__).resolve().parent.parent
     output = project / "Texture" / "Menu" / "History"
     output.mkdir(parents=True, exist_ok=True)
+    press = output / "Texture_HistoryXinhuaDaily19380408Image.webp"
+    if not press.is_file():
+        raise FileNotFoundError("Restore the approved Xinhua Daily composited image before rebuilding.")
     records = []
+
+    def Record(image, target, lossless):
+        records.append({"file": target.relative_to(project / "Texture").as_posix(), "width": image.width,
+                        "height": image.height, "bytes": target.stat().st_size, "lossless": lossless,
+                        "sha256": hashlib.sha256(target.read_bytes()).hexdigest()})
 
     def Save(image, name, lossless=False):
         target = output / ("Texture_History" + name + "Image.webp")
         image.convert("RGB").save(target, format="WEBP", lossless=lossless, quality=95, method=6)
-        records.append({"file": target.relative_to(project / "Texture").as_posix(), "width": image.width,
-                        "height": image.height, "bytes": target.stat().st_size, "lossless": lossless,
-                        "sha256": hashlib.sha256(target.read_bytes()).hexdigest()})
+        Record(image, target, lossless)
 
     plate = PdfReader(args.source_dir / "Source_Beizhuang1938.pdf").pages[9].images[0].image
     # The portrait rectangle within file page 10; captions remain accessible through the original source.
@@ -40,12 +46,13 @@ def Main():
         if len(page.images) != 1:
             raise ValueError("A page is no longer a single original scan")
         Save(page.images[0].image, "ZhangMemoir" + str(index + 1).zfill(2), lossless=True)
-    for source, name in [("Source_XinhuaDaily19380408.jpg", "XinhuaDaily19380408"),
-                         ("Source_WuhanMemorial.jpeg", "WuhanMemorial")]:
-        with Image.open(args.source_dir / source) as image:
-            Save(image, name)
+    # Reuse the approved front page composed onto the restored paper.
+    with Image.open(press) as image:
+        Record(image, press, False)
+    with Image.open(args.source_dir / "Source_WuhanMemorial.jpeg") as image:
+        Save(image, "WuhanMemorial")
     record = project / "_import" / "Data_HistoryCodexImages.json"
-    record.write_text(json.dumps({"method": "Native dimensions; memoir scans lossless, JPEG-origin photos/press WebP quality 95; portrait rectangle crop only",
+    record.write_text(json.dumps({"method": "Native scan dimensions for portraits, memoir and photos. The Xinhua Daily front page is placed on a restored paper surface.",
                                   "files": records}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(records, ensure_ascii=False))
 

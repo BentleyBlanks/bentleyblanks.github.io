@@ -27,14 +27,14 @@
 | --- | --- | --- |
 | Source_Beizhuang1938.pdf | [1938年《悲壮的滕县之役》95页扫描](https://upload.wikimedia.org/wikipedia/commons/c/c6/NLC416-07jh008596-3580_%E6%82%B2%E5%A3%AF%E7%9A%84%E6%BB%95%E7%B8%A3%E4%B9%8B%E5%BD%B9.pdf) | 文件第10页裁取遗像矩形；没有生成式修补或重绘 |
 | Source_ZhangMemoir.pdf | [张宣武回忆扫描](https://ks3-cn-beijing.ksyun.com/attachment/b1a9f551fb36af74de7926b2ba283874) | 逐页提取原始800×1200扫描，保留印刷页码 |
-| Source_XinhuaDaily19380408.jpg | [新华网资料页](https://www.xinhuanet.com/mil/2015-06/28/c_127959205_6.htm)的[版面图片](https://www.xinhuanet.com/mil/2015-06/28/127959205_14354633363791n.jpg) | 原尺寸550×465，不伪造模糊文字 |
+| Source_XinhuaDaily19380408.pdf 第 1 页 | [国家图书馆藏原报](https://commons.wikimedia.org/wiki/File:NLC1080-00N000846-4978_新華日報_1938年04月08日.pdf) | 原版完整头版叠印到做旧纸面，成品 775 × 1152 |
 | Source_WuhanMemorial.jpeg | [抗日战争纪念网图集](https://www.krzzjn.com/show-1209-76894.html)的[举像照片](https://www.krzzjn.com/uploadfile/2018/0624/20180624104348697.jpeg) | 原尺寸319×450，保留转载版本，不假称原底片 |
 
 这些是注明出处的历史材料展示，未将转载图像和回忆录扫描声明为 CC0 或本作原创。王铭章肖像的拍摄日期不详；武汉照片的具体摄日、街段及摄影者待考。相同图集的多次转载不视为独立互证来源。文献内容为事后回忆，战况、人数等须与同期档案互核。
 
 ## 重建与验收
 
-离线源PDF与设计图留在本地；游戏使用的20张 WebP 登记在 `Data_TextureManifest.mjs` 的 `lazy` 层，来源及 SHA-256 记录为 `_import/Data_HistoryCodexImages.json`。图像保持原扫描像素尺寸，仅肖像执行记录在脚本中的矩形裁剪；17张文字扫描无损转换，JPEG来源的照片与报刊用95质量编码，避免无损封装放大原JPEG体积。不生成历史人物面貌与原刊正文。
+离线源PDF与设计图留在本地；游戏使用的20张 WebP 登记在 `Data_TextureManifest.mjs` 的 `lazy` 层，来源及 SHA-256 记录为 `_import/Data_HistoryCodexImages.json`。照片与文献扫描保留原像素尺寸，肖像使用脚本记录的矩形裁剪。《新华日报》头版沿用经校对的做旧成品，重建其余图鉴影像时直接读取它并更新校验记录。17 张文字扫描使用无损 WebP，JPEG 来源的照片使用质量 95。
 
 ```powershell
 python Taierzhuang1938/_import/Script_HistoryCodexBake.py --source-dir <SourceDirectory>

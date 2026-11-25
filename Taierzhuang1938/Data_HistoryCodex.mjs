@@ -1,6 +1,6 @@
 // Player-facing archive. Contemporary sources, retrospective accounts and game diagrams remain distinct.
 // Images are documentary reproductions; the approved Imagegen concepts are layout references only.
-export const HISTORY_CODEX_VERSION = "2026101501";
+export const HISTORY_CODEX_VERSION = "2026112601";
 const Image = name => `./Texture/Menu/History/Texture_History${name}Image.webp?v=${HISTORY_CODEX_VERSION}`;
 export const HISTORY_CODEX_CATEGORIES = ["people", "history", "documents", "press", "photos", "creation"];
 // Fact-and-invention marks, in reading order. Notion "待核" is shown to players as "出处待查", never as a fact.
@@ -110,11 +110,11 @@ export const HISTORY_CODEX_ENTRIES = [
   {
     id: "XinhuaDaily", category: "press", title: "新华日报", subtitle: "1938年4月8日",
     summary: "《庆祝台儿庄胜利！》", caption: "同期报刊 · 后续战局", image: Image("XinhuaDaily19380408"),
-    imageAlt: "1938年4月8日《新华日报》社论版面", headline: "庆祝台儿庄胜利！",
+    imageAlt: "1938年4月8日《新华日报》头版及《庆祝台儿庄胜利！》社论", headline: "庆祝台儿庄胜利！",
     excerpt: "我们还应该清楚的了解，在军事上我们的胜利，不过是局部的开端，敌人的损失和挫折，也不过是部分的开始。",
     sections: [{ title: "阅读提示", text: "社论在庆祝胜利的同时，提醒读者保持警惕、继续抗战。这份报纸属于台儿庄胜利后的报道，可与滕县战役的后续背景对照阅读。战时报道中的战果数字不直接作为精确统计。" }],
-    sourceNote: "影像来源：新华网资料页",
-    sources: [{ title: "新华网：同期报纸影像", url: "https://www.xinhuanet.com/mil/2015-06/28/c_127959205_6.htm", note: "网页图注标为1938年4月8日《新华日报》社论；版面影像保留原样。" }],
+    sourceNote: "影像来源：国家图书馆藏《新华日报》头版扫描",
+    sources: [{ title: "国家图书馆藏本：1938年4月8日《新华日报》", url: "https://commons.wikimedia.org/wiki/File:NLC1080-00N000846-4978_新華日報_1938年04月08日.pdf", note: "取第1页完整图文，在做旧纸底上合成。" }],
   },
   {
     id: "WuhanMemorial", category: "photos", title: "武汉公祭王铭章", subtitle: "1938年5月 · 武汉",

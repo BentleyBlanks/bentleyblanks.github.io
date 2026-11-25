@@ -1479,7 +1479,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     "source": {
       "provider": "imagegen",
       "date": "2026-10-06",
-      "ref": "One normal source per paper; original printing unchanged",
+      "ref": "Per-paper UV-aligned relief. Three replacements dated 2026-11-26 use the relief from their matching reference sheets.",
       "prompt": "_import/Prompts/Texture_BootPaperPbr.txt"
     },
     "bake": "_import/Script_BakeBootPaperPbr.mjs",
@@ -1543,14 +1543,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
       [
         "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906Normal.webp",
         "Normal",
-        512,
-        374
+        335,
+        512
       ],
       [
         "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906RoughnessMask.webp",
         "Mask",
-        512,
-        374
+        335,
+        512
       ],
       [
         "Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911Normal.webp",
@@ -1603,42 +1603,42 @@ export const TEXTURE_MANIFEST = Object.freeze([
       [
         "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220Normal.webp",
         "Normal",
-        512,
-        351
+        489,
+        512
       ],
       [
         "Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220RoughnessMask.webp",
         "Mask",
-        512,
-        351
+        489,
+        512
       ],
       [
         "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106Normal.webp",
         "Normal",
         512,
-        360
+        351
       ],
       [
         "Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106RoughnessMask.webp",
         "Mask",
         512,
-        360
+        351
       ]
     ]
   },
   {
     id: "BootPaper", kind: "menu", tier: "ui",
-    source: { provider: "lovart", date: "2026-09-30", ref: "Lovart 项目 oKHfWa1O2A：6 张无印刷的空白做旧纸底（横幅 L1/L2、近方 S1/S2、竖幅 R1/R2）；印刷内容是 Notion 史料页上的原图，由 _import/Script_ComposeBootPaper.py 正片叠底合成", prompt: "_import/Prompts/Texture_BootPaper.txt" },
+    source: { provider: "lovart", date: "2026-09-30", ref: "初版纸底来自 Lovart 项目 oKHfWa1O2A。2026-11-26 三张以用户参考和 OpenAI 图片 API 还原纸底，真实图文由 Script_ComposeBootPaper 正片叠底。", prompt: "_import/Prompts/Texture_BootPaper.txt" },
     consumers: [{ file: "Data_BootPapers.mjs", token: "Texture_BootPaper" }],
     budgetReason: "11 张战前报纸剪报（原图印在做旧纸上），每次开机只按需下载其中 1 张（约 0.2 MB），其余 10 张不进玩家的下载量",
     files: [
-      ["Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106.webp", "Image", 1573, 1105],
-      ["Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220.webp", "Image", 1569, 1075],
+      ["Menu/BootPaper/Texture_BootPaperChinaWeeklyReview19371106.webp", "Image", 1569, 1075],
+      ["Menu/BootPaper/Texture_BootPaperJiuGuoShiBao19371220.webp", "Image", 1098, 1149],
       ["Menu/BootPaper/Texture_BootPaperLiBao19370709.webp", "Image", 1098, 1149],
       ["Menu/BootPaper/Texture_BootPaperShenBao19370731.webp", "Image", 775, 1152],
       ["Menu/BootPaper/Texture_BootPaperWenHui19380125.webp", "Image", 1569, 1075],
       ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370820.webp", "Image", 754, 1152],
-      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906.webp", "Image", 1576, 1152],
+      ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370906.webp", "Image", 754, 1152],
       ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19370911.webp", "Image", 775, 1152],
       ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371001.webp", "Image", 754, 1152],
       ["Menu/BootPaper/Texture_BootPaperZhanShiHuaKan19371106.webp", "Image", 775, 1152],
@@ -1841,9 +1841,9 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "HistoryCodexPress", kind: "menu", tier: "lazy",
-    source: {provider: "user", date: "2026-10-13", ref: "https://www.xinhuanet.com/mil/2015-06/28/c_127959205_6.htm", license: "1938 newspaper documentary reproduction, with publication and reproduction source credited; not asserted CC0."},
+    source: {provider: "user", date: "2026-11-26", ref: "https://commons.wikimedia.org/wiki/File:NLC1080-00N000846-4978_新華日報_1938年04月08日.pdf", prompt: "_import/Prompts/Texture_BootPaper.txt", license: "1938 newspaper documentary reproduction credited to the National Library of China. The display paper was restored with the OpenAI Image API."},
     bake: "_import/Script_HistoryCodexBake.py", consumers: [{file: "Data_HistoryCodex.mjs", token: "XinhuaDaily19380408"}],
-    files: [["Menu/History/Texture_HistoryXinhuaDaily19380408Image.webp", "Image", 550, 465]],
+    files: [["Menu/History/Texture_HistoryXinhuaDaily19380408Image.webp", "Image", 775, 1152]],
   },
   {
     id: "HistoryCodexPhoto", kind: "menu", tier: "lazy",
