@@ -322,33 +322,30 @@
                 <div id="s3SourceSummary" class="mwReadout">—</div>
               </div>
 
-              <!-- ② 视频生成引擎卡片（清晰解释 3 种引擎的作用、耗时与积分成本） -->
+              <!-- ② 视频生成引擎卡片（精简双行） -->
               <div class="mwSec">
                 <div class="mwSecH">02 · 视频生成引擎</div>
                 <div class="mwSpecCards" id="s3ModelPresets">
                   <button class="mwSpecCard mwPresetBtn" data-m="seedance_2.5_flash" type="button">
                     <div class="mwSpecTop">
                       <span class="mwSpecName">Seedance 2.5 Flash</span>
-                      <span class="mwSpecBadge">快抽卡</span>
+                      <span class="mwSpecBadge">快抽省积分</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">即梦画布 · 省积分</div>
-                    <div class="mwSpecDesc">直喂分镜图快速出片，适合先验证动作节奏与四肢走位</div>
+                    <div class="mwSpecEngine mwMono">即梦画布 · 快速验证动作</div>
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-m="seedance_2.5" type="button">
                     <div class="mwSpecTop">
                       <span class="mwSpecName">Seedance 2.5 正片</span>
                       <span class="mwSpecBadge">高精画质</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">即梦画布 · 正片模型</div>
-                    <div class="mwSpecDesc">动作连贯性与细节更稳，耗积分较多，适合定稿抽卡</div>
+                    <div class="mwSpecEngine mwMono">即梦画布 · 定稿质量更稳</div>
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-m="minimax_h3_colab" type="button">
                     <div class="mwSpecTop">
                       <span class="mwSpecName">MiniMax-H3 加速版</span>
-                      <span class="mwSpecBadge">0 即梦积分</span>
+                      <span class="mwSpecBadge">0 积分</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">Colab 96G G4 · int8 + nvfp4 + 8step Turbo</div>
-                    <div class="mwSpecDesc">机房光纤直拉 Blackwell 加速权重跑首尾帧 FL2V，1080p 清显存后超分，完片自动停表</div>
+                    <div class="mwSpecEngine mwMono">Colab G4 · int8+nvfp4+8step</div>
                   </button>
                 </div>
               </div>
@@ -494,33 +491,30 @@
                 </div>
               </div>
 
-              <!-- ② 提骨规格卡片（用清晰卡片层级解释 Colab 与 Modal 来源及顺位差异） -->
+              <!-- ② 提骨规格卡片（精简双行） -->
               <div class="mwSec">
                 <div class="mwSecH">02 · 提骨规格与算力来源</div>
                 <div class="mwSpecCards" id="s4PrecisionPresets">
                   <button class="mwSpecCard mwPresetBtn" data-p="modal_l4" type="button">
                     <div class="mwSpecTop">
-                      <span class="mwSpecName">Modal 云端 · L4/A10G</span>
+                      <span class="mwSpecName">Modal 云端</span>
                       <span class="mwSpecBadge">随叫随到</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">Modal Serverless · L4→A10G→L40S→A100</div>
-                    <div class="mwSpecDesc">独立商业 GPU 池自动顺位兜底，不受 Colab 503 影响；月免 $30，跑完 60 秒停表</div>
+                    <div class="mwSpecEngine mwMono">L4→A10G→L40S→A100 · 月免 $30</div>
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-p="standard_l4" type="button">
                     <div class="mwSpecTop">
-                      <span class="mwSpecName">Colab 标准提骨 · L4</span>
-                      <span class="mwSpecBadge">Colab Pro+</span>
+                      <span class="mwSpecName">Colab 标准 · L4</span>
+                      <span class="mwSpecBadge">Pro+</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">NVIDIA GEM-X 77 骨 · L4→A100→G4</div>
-                    <div class="mwSpecDesc">一次提取全身与基础十指，消耗已购 Colab 算力点；L4 暂满时顺延备选 GPU</div>
+                    <div class="mwSpecEngine mwMono">GEM-X 77骨 · L4→A100→G4</div>
                   </button>
                   <button class="mwSpecCard mwPresetBtn" data-p="high_a100" type="button">
                     <div class="mwSpecTop">
                       <span class="mwSpecName">Colab 手部精修 · A100</span>
-                      <span class="mwSpecBadge">特写推荐</span>
+                      <span class="mwSpecBadge">特写</span>
                     </div>
-                    <div class="mwSpecEngine mwMono">GEM-X + WiLoR 十指增强 · A100→G4→L4</div>
-                    <div class="mwSpecDesc">在 GEM-X 主干上叠加 WiLoR 强化手指细节，适合捏弹壳、勒带、拉栓</div>
+                    <div class="mwSpecEngine mwMono">GEM-X + WiLoR · A100→G4→L4</div>
                   </button>
                 </div>
               </div>
