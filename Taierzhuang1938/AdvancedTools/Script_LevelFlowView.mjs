@@ -6,7 +6,7 @@ import { IsMainlineLandmark, LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
-export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85"};
+export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85","Whitebox/Void":"#5a544a","Whitebox/Danger":"#b6614d","Whitebox/Coping":"#cbc5b3"};
 
 export const FLOW_COVER_COLORS = {
   side: "#476d54",
@@ -393,6 +393,17 @@ export class FlowMapView {
     }
   }
 
+  DrawSmokeColumns(context, frame) {
+    const columns = this.mapData.smokeColumns;
+    if (!columns?.length) return;
+    for (const col of columns) {
+      const p = this.ToScreen([col.x, col.z]);
+      const radius = Clamp((col.options?.sizeEnd || 6) * 0.42 * this.scale, 5, 22);
+      const fire = (col.options?.fire || 0) > 0;
+      Circle(context, p, radius, "#3a352f44", "#2e292366");
+      if (fire) Circle(context, p, Math.max(2.5, radius * 0.34), "#d97a32bb", "#f5be5b");
+    }
+  }
   DrawActor(context,actor,frame) {
     const p=this.ToScreen(actor.p),color=FLOW_COLORS[actor.side];
     if(actor.tetherTo) Line(context,[p,this.ToScreen(actor.tetherTo)],"#75613e",1.5);
@@ -481,6 +492,9 @@ export class FlowMapView {
     if(layers.routes) {
       this.DrawPath(context,frame.stage.beats.flatMap((beat)=>beat.p),"#9c731b9c",2,[6,5]);
       if(Number(frame.stage.id)>=3&&Number(frame.stage.id)<=6) this.DrawPath(context,FLOW_GROUND.road,"#ad453499",2,[7,5]);
+      if(this.mapData.playCorridor?.length && Number(frame.stage.id)>=8) {
+        this.DrawPath(context,this.mapData.playCorridor,"#496f8278",1.6,[9,6]);
+      }
     }
     if(layers.triggers) for(const trigger of frame.triggers.filter(relevant)) {
       const selected=selection?.type==="trigger"&&selection.id===trigger.id;
@@ -576,6 +590,7 @@ export class FlowMapView {
     this.EndOverlay?.(context);
     cpu?.End();
     cpu?.Begin("特效与标注");
+    this.DrawSmokeColumns(context, frame);
     for(const effect of frame.effects) {
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
       if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;this.DrawPath(context,[effect.a,effect.b],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}

@@ -764,6 +764,63 @@ export class FlowPerspectiveView extends FlowMapView {
     const head=this.Vertex([x,base+height*0.94*crouch,z]),neck=this.Vertex([x,base+height*0.8*crouch,z]);
     if(head.depth>=this.near&&head.depth<=this.far) this.raster.Head(context,head,Clamp(Math.hypot(head.x-neck.x,head.y-neck.y)*0.75,2.5,7),color,stats,hiddenAlpha);
   }
+  DrawSmokeColumns(context, frame) {
+    const columns = this.mapData.smokeColumns;
+    if (!columns?.length) return;
+    const t = frame?.time || 0;
+    const sorted = [...columns].sort((a, b) =>
+      Math.hypot(b.x - this.eye[0], b.z - this.eye[2]) - Math.hypot(a.x - this.eye[0], a.z - this.eye[2]));
+    context.save();
+    for (const col of sorted) {
+      const opts = col.options || {};
+      const baseY = this.Ground([col.x, col.z]) + (col.heightOffset || 0.3);
+      const windX = opts.wind?.x ?? -0.55;
+      const windZ = opts.wind?.z ?? 0.25;
+      const riseH = Math.max(8, (opts.rise || 1.2) * (opts.life || 8.5) * 1.15);
+      const startR = opts.sizeStart || 1.4;
+      const endR = opts.sizeEnd || 6.2;
+      const baseAlpha = Clamp((opts.opacity || 0.08) * 3.8, 0.14, 0.42);
+      const basePt = this.Vertex([col.x, baseY, col.z]);
+      if (basePt.depth < this.near || basePt.depth > this.far) continue;
+      // Warm smoldering ember glow at crater / burnt roof base
+      if ((opts.fire || 0) > 0) {
+        const fireR = Clamp((opts.radius || 1.1) * 1.35 * this.focal / basePt.depth, 3.5, 42);
+        const flicker = 0.85 + 0.15 * Math.sin(t * 6.5 + col.x);
+        const g = context.createRadialGradient(basePt.x, basePt.y, 0, basePt.x, basePt.y, fireR);
+        g.addColorStop(0, `rgba(255, 198, 96, ${(0.72 * flicker).toFixed(3)})`);
+        g.addColorStop(0.45, `rgba(224, 102, 36, ${(0.44 * flicker).toFixed(3)})`);
+        g.addColorStop(1, "rgba(180, 62, 20, 0)");
+        context.fillStyle = g;
+        context.beginPath();
+        context.arc(basePt.x, basePt.y, fireR, 0, Math.PI * 2);
+        context.fill();
+      }
+      // 7 layered rising wind-drifted soot puffs
+      const puffs = 7;
+      for (let i = 0; i < puffs; i++) {
+        const phase = ((i / puffs) + t * 0.035 + ((col.x * 0.013) % 1 + 1) % 1) % 1;
+        const py = baseY + phase * riseH;
+        const px = col.x + windX * phase * riseH * 0.45 + Math.sin(phase * 5.2 + i + t * 0.6) * 0.65;
+        const pz = col.z + windZ * phase * riseH * 0.45 + Math.cos(phase * 4.4 + i) * 0.45;
+        const v = this.Vertex([px, py, pz]);
+        if (v.depth < this.near || v.depth > this.far) continue;
+        if (v.x < -80 || v.x > this.width + 80 || v.y < -80 || v.y > this.height + 80) continue;
+        const worldR = startR + (endR - startR) * Math.pow(phase, 0.78);
+        const scrR = Clamp(worldR * this.focal / v.depth, 4, 120);
+        const fade = Math.sin(phase * Math.PI) * baseAlpha * (opts.kind === "dust" ? 0.75 : 1);
+        const shade = opts.kind === "dust" ? [156, 144, 124] : [48 + Math.round(phase * 36), 44 + Math.round(phase * 34), 41 + Math.round(phase * 32)];
+        const grad = context.createRadialGradient(v.x, v.y, scrR * 0.08, v.x, v.y, scrR);
+        grad.addColorStop(0, `rgba(${shade[0]},${shade[1]},${shade[2]},${fade.toFixed(3)})`);
+        grad.addColorStop(0.58, `rgba(${shade[0]},${shade[1]},${shade[2]},${(fade * 0.48).toFixed(3)})`);
+        grad.addColorStop(1, `rgba(${shade[0]},${shade[1]},${shade[2]},0)`);
+        context.fillStyle = grad;
+        context.beginPath();
+        context.arc(v.x, v.y, scrR, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+    context.restore();
+  }
   DrawFire(context,effect,frame) {
     if(effect.phase>=0.3) return;
     const source=frame.actors.find(actor=>Distance(actor.p,effect.a)<0.1),target=frame.actors.find(actor=>Distance(actor.p,effect.b)<0.1);

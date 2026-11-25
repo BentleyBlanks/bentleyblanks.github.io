@@ -58,7 +58,31 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       const u = dx * field.cosine - dz * field.sine, v = dx * field.sine + dz * field.cosine;
       if (Math.abs(u) > field.w / 2 || Math.abs(v) > field.d / 2 || !InsidePolygon([x,z], field.polygon)) continue;
       const strip = field.strips.find(strip => u >= strip.from && u < strip.to) || field.strips.at(-1);
-      color.splice(0, 3, ...fieldColors[strip.kind]);
+      const base = fieldColors[strip.kind] || fieldColors.fallow;
+      if (field.zone.startsWith("Merged")) {
+        const edgeDist = Math.min(u - strip.from, strip.to - u, field.w / 2 - Math.abs(u), field.d / 2 - Math.abs(v));
+        if (edgeDist < 0.28) {
+          // Narrow warm-earth field bund (田埂) separating Lunan strip plots
+          color.splice(0, 3, 0.63, 0.56, 0.44);
+        } else {
+          let shade = 1;
+          if (strip.kind === "wheatRich" || strip.kind === "wheatSparse") {
+            const bedPos = ((u - strip.from) % 2.0 + 2.0) % 2.0;
+            shade = bedPos < 0.28 ? 1.055 : (0.97 + 0.03 * Math.sin(u * 3.1));
+          } else if (strip.kind === "plowedFresh") {
+            shade = 0.945 + 0.055 * Math.sin(u * 4.2);
+          } else if (strip.kind === "garden") {
+            const gx = ((u - strip.from) % 2.2 + 2.2) % 2.2;
+            const gz = ((v + field.d / 2) % 4.5 + 4.5) % 4.5;
+            shade = (gx < 0.28 || gz < 0.28) ? 1.09 : 0.985;
+          } else if (strip.kind === "stubble") {
+            shade = 0.975 + 0.025 * Math.sin(u * 2.5 + v * 0.35);
+          }
+          color.splice(0, 3, Math.min(1, base[0] * shade), Math.min(1, base[1] * shade), Math.min(1, base[2] * shade));
+        }
+      } else {
+        color.splice(0, 3, ...base);
+      }
       break;
     }
     groundPaint?.Blend(x, z, color);

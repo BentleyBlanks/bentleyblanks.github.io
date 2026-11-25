@@ -47,7 +47,7 @@ function RayHitsOrientedBox(from, to, obj, groundAt) {
   const [cx, rawY, cz] = obj.pos, [w, h, d] = obj.size;
   const y0 = rawY === null ? groundAt(cx, cz) : rawY;
   const y1 = y0 + h;
-  const rad = -(obj.yawDeg || 0) * Math.PI / 180;
+  const rad = (obj.yawDeg || 0) * Math.PI / 180;
   const cos = Math.cos(rad), sin = Math.sin(rad);
   const Local = ([x, y, z]) => {
     const dx = x - cx, dz = z - cz;
@@ -183,36 +183,130 @@ assert.ok(resolved.doc.objects.some((o) => o.id === "MA3_SideGate_Door" && o.hid
 for (const landmarkId of ["Merged_House_TempleHall_Roof", "Merged_RoadShrineRoof", "Merged_WatchTower", "Merged_BigLocust", "Merged_MillStone"]) {
   assert.ok(resolved.doc.objects.some((o) => o.id === landmarkId), `合成场景包含鲁南特色建筑地标 ${landmarkId}`);
 }
-// 验证村落建筑多样性改造与鲁南田野乡土景物、底色提亮与无重叠麦田地块
-assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_ThatchCrown")), "村落包含草顶土坯农舍差异化屋顶");
+// 验证村落建筑多样性改造与 1938.3.14 鲁南田野真实构筑、桥圈六区地标、时代红线纠偏与无重叠多角度条田
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_ThatchCrown")), "村落包含陡坡草顶土坯农舍");
 assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_Ridge") || o.id.endsWith("_HighRidge")), "村落包含双坡灰瓦高脊院落");
 assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_Chimney")), "村落包含砖砌灶台烟囱");
-assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_Rick_")), "外围田野包含麦秸垛");
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_Pigsty_W")), "鲁南院落包含连茅圈猪厕生活细节");
+assert.ok(resolved.doc.objects.some((o) => o.id.endsWith("_ShopAwning")), "官道沿街包含挑檐铺面/大车店");
+assert.ok(resolved.doc.objects.some((o) => o.id === "Church_Spire_2"), "圣言会德国教堂具备陡坡礼拜堂与尖顶钟楼");
+assert.ok(resolved.doc.objects.some((o) => o.id === "Pond_Mid_Water"), "村心保留真实取土坑塘打破僵硬网格");
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_Rick_")), "外围田野包含残半冬麦秸垛");
 assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_Mound_")), "外围田野包含鲁南田间坟头与孤树");
-assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_FieldTree_")), "外围田野包含沿田埂水沟的榆柳树排");
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("Merged_FieldTree_")), "外围田野包含地头枯榆与沟边旱柳");
+// 时代红线与历史 Bug 纠偏：禁止 3 月看青棚与浮空假墙，火线改接桥南西侧
+assert.ok(!resolved.doc.objects.some((o) => o.id.startsWith("Merged_Hut_")), "3 月 14 日农田严禁残留七八月看青草棚");
+assert.ok(!resolved.doc.objects.some((o) => o.id === "Encounter_BeishaheBridgeRushScreen"), "浮空遮挡假墙已由德式砖石巡道房取代");
+for (const reqId of [
+  "RailSec_Body", "RailSemaphore_Mast", "RailAbutN_WingW", "RailPier_1_Cutwater", "RailRefuge_W_Deck",
+  "Detonation_ExploderBox", "WoundedAlcove_WallW", "SouthEast_DugoutRoof", "SouthHam_1_House1_Body",
+  "Merged_Well_ChurchGarden_Fulcrum", "Merged_Grove_BridgeWest_Stele", "Merged_Kiln_East_Dome1",
+  "Merged_Kiln_NorthBank_Dome1", "Merged_FieldShrine_West_BrickSeal", "Merged_DitchBridge_WestMid_Slab",
+  "Merged_Manure_1_1B", "Merged_StoneWall_1",
+]) {
+  assert.ok(resolved.doc.objects.some((o) => o.id === reqId), `合成场景包含桥圈六区/三月农田核心构筑 ${reqId}`);
+}
+const railFuseBridge = resolved.doc.objects.find((o) => o.id === "RailFuse_Bridge");
+const railFuseBank = resolved.doc.objects.find((o) => o.id === "RailFuse_Bank");
+assert.ok(railFuseBridge && railFuseBridge.pos[0] < -80.5, "起爆引线沿西侧钢梁布置");
+assert.ok(railFuseBank && railFuseBank.pos[0] < -81.0, "桥南起爆引线已修正接入桥西工兵与起爆所，不再错拉向桥东");
+for (const walkId of ["RailWalk_S1", "RailWalk_S2"]) {
+  const walkObj = resolved.doc.objects.find((o) => o.id === walkId);
+  assert.equal(walkObj?.hideOn, "BridgeBlown", `${walkId} 在 BridgeBlown 炸毁后同步隐藏，避免桥面悬空穿帮`);
+}
+// 校验先期轰炸弹坑残垣、烟柱特效与玩家动线收束空气墙走廊
+assert.ok(resolved.doc.objects.some((o) => o.id.startsWith("BombCrater_")), "村内及村北具备先期轰炸弹坑与碎砖残垣");
+assert.ok((resolved.doc.smokeColumns?.length || 0) >= 6, `场景配置 >=6 处先期轰炸烟柱与阴燃火光，实测：${resolved.doc.smokeColumns?.length || 0}`);
+// 校验北沙河村半环形多向野战防线（东西翼折回战壕、联络壕、纵深折线铁丝网、侧翼机枪窝与二营/三营守备兵力）
+const segIds = new Set((resolved.doc.trenches?.segments || []).map((s) => s.id));
+for (const reqSeg of ["VillageNorthWest", "VillageNorthEast", "VillageWestFlankN", "VillageWestFlankS", "VillageEastFlankN", "VillageEastFlankS", "VillageSouthEastGuard", "VillageCommW", "VillageCommE"]) {
+  assert.ok(segIds.has(reqSeg), `北沙河村环形防御包含战壕段 ${reqSeg}`);
+}
+for (const reqDef of ["BshWireOuterW_01", "BshWireOuterE_01", "BshWireNE_01", "BshWireEastN_01", "BshWireWestN_01", "BshFlankMgE_Front", "BshFlankMgW_Front", "RoadMouth_HedgehogW", "FelledStump_1"]) {
+  assert.ok(resolved.doc.objects.some((o) => o.id === reqDef), `北沙河防线包含纵深障碍/侧翼工事 ${reqDef}`);
+}
+const f08cDef = merged.evaluate(merged.BeatById("08c").start + 30);
+for (const defId of ["bn2_mgWest", "bn2_mgEast", "bn2_westFlank", "bn2_eastFlank1", "bn2_reserve1", "bn2_seGuard"]) {
+  assert.ok(f08cDef.actors.some((a) => a.id === defId && a.side === "friend"), `08c 北沙河全向防线部署二营守备兵力 ${defId}`);
+}
+const f13cDef = merged.evaluate(merged.BeatById("13c").start + 10);
+assert.ok(f13cDef.actors.some((a) => a.id === "bn3_mgEast" && a.side === "friend"), "13c 桥南阵地部署三营东翼掩护机枪组");
+const mergedKeepIn = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_KeepIn_"));
+assert.ok(mergedKeepIn.length >= 25, `08–13 可玩走廊配置完整玩家专用空气墙收束（实测 ${mergedKeepIn.length} 段）`);
+for (const aw of mergedKeepIn) {
+  assert.equal(aw.tag, "airWall");
+  assert.equal(aw.material, "Whitebox/AirWall");
+  assert.equal(aw.visual, false);
+}
+// 确保 08a–13e 玩家主线每一步都不撞到任何 KeepIn 空气墙（至少留出 1.2m 安全余量）
+const keepInCheckGround = () => 0;
+for (const beat of merged.timeline.filter((b) => Number(b.stage) >= 8)) {
+  for (let i = 1; i < beat.p.length; i++) {
+    const a = [beat.p[i - 1][0], 1.0, beat.p[i - 1][1]];
+    const b = [beat.p[i][0], 1.0, beat.p[i][1]];
+    for (const aw of mergedKeepIn) {
+      const boxObj = { ...aw, tag: undefined };
+      assert.ok(!RayHitsOrientedBox(a, b, boxObj, keepInCheckGround), `玩家主线 ${beat.id} 不得被空气墙 ${aw.id} 阻断`);
+    }
+  }
+}
 const villagePaint = resolved.doc.paint.find((p) => p.id === "Village");
-assert.equal(villagePaint?.color, "#c6b99c", "村庄地基色提亮为鲁南夯实黄土，避免巷道与打麦场周围像黑色阴影");
+assert.equal(villagePaint?.color, "#c6b99c", "村庄地基色保持鲁南夯实黄土");
 assert.ok(!resolved.doc.paint.some((p) => /^Wheat_/.test(p.id || "") && p.z >= 355), "合并村外围不再残留突兀绿方块麦田矩形");
 
 const mergedMap = BuildEncounterMap(resolved.doc, { sceneId: "FirstLevelMerged", variantSpec: GetEncounterVariantSpec("L1_BeishaheMerged") });
 assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 990]);
-const expYards = new Set(resolved.doc.objects.filter((o) => /^Exp_[A-Z0-9]+_[A-Z0-9]+_/.test(o.id)).map((o) => o.id.match(/^(Exp_[A-Z0-9]+_[A-Z0-9]+)_/)[1]));
-assert.ok(expYards.size >= 60, `方案 A 扩建加密至少新增 60 座鲁南合院，实测：${expYards.size}`);
+const s2Yards = new Set(resolved.doc.objects.filter((o) => /^S2_[A-Za-z0-9]+_[A-Za-z0-9]+_/.test(o.id)).map((o) => o.id.match(/^(S2_[A-Za-z0-9]+_[A-Za-z0-9]+)_/)[1]));
+assert.ok(s2Yards.size >= 30, `S2 有机重构包含至少 30 座鲁南分型宗族院落/商铺，实测：${s2Yards.size}`);
+assert.ok(!resolved.doc.objects.some((o) => /^Exp_[WE]\d/.test(o.id)), "已撤除超标 2.4 倍的东西方盒外扩翼");
 const lmVillage = resolved.doc.markers.find((m) => m.id === "LmVillage");
-assert.ok(lmVillage && lmVillage.w >= 240 && lmVillage.d >= 260, `北沙河村规模已扩建至鲁南百户大村尺度（实测 ${lmVillage?.w}×${lmVillage?.d}m）`);
+assert.ok(lmVillage && lmVillage.w >= 165 && lmVillage.w <= 195 && lmVillage.d >= 250, `北沙河村回归 1938 年 500 余口史料尺度（实测 ${lmVillage?.w}×${lmVillage?.d}m）`);
+
 const mergedOnlyFields = mergedMap.fields.filter((f) => f.zone.startsWith("Merged"));
-assert.ok(mergedOnlyFields.length >= 40, "合并村外围具备完整无重叠农田地块网格");
-for (let i = 0; i < mergedOnlyFields.length; i++) {
-  const a = mergedOnlyFields[i];
-  assert.equal(a.angleDeg, 0, "合并村农田地块不再旋转堆叠");
-  for (let j = i + 1; j < mergedOnlyFields.length; j++) {
-    const b = mergedOnlyFields[j];
-    const overlapX = Math.abs(a.x - b.x) < (a.w + b.w) / 2 - 0.1;
-    const overlapZ = Math.abs(a.z - b.z) < (a.d + b.d) / 2 - 0.1;
-    assert.ok(!(overlapX && overlapZ), `农田地块 (${i},${j}) 严禁互相重叠堆叠`);
+assert.ok(mergedOnlyFields.length >= 60, `合并村外围具备多角度细碎鲁南条田（实测 ${mergedOnlyFields.length} 块）`);
+const fieldAngles = new Set(mergedOnlyFields.map((f) => f.angleDeg));
+assert.ok(fieldAngles.size >= 4, `鲁南条田包含 >=4 种片区垄向倾角以破除 0° 方格表（实测：${[...fieldAngles].join(",")}）`);
+// 校验同片区旋转局部坐标下绝对零重叠
+const fieldsByZone = new Map();
+for (const f of mergedOnlyFields) {
+  if (!fieldsByZone.has(f.zone)) fieldsByZone.set(f.zone, []);
+  fieldsByZone.get(f.zone).push(f);
+}
+for (const [zoneId, list] of fieldsByZone) {
+  const rad = (list[0].angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j];
+      assert.equal(a.angleDeg, b.angleDeg, `同片区 ${zoneId} 内条田保持一致垄向避免交叉堆叠`);
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const du = Math.abs(dx * cos - dz * sin), dv = Math.abs(dx * sin + dz * cos);
+      assert.ok(!(du < (a.w + b.w) / 2 - 0.1 && dv < (a.d + b.d) / 2 - 0.1), `同片区 ${zoneId} 条田 (${i},${j}) 严禁互相重叠`);
+    }
   }
 }
-for (const expectedLabel of ["防炮洞", "小土地庙", "土炮楼", "关帝庙（兼村塾）", "大槐树", "石碾", "老耿家（中街西头）", "夹壁便门"]) {
+// 校验各 Merged* 农田裁剪片区彼此不重叠（跨片区零像素堆叠）
+const mergedZones = mergedMap.fieldZones.filter((z) => z.id.startsWith("Merged"));
+const SegsIntersect = (a, b, c, d) => {
+  const Cross = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const c1 = Cross(a, b, c), c2 = Cross(a, b, d), c3 = Cross(c, d, a), c4 = Cross(c, d, b);
+  return ((c1 > 1e-6 && c2 < -1e-6) || (c1 < -1e-6 && c2 > 1e-6)) && ((c3 > 1e-6 && c4 < -1e-6) || (c3 < -1e-6 && c4 > 1e-6));
+};
+for (let i = 0; i < mergedZones.length; i++) {
+  const pA = mergedZones[i].poly;
+  for (let j = i + 1; j < mergedZones.length; j++) {
+    const pB = mergedZones[j].poly;
+    for (let ea = 0; ea < pA.length; ea++) {
+      const a1 = pA[ea], a2 = pA[(ea + 1) % pA.length];
+      for (let eb = 0; eb < pB.length; eb++) {
+        const b1 = pB[eb], b2 = pB[(eb + 1) % pB.length];
+        assert.ok(!SegsIntersect(a1, a2, b1, b2), `农田片区 ${mergedZones[i].id} 与 ${mergedZones[j].id} 边界相交`);
+      }
+    }
+  }
+}
+for (const expectedLabel of ["防炮洞", "小土地庙", "土炮楼", "关帝庙（兼村塾）", "大槐树", "石碾", "老耿家（中街西头）", "夹壁便门", "德式巡道房", "桥南小庄", "村东砖窑"]) {
   assert.ok(mergedMap.labels.some((l) => l.name === expectedLabel), `合并版底图包含地标：${expectedLabel}`);
 }
 assert.ok(!mergedMap.labels.some((l) => l.name === "西巷" && l.p[0] < 50), "不再残留错位漂在村外的西巷标注");

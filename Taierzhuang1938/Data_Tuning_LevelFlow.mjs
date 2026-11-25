@@ -47,7 +47,17 @@ export const FLOW_NIGHT = {
   lighting:{ambient:0.34,direct:0.1},
 };
 
-export const FLOW_FIELD_COLORS = {wheat:"#b6bf88", plowed:"#b59c7a", fallow:"#b6b197"};
+export const FLOW_FIELD_COLORS = {
+  wheat: "#b6bf88",
+  plowed: "#b59c7a",
+  fallow: "#b6b197",
+  wheatRich: "#889668",
+  wheatSparse: "#9ea479",
+  plowedFresh: "#957c5e",
+  stubble: "#b8a382",
+  garden: "#768a5c",
+  sandy: "#bfb193",
+};
 
 // Screenshot reference supplied by the user on 2026-11-13.
 export const FLOW_DEFAULT_VIEWS = [

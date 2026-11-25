@@ -333,7 +333,7 @@ export function MergedActors(beat, time, player, progress, timeline) {
     }
   }
 
-  // 二营守军与扛门板本村汉子（军民同防）
+  // 七二七团二营环形守备兵力与扛门板本村汉子（正面战壕 + 东西侧翼折回阵地 + 炮楼哨 + 村心预备班 + 东南桥头警戒）
   if (time < At("10a") || beat.id === "11b") {
     actors.push(Actor("sentry", "二营哨兵", "friend", "person", [101.8, 475.6], "stand"));
     actors.push(Actor("battalion", "二营连长", "friend", "person", beat.id === "11b" ? [105.5, 742] : [104, 478], "stand"));
@@ -342,6 +342,24 @@ export function MergedActors(beat, time, player, progress, timeline) {
         beat.id === "08d" ? [100.2, 476.2] : [108, 480], beat.id === "08d" ? "carry" : "walk",
         { status: "主动协助二营拆门板守沟口" }));
     }
+  }
+  if (time < At("11c")) {
+    const eastBreached = time >= At("08c", 0.45);
+    const northUnderFire = beat.id === "08c" || beat.id === "08d";
+    actors.push(
+      Actor("bn2_mgWest", "二营西翼机枪组", "friend", "person", [36.0, 482.5], northUnderFire ? "shoot" : "kneel", { heavy: true, status: "沿防战车壕西段交叉侧射" }),
+      Actor("bn2_west1", "二营北西壕兵", "friend", "person", [64.0, 485.4], northUnderFire ? "shoot" : "kneel"),
+      Actor("bn2_westFlank", "二营西翼守兵", "friend", "person", [40.5, 526.0], "kneel", { status: "守西翼折回战壕防铁路侧包" }),
+      Actor("bn2_mgEast", "二营东翼机枪组", "friend", "person", [183.5, 474.2], northUnderFire ? "shoot" : "kneel", { heavy: true, status: "沿防战车壕东段交叉侧射" }),
+      Actor("bn2_east1", "二营北东壕兵", "friend", "person", [142.0, 478.2], northUnderFire ? "shoot" : "kneel"),
+      Actor("bn2_towerObs", "二营炮楼警戒哨", "friend", "person", [217.5, 496.5], "kneel", { status: "东北角炮楼监视麦田" }),
+      Actor("bn2_eastFlank1", "二营东翼守兵", "friend", "person", [223.8, 526.0], eastBreached ? "shoot" : "kneel", { status: "守东翼折回战壕" }),
+      Actor("bn2_eastFlankFallen", "二营东翼中街哨", "friend", "person", [221.8, 565.5], eastBreached ? "dead" : "kneel",
+        { status: eastBreached ? "遭日军东翼侧包尖兵突破阵亡" : "守中街东口未合拢缺口" }),
+      Actor("bn2_reserve1", "二营村心预备班长", "friend", "person", [156.0, 522.0], "kneel", { status: "二线预备队待命堵口" }),
+      Actor("bn2_reserve2", "二营村心预备兵", "friend", "person", [166.0, 594.0], "kneel"),
+      Actor("bn2_seGuard", "二营东南桥头警戒", "friend", "person", [212.0, 718.0], "kneel", { status: "监视已炸断的官道桥" }),
+    );
   }
 
   // 过板桥的老乡与散兵：严格沿官道中心线南行（0 穿掩体/篱笆）
@@ -369,8 +387,13 @@ export function MergedActors(beat, time, player, progress, timeline) {
   }
 
   if (beat.stage === "13") {
-    actors.push(Actor("officer", "三营军官", "friend", "person", [-88, 880], "kneel"));
-    actors.push(Actor("engineer", "工兵", "friend", "person", [-83, 875], time < At("13d", 0.6) ? "kneel" : "run"));
+    actors.push(
+      Actor("officer", "三营军官", "friend", "person", [-88, 880], "kneel"),
+      Actor("engineer", "工兵", "friend", "person", [-83, 875], time < At("13d", 0.6) ? "kneel" : "run"),
+      Actor("bn3_mgEast", "三营东翼机枪组", "friend", "person", [-69.2, 878.0], beat.id === "13c" ? "shoot" : "kneel", { heavy: true, status: "南岸东翼交叉火力掩护铁桥" }),
+      Actor("bn3_rifle1", "三营桥头守兵", "friend", "person", [-74.5, 879.0], "kneel"),
+      Actor("bn3_rifle2", "三营南坡收容哨", "friend", "person", [-59.5, 886.0], "kneel"),
+    );
   }
   return actors;
 }
@@ -422,8 +445,9 @@ export function MergedEffects(beat, time, progress, actors, timeline) {
   };
 
   if (beat.id === "08c") {
-    // 沟口守军只打沟北（z < 475）正在压制和垫沟的日军，绝不隔着六排民房去打东头中街渗入的侧包组
-    EmitFriendlyFire(["player", "liu", "luo", "he", "yao"], 85, (e) => e.p[1] < 475);
+    // 沟口及东西翼二营守军对沟北正面与侧翼可见敌军交叉射击（严守各自射界扇区，不隔村穿射）
+    EmitFriendlyFire(["player", "liu", "luo", "he", "yao", "bn2_mgWest", "bn2_west1", "bn2_mgEast", "bn2_east1"], 85, (e) => e.p[1] < 475);
+    EmitFriendlyFire(["bn2_eastFlank1"], 65, (e) => e.p[0] > 195 && e.p[1] > 540);
   } else if (beat.id === "08d" && progress >= 0.35) {
     // 08d 后半拍：东翼侧包进老耿家的机枪沿主街朝大槐树石碾口扫射封路（24m 直视），班长三人压上主街正面交火
     effects.push({ kind: "fire", a: [131.6, 573.1], b: [133.5, 549.5], side: "enemy", heavy: true, phase: (time * 5.2) % 1 });
@@ -440,7 +464,7 @@ export function MergedEffects(beat, time, progress, actors, timeline) {
   } else if (beat.id === "12b") {
     EmitFriendlyFire(["player", "liu"], 78, (e) => e.groupId === "MergedRailAmbush");
   } else if (["13b", "13c", "13d"].includes(beat.id)) {
-    EmitFriendlyFire(["player", "liu"], 115, (e) => e.p[0] < -55);
+    EmitFriendlyFire(["player", "liu", "bn3_mgEast", "bn3_rifle1"], 115, (e) => e.p[0] < -55);
   }
 
   // 九四式在沟北沿交叉扫射沟南战壕
