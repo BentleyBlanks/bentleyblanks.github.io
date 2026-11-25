@@ -70,6 +70,7 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
     (entry.poly || entry.line || []).some((pt) => PointZ(pt) < maxZ));
   const northMarkers = (base.doc.markers || []).filter((marker) => marker.z < maxZ);
   const northRoads = (base.doc.ways?.roads || []).filter((line) => line.some((pt) => PointZ(pt) < maxZ));
+  const northRoadRibbons = (base.doc.ways?.roadRibbons || []).filter((ribbon) => (ribbon.points || []).some((pt) => PointZ(pt) < maxZ));
   const northWayTrenches = (base.doc.ways?.trenches || []).filter((line) => line.some((pt) => PointZ(pt) < maxZ));
 
   const baseSurface = base.doc.surface, ownSurface = doc.surface;
@@ -107,6 +108,9 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
     paint: [...northPaint, ...(doc.paint || [])],
     ways: {
       roads: [...northRoads, ...(doc.ways?.roads || [])],
+      ...(northRoadRibbons.length || doc.ways?.roadRibbons?.length ? {
+        roadRibbons: [...northRoadRibbons, ...(doc.ways?.roadRibbons || [])],
+      } : {}),
       trenches: [...northWayTrenches, ...(doc.ways?.trenches || [])],
     },
     trenches: {

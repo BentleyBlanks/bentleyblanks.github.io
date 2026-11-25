@@ -285,8 +285,15 @@ export function BuildEncounterMap(scene, options = {}) {
   ];
   const InMap = (line) => line.some((point) => Point(point)[1] < mapMaxZ);
   const Beyond = (line) => line.every((point) => Point(point)[1] >= southWaysZ);
-  roads.push(...(scene.ways?.roads || []).filter((line) => Beyond(line.slice(1)) && InMap(line))
-    .map((line, index) => ({ id: `BeishaheRoad${index}`, points: line.map(Point), width: 5 })));
+  const sceneRibbons = (scene.ways?.roadRibbons || []).filter((r) => Array.isArray(r.points) && r.points.length >= 2 && InMap(r.points));
+  if (sceneRibbons.length) {
+    roads.push(...sceneRibbons
+      .filter((r) => r.kind !== "footpath")
+      .map((r) => ({ id: r.id, kind: r.kind || "villageStreet", points: r.points.map(Point), width: r.width || 3.2, widthJitter: r.widthJitter })));
+  } else {
+    roads.push(...(scene.ways?.roads || []).filter((line) => Beyond(line.slice(1)) && InMap(line))
+      .map((line, index) => ({ id: `BeishaheRoad${index}`, points: line.map(Point), width: 5 })));
+  }
   const trenches = scene.trenches.segments.filter((segment) => InMap(segment.points))
     .map((segment) => ({ id: segment.id, points: segment.points.map(Point), width: segment.floorW || 3.8 }));
   for (const line of (scene.ways?.trenches || []).filter((line) => Beyond(line) && InMap(line)))
@@ -354,7 +361,9 @@ export function BuildEncounterMap(scene, options = {}) {
       ...front.L0105_FIELD_LANES,
       ...(hasGengjiazhuang
         ? village.L0610_FOOTPATHS.map((path) => path.line)
-        : [
+        : sceneRibbons.some((r) => r.kind === "footpath")
+          ? sceneRibbons.filter((r) => r.kind === "footpath").map((r) => r.points.map(Point))
+          : [
             // 村西曲折穿田毛细小径（顺村缘水坑/菜园自然拐弯，不贴直线边界走）
             [[10, 355], [2, 412], [-8, 462], [20, 492], [44, 508], [58, 518]],
             [[-74, 540], [-38, 549], [-8, 543], [22, 552], [48, 544], [62, 556]],

@@ -365,7 +365,15 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     ...(withBackdrop ? { backdrop: { far: bd.far, ground: { ...bd.ground }, ...(bd.haze ? { haze: { ...bd.haze } } : {}),
       paint: (bd.paint || []).map(p => ({ ...p })), shapes } } : {}),
     ...(markers.length ? { landmarks: markers.map(m => ({ ...m })) } : {}),
-    ways: { roads: Lines(scene.ways?.roads), trenches: [...Lines(scene.ways?.trenches), ...Lines(SceneTrenchLines(slicePlan))] },
+    ways: {
+      roads: Lines(scene.ways?.roads),
+      ...(scene.ways?.roadRibbons?.length ? {
+        roadRibbons: scene.ways.roadRibbons
+          .filter((r) => Array.isArray(r.points) && r.points.length >= 2 && LineTouches(area, r.points.map((p) => (Array.isArray(p) ? { x: p[0], z: p[1] } : p)), (r.width || 4) * 0.6))
+          .map((r) => ({ ...r, points: r.points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z])) })),
+      } : {}),
+      trenches: [...Lines(scene.ways?.trenches), ...Lines(SceneTrenchLines(slicePlan))],
+    },
     ...(slicePlan ? { trenchPlan: slicePlan } : {}),
   };
 }

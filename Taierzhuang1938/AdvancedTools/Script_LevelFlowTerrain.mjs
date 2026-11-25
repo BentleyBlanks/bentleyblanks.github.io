@@ -4,6 +4,206 @@ import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometr
 import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
 import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
 import { BuildGroundPaint, HydrateGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
+import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
+
+const ROAD_TIER_ORDER = { footpath: 0, villageAlley: 1, villageStreet: 2, guandao: 3 };
+const SmoothStep = (edge0, edge1, x) => {
+  const t = Clamp((x - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+const MixRgb = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+function InferRoadKind(road) {
+  if (road.kind) return road.kind;
+  const w = road.width || 3;
+  if (w >= 4.0) return "guandao";
+  if (w >= 2.4) return "villageStreet";
+  return "villageAlley";
+}
+
+function BuildSplineRoadPaint(roads, footpaths, floors, bounds, { cellM: startCellM, maxCells }) {
+  const minX = bounds.minX, maxX = bounds.maxX, minZ = bounds.minZ, maxZ = bounds.maxZ;
+  if (!(maxX > minX && maxZ > minZ)) return null;
+  let cellM = startCellM;
+  while (((maxX - minX) / cellM + 1) * ((maxZ - minZ) / cellM + 1) > maxCells) cellM *= 2;
+  const cols = Math.ceil((maxX - minX) / cellM) + 1;
+  const rows = Math.ceil((maxZ - minZ) / cellM) + 1;
+  const total = cols * rows;
+  const C = new Float32Array(total * 3);
+  const A = new Float32Array(total);
+  // Floors (courtyard yards / threshing pockets) first so roads blend cleanly over edges
+  if (floors && floors.length) {
+    const floorPaint = BuildGroundPaint(
+      floors.map((floor) => ({ poly: floor.points.map(([x, z]) => ({ x, z })), feather: 0.6, color: "#cfc1a1", strength: 0.92 })),
+      bounds, { cellM, maxCells: total + 16 },
+    );
+    if (floorPaint) {
+      const rgb = [0, 0, 0];
+      for (let j = 0; j < rows; j++) {
+        const z = minZ + j * cellM;
+        for (let i = 0; i < cols; i++) {
+          const x = minX + i * cellM;
+          rgb[0] = 0; rgb[1] = 0; rgb[2] = 0;
+          const a = floorPaint.Blend(x, z, rgb);
+          if (a > 1e-4) {
+            const at = j * cols + i;
+            A[at] = a;
+            C[at * 3] = rgb[0];
+            C[at * 3 + 1] = rgb[1];
+            C[at * 3 + 2] = rgb[2];
+          }
+        }
+      }
+    }
+  }
+  const entries = [
+    ...(footpaths || []).map((pts, idx) => ({
+      id: `Footpath_${idx}`,
+      kind: "footpath",
+      points: pts,
+      width: 1.05,
+      widthJitter: 0.14,
+    })),
+    ...(roads || []).map((road, idx) => ({
+      id: road.id || `Road_${idx}`,
+      kind: InferRoadKind(road),
+      points: road.points,
+      width: road.width || 3.2,
+      widthJitter: road.widthJitter ?? (InferRoadKind(road) === "guandao" ? 0.06 : 0.05),
+    })),
+  ].filter((e) => Array.isArray(e.points) && e.points.length >= 2);
+  entries.sort((a, b) => (ROAD_TIER_ORDER[a.kind] ?? 2) - (ROAD_TIER_ORDER[b.kind] ?? 2));
+
+  const stamp = new Int32Array(total);
+  const minDist = new Float32Array(total);
+  const bestS = new Float32Array(total);
+  const bestHalf = new Float32Array(total);
+  const touched = [];
+
+  // 1938 Lunan earth-road palette (sRGB 0–1)
+  const COL_GUANDAO_CROWN = [0.77, 0.71, 0.57];
+  const COL_GUANDAO_RURAL = [0.69, 0.67, 0.51];
+  const COL_GUANDAO_RUT = [0.56, 0.49, 0.37];
+  const COL_GUANDAO_EDGE = [0.72, 0.65, 0.51];
+  const COL_GUANDAO_VERGE = [0.60, 0.59, 0.44];
+  const COL_STREET_CORE = [0.62, 0.55, 0.43];
+  const COL_STREET_BODY = [0.74, 0.68, 0.56];
+  const COL_STREET_EDGE = [0.69, 0.63, 0.51];
+  const COL_ALLEY_CORE = [0.62, 0.56, 0.44];
+  const COL_ALLEY_EDGE = [0.70, 0.64, 0.53];
+  const COL_PATH_CORE = [0.58, 0.50, 0.37];
+  const COL_PATH_VERGE = [0.55, 0.58, 0.41];
+
+  let roadId = 0;
+  for (const entry of entries) {
+    let path;
+    try {
+      path = MakeRoadPath(entry.points);
+    } catch {
+      continue;
+    }
+    const samples = SampleRun(path, 0, path.length, 1.4);
+    if (samples.length < 2) continue;
+    roadId += 1;
+    touched.length = 0;
+    const baseHalf = Math.max(0.35, entry.width * 0.5);
+    const jitterAmp = entry.widthJitter || 0;
+    const seed = [...String(entry.id)].reduce((acc, ch) => ((acc * 31 + ch.charCodeAt(0)) >>> 0), 17) * 0.001;
+    const HalfAt = (s) => baseHalf * (1 + jitterAmp * (0.65 * Math.sin(s * 0.21 + seed) + 0.35 * Math.cos(s * 0.47 - seed * 1.7)));
+    const reachScale = entry.kind === "footpath" ? 1.45 : 1.32;
+
+    for (let k = 0; k < samples.length - 1; k++) {
+      const a = samples[k], b = samples[k + 1];
+      const dx = b.x - a.x, dz = b.z - a.z;
+      const len2 = dx * dx + dz * dz;
+      if (len2 < 1e-6) continue;
+      const segLen = Math.sqrt(len2);
+      const midHalf = HalfAt((a.s + b.s) * 0.5);
+      const pad = midHalf * reachScale + cellM;
+      const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x) - pad - minX) / cellM));
+      const i1 = Math.min(cols - 1, Math.ceil((Math.max(a.x, b.x) + pad - minX) / cellM));
+      const j0 = Math.max(0, Math.floor((Math.min(a.z, b.z) - pad - minZ) / cellM));
+      const j1 = Math.min(rows - 1, Math.ceil((Math.max(a.z, b.z) + pad - minZ) / cellM));
+      for (let j = j0; j <= j1; j++) {
+        const z = minZ + j * cellM;
+        const rowOff = j * cols;
+        for (let i = i0; i <= i1; i++) {
+          const x = minX + i * cellM;
+          const u = Clamp(((x - a.x) * dx + (z - a.z) * dz) / len2, 0, 1);
+          const px = a.x + dx * u, pz = a.z + dz * u;
+          const dist = Math.hypot(x - px, z - pz);
+          const s = a.s + segLen * u;
+          const half = HalfAt(s);
+          if (dist > half * reachScale) continue;
+          const at = rowOff + i;
+          if (stamp[at] !== roadId) {
+            stamp[at] = roadId;
+            minDist[at] = dist;
+            bestS[at] = s;
+            bestHalf[at] = half;
+            touched.push(at);
+          } else if (dist < minDist[at]) {
+            minDist[at] = dist;
+            bestS[at] = s;
+            bestHalf[at] = half;
+          }
+        }
+      }
+    }
+
+    for (let idx = 0; idx < touched.length; idx++) {
+      const at = touched[idx];
+      const dist = minDist[at];
+      const half = bestHalf[at];
+      const s = bestS[at];
+      const t = dist / half;
+      const j = Math.floor(at / cols);
+      const i = at - j * cols;
+      const z = minZ + j * cellM;
+      const mottle = 0.035 * Math.sin(s * 0.85 + dist * 2.4 + seed) + 0.022 * Math.cos(s * 2.1 - dist * 3.8);
+
+      let rgb, alpha;
+      if (entry.kind === "guandao") {
+        // Dual compacted wooden-cart wheel ruts around t ≈ 0.50 + slight rural grass crown + feathered verge
+        const rural = (z < 474 || z > 735) ? 1 : 0;
+        const centerCol = rural ? MixRgb(COL_GUANDAO_CROWN, COL_GUANDAO_RURAL, 0.42) : COL_GUANDAO_CROWN;
+        const rutFactor = Math.exp(-Math.pow((t - 0.50) / 0.16, 2));
+        const edgeMix = SmoothStep(0.70, 0.96, t);
+        const vergeMix = SmoothStep(0.92, 1.24, t);
+        rgb = MixRgb(centerCol, COL_GUANDAO_EDGE, edgeMix);
+        rgb = MixRgb(rgb, COL_GUANDAO_RUT, rutFactor * 0.82);
+        if (vergeMix > 0) rgb = MixRgb(rgb, COL_GUANDAO_VERGE, vergeMix * (rural ? 0.78 : 0.42));
+        alpha = (1 - SmoothStep(0.88, 1.30, t)) * 0.95;
+      } else if (entry.kind === "villageStreet") {
+        const trackFactor = Math.exp(-Math.pow(t / 0.42, 2));
+        const edgeMix = SmoothStep(0.75, 1.15, t);
+        rgb = MixRgb(COL_STREET_BODY, COL_STREET_CORE, trackFactor * 0.58);
+        rgb = MixRgb(rgb, COL_STREET_EDGE, edgeMix * 0.65);
+        alpha = (1 - SmoothStep(0.84, 1.26, t)) * 0.90;
+      } else if (entry.kind === "villageAlley") {
+        const edgeMix = SmoothStep(0.50, 1.10, t);
+        rgb = MixRgb(COL_ALLEY_CORE, COL_ALLEY_EDGE, edgeMix * 0.75);
+        alpha = (1 - SmoothStep(0.78, 1.24, t)) * 0.86;
+      } else {
+        // Narrow trodden rural dirt footpath with trampled grass/earth verge and subtle organic break-up
+        const vergeMix = SmoothStep(0.42, 1.05, t);
+        rgb = MixRgb(COL_PATH_CORE, COL_PATH_VERGE, vergeMix);
+        const organic = 0.84 + 0.16 * Math.sin(s * 0.65 + seed * 3.1);
+        alpha = (1 - SmoothStep(0.55, 1.42, t)) * 0.84 * organic;
+      }
+
+      if (alpha <= 1e-3) continue;
+      const r = Clamp(rgb[0] + mottle, 0, 1);
+      const g = Clamp(rgb[1] + mottle * 0.92, 0, 1);
+      const b = Clamp(rgb[2] + mottle * 0.78, 0, 1);
+      A[at] = A[at] * (1 - alpha) + alpha;
+      C[at * 3] = C[at * 3] * (1 - alpha) + r * alpha;
+      C[at * 3 + 1] = C[at * 3 + 1] * (1 - alpha) + g * alpha;
+      C[at * 3 + 2] = C[at * 3 + 2] * (1 - alpha) + b * alpha;
+    }
+  }
+  return HydrateGroundPaint({ cellM, minX, minZ, cols, rows, C, A });
+}
 
 function LowerBound(values,target) {
   let low=0,high=values.length;
@@ -28,11 +228,9 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   const fields = (map.fields || []).map(field => ({...field,
     cosine:Math.cos(field.angleDeg * Math.PI / 180), sine:Math.sin(field.angleDeg * Math.PI / 180),
     polygon:map.fieldZones.find(zone => zone.id === field.zone).poly}));
-  const routePaint = prepared?HydrateGroundPaint(prepared.routePaint):BuildGroundPaint([
-    ...(map.roads || []).map(road => ({line:road.points.map(([x,z]) => ({x,z})), halfW:road.width / 2, feather:0.8, color:"#d8c8a7"})),
-    ...(map.footpaths || []).map(points => ({line:points.map(([x,z]) => ({x,z})), halfW:0.35, feather:0.5, color:"#c4b792"})),
-    ...(map.floors || []).map(floor => ({poly:floor.points.map(([x,z]) => ({x,z})), feather:0.5, color:"#d8c8a7"})),
-  ], bounds, paintSettings);
+  const routePaint = prepared
+    ? HydrateGroundPaint(prepared.routePaint)
+    : BuildSplineRoadPaint(map.roads, map.footpaths, map.floors, bounds, paintSettings);
   const SurfaceColorAt = (x, z) => {
     const color = [198 / 255, 207 / 255, 169 / 255];
     const paint = localBackdropPaint && x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ

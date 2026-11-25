@@ -20,6 +20,7 @@ import {
 } from "../Script_SceneDoc.mjs";
 import { DecodeTrenchDatum, EncodeTrenchDatum } from "../Script_SceneTrenches.mjs";
 import { ResolveInheritedScene } from "../Script_SceneInherit.mjs";
+import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(dirHere, "..");
@@ -2160,28 +2161,18 @@ function BuildMergedScene() {
       poly: [{ x: -46, z: 910 }, { x: -9, z: 910 }, { x: -9, z: 958 }, { x: -46, z: 958 }],
       feather: 2.6, color: "#c6b99c", strength: 0.85,
     },
-    {
-      id: "MergedConnectRoad",
-      line: [{ x: 99, z: 355 }, { x: 103, z: 392 }, { x: 103.5, z: 418 }, { x: 102, z: 440 }, { x: 99, z: 467 }],
-      halfW: 2.6, feather: 0.8, color: "#dfd5bc",
-    },
-    { id: "Road_MainStreet", line: mainStreetPts, halfW: 2.1, feather: 0.7, color: "#e3dac2" },
-    { id: "Road_NorthStreet", line: northStreetPts, halfW: 1.25, feather: 0.55, color: "#e3dac2" },
-    { id: "Road_MidStreet", line: midStreetPts, halfW: 1.55, feather: 0.6, color: "#e3dac2" },
-    { id: "Road_EastFlankTrack", line: eastFlankTrackPts, halfW: 1.05, feather: 0.5, color: "#d5c7a7" },
-    { id: "Road_SouthMidStreet", line: southMidStreetPts, halfW: 0.95, feather: 0.45, color: "#dfd5bc" },
-    { id: "Road_SouthMidEastAlley", line: southMidEastAlleyPts, halfW: 0.95, feather: 0.45, color: "#dfd5bc" },
-    { id: "Road_SouthStreet", line: southStreetPts, halfW: 1.45, feather: 0.6, color: "#e3dac2" },
-    { id: "Road_WestLane", line: westLanePts, halfW: 1.0, feather: 0.45, color: "#dfd5bc" },
-    { id: "Road_ExitPath", line: exitPathPts, halfW: 1.25, feather: 0.55, color: "#e3dac2" },
-    // G4 农田干沟底深土涂色（凸显干沟立体走线）
+    // G4 农田干沟底深土涂色（凸显干沟立体走线；村路与田间小路改由 ways.roadRibbons 样条管线生成，不再用平色涂抹）
     { id: "FieldDitch_West", line: WestFieldDitchPts.map(([x, z]) => ({ x, z })), halfW: 1.15, feather: 0.55, color: "#9b8768", strength: 0.72 },
     { id: "FieldDitch_NorthBank", line: NorthBankDitchPts.map(([x, z]) => ({ x, z })), halfW: 0.90, feather: 0.45, color: "#9b8768", strength: 0.68 },
     { id: "FieldDitch_EastN", line: EastFieldDitchNPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
     { id: "FieldDitch_EastS", line: EastFieldDitchSPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
   );
 
-  // Build updated ways.roads
+  // Build updated ways.roads & typed spline roadRibbons (Script_RoadPath / Script_RoadSpline)
+  const ToPairs = (pts) => pts.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z]));
+  const southBaseRoads = (baseDoc.ways?.roads || [])
+    .filter((line) => line.every((pt) => ((pt.z ?? pt[1]) + DELTA_Z) >= 665))
+    .map((line) => line.map((pt) => ShiftPoint(pt, true)));
   const ownRoads = [
     [{ x: 98.5, z: 344 }, { x: 99, z: 355 }, { x: 103, z: 392 }, { x: 103.5, z: 418 }, { x: 102, z: 440 }, { x: 99, z: 467 }],
     [{ x: 99, z: 467 }, { x: 99, z: 475 }],
@@ -2197,10 +2188,93 @@ function BuildMergedScene() {
     [{ x: 185, z: 569 }, { x: 190, z: 586 }, { x: 188, z: 601 }],
     [{ x: 175, z: 518 }, { x: 178, z: 498 }],
     [{ x: 84, z: 561 }, { x: 68, z: 544 }],
-    ...((baseDoc.ways?.roads || [])
-      .filter((line) => line.every((pt) => ((pt.z ?? pt[1]) + DELTA_Z) >= 665))
-      .map((line) => line.map((pt) => ShiftPoint(pt, true)))),
+    ...southBaseRoads,
   ];
+  const ownRoadRibbons = [
+    // Tier 1: 官道 / 村主街（宽 4.2–4.8 m，双车辙 + 路肩，在村口防坦克沟 z=471..479 处自然断开）
+    { id: "MergedConnectRoad", kind: "guandao", width: 4.8, widthJitter: 0.06,
+      points: [[98.5, 344], [99, 358], [103, 392], [103.5, 418], [102, 442], [99.2, 470.5]] },
+    { id: "Road_MainStreet", kind: "guandao", width: 4.3, widthJitter: 0.05,
+      points: [[99.5, 479], [106, 498], [114, 520], [140, 560], [170, 600], [174, 638], [172, 680], [205, 720], [238, 754]] },
+    ...southBaseRoads.map((line, i) => ({
+      id: `Road_SouthBank_${i}`, kind: "guandao", width: 4.0, widthJitter: 0.06, points: ToPairs(line),
+    })),
+    // Tier 2: 村内主横街（宽 2.5–3.1 m，单车/独轮车压痕）
+    { id: "Road_NorthStreet", kind: "villageStreet", width: 2.6, widthJitter: 0.05, points: ToPairs(northStreetPts) },
+    { id: "Road_MidStreet", kind: "villageStreet", width: 3.0, widthJitter: 0.05, points: ToPairs(midStreetPts) },
+    { id: "Road_SouthStreet", kind: "villageStreet", width: 2.8, widthJitter: 0.05, points: ToPairs(southStreetPts) },
+    { id: "Road_ExitPath", kind: "villageStreet", width: 2.6, widthJitter: 0.05, points: ToPairs(exitPathPts) },
+    // Tier 3: 村内密巷 / 东出田土路（宽 1.7–2.1 m）
+    { id: "Road_WestLane", kind: "villageAlley", width: 2.0, widthJitter: 0.06, points: ToPairs(westLanePts) },
+    { id: "Road_SouthMidStreet", kind: "villageAlley", width: 1.9, widthJitter: 0.06, points: ToPairs(southMidStreetPts) },
+    { id: "Road_SouthMidEastAlley", kind: "villageAlley", width: 1.8, widthJitter: 0.06, points: ToPairs(southMidEastAlleyPts) },
+    { id: "Road_EastFlankTrack", kind: "villageAlley", width: 2.1, widthJitter: 0.08, points: ToPairs(eastFlankTrackPts) },
+    { id: "Road_InnerLink1", kind: "villageAlley", width: 1.8, widthJitter: 0.06, points: [[145, 521], [152, 540], [157, 564]] },
+    { id: "Road_InnerLink2", kind: "villageAlley", width: 1.8, widthJitter: 0.06, points: [[185, 569], [190, 586], [188, 601]] },
+    { id: "Road_InnerLink3", kind: "villageAlley", width: 1.8, widthJitter: 0.06, points: [[175, 518], [178, 498]] },
+    { id: "Road_InnerLink4", kind: "villageAlley", width: 1.8, widthJitter: 0.06, points: [[84, 561], [68, 544]] },
+    // Tier 4: 田间曲折毛细小路（宽 0.95–1.15 m，高有机摆动，贴合农田条块与村缘菜园）
+    { id: "Footpath_WestNW", kind: "footpath", width: 1.05, widthJitter: 0.14, points: [[10, 355], [2, 412], [-8, 462], [20, 492], [44, 508], [58, 518]] },
+    { id: "Footpath_WestMid", kind: "footpath", width: 1.05, widthJitter: 0.14, points: [[-74, 540], [-38, 549], [-8, 543], [22, 552], [48, 544], [62, 556]] },
+    { id: "Footpath_WestSW", kind: "footpath", width: 1.05, widthJitter: 0.14, points: [[56, 634], [38, 650], [12, 654], [-14, 669], [-40, 687], [-74, 696]] },
+    { id: "Footpath_WestSpine", kind: "footpath", width: 1.0, widthJitter: 0.14, points: [[-12, 546], [-18, 610], [-22, 676], [-34, 732], [-46, 772]] },
+    { id: "Footpath_NorthBank", kind: "footpath", width: 1.1, widthJitter: 0.13, points: [[50, 766], [26, 768], [6, 784], [-20, 798], [-48, 801], [-74, 790]] },
+    { id: "Footpath_NorthEastIn", kind: "footpath", width: 1.0, widthJitter: 0.14, points: [[148, 355], [158, 414], [176, 466]] },
+    { id: "Footpath_EastOuter", kind: "footpath", width: 1.15, widthJitter: 0.14, points: [[212, 355], [226, 424], [224, 480], [234, 522], [246, 566], [286, 572], [316, 574]] },
+    { id: "Footpath_EastSouth", kind: "footpath", width: 1.05, widthJitter: 0.14, points: [[246, 566], [254, 628], [240, 684], [220, 706], [204, 718]] },
+    { id: "Footpath_EastGrove", kind: "footpath", width: 1.0, widthJitter: 0.14, points: [[212, 538], [234, 526], [272, 522], [314, 526]] },
+    { id: "Footpath_SouthHamlet", kind: "footpath", width: 1.1, widthJitter: 0.13, points: [[-58, 922], [-42, 924], [-14, 932], [28, 938], [88, 928]] },
+    { id: "Footpath_SouthWestRail", kind: "footpath", width: 1.05, widthJitter: 0.13, points: [[-118, 888], [-116, 932], [-96, 972]] },
+  ];
+  // 烘入轻微的样条道路横断面微地形（官道双车辙与路肩微隆、村街/小路踩实微凹；避开河道/坑塘/干沟/弹坑低洼处）
+  for (const r of ownRoadRibbons) {
+    if (!r.points || r.points.length < 2) continue;
+    const roadPath = MakeRoadPath(r.points);
+    const samples = SampleRun(roadPath, 0, roadPath.length, 1.5);
+    const halfW = (r.width || 2.5) * 0.5;
+    const pad = halfW * 1.35 + 0.6;
+    for (let k = 0; k < samples.length - 1; k++) {
+      const a = samples[k], b = samples[k + 1];
+      const dx = b.x - a.x, dz = b.z - a.z, segLen = Math.hypot(dx, dz);
+      if (segLen < 1e-4) continue;
+      const tx = dx / segLen, tz = dz / segLen;
+      const nx = tz, nz = -tx;
+      const gx0 = Math.max(0, Math.floor((Math.min(a.x, b.x) - pad - minX) / cellM));
+      const gx1 = Math.min(cols, Math.ceil((Math.max(a.x, b.x) + pad - minX) / cellM));
+      const gz0 = Math.max(4, Math.floor((Math.min(a.z, b.z) - pad - INHERIT_MAX_Z) / cellM));
+      const gz1 = Math.min(outRows, Math.ceil((Math.max(a.z, b.z) + pad - INHERIT_MAX_Z) / cellM));
+      for (let gz = gz0; gz <= gz1; gz++) {
+        const z = INHERIT_MAX_Z + gz * cellM;
+        const seamFade = Math.min(1, Math.max(0, (z - (INHERIT_MAX_Z + 2)) / 5));
+        if (seamFade <= 0) continue;
+        for (let gx = gx0; gx <= gx1; gx++) {
+          const x = minX + gx * cellM;
+          const idx = gz * (cols + 1) + gx;
+          if (ownHeights[idx] <= -0.9) continue; // 不干扰河床/干沟/坑塘/弹坑
+          const rx = x - a.x, rz = z - a.z;
+          const proj = rx * tx + rz * tz;
+          if (proj < -0.25 || proj > segLen + 0.25) continue;
+          const lat = Math.abs(rx * nx + rz * nz);
+          const t = lat / halfW;
+          if (t > 1.35) continue;
+          let delta = 0;
+          if (r.kind === "guandao") {
+            const rut = Math.exp(-Math.pow((t - 0.52) / 0.16, 2));
+            const crown = Math.exp(-Math.pow(t / 0.28, 2));
+            const shoulder = Math.exp(-Math.pow((t - 1.02) / 0.20, 2));
+            delta = -0.045 * rut + 0.02 * crown + 0.03 * shoulder;
+          } else if (r.kind === "villageStreet") {
+            const wear = Math.exp(-Math.pow(t / 0.45, 2));
+            const shoulder = Math.exp(-Math.pow((t - 1.0) / 0.22, 2));
+            delta = -0.028 * wear + 0.015 * shoulder;
+          } else {
+            delta = -0.02 * Math.exp(-Math.pow(t / 0.55, 2));
+          }
+          ownHeights[idx] = Fix(ownHeights[idx] + delta * 0.5 * seamFade);
+        }
+      }
+    }
+  }
   const ownWayTrenches = (baseDoc.ways?.trenches || [])
     .filter((line) => line.every((pt) => (pt.z ?? pt[1]) >= SOURCE_START_Z))
     .map((line) => {
@@ -2275,7 +2349,7 @@ function BuildMergedScene() {
       paint: (baseDoc.backdrop?.paint || []).filter((e) => InSouth(e.poly || e.line)).map(ShiftPaintEntry),
     },
     paint: ownPaint,
-    ways: { roads: ownRoads, trenches: ownWayTrenches },
+    ways: { roads: ownRoads, roadRibbons: ownRoadRibbons, trenches: ownWayTrenches },
     trenches: {
       seed: baseDoc.trenches.seed,
       earthProfile: baseDoc.trenches.earthProfile,

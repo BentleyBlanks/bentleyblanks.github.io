@@ -4,6 +4,22 @@ import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 import { IsMainlineLandmark, LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
+import { MakeRoadPath } from "../Script_RoadPath.mjs";
+
+const roadSplineCache = new WeakMap();
+function SplinePoints(points, step = 2.5) {
+  if (!Array.isArray(points) || points.length < 3) return points;
+  let cached = roadSplineCache.get(points);
+  if (!cached) {
+    try {
+      cached = MakeRoadPath(points).Dense(step);
+    } catch {
+      cached = points;
+    }
+    roadSplineCache.set(points, cached);
+  }
+  return cached;
+}
 
 export const FLOW_COLORS = {player:"#ac7a16",friend:"#276d82",enemy:"#ac4031",civilian:"#72608e"};
 export const FLOW_MATERIAL_COLORS={"Whitebox/Plaster":"#d8d0ba","Whitebox/Roof":"#aaa58f","Whitebox/Structure":"#beb9a5","Whitebox/Timber":"#aa8862","Whitebox/EarthDark":"#bba98b","Whitebox/Cover":"#c7b391","Whitebox/Step":"#baa482","Whitebox/Canvas":"#d0bd91","Whitebox/Metal":"#8b9186","Whitebox/Water":"#a8c5ce","Whitebox/Foliage":"#a5af85","Whitebox/Void":"#5a544a","Whitebox/Danger":"#b6614d","Whitebox/Coping":"#cbc5b3"};
@@ -265,13 +281,32 @@ export class FlowMapView {
       context.globalAlpha = 1;
     }
     this.DrawTerrain(context,width,height);
-    for(const path of map.footpaths) Line(context,path.map(Screen),"#a38e6455",Math.max(0.7,scale*0.35),[3,4]);
-    // Paint the whole bank network first, then the whole walking surface.
+    for(const path of map.footpaths) {
+      const pts = SplinePoints(path, 2.5).map(Screen);
+      SmoothLine(context, pts, "#9c8a6845", Math.max(1.1, scale * 0.85));
+      Line(context, pts, "#7e6b4a77", Math.max(0.75, scale * 0.28), [4, 4]);
+    }
+    // Paint the whole bank network first, then the whole walking surface along true Catmull-Rom splines.
     // Drawing each complete segment in turn used to seal T-junctions again.
-    for(const road of map.roads) SmoothLine(context,road.points.map(Screen),"#bdad8880",(road.width+0.8)*scale);
+    for(const road of map.roads) {
+      const pts = SplinePoints(road.points, 2.5).map(Screen);
+      const borderCol = road.kind === "guandao" ? "#a6957188" : "#b3a38070";
+      SmoothLine(context, pts, borderCol, (road.width + (road.kind === "guandao" ? 0.9 : 0.55)) * scale);
+    }
     for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#a58d6870",(trench.width+1.5)*scale);
     for(const floor of map.floors) Polygon(context,floor.points.map(Screen),"#efe3c9","#b8a68166");
-    for(const road of map.roads) SmoothLine(context,road.points.map(Screen),"#f2ebd5",road.width*scale);
+    for(const road of map.roads) {
+      const pts = SplinePoints(road.points, 2.5).map(Screen);
+      const fillCol = road.kind === "guandao" ? "#dfd3b6"
+        : road.kind === "villageAlley" ? "#d0c3a5"
+          : "#e6dbc0";
+      SmoothLine(context, pts, fillCol, road.width * scale);
+      if (road.kind === "guandao" && scale > 1.2) {
+        // Subtle cart-wheel rut center track for 2D hierarchy clarity
+        SmoothLine(context, pts, "#9b896938", road.width * 0.52 * scale);
+        SmoothLine(context, pts, "#dcd0b2", road.width * 0.22 * scale);
+      }
+    }
     for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#c9b18b",(trench.width+0.35)*scale);
     for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#ead9b7",Math.max(1,(trench.width-0.3)*scale));
     SmoothLine(context,map.river.map(Screen),"#9bb5ba66",10*scale);

@@ -13,7 +13,7 @@ import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { DeriveCoversFromColliders } from "./Script_AiCover.mjs";
-import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
+import { BuildRailwayFromSpec, BuildRoadRibbon } from "./Script_RoadSpline.mjs";
 import { MarkDynamicPrepass, MarkNoPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Script_FirstLevelP012Terrain.mjs";
@@ -448,6 +448,43 @@ export class FirstLevelWhiteboxField {
     if (this.layout.railway) {
       const railway = BuildRailwayFromSpec(sink, this.layout.railway, { groundAt: (x, z) => this.TerrainHeight(x, z) });
       this.stats.railway = { bedChunks: railway.bed.chunks, ties: railway.track.ties, railSegs: railway.track.railSegs };
+    }
+    // 村内道路与田间小路样条条带（Script_RoadSpline.BuildRoadRibbon）：按等级贴地铺设，不登记碰撞以免阻挡脚步或弹坑。
+    if (this.layout.ways?.roadRibbons?.length) {
+      const roadPalette = {
+        roadGuandao: 0xbeb08e,
+        roadVillage: 0xb5a687,
+        roadAlley: 0xa59678,
+        roadFootpath: 0x968565,
+      };
+      for (const [key, hex] of Object.entries(roadPalette)) {
+        if (!this.materials.has(key)) this.materials.set(key, MakeSemanticMaterial(`FirstLevelWhitebox_${key}`, hex));
+      }
+      const roadSpecByKind = {
+        guandao: { material: "roadGuandao", crown: 0.032, skirtDrop: 0.18, step: 2.5, widthJitter: 0.06 },
+        villageStreet: { material: "roadVillage", crown: 0.024, skirtDrop: 0.16, step: 2.2, widthJitter: 0.05 },
+        villageAlley: { material: "roadAlley", crown: 0.018, skirtDrop: 0.14, step: 2.0, widthJitter: 0.06 },
+        footpath: { material: "roadFootpath", crown: 0.014, skirtDrop: 0.12, step: 2.0, widthJitter: 0.12 },
+      };
+      let ribbonChunks = 0;
+      for (const r of this.layout.ways.roadRibbons) {
+        if (!Array.isArray(r.points) || r.points.length < 2) continue;
+        const spec = roadSpecByKind[r.kind] || roadSpecByKind.villageStreet;
+        const res = BuildRoadRibbon(sink, {
+          points: r.points,
+          width: r.width || 2.8,
+          material: spec.material,
+          groundAt: (x, z) => this.TerrainHeight(x, z),
+          crown: spec.crown,
+          skirtDrop: spec.skirtDrop,
+          step: spec.step,
+          widthJitter: r.widthJitter ?? spec.widthJitter,
+          seed: r.id || "merged_road",
+          colliders: null,
+        });
+        ribbonChunks += res.chunks;
+      }
+      this.stats.roadRibbonChunks = ribbonChunks;
     }
 
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {

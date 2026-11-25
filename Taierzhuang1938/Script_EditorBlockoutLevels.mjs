@@ -751,6 +751,9 @@ export function LayoutFromSceneDoc(doc) {
     ...(doc.landmarks ? { landmarks: doc.landmarks.map((marker) => ({ ...marker })) } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
+      ...(doc.ways?.roadRibbons?.length ? {
+        roadRibbons: doc.ways.roadRibbons.map((r) => ({ ...r, points: r.points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z])) })),
+      } : {}),
       trenches: (doc.ways?.trenches || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
     },
   };
