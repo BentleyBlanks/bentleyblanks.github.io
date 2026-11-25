@@ -271,6 +271,33 @@ Check("腾空收脚、落地站住", () => {
   assert.ok(gait.feet.every((f) => !f.planted && f.lift > 0));
   s.grounded = true; Step();
   assert.ok(gait.feet.every((f) => f.planted && f.lift === 0));
+  assert.equal(gait.ConsumeLandings().length, 0, "jump landing reset does not double-emit gait footstep");
+});
+
+Check("脚触地事件（ConsumeLandings）与双脚落地帧一一对应，瞬移与重置不误发", () => {
+  const { gait, s, Step } = Sim();
+  for (let i = 0; i < 20; i++) Step();
+  gait.ConsumeLandings();
+  let plantedTransitions = 0, emittedEvents = 0;
+  let prevPlanted = gait.feet.map((f) => f.planted);
+  for (let i = 0; i < 240; i++) {
+    s.z -= 3.05 * DT;
+    Step();
+    const curPlanted = gait.feet.map((f) => f.planted);
+    let frameLands = 0;
+    for (let k = 0; k < 2; k++) if (curPlanted[k] && !prevPlanted[k]) frameLands += 1;
+    const events = gait.ConsumeLandings();
+    assert.equal(events.length, frameLands, `frame ${i}: emitted ${events.length} vs actual foot lands ${frameLands}`);
+    plantedTransitions += frameLands;
+    emittedEvents += events.length;
+    prevPlanted = curPlanted;
+  }
+  assert.ok(plantedTransitions >= 8, `enough walk foot landings (${plantedTransitions})`);
+  assert.equal(emittedEvents, plantedTransitions, "1:1 landing event match");
+  // 瞬移不应产出脚步事件
+  s.x += 20;
+  Step();
+  assert.equal(gait.ConsumeLandings().length, 0, "teleport emits no footstep");
 });
 
 console.log(results.join("\n"));

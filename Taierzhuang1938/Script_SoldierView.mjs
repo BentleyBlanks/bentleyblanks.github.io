@@ -22,6 +22,16 @@ export class SoldierView {
 
   SetObserverCameras(cameras) { this.observerCameras=cameras; }
   SetSkin(s,skin) { if(skin)this.skins.set(s,skin);else this.skins.delete(s); }
+  /** 返回士兵当前活跃动画驱动的真实脚触地序号（未在画面中驱动或无足锁时返回 null）。 */
+  FootLandSerial(s) {
+    if (!s) return null;
+    const skin = this.skins.get(s);
+    if (skin?.footLock) return skin.footLock.landSerial ?? null;
+    if (s.actor?.root?.visible && s.actor.characterRig?.locomotion) {
+      return s.actor.characterRig.locomotion.landSerial ?? null;
+    }
+    return null;
+  }
   SyncSkin(s,dt,state) {
     const aimWeight = Number.isFinite(state.aim) ? state.aim : (state.aim ? 1 : 0);
     this.skins.get(s)?.Sync({

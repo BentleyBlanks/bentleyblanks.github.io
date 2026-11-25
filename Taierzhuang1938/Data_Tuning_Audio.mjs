@@ -329,24 +329,24 @@ export const AI_FOLEY = Object.freeze({
   reloadWithinM: 30,
   reloadVolume: 0.5,
   stepWithinM: 30,
-  stepStrideM: 1.9,         // 与玩家站姿同一步距
-  stepMinIntervalS: 0.28,   // 每个兵自己的限频；跑起来也不许比这更密
+  stepStrideM: 0.95,        // 与真实士兵步态单步步幅对齐（RifleRun ~0.75 m、快跑 ~1.0 m）；画面内优先跟随骨骼落脚
+  stepMinIntervalS: 0.24,   // 每个兵自己的限频；快跑 3.2 步/秒时不吞步、不连响
   stepVolume: 0.3,
 });
 
-/** 玩家脚步：姿态与冲刺各自的音量与步距。dB 换算成倍率写在注释里。 */
+/** 玩家脚步：姿态与冲刺各自的音量与步距。正常站/蹲移动直接听 FirstPersonGait 的真实落脚事件；步距用于卧姿或无身体模型时的回落。 */
 export const PLAYER_STEP = Object.freeze({
   baseVolume: 0.45,
   crouchGain: 0.50,         // −6 dB
   proneGain: 0.32,          // −10 dB
   sprintGain: 1.26,         // +2 dB
   fastCrawlGain: 1.8,       // 快速匍匐那条「更快也更响」的取舍
-  strideM: 1.9,
-  crouchStrideM: 1.55,      // 蹲着步子迈不开
-  proneStrideM: 1.0,
-  // 冲刺步距**变短**（不是变长）：跑起来是小步高频，步距还按 2.4 m 算的话
-  // 听感是「跑得越快脚步越稀」，正好反了。
-  sprintStrideM: 1.5,
+  settleGain: 0.62,         // 停步收脚 / 原地转身挪步比正常迈步轻一档
+  minIntervalS: 0.12,       // 防同帧或刚跳落地后的叠音护栏
+  strideM: 1.1,             // 3.05 m/s ÷ 2.75 步/秒 ≈ 1.11 m（与 FIRST_PERSON_BODY.cadence 对齐）
+  crouchStrideM: 0.8,       // 1.62 m/s ÷ 2.05 步/秒 ≈ 0.79 m
+  proneStrideM: 0.75,
+  sprintStrideM: 1.55,      // 5.25 m/s ÷ 3.25 步/秒 ≈ 1.62 m
   sprintPitch: 1.06,
 });
 

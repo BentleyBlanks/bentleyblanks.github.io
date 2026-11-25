@@ -161,6 +161,9 @@ export class AudioWiring {
 
     // --- 玩家 foley 的状态 -----------------------------------------------
     this.lastFootstepAt = 0;
+    this.lastFootstepTime = -99;
+    this.playerStepCount = 0;
+    this.aiFootSerial = new WeakMap();
     this.lastLandSerial = 0;
     this.lastStance = null;
     this.lastVaultCount = 0;
@@ -222,6 +225,7 @@ export class AudioWiring {
   get Audio() { return this.host.audio || null; }
   get Battlefield() { return this.host.battlefield || null; }
   get Player() { return this.host.player || null; }
+  get Viewmodel() { return this.host.viewmodel || null; }
   /**
    * 第一关 01–06 的声景开关（任务侧，2026-09-23）。壕沟/防炮洞两档空间与压制喘息心跳
    * 只在这个开关打开时生效；开关由 Script_FirstLevelMissionBattleSound 在 01–06 的步骤里
@@ -247,6 +251,9 @@ export class AudioWiring {
     this.heartNextAt = 0;
     this.blastHeartNextAt = 0;
     this.lastFootstepAt = 0;
+    this.lastFootstepTime = -99;
+    this.playerStepCount = 0;
+    this.aiFootSerial = new WeakMap();
     this.lastStance = null;
     this.sprintHeldS = 0;
     // 战场密度：换一张地图之后「刚才打得多凶」是上一局的事。**强度也要归零**，
@@ -1148,15 +1155,33 @@ export class AudioWiring {
   }
 
   /**
-   * AI 走了一步。按**步距**触发，不按时间 —— 时间触发的话站在原地转身的人
-   * 也会一直响脚步。每个兵自己的限频挂在 soldier 上（`audioStepAt`）。
+   * AI 走了一步。画面内近处士兵优先跟随真实骨骼/足锁的脚触地边沿（SoldierView.FootLandSerial），
+   * 远距剔除或纯规则驱动时退回实际位移步距；不按时间触发，避免原地转身空响。
+   * 每个兵自己的限频挂在 soldier 上（`audioStepAt`），骨骼落脚序号存在本层 WeakMap 中。
    */
   AiStep(soldier, dx, dz) {
     const audio = this.Audio;
     if (!audio || !soldier || !soldier.alive) return false;
-    soldier.audioStepDist = (soldier.audioStepDist || 0) + Math.hypot(dx, dz);
-    if (soldier.audioStepDist < AI_FOLEY.stepStrideM) return false;
-    soldier.audioStepDist = 0;
+    const moved = Math.hypot(dx, dz);
+    const landSerial = this.host.ai?.view?.FootLandSerial?.(soldier);
+    let triggered = false;
+    if (landSerial !== null && landSerial !== undefined) {
+      const prev = this.aiFootSerial.get(soldier);
+      this.aiFootSerial.set(soldier, landSerial);
+      if (prev !== undefined && landSerial > prev) {
+        triggered = true;
+      } else if (moved >= AI_FOLEY.stepStrideM) {
+        // 单测或单步大位移兜底（不走渲染动画帧直接调 AiStep）
+        triggered = true;
+      }
+      soldier.audioStepDist = 0;
+    } else {
+      soldier.audioStepDist = (soldier.audioStepDist || 0) + moved;
+      if (soldier.audioStepDist < AI_FOLEY.stepStrideM) return false;
+      soldier.audioStepDist = 0;
+      triggered = true;
+    }
+    if (!triggered) return false;
     if (this.time - (soldier.audioStepAt || -99) < AI_FOLEY.stepMinIntervalS) return false;
     if (this.DistanceToListener(soldier.position) > AI_FOLEY.stepWithinM) return false;
     soldier.audioStepAt = this.time;
@@ -1283,27 +1308,65 @@ export class AudioWiring {
     });
   }
 
-  Footsteps(surfaceByTag) {
+  _PlayPlayerStep(surfaceByTag, { position = null, settle = false } = {}) {
     const player = this.Player;
     const audio = this.Audio;
-    if (!player.Alive || !player.grounded) return;
-    const sprinting = player.sprint > 0.5;
-    const stride = player.stance === "prone" ? PLAYER_STEP.proneStrideM
-      : sprinting ? PLAYER_STEP.sprintStrideM
-        : player.stance === "crouch" ? PLAYER_STEP.crouchStrideM : PLAYER_STEP.strideM;
-    if (player.stepDistance - this.lastFootstepAt < stride) return;
-    this.lastFootstepAt = player.stepDistance;
-    const surface = this.SurfaceUnder(player.position, surfaceByTag);
+    const sprinting = !settle && player.sprint > 0.5;
+    const samplePos = position && Number.isFinite(position.x) ? position : player.position;
+    const surface = this.SurfaceUnder(samplePos, surfaceByTag);
     let volume = PLAYER_STEP.baseVolume;
     if (player.stance === "prone") volume *= PLAYER_STEP.proneGain;
     else if (player.stance === "crouch") volume *= PLAYER_STEP.crouchGain;
     if (sprinting) volume *= PLAYER_STEP.sprintGain;
     if (player.fastCrawl) volume *= PLAYER_STEP.fastCrawlGain;
+    if (settle) volume *= PLAYER_STEP.settleGain;
+    this.lastFootstepTime = this.time;
+    this.playerStepCount += 1;
     // 不给 position：脚就在自己身下，走空间化那条链只会白花一个 panner，
     // 而且 HRTF 会把自己的脚步推到某个方位上去（听着像旁边有人在走）。
     audio.Play(surface === "rubble" ? "footstepRubble" : FOOTSTEP_BY_SURFACE[surface] || "footstepDirt", {
       volume, pitch: sprinting ? PLAYER_STEP.sprintPitch : 1,
     });
+  }
+
+  Footsteps(surfaceByTag) {
+    const player = this.Player;
+    const audio = this.Audio;
+    const body = this.Viewmodel?.body || null;
+    const gait = body?.gait || null;
+    if (!player.Alive || !player.grounded) {
+      gait?.ConsumeLandings?.();
+      this.lastFootstepAt = player.stepDistance;
+      return;
+    }
+    const sprinting = player.sprint > 0.5;
+    const stride = player.stance === "prone" ? PLAYER_STEP.proneStrideM
+      : sprinting ? PLAYER_STEP.sprintStrideM
+        : player.stance === "crouch" ? PLAYER_STEP.crouchStrideM : PLAYER_STEP.strideM;
+    const useGait = !!(gait && gait.ready && !gait.airborne
+      && player.stance !== "prone" && (player.stanceBlend?.prone || 0) < 0.6
+      && body.root?.visible !== false);
+    if (useGait) {
+      const landings = gait.ConsumeLandings();
+      if (landings.length > 0) {
+        for (const ev of landings) {
+          if (this.time - this.lastFootstepTime < PLAYER_STEP.minIntervalS) continue;
+          this._PlayPlayerStep(surfaceByTag, { position: ev, settle: ev.settle });
+        }
+        this.lastFootstepAt = player.stepDistance;
+        return;
+      }
+      // 外部测试/脚本直接推进 stepDistance 而未跑第一人称步态帧时，仍保留步距触发以兼容材质单测；
+      // 常规移动每帧位移远小于 stride，同步 lastFootstepAt 防止与真实脚触地双响。
+      if (player.stepDistance - this.lastFootstepAt >= stride) {
+        this._PlayPlayerStep(surfaceByTag, { position: player.position, settle: false });
+      }
+      this.lastFootstepAt = player.stepDistance;
+      return;
+    }
+    if (player.stepDistance - this.lastFootstepAt < stride) return;
+    this.lastFootstepAt = player.stepDistance;
+    this._PlayPlayerStep(surfaceByTag, { position: player.position, settle: false });
   }
 
   /** 落地。轻跳只有靴底那一下，摔下来才叠身体。 */
@@ -1313,6 +1376,7 @@ export class AudioWiring {
     const jump = player.jump;
     if (!jump || jump.landSerial === this.lastLandSerial) return;
     this.lastLandSerial = jump.landSerial;
+    this.lastFootstepTime = this.time;
     const impact = jump.landImpact || 0;
     const surface = this.SurfaceUnder(player.position, surfaceByTag);
     audio.Play(FOOTSTEP_BY_SURFACE[surface] || "footstepDirt", { volume: 0.42 + impact * 0.38 });

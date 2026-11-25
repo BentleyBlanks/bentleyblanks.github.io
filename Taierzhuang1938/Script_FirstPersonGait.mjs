@@ -14,6 +14,7 @@
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
+const EMPTY_LANDINGS = Object.freeze([]);
 
 export function WrapAngle(a) {
   a = (a + Math.PI) % TAU;
@@ -70,7 +71,18 @@ export class FirstPersonGait {
     this.lastX = 0; this.lastY = 0; this.lastZ = 0;
     this.lastSwingRate = 3;
     this.steps = 0;
+    this.landSerial = 0;
+    this.lastLand = null;
+    this.landings = [];
     this.pivots = 0;   // 脚被「跟着胯拧」或「推开」的帧数（探针用）
+  }
+
+  /** 取出并清空尚未消费的落脚事件（按时间顺序）。无事件时返回空冻结数组。 */
+  ConsumeLandings() {
+    if (!this.landings.length) return EMPTY_LANDINGS;
+    const out = this.landings;
+    this.landings = [];
+    return out;
   }
 
   _Ground(x, z, input) {
@@ -107,6 +119,7 @@ export class FirstPersonGait {
     this.lastX = input.playerX; this.lastY = input.playerY; this.lastZ = input.playerZ;
     this.twist = WrapAngle(input.aimYaw - this.lowerYaw);
     this.turning = false;
+    this.landings.length = 0;
     this.ready = true;
   }
 
@@ -132,6 +145,7 @@ export class FirstPersonGait {
     // ---- 卧倒：交给卧姿片段，起来时脚重新落位 ----
     if ((input.prone || 0) >= 0.6) {
       this.lowerYaw = input.aimYaw; this.twist = 0; this.moving = false;
+      this.landings.length = 0;
       this.proneReset = true;
       return this;
     }
@@ -141,6 +155,7 @@ export class FirstPersonGait {
     this.airS = input.grounded === false ? this.airS + dt : 0;
     if (this.airS > t.airborneDelayS) {
       this.airborne = true;
+      this.landings.length = 0;
       this.lowerYaw += WrapAngle(input.aimYaw - this.lowerYaw) * (1 - Math.exp(-dt * t.movingTurnRate));
       this.twist = WrapAngle(input.aimYaw - this.lowerYaw);
       const tmp = [0, 0];
@@ -314,8 +329,14 @@ export class FirstPersonGait {
       const swingRel = WrapAngle(f.yaw - this._ToeYaw(i)), lim = t.footTwistLimitDeg * DEG;
       if (Math.abs(swingRel) > lim) f.yaw = WrapAngle(this._ToeYaw(i) + Math.sign(swingRel) * lim);
       if (s.u >= 1) {
+        const settle = !!s.settle;
         f.x = tx; f.z = tz; f.y = ty; f.lift = 0; f.yaw = this._ToeYaw(i);
         f.swing = null; f.planted = true; f.plantedS = 0;
+        this.landSerial += 1;
+        const ev = { side: i, x: f.x, y: f.y, z: f.z, settle, speed: this.speed, serial: this.landSerial };
+        this.lastLand = ev;
+        this.landings.push(ev);
+        if (this.landings.length > 8) this.landings.shift();
       }
     }
 

@@ -40,6 +40,8 @@ import { CapturePlayerDeath, SyncPlayerDeathCamera } from "./Script_PlayerDeath.
 import { PlayerKnockback } from "./Script_PlayerKnockback.mjs";
 import { BlastPush } from "./Script_BlastKnockback.mjs";
 import { BLAST_KNOCKBACK } from "./Data_Tuning_BlastKnockback.mjs";
+import { FIRST_PERSON_BODY } from "./Data_Tuning_FirstPersonBody.mjs";
+import { Interp } from "./Script_FirstPersonGait.mjs";
 
 const _flashPoint = new THREE.Vector3();
 
@@ -224,6 +226,7 @@ export class PlayerController {
     this.eyeHeight = STANCE.stand.eye;
     this.radius = STANCE.stand.radius;
     this.headBob = 0;
+    this.gaitPhase = 0;
     this.stepDistance = 0;
     this.rnd = Mulberry32(seed);
     this.lastFootstep = 0;
@@ -973,9 +976,16 @@ export class PlayerController {
     this.stun.Update(dt);
     const planar = Math.hypot(this.velocity.x, this.velocity.z);
     // 被掀倒在地上滑的那一段不是在走路：不攒步距（不然滑出去一路都是脚步声）
-    if (!this.knock.Active) this.stepDistance += planar * dt;
-    this.headBob = Math.sin(this.stepDistance
-      * (this.stance === "prone" ? CAMERA.strideProne : CAMERA.strideStand)) * 0.5 + 0.5;
+    if (!this.knock.Active) {
+      this.stepDistance += planar * dt;
+      if (this.grounded && planar > FIRST_PERSON_BODY.stopMps) {
+        const cycleRate = this.stance === "prone"
+          ? (planar * CAMERA.strideProne) / (Math.PI * 4)
+          : Interp(FIRST_PERSON_BODY.cadence, Math.min(planar, 7)) / 2;
+        this.gaitPhase = (this.gaitPhase + dt * cycleRate) % 1;
+      }
+    }
+    this.headBob = -Math.cos(this.gaitPhase * Math.PI * 4) * 0.5 + 0.5;
 
     // --- 流血 ---------------------------------------------------------------
     if (this.debug.invincible) {
@@ -1267,8 +1277,10 @@ export class PlayerController {
     const bobAmp = CAMERA.bobAmp * damp
       * Math.min(1, Math.hypot(this.velocity.x, this.velocity.z) / CAMERA.bobRefMps)
       * (this.grounded && !this.knock.Active ? 1 : 0);
-    const bobY = Math.sin(this.stepDistance * CAMERA.bobYFreq) * bobAmp;
-    const bobX = Math.sin(this.stepDistance * CAMERA.bobXFreq) * bobAmp * CAMERA.bobXScale;
+    // 相位对齐 FirstPersonGait（0 = 左脚着地、0.5 = 右脚着地）：落脚瞬间视角下沉触底（-cos(4π·phase) = -1）。
+    const gaitRad = this.gaitPhase * Math.PI * 2;
+    const bobY = -Math.cos(gaitRad * 2) * bobAmp;
+    const bobX = Math.sin(gaitRad) * bobAmp * CAMERA.bobXScale;
     // 侧身：身体横移 + 相机滚转，探头出去看的那一下必须有位移，不然只是画面歪了
     const leanOffset = this.LeanOffsetM;
     const rightVec = this._right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));

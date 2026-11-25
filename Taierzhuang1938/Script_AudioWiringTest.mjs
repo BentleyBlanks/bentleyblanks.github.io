@@ -272,6 +272,58 @@ Check("水里 → footstepMud", steps.mud.join() === "footstepMud",
   `播的是 ${steps.mud.join("/") || "（没有）"}`);
 
 // ---------------------------------------------------------------------------
+// 3b) 玩家站走 / 冲刺 / 蹲走：脚步声与第一人称真实脚触地 1:1 同步（同帧零滞后）
+// ---------------------------------------------------------------------------
+const gaitSync = await page.evaluate(() => {
+  const T = window.Taierzhuang;
+  const gait = T.viewmodel?.body?.gait;
+  if (!gait) return { skipped: true };
+  const Measure = (stance, sprint, frames) => {
+    T.player.health = 100;
+    T.player.spawnGrace = 999;
+    T.player.stamina = 1;
+    T.player.stance = stance;
+    T.player.grounded = true;
+    T.Debug.Key("KeyW", true);
+    T.Debug.Key("ShiftLeft", sprint);
+    T.StepFrames(20);
+    let footLands = 0, playerSteps = 0, sameFrameHits = 0;
+    let prevLand = gait.landSerial;
+    let prevSteps = T.audioWiring.playerStepCount;
+    for (let f = 0; f < frames; f += 1) {
+      T.player.stamina = 1;
+      T.StepFrames(1);
+      const curLand = gait.landSerial;
+      const curSteps = T.audioWiring.playerStepCount;
+      const dLand = curLand - prevLand;
+      const dSteps = curSteps - prevSteps;
+      if (dLand > 0) footLands += dLand;
+      if (dSteps > 0) playerSteps += dSteps;
+      if (dLand > 0 && dSteps > 0) sameFrameHits += Math.min(dLand, dSteps);
+      prevLand = curLand;
+      prevSteps = curSteps;
+    }
+    T.Debug.Key("KeyW", false);
+    T.Debug.Key("ShiftLeft", false);
+    T.StepFrames(10);
+    return { footLands, playerSteps, sameFrameHits };
+  };
+  return {
+    skipped: false,
+    walk: Measure("stand", false, 150),
+    sprint: Measure("stand", true, 120),
+    crouch: Measure("crouch", false, 150),
+  };
+});
+if (!gaitSync.skipped) {
+  for (const [label, r] of [["站走", gaitSync.walk], ["冲刺", gaitSync.sprint], ["蹲走", gaitSync.crouch]]) {
+    Check(`玩家${label}：脚步声与第一人称脚触地 1:1 同步且同帧命中`,
+      r.footLands >= 3 && r.playerSteps === r.footLands && r.sameFrameHits === r.footLands,
+      `脚触地 ${r.footLands} 次、玩家脚步声 ${r.playerSteps} 次、同帧 ${r.sameFrameHits}/${r.footLands}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4) 空间档：屋里 / 院子 / 街 / 开阔地
 // ---------------------------------------------------------------------------
 const zones = await page.evaluate(() => {

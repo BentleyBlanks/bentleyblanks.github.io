@@ -171,8 +171,10 @@ export function ComputeLocomotion2D({
 export class FootLockController {
   constructor() {
     this.prevMode = "idle";
+    this.landSerial = 0;
     this.feet = [0, 1].map(() => ({
       locked: false,
+      lifted: false,
       weight: 0,
       lockX: 0,
       lockZ: 0,
@@ -191,6 +193,7 @@ export class FootLockController {
     this.prevMode = "idle";
     for (const f of this.feet) {
       f.locked = false;
+      f.lifted = false;
       f.weight = 0;
       f.lockX = 0;
       f.lockZ = 0;
@@ -301,15 +304,20 @@ export class FootLockController {
           const distFromHip = Math.hypot(f.lockX - inp.hipX, floorY - inp.hipY, f.lockZ - inp.hipZ);
           if (lift > 0.044 || (lift > 0.022 && vy > 0.28) || distFromAnim > 0.30 || distFromHip > inp.maxReachM * 0.985) {
             f.locked = false;
+            f.lifted = true;
           }
-        } else if (lift < 0.032 && vy < 0.25) {
-          const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
-          const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
-          f.locked = true;
-          f.lockX = curX;
-          f.lockZ = curZ;
-          f.weight = 1;
-          f.slipAccumM = 0;
+        } else {
+          if (lift > 0.036) f.lifted = true;
+          if (lift < 0.032 && vy < 0.25) {
+            const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
+            const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+            f.locked = true;
+            if (f.lifted) { this.landSerial += 1; f.lifted = false; }
+            f.lockX = curX;
+            f.lockZ = curZ;
+            f.weight = 1;
+            f.slipAccumM = 0;
+          }
         }
         if (!f.locked && f.weight > 0) {
           f.weight *= Math.exp(-dt / 0.070);
@@ -344,14 +352,19 @@ export class FootLockController {
           // 抬升明显高于另一只支撑脚（兼容各角色 3.2~5.7 cm 迈步高度）或超安全距时释放迈步
           if (relLift > 0.015 || (relLift > 0.008 && vy > 0.14) || lift > 0.026 || distFromAnim > 0.28 || distFromHip > inp.maxReachM * 0.985) {
             f.locked = false;
+            f.lifted = true;
           }
-        } else if (relLift < 0.010 && lift < 0.020 && vy < 0.12) {
-          const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
-          const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
-          f.locked = true;
-          f.lockX = curX;
-          f.lockZ = curZ;
-          f.weight = 1;
+        } else {
+          if (relLift > 0.012 || lift > 0.022) f.lifted = true;
+          if (relLift < 0.010 && lift < 0.020 && vy < 0.12) {
+            const curX = inp.animX + (f.lockX - inp.animX) * f.weight;
+            const curZ = inp.animZ + (f.lockZ - inp.animZ) * f.weight;
+            f.locked = true;
+            if (f.lifted) { this.landSerial += 1; f.lifted = false; }
+            f.lockX = curX;
+            f.lockZ = curZ;
+            f.weight = 1;
+          }
         }
         if (!f.locked && f.weight > 0) {
           f.weight *= Math.exp(-dt / 0.055);
@@ -397,6 +410,8 @@ export class FootLockController {
       if (f.step.elapsed >= f.step.dur) {
         f.step = null;
         f.locked = true;
+        f.lifted = false;
+        this.landSerial += 1;
         f.lockX = feet[i].animX;
         f.lockZ = feet[i].animZ;
         f.weight = 1;

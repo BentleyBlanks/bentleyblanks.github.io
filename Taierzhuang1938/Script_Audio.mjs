@@ -3585,6 +3585,39 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
 const SAMPLE_VARISPEED = new Set(["bombWhistle"]);
 /** SetRate 允许的最慢倍率（寿命按它留）。与 Data_FirstLevelAirRaid.audio.whistle.rateMin 同一个数。 */
 const VARISPEED_MIN = 0.8;
+/**
+ * 强节奏对齐的瞬态采样（脚步）：MP3 编码器 padding 与原录音前导静音会让各变体起音相差 15–80 ms
+ *（实测 FootstepDirt_01 前导静音 ~70 ms、03/04 ~15 ms），直接从 0 起播会造成脚步声滞后与步间忽长忽短。
+ * 解码后逐变体测一次真实起音并留 4 ms 软起音缓冲，保证触发即出声且各变体节拍齐整。
+ */
+const SAMPLE_TRIM_ONSET = new Set([
+  "footstepDirt", "footstepRubble", "footstepWood", "footstepStone", "footstepGrass", "footstepMud",
+]);
+
+function ComputeOnsetTrimS(buf) {
+  if (!buf || !buf.length || !buf.sampleRate || typeof buf.getChannelData !== "function") return 0;
+  const chCount = Math.max(1, buf.numberOfChannels || 1);
+  let peak = 0;
+  for (let c = 0; c < chCount; c += 1) {
+    const data = buf.getChannelData(c);
+    for (let i = 0; i < data.length; i += 1) {
+      const a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+  }
+  if (!(peak > 1e-4)) return 0;
+  const threshold = peak * 0.08;
+  let first = buf.length;
+  for (let c = 0; c < chCount; c += 1) {
+    const data = buf.getChannelData(c);
+    for (let i = 0; i < first; i += 1) {
+      if (Math.abs(data[i]) >= threshold) { first = i; break; }
+    }
+  }
+  if (first >= buf.length) return 0;
+  const trimS = first / buf.sampleRate - 0.004;
+  return Clamp(trimS, 0, Math.max(0, buf.duration - 0.08));
+}
 
 function VarispeedSample(A, v, src, buf, rate) {
   const off = Math.min(Math.max(0, v.offset || 0), Math.max(0, buf.duration - 0.01));
@@ -3610,14 +3643,15 @@ function SampleRecipe(buffers, name) {
   const interval = SAMPLE_BURST[name] || 0;
   const wet = SAMPLE_WET[name];
   const cycle = SAMPLE_CYCLE.has(name);
+  const trimOffsets = SAMPLE_TRIM_ONSET.has(name) ? buffers.map(ComputeOnsetTrimS) : null;
   let turn = 0;                      // 轮播游标；重载音效包时随配方一起重建
   let last = -1;                     // 随机挑的上一条变体（下面：多变体的 cue 不连着出两次同一条）
   return (A, v) => {
     const shots = interval ? Clamp(v.burst ?? 1, 1, 14) : 1;
     for (let i = 0; i < shots; i += 1) {
-      let buf;
+      let idx = 0;
       if (cycle) {
-        buf = buffers[turn];
+        idx = turn;
         turn = (turn + 1) % buffers.length;
       } else {
         // 【2026-09-29】随机挑，但不连着出两次同一条：两条变体的 cue（explosionFar、zb26Far、type92Far）随机挑时一半的相邻两声是同一条录音，
@@ -3625,8 +3659,9 @@ function SampleRecipe(buffers, name) {
         let k = buffers.length === 1 ? 0 : Math.min(buffers.length - 1, Math.floor(v.rng() * buffers.length));
         if (buffers.length > 1 && k === last) k = (k + 1 + Math.floor(v.rng() * (buffers.length - 1))) % buffers.length;
         last = k;
-        buf = buffers[k];
+        idx = k;
       }
+      const buf = buffers[idx];
       const src = v.Own(A.ctx.createBufferSource());
       src.buffer = buf;
       // 逐发 ±3%：连打二十发不会听出是同一个 wav 在复读。轮播的那几条、跟着游戏时钟变速的那几条不掺。
@@ -3646,7 +3681,8 @@ function SampleRecipe(buffers, name) {
       } else {
         // Mechanical reload events reuse a bounded piece of a recording.
         // Default offset=0/maxDuration=Infinity preserves whole-cue playback.
-        const offset = Clamp(v.offset || 0, 0, Math.max(0, buf.duration - 0.01));
+        const baseOffset = trimOffsets ? trimOffsets[idx] : 0;
+        const offset = Clamp(baseOffset + (v.offset || 0), 0, Math.max(0, buf.duration - 0.01));
         const duration = Math.min(buf.duration - offset, v.maxDuration) / Math.max(0.1, rate);
         v.Start(src, v.t + i * interval, duration, offset);
       }

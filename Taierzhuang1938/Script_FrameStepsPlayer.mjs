@@ -340,6 +340,10 @@ export function PlayStepView(ctx, f) {
     // 整条视线的呼吸漂移幅度（姿态 / 体力 / 伤 / 屏息 / 喘气）与体力消耗（呼吸变急）。
     swayCondition: ctx.player.SwayCondition(ctx.viewmodel.weapon), exertion: 1 - ctx.player.stamina,
   });
+  // 相机上下起伏相位锁定到第一人称双脚的真实相位，避免急起步或斜坡补步后漂移。
+  if (ctx.viewmodel.body?.gait?.moving && ctx.player.stance !== "prone") {
+    ctx.player.gaitPhase = ctx.viewmodel.body.gait.phase;
+  }
   const drift = ctx.viewmodel.holdDrift || NO_DRIFT;
   ctx.camera.rotation.x += drift.pitch - driftBefore.pitch - ((ctx.viewmodel.headDipRad || 0) - dipBefore);
   ctx.camera.rotation.y += drift.yaw - driftBefore.yaw;

@@ -4718,16 +4718,17 @@ export class AiDirector {
     if (!body) {
       const bf = this.ctx.battlefield;
       const cap = s.childCapsules?.[s.stance] || s.childCapsules?.[0];
-      this.ctx.audioWiring?.AiStep(s, dx, dz);
+      const prevX = s.position.x, prevZ = s.position.z;
       if (!this.Blocked(s.position.x + dx, s.position.z, s.position.y, cap)) s.position.x += dx;
       if (!this.Blocked(s.position.x, s.position.z + dz, s.position.y, cap)) s.position.z += dz;
       s.position.y = bf.StandHeight(s.position.x, s.position.z, s.position.y);
+      this.ctx.audioWiring?.AiStep(s, s.position.x - prevX, s.position.z - prevZ);
       return;
     }
     // 有人绕过物理直接改了 position（撒兵、剧本摆位、冒烟脚本摆人）就认外面那份。
     // 不对账的话表现很怪：把人挪到某处，下一帧他自己"弹"回胶囊所在的老位置 ——
     // 通关冒烟里「圈里留一个敌人」那一条就是这么失效的（人被弹回去，圈里没人了）。
-    this.ctx.audioWiring?.AiStep(s, dx, dz);
+    const prevX = s.position.x, prevZ = s.position.z;
     body.ReconcileTo(s.position.x, s.position.y, s.position.z);
     const capsules = s.childCapsules || CAPSULE;
     const cap = capsules[s.stance] || capsules[0];
@@ -4745,6 +4746,7 @@ export class AiDirector {
     s.position.set(r.x, r.y, r.z);
     s.grounded = r.grounded;
     if (r.grounded) s.velocityY = 0;
+    this.ctx.audioWiring?.AiStep(s, s.position.x - prevX, s.position.z - prevZ);
   }
 
   Blocked(x, z, y, capsule = null) {

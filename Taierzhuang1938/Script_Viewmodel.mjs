@@ -57,6 +57,8 @@ import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
 import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
 import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
+import { FIRST_PERSON_BODY } from "./Data_Tuning_FirstPersonBody.mjs";
+import { Interp } from "./Script_FirstPersonGait.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
 import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
@@ -3132,26 +3134,31 @@ export class Viewmodel {
     let wpYaw = sway.yaw * (1 - lookSh) + (inertiaOn ? inertia.yaw * (1 - shYaw) : 0);
     let wpRoll = (sway.roll + sway.strafeRoll) * (1 - lookSh) + (inertiaOn ? inertia.roll * (1 - shR) : 0);
 
-    // --- 步伐晃动：走 / 跑 / 蹲三档 -----------------------------------------
+    // --- 步伐晃动：与 FirstPersonGait 步频与触地相位对齐 ----------------------
     const gait = inertiaOn ? inertia.gaitEnvelope : gaitRaw;
-    // 频率：走 1.55 Hz，冲刺 2.5 Hz，蹲下拖慢到 0.78
-    const cadence = Mix(1.55, 2.50, sprint) * Mix(1.0, 0.78, crouchValue) * Math.PI * 2;
-    this.bobPhase += step * cadence * (legacyMotion ? (0.25 + gait * 0.75) : (0.08 + gait * 0.92));
-    if (this.bobPhase > Math.PI * 200) this.bobPhase -= Math.PI * 200;   // 别让 float 精度慢慢烂掉
+    const moveMag = Math.hypot(rightMps, forwardMps);
+    const bodyGait = this.body?.gait;
+    if (bodyGait?.moving && (input.prone || 0) < 0.6) {
+      this.bobPhase = bodyGait.phase * Math.PI * 2;
+    } else {
+      // 无第一人称身体或卧姿时按同一张步频表推进（一个完整周期 = 左右各一步）
+      const speedRef = moveMag > 0.05 ? moveMag : Mix(3.05, 5.25, sprint) * Mix(1, 0.53, crouchValue);
+      const cadence = (Interp(FIRST_PERSON_BODY.cadence, Math.min(speedRef, 7)) / 2) * Math.PI * 2;
+      this.bobPhase += step * cadence * (legacyMotion ? (0.25 + gait * 0.75) : (0.08 + gait * 0.92));
+      if (this.bobPhase > Math.PI * 200) this.bobPhase -= Math.PI * 200;   // 别让 float 精度慢慢烂掉
+    }
     const bobScale = gait * (1 - adsVisual) * Mix(1, 0.55, crouchValue);
     // Pure sideways strafing should stay horizontal instead of bouncing the muzzle up/down.
-    const moveMag = Math.hypot(rightMps, forwardMps);
     const lateralShare = moveMag > 0.15 ? Math.abs(rightMps) / moveMag : 0;
     const vertBobScale = bobScale * (legacyMotion ? 1 : Mix(1, 0.42, lateralShare));
     const ampX = Mix(0.013, 0.030, sprint) * bobScale;
     const ampY = Mix(0.009, 0.020, sprint) * vertBobScale;
     const phase = this.bobPhase;
-    // 8 字：横向一倍频、纵向二倍频。新惯性模式下去掉 -|sin| 的负直流偏置，
-    // 避免横移起步时枪身被压低、停步时凭空向上抬起。
+    // 8 字：横向一倍频、纵向二倍频；-cos(2·phase) 让枪身在 phase = 0 / π（左右脚触地瞬间）下沉触底。
     const bobX = Math.sin(phase) * ampX;
     const bobY = legacyMotion
-      ? (Math.sin(phase * 2) * ampY * 0.5 - Math.abs(Math.sin(phase)) * ampY)
-      : (Math.sin(phase * 2) * ampY * 0.55);
+      ? (-Math.cos(phase * 2) * ampY * 0.5 - Math.abs(Math.sin(phase)) * ampY)
+      : (-Math.cos(phase * 2) * ampY * 0.55);
     // 站着不动时的呼吸：幅度只有走路的十分之一，但没有它枪就是"钉死"的
     const idle = (1 - gait) * (1 - adsVisual);
     const breathY = Math.sin(this.elapsed * 1.15) * 0.0026 * idle;
@@ -3186,7 +3193,7 @@ export class Viewmodel {
     const drift = this.holdDrift;
     drift.pitch = idleDrift.pitch; drift.yaw = idleDrift.yaw;
     const breath = idleKind ? 0 : 1;
-    const bobRx = Math.sin(phase * 2) * 0.010 * vertBobScale;
+    const bobRx = -Math.cos(phase * 2) * 0.010 * vertBobScale;
     const bobRy = Math.sin(phase) * 0.014 * bobScale;
     const bobRz = -Math.sin(phase) * 0.018 * bobScale;
     const shBobX = Mix(1, 0.28, dw);

@@ -758,6 +758,7 @@ const audioWiring = new AudioWiring({
   audio,
   get battlefield() { return battlefield; },
   get player() { return player; },
+  get viewmodel() { return viewmodel; },
   get vfx() { return vfx; },
   get ai() { return ai; },
 });

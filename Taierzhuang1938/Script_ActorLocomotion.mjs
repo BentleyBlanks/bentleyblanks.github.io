@@ -14,6 +14,7 @@ export class ActorLocomotion {
     this.phase=phase;this.previous=new THREE.Vector3();this.position=new THREE.Vector3();
     this.scale=new THREE.Vector3();this.sampled=false;this.elapsed=null;this.step=0;
     this.speedMps=0;this.discontinuity=false;this.lastAction=null;
+    this.landSerial=0;
     // Speed split (Data_Tuning_ActorLocomotion playRate*/stride*): shown stride scale, its warp weight.
     this.stride=1;this.strideWeight=0;this.ratioSmooth=null;
     this.pelvis=rig.bones.pelvis||null;this.pelvisSaved=new THREE.Vector3();this.pelvisApplied=false;this.pelvisDropM=0;
@@ -214,7 +215,10 @@ export class ActorLocomotion {
       // Lock in from the carried-over residual (so a stance starts where the foot is shown), hold to the end.
       const weight=holding?1:Smooth((phase-start)*profile.duration/C.contactBlendS)*action.getEffectiveWeight();
       const toe=f.toe.getWorldPosition(this.v[0]);
-      if(changed||wrapped&&!seam||f.key!==key){f.anchor.copy(toe).add(f.residual);f.key=key;}
+      if(changed||wrapped&&!seam||f.key!==key){
+        if(!holding&&!changed&&f.key!==key&&this.speedMps>C.movingMps)this.landSerial+=1;
+        f.anchor.copy(toe).add(f.residual);f.key=key;
+      }
       const correction=this.v[1].subVectors(f.anchor,toe);
       // Keep authored heel/toe roll and terrain height; anchor only the sole's planar contact.
       correction.y=0;

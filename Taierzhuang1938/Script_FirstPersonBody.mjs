@@ -308,7 +308,7 @@ export class FirstPersonBody {
     if (!g) return null;
     return {
       lowerYaw: g.lowerYaw, twist: g.twist, moving: g.moving, turning: g.turning, speed: g.speed, phase: g.phase,
-      steps: g.steps, pelvisDrop: this.pelvisDrop,
+      steps: g.steps, landSerial: g.landSerial, pelvisDrop: this.pelvisDrop,
       feet: g.feet.map((f) => ({ x: f.x, y: f.y, z: f.z, yaw: f.yaw, planted: f.planted, lift: f.lift })),
     };
   }
