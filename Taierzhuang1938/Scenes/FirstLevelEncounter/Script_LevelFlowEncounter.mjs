@@ -745,9 +745,32 @@ function UpgradeExistingEncounterDocument(input,defaults) {
   return UpgradeTankDestruction(UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults),defaults);
 }
 
+function UpgradeMergedWestSearch(document, defaults) {
+  const next = defaults.groups.find(group => group.id === "MergedWestSearch");
+  const group = document.groups.find(group => group.id === next?.id);
+  const previousRoute = [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]];
+  if (!group || group.spawnOffsets || group.memberPlans
+    || group.area.shape !== "rect" || group.area.size.some(size => size !== 0.9)
+    || JSON.stringify(group.area.center) !== JSON.stringify(previousRoute[0])
+    || JSON.stringify(group.route) !== JSON.stringify(previousRoute)) return;
+
+  group.area = structuredClone(next.area);
+  group.route = structuredClone(next.route);
+  if (group.lifetime === 14) group.lifetime = next.lifetime;
+  if (group.note === "自村西北沿北街贴关帝庙 3.8m 北外实墙搜索（全程与庙内主角隔墙绝不打照面），闻主街班长手榴弹声后撤回转援") group.note = next.note;
+  const trigger = document.triggers.find(trigger => trigger.id === group.triggerId);
+  if (trigger?.id === next.triggerId && trigger.mode === "time" && trigger.beat === "09a" && trigger.delay === 34) {
+    trigger.delay = defaults.triggers.find(trigger => trigger.id === next.triggerId).delay;
+  }
+}
+
 export function UpgradeEncounterDocument(input,defaults) {
   if(defaults.id!=="FirstLevelEncounter") {
     const cloned=structuredClone(input);
+    if (input.id === "L1_BeishaheMerged" && input.id === defaults.id
+      && input.revision === "2026-11-22-beishahe-merged-1" && input.revision !== defaults.revision) {
+      UpgradeMergedWestSearch(cloned, defaults);
+    }
     cloned.id=defaults.id;
     cloned.revision=defaults.revision;
     return cloned;

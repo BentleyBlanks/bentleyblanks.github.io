@@ -16,6 +16,7 @@ import {
 import { EncounterPlayPlan, EncounterCanPlay, EncounterSceneSignals } from "./Script_EncounterPlayPlan.mjs";
 import { EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { EncounterDocument } from "./AdvancedTools/Script_LevelFlowDocument.mjs";
+import { CompileEncounters, GroupPath } from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 import { BuildEncounterMap } from "./AdvancedTools/Script_LevelFlowMap.mjs";
 import { FlowPerspectiveView } from "./AdvancedTools/Script_LevelFlowPerspective.mjs";
 
@@ -341,6 +342,32 @@ assert.equal(JSON.parse(fakeStore.get(merged.spec.storageKey)).groups.find((g) =
 assert.equal(fakeStore.get(original.spec.storageKey), undefined, "修改合并版草稿不写入基线存储键");
 assert.equal(docOrig.value.groups[0].count, original.defaultDocument.groups[0].count);
 
+const oldDraft = structuredClone(docMerged.value);
+oldDraft.revision = "2026-11-22-beishahe-merged-1";
+const oldSearch = oldDraft.groups.find(group => group.id === "MergedWestSearch");
+oldSearch.area.center = [68, 516];
+oldSearch.route = [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]];
+oldSearch.lifetime = 14;
+const oldSearchTrigger = oldDraft.triggers.find(trigger => trigger.id === oldSearch.triggerId);
+oldSearchTrigger.delay = 34;
+const ReloadMerged = () => {
+  fakeStore.set(merged.spec.storageKey, JSON.stringify(oldDraft));
+  return new EncounterDocument(merged.defaultDocument, merged.timeline, mockStorage, {
+    storageKey: merged.spec.storageKey, legacyStorageKey: null,
+  }).value;
+};
+const upgradedDraft = ReloadMerged();
+assert.equal(upgradedDraft.revision, merged.defaultDocument.revision);
+assert.deepEqual(upgradedDraft.groups.find(group => group.id === oldSearch.id),
+  merged.defaultDocument.groups.find(group => group.id === oldSearch.id));
+assert.equal(upgradedDraft.triggers.find(trigger => trigger.id === oldSearch.triggerId).delay, 30);
+assert.equal(upgradedDraft.groups.find(group => group.id === "MergedBoards").count, 6);
+oldSearch.route[1] = [79, 516];
+oldSearchTrigger.delay = 35;
+const customizedDraft = ReloadMerged();
+assert.deepEqual(customizedDraft.groups.find(group => group.id === oldSearch.id), oldSearch);
+assert.deepEqual(customizedDraft.triggers.find(trigger => trigger.id === oldSearchTrigger.id), oldSearchTrigger);
+
 // 6. 单村合并版 08–13 单向动线、完整敌军渗入路径与全链路 Play 过关验证
 const f08d = merged.evaluate(merged.BeatById("08d").start + 28);
 assert.ok(f08d.dialogue.some((d) => d.actorId === "liu" && d.text.includes("关帝庙")), "08d 顺视线转向关帝庙绕后");
@@ -500,6 +527,46 @@ for (const group of mergedEnemyGroups) {
     `敌军波次 ${group.id}（${group.beat}）在玩家进拍点 [${playerAtEntry}] 处未遮挡！生成中心 [${group.area.center}]`,
   );
 }
+
+// 玩家在出生时的实际视点与附件位置，以及接近庙院的沿途余量。
+const westSearch = CompileEncounters(merged.defaultDocument, merged.timeline).groups.find(group => group.id === "MergedWestSearch");
+const searchWalls = solidObjects.filter(({ pos: [x, , z] }) => x >= 55 && x <= 112 && z >= 494 && z <= 538);
+const Eyes = (xz, eyeHeight) => [xz[0], groundAt(...xz) + eyeHeight, xz[1]];
+const observationPoints = [merged.evaluate(1287.1698).player];
+for (let elapsed = 27; elapsed <= b09a.duration; elapsed += 0.5) {
+  const [x, z] = merged.evaluate(b09a.start + elapsed).player;
+  observationPoints.push([x, z], [x - 0.6, z], [x + 0.6, z], [x, z - 0.6], [x, z + 0.6]);
+}
+for (const [index, { born }] of westSearch.lives.entries()) {
+  const preview = merged.evaluate(born).actors.find(actor => actor.id === `MergedWestSearch_${index}`);
+  const route = GroupPath(westSearch, index);
+  const views = [merged.evaluate(born).player, ...observationPoints];
+  for (const player of views) {
+    for (const eyeHeight of [1.15, 1.7]) {
+      const origin = Eyes(player, eyeHeight);
+      for (const spawn of [preview.p, route[0]]) {
+        for (const [dx, height] of [[0, 0.4], [0, 1.1], [0, 1.7], [-0.35, 1.4], [0.35, 1.4]]) {
+          const target = Eyes([spawn[0] + dx, spawn[1]], height);
+          assert.ok(searchWalls.some(wall => RayHitsOrientedBox(origin, target, wall, groundAt)),
+            `09A 西翼搜兵 ${index + 1} 的生成点 ${spawn} 从玩家位置 ${player} 可见`);
+        }
+      }
+    }
+  }
+  for (const [step, end] of route.slice(1).entries()) {
+    const start = route[step];
+    const dx = end[0] - start[0], dz = end[1] - start[1];
+    const length = Math.hypot(dx, dz);
+    for (const offset of [-0.32, 0, 0.32]) {
+      const Track = ([x, z]) => Eyes([x - dz * offset / length, z + dx * offset / length], 1);
+      assert.ok(!searchWalls.some(wall => RayHitsOrientedBox(Track(start), Track(end), wall, groundAt)),
+        `09A 西翼搜兵第 ${step + 1} 段路线须有通行净空`);
+    }
+  }
+}
+const westSearchAtReport = merged.evaluate(1287.1698).actors.filter(actor => actor.groupId === westSearch.id);
+assert.equal(westSearchAtReport.length, 3, "原标注帧的三名搜兵仍沿北街经过");
+assert.ok(westSearchAtReport.every(actor => actor.pose === "run" && actor.p[1] > 515 && actor.p[0] < 76));
 
 // 8. 全员 0 穿墙、潜行/平民零照面穿帮、合理近距交火线回归审计（按 1s 步进扫完整个 08a–13e）
 const solidWalls = solidObjects.filter((o) => o.size[1] >= 0.45 && o.meta?.obstacle !== "barbedWire");

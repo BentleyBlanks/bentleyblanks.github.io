@@ -231,10 +231,12 @@ export const MERGED_WAVES = [
   },
   {
     id: "MergedWestSearch", beat: "09a", until: "09b", label: "西翼反包抄搜索组",
-    source: [68, 516], areaSize: [0.9, 0.9],
-    route: [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]],
-    count: 3, interval: 0.7, maxAlive: 3, lifetime: 14, speed: 2.5, behavior: "withdraw", deployDelay: 0,
-    target: "none", trigger: { mode: "time", delay: 34 }, repeat: "自村西北沿北街贴关帝庙 3.8m 北外实墙搜索（全程与庙内主角隔墙绝不打照面），闻主街班长手榴弹声后撤回转援",
+    source: [67.75, 499.2], areaSize: [0.9, 0.9],
+    // 穿门和拐弯用短路段，避免实机长距离导航把搜兵引离院门。
+    route: [[67.75, 499.2], [67.03, 510.2], [66.65, 516], [75, 516], [84, 516],
+      [75, 516], [66, 516], [67.03, 510.2], [67.75, 499.2]],
+    count: 3, interval: 0.7, maxAlive: 3, lifetime: 31, speed: 2.5, behavior: "withdraw", deployDelay: 0,
+    target: "none", trigger: { mode: "time", delay: 30 }, repeat: "从北街西头民房内出发，穿过房门与院门，沿关帝庙北墙搜索，再原路退入民房",
   },
   {
     id: "MergedRailAmbush", beat: "12a", until: "12b", label: "铁路路基截击组",
