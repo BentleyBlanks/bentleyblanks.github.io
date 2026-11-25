@@ -32,6 +32,19 @@ export const FLOW_COVER_COLORS = {
   mark: "#fff4cf",
 };
 
+export const FLOW_AIRWALL_COLORS = {
+  fill2d: "#d932383d",
+  stroke2d: "#c4242b",
+  stripe2d: "#ff8c90cc",
+  gateFill2d: "#e66a1e4d",
+  gateStroke2d: "#d95b12",
+  gateStripe2d: "#ffe09ecc",
+  face3d: "#e0383852",
+  edge3d: "#eb4238f0",
+  gateFace3d: "#f07c1e6b",
+  gateEdge3d: "#ff9b2aff",
+};
+
 export function IsEncounterCover(object) {
   return !!object.cover || object.planning === true || object.material === "Whitebox/Cover";
 }
@@ -59,6 +72,7 @@ export function EncounterSignals(frame) {
   if(frame.time>=40) signals.add("DugoutCollapsed");
   if(frame.beat.id>="04c") signals.add("L1TrunkLoaded");
   if(frame.beat.id>="05a") signals.add("CartDeparted");
+  if(frame.beat.id>="06a") signals.add("Stage0105Done");
   if(frame.beat.id>="06e") signals.add("L1TrunkTossed");
   if(frame.beat.id>="06i") signals.add("L1SunkenRoadBlocked");
   if(!frame.customSignals) {
@@ -486,6 +500,47 @@ export class FlowMapView {
       const point=Screen(marker.p);
       Line(context,[[point[0]-3,point[1]],[point[0]+3,point[1]]],marker.kind==="window"?"#487e9e":"#9b6329",2);
     }
+    if(layers.airWalls!==false&&map.airWalls?.length) {
+      this.DrawAirWalls2D(context,width,height,signals);
+    }
+  }
+
+  DrawAirWalls2D(context,width,height,signals) {
+    const map=this.mapData,scale=this.scale;
+    const Screen=(point)=>[(point[0]-this.center[0])*scale+width/2,(point[1]-this.center[1])*scale+height/2];
+    for(const wall of map.airWalls||[]) {
+      if(!VisibleEncounterObject(wall,signals)) continue;
+      const [x,,z]=wall.pos,[w,,d]=wall.size||[1,6,0.4],point=Screen([x,z]);
+      const radius=Math.max(w,d)*scale+6;
+      if(point[0]+radius<0||point[1]+radius<0||point[0]-radius>width||point[1]-radius>height) continue;
+      const dynamic=!!(wall.hideOn||wall.showOn);
+      const boxW=Math.max(3.2,w*scale),boxD=Math.max(3.2,d*scale);
+      const left=-boxW/2,top=-boxD/2;
+      context.save();
+      context.translate(point[0],point[1]);
+      context.rotate(-(wall.yawDeg||0)*Math.PI/180);
+      context.fillStyle=dynamic?FLOW_AIRWALL_COLORS.gateFill2d:FLOW_AIRWALL_COLORS.fill2d;
+      context.fillRect(left,top,boxW,boxD);
+      if(Math.max(boxW,boxD)>=10) {
+        context.save();
+        context.beginPath();context.rect(left,top,boxW,boxD);context.clip();
+        const span=Math.max(boxW,boxD),step=Math.max(5,Math.min(10,scale*1.5));
+        context.strokeStyle=dynamic?FLOW_AIRWALL_COLORS.gateStripe2d:FLOW_AIRWALL_COLORS.stripe2d;
+        context.lineWidth=1.1;
+        context.beginPath();
+        for(let o=-span;o<span;o+=step) {
+          context.moveTo(left+o,top+boxD);context.lineTo(left+o+boxD,top);
+        }
+        context.stroke();
+        context.restore();
+      }
+      context.strokeStyle=dynamic?FLOW_AIRWALL_COLORS.gateStroke2d:FLOW_AIRWALL_COLORS.stroke2d;
+      context.lineWidth=dynamic?1.8:1.4;
+      if(dynamic) context.setLineDash([5,3]);
+      context.strokeRect(left,top,boxW,boxD);
+      context.setLineDash([]);
+      context.restore();
+    }
   }
 
   DrawScreenMarks(context,width,height,layers) {
@@ -624,9 +679,10 @@ export class FlowMapView {
     context.lineClip=[-LINE_CLIP_PAD,-LINE_CLIP_PAD,width+LINE_CLIP_PAD,height+LINE_CLIP_PAD];
     const planar=!this.raster;
     const nightStep=Math.round((frame.nightBlend||0)*FLOW_DUSK.steps);
+    const showAirWalls=layers.airWalls!==false;
     const key=planar
-      ?JSON.stringify([pixelWidth,pixelHeight,frame.beat.id,this.cameraKey,frame.signals,nightStep])
-      :JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,LandmarkMode(layers),frame.signals,nightStep]);
+      ?JSON.stringify([pixelWidth,pixelHeight,frame.beat.id,this.cameraKey,frame.signals,nightStep,showAirWalls])
+      :JSON.stringify([pixelWidth,pixelHeight,this.center,this.scale,frame.beat.id,this.cameraKey,LandmarkMode(layers),frame.signals,nightStep,showAirWalls]);
     cpu?.End();
     let source=null;
     if(planar&&!trace?.redrawBase&&key===this.baseKey) source=this.BaseSource(width,height,ratio);

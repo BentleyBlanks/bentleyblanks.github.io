@@ -1,5 +1,5 @@
 import { PickEncounterBody } from "./Script_LevelFlowPicking.mjs";
-import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Line, Label } from "./Script_LevelFlowView.mjs";
+import { FlowMapView, FLOW_COLORS, FLOW_MATERIAL_COLORS, FLOW_COVER_COLORS, FLOW_AIRWALL_COLORS, IsEncounterCover, DrawCoverSymbol, EncounterSignals, VisibleEncounterObject, Polygon, Line, Label } from "./Script_LevelFlowView.mjs";
 import { LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { Clamp, Distance, SampleBeatRoute } from "./Script_LevelFlowGeometry.mjs";
 import { EncounterRaster } from "./Script_LevelFlowRaster.mjs";
@@ -580,6 +580,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.BeginOverlay(context);
     this.DrawWallWriting(context,frame);
     this.DrawCoverBoxes(context,coverBoxes);
+    if(layers.airWalls!==false&&this.mapData.airWalls?.length) this.DrawAirWalls(context,frame);
     const landmarkMode=LandmarkMode(layers);
     if(landmarkMode!=="none") this.DrawLandmarks(context,width,height,landmarkMode);else this.visibleLandmarks=[];
     this.EndOverlay(context);
@@ -674,6 +675,69 @@ export class FlowPerspectiveView extends FlowMapView {
         if(context?.DepthOverlay) context.DepthOverlay.Billboard("cover",vertex.x-7,vertex.y-7,14,16,
           ctx=>DrawCoverSymbol(ctx,[7,7]),[vertex.x,vertex.y,probeDepth,0]);
         else DrawCoverSymbol(context, [vertex.x, vertex.y]);
+      }
+    }
+  }
+
+  DrawAirWalls(context, frame) {
+    const signals = EncounterSignals(frame);
+    const eyeOnly = this.type === "eye" && !this.freeCamera;
+    const faceHiddenAlpha = eyeOnly ? 0 : 0.08;
+    const edgeHiddenAlpha = eyeOnly ? 0 : 0.16;
+    const ortho = this.type === "oblique" && !this.freeCamera;
+    const stats = { visible: 0, hidden: 0 };
+    const Stroke = (a, b, color, lineWidth) => {
+      const vertices = this.FaceVertices([a, b, b]);
+      if (vertices.length >= 2) {
+        this.raster.Stroke(context, vertices[0], vertices[1], color, lineWidth, stats, edgeHiddenAlpha);
+      }
+    };
+    for (const wall of this.mapData.airWalls || []) {
+      if (!VisibleEncounterObject(wall, signals)) continue;
+      const [x, rawY, z] = wall.pos;
+      const [w, rawH, d] = wall.size || [1, 6, 0.4];
+      const visH = Math.min(rawH || 6, 3.2);
+      const base = Number.isFinite(rawY) ? rawY : this.Ground([x, z]);
+      const radius = Math.hypot(w, visH, d) / 2;
+      const camera = this.CameraPoint([x, base + visH / 2, z]);
+      if (!this.SphereInView(camera, radius)) continue;
+      const yaw = (wall.yawDeg || 0) * Math.PI / 180;
+      const c = Math.cos(yaw), s = Math.sin(yaw);
+      const dynamic = !!(wall.hideOn || wall.showOn);
+      const faceColor = dynamic ? FLOW_AIRWALL_COLORS.gateFace3d : FLOW_AIRWALL_COLORS.face3d;
+      const edgeColor = dynamic ? FLOW_AIRWALL_COLORS.gateEdge3d : FLOW_AIRWALL_COLORS.edge3d;
+      const showCross = ortho ? this.scale >= 1.8 : camera[2] < 220;
+      // Thin barrier walls render as a center-plane fence; thick blocks render their 4 perimeter panels.
+      const spans = [];
+      if (Math.min(w, d) > 1.5) {
+        const hx = w / 2, hz = d / 2;
+        const corners = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]].map(([lx, lz]) => [x + lx * c + lz * s, z - lx * s + lz * c]);
+        for (let k = 0; k < 4; k++) spans.push([corners[k], corners[(k + 1) % 4]]);
+      } else {
+        const alongX = w >= d;
+        const halfSpan = (alongX ? w : d) / 2;
+        const ux = alongX ? c : s, uz = alongX ? -s : c;
+        spans.push([[x - ux * halfSpan, z - uz * halfSpan], [x + ux * halfSpan, z + uz * halfSpan]]);
+      }
+      for (const [p0, p1] of spans) {
+        const spanLen = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+        const segCount = Math.max(1, Math.min(10, Math.ceil(spanLen / 14)));
+        for (let i = 0; i < segCount; i++) {
+          const t0 = i / segCount, t1 = (i + 1) / segCount;
+          const ax = p0[0] + (p1[0] - p0[0]) * t0, az = p0[1] + (p1[1] - p0[1]) * t0;
+          const bx = p0[0] + (p1[0] - p0[0]) * t1, bz = p0[1] + (p1[1] - p0[1]) * t1;
+          const gyA = Number.isFinite(rawY) ? rawY : this.Ground([ax, az]);
+          const gyB = Number.isFinite(rawY) ? rawY : this.Ground([bx, bz]);
+          const b0 = [ax, gyA + 0.04, az], b1 = [bx, gyB + 0.04, bz];
+          const top0 = [ax, gyA + visH, az], top1 = [bx, gyB + visH, bz];
+          const verts = this.FaceVertices([b0, b1, top1, top0]);
+          if (verts.length >= 3) this.raster.OverlayFace(context, verts, faceColor, stats, faceHiddenAlpha);
+          Stroke(top0, top1, edgeColor, dynamic ? 2.4 : 1.8);
+          Stroke(b0, b1, edgeColor, 1.2);
+          Stroke(b0, top0, edgeColor, 1.2);
+          if (i === segCount - 1) Stroke(b1, top1, edgeColor, 1.2);
+          if (showCross) Stroke(b0, top1, edgeColor, 0.9);
+        }
       }
     }
   }

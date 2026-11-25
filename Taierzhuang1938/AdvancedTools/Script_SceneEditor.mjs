@@ -971,7 +971,7 @@ class SceneEditorApp {
 
   LayerKey(obj) {
     if (obj.layer === "backdrop") return `bd:${SCENE_ASSETS[obj.asset]?.kind}`;
-    if (obj.visual === false) return "ghost";
+    if (obj.visual === false) return (obj.hideOn || obj.showOn) ? "ghostGate" : "ghost";
     const kind = SCENE_ASSETS[obj.asset]?.kind;
     if (kind === "tree") return "tree";
     if (kind === "prop") return `prop:${obj.asset}`;
@@ -980,7 +980,8 @@ class SceneEditorApp {
   }
 
   MakeLayerMaterial(key, doc = this.model.doc) {
-    if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.22, depthWrite: false });
+    if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide });
+    if (key === "ghostGate") return new THREE.MeshBasicMaterial({ color: 0xf08c28, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide });
     if (key.startsWith("bd:")) return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
     if (key === "tree") return new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 });
     if (key.startsWith("color:")) {

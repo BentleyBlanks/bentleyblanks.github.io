@@ -239,17 +239,63 @@ for (const aw of mergedKeepIn) {
   assert.equal(aw.material, "Whitebox/AirWall");
   assert.equal(aw.visual, false);
 }
-// 确保 08a–13e 玩家主线每一步都不撞到任何 KeepIn 空气墙（至少留出 1.2m 安全余量）
+const mergedStageGates = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_StageGate_"));
+assert.ok(mergedStageGates.length >= 7, `08–13 配置阶段动态空气墙门禁以防止跨阶段自由乱逛（实测 ${mergedStageGates.length} 段）`);
+for (const gate of mergedStageGates) {
+  assert.equal(gate.tag, "airWall", `阶段空气墙 ${gate.id} 必须使用 tag="airWall"`);
+  assert.equal(gate.material, "Whitebox/AirWall", `阶段空气墙 ${gate.id} 必须使用 Whitebox/AirWall`);
+  assert.equal(gate.visual, false, `阶段空气墙 ${gate.id} 必须 visual=false（游戏内不可见）`);
+  assert.equal(gate.noClimb, true, `阶段空气墙 ${gate.id} 必须禁止翻越`);
+  assert.ok(gate.hideOn || gate.showOn, `阶段空气墙 ${gate.id} 必须绑定 hideOn 或 showOn 信号`);
+}
+const mergedBlocks = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_Block_"));
+assert.ok(mergedBlocks.length >= 80, `08–13 支路与豁口配置可见白盒路障/倒塌残墙（实测 ${mergedBlocks.length} 块）`);
+for (const blk of mergedBlocks) {
+  assert.equal(blk.noClimb, true, `动线封堵路障 ${blk.id} 必须禁止翻越`);
+  assert.notEqual(blk.visual, false, `动线封堵路障 ${blk.id} 为可见实体白盒`);
+}
+// 确保 08a–13e 玩家主线每一步都不撞到任何 KeepIn 或当拍生效中的 StageGate 空气墙
 const keepInCheckGround = () => 0;
+const stageGateActive = (gate, signals) => !(gate.hideOn && signals.includes(gate.hideOn)) && !(gate.showOn && !signals.includes(gate.showOn));
 for (const beat of merged.timeline.filter((b) => Number(b.stage) >= 8)) {
+  const activeSignals = merged.evaluate(beat.start + 0.01, merged.defaultDocument).signals || [];
+  const activeAirWalls = [...mergedKeepIn, ...mergedStageGates.filter((g) => stageGateActive(g, activeSignals))];
   for (let i = 1; i < beat.p.length; i++) {
     const a = [beat.p[i - 1][0], 1.0, beat.p[i - 1][1]];
     const b = [beat.p[i][0], 1.0, beat.p[i][1]];
-    for (const aw of mergedKeepIn) {
-      const boxObj = { ...aw, tag: undefined };
-      assert.ok(!RayHitsOrientedBox(a, b, boxObj, keepInCheckGround), `玩家主线 ${beat.id} 不得被空气墙 ${aw.id} 阻断`);
+    for (const aw of activeAirWalls) {
+      const boxObj = { ...aw, tag: undefined, showOn: undefined };
+      assert.ok(!RayHitsOrientedBox(a, b, boxObj, keepInCheckGround), `玩家主线 ${beat.id} 不得被生效中的空气墙 ${aw.id} 阻断`);
     }
   }
+}
+// 核对 7 道阶段空气墙在对应信号前/后的真实阻断与放行语义，以及 Blockout 转换后保留不可见空气墙属性
+const stageGateChecks = [
+  { id: "Merged_StageGate_NorthVillageEntry", from: [106, 488], to: [106, 502], lockedBeat: "08c", openBeat: "09a" },
+  { id: "Merged_StageGate_PlankBridgeCut", from: [106, 480], to: [106, 470], lockedBeat: "09a", openBeat: "08c" },
+  { id: "Merged_StageGate_MidStPreFlank", from: [120, 559], to: [128, 559], lockedBeat: "09b", openBeat: "10a" },
+  { id: "Merged_StageGate_GengFrontGate", from: [131.5, 560], to: [131.5, 565], lockedBeat: "09d", openBeat: "10a" },
+  { id: "Merged_StageGate_PreShelterExit", from: [118, 746], to: [118, 753], lockedBeat: "10b", openBeat: "11c" },
+  { id: "Merged_StageGate_SouthLeveeHold", from: [-80, 890], to: [-80, 900], lockedBeat: "13b", openBeat: "13e" },
+  { id: "Merged_StageGate_BridgeSpanCut", from: [-80, 860], to: [-80, 845], lockedBeat: "13e", openBeat: "13b" },
+];
+for (const chk of stageGateChecks) {
+  const gate = mergedStageGates.find((g) => g.id === chk.id);
+  assert.ok(gate, `缺少阶段门禁空气墙 ${chk.id}`);
+  const lockedSigs = merged.evaluate(merged.BeatById(chk.lockedBeat).start + 0.01, merged.defaultDocument).signals || [];
+  const openSigs = merged.evaluate(merged.BeatById(chk.openBeat).start + 0.01, merged.defaultDocument).signals || [];
+  assert.ok(stageGateActive(gate, lockedSigs), `${chk.id} 在 ${chk.lockedBeat} 应处于关闭封堵状态`);
+  assert.ok(!stageGateActive(gate, openSigs), `${chk.id} 在 ${chk.openBeat} 应处于放行状态`);
+  assert.ok(RayHitsOrientedBox([chk.from[0], 1, chk.from[1]], [chk.to[0], 1, chk.to[1]], { ...gate, tag: undefined, showOn: undefined }, keepInCheckGround),
+    `${chk.id} 的包围盒须实际拦截越界路径 ${JSON.stringify(chk.from)}->${JSON.stringify(chk.to)}`);
+}
+const mergedBlockout = BlockoutDocFromScene(resolved.doc, resolved.heights, { level: "FirstLevelMerged" });
+for (const gate of mergedStageGates) {
+  const bg = (mergedBlockout.gates || []).find((g) => g.id === gate.id);
+  assert.ok(bg, `BlockoutDocFromScene 须导出动态空气墙 ${gate.id}`);
+  assert.equal(bg.visual, false, `Blockout gate ${gate.id} 保留 visual=false`);
+  assert.equal(bg.tag, "airWall", `Blockout gate ${gate.id} 保留 tag=airWall`);
+  assert.equal(bg.noClimb, true, `Blockout gate ${gate.id} 保留 noClimb=true`);
 }
 const villagePaint = resolved.doc.paint.find((p) => p.id === "Village");
 assert.equal(villagePaint?.color, "#c6b99c", "村庄地基色保持鲁南夯实黄土");
@@ -257,6 +303,11 @@ assert.ok(!resolved.doc.paint.some((p) => /^Wheat_/.test(p.id || "") && p.z >= 3
 
 const mergedMap = BuildEncounterMap(resolved.doc, { sceneId: "FirstLevelMerged", variantSpec: GetEncounterVariantSpec("L1_BeishaheMerged") });
 assert.deepEqual(mergedMap.bounds, [-160, 320, -480, 990]);
+assert.ok(Array.isArray(mergedMap.airWalls) && mergedMap.airWalls.length >= mergedKeepIn.length + mergedStageGates.length,
+  `Encounter 地图导出全部空气墙供 2D/3D 预览（实测 ${mergedMap.airWalls?.length || 0}）`);
+assert.ok(mergedKeepIn.every((aw) => mergedMap.airWalls.some((entry) => entry.id === aw.id)), "所有静态走廊空气墙进入 map.airWalls");
+assert.ok(mergedStageGates.every((g) => mergedMap.airWalls.some((entry) => entry.id === g.id)), "所有阶段门禁空气墙进入 map.airWalls");
+assert.ok(!mergedMap.objects.some((o) => o.tag === "airWall"), "空气墙不混入常规 2D/3D 实体物件数组");
 const s2Yards = new Set(resolved.doc.objects.filter((o) => /^S2_[A-Za-z0-9]+_[A-Za-z0-9]+_/.test(o.id)).map((o) => o.id.match(/^(S2_[A-Za-z0-9]+_[A-Za-z0-9]+)_/)[1]));
 assert.ok(s2Yards.size >= 30, `S2 有机重构包含至少 30 座鲁南分型宗族院落/商铺，实测：${s2Yards.size}`);
 assert.ok(!resolved.doc.objects.some((o) => /^Exp_[WE]\d/.test(o.id)), "已撤除超标 2.4 倍的东西方盒外扩翼");

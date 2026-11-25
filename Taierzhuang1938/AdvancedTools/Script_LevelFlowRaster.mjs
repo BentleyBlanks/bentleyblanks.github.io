@@ -6,6 +6,11 @@ function Rgb(color) {
   if(!colors.has(color)) colors.set(color,[parseInt(color.slice(1,3),16),parseInt(color.slice(3,5),16),parseInt(color.slice(5,7),16)]);
   return colors.get(color);
 }
+function ColorAlpha(color) {
+  if(color.length===9) return parseInt(color.slice(7,9),16)/255;
+  if(color.length===5) return parseInt(color[4]+color[4],16)/255;
+  return 1;
+}
 function Edge(a,b,x,y) {return (x-a.x)*(b.y-a.y)-(y-a.y)*(b.x-a.x);}
 
 // World triangles and actor strokes use the same depth test. This avoids
@@ -292,7 +297,7 @@ export class EncounterRaster {
     const left=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.x)))),top=Math.max(0,Math.floor(Math.min(...vertices.map((point)=>point.y))));
     const right=Math.min(this.displayWidth,Math.ceil(Math.max(...vertices.map((point)=>point.x)))),bottom=Math.min(this.displayHeight,Math.ceil(Math.max(...vertices.map((point)=>point.y))));
     if(right<=left||bottom<=top) return;
-    const width=right-left,height=bottom-top,image=!context||this.collectingDepth?null:new ImageData(width,height),rgb=Rgb(color);
+    const width=right-left,height=bottom-top,image=!context||this.collectingDepth?null:new ImageData(width,height),rgb=Rgb(color),alpha=ColorAlpha(color);
     for(let triangle=1;triangle<vertices.length-1;triangle++) {
       const a=vertices[0],b=vertices[triangle],c=vertices[triangle+1],area=Edge(a,b,c.x,c.y);
       if(Math.abs(area)<0.001) continue;
@@ -302,7 +307,7 @@ export class EncounterRaster {
         const depth=this.perspective?1/(first/a.depth+second/b.depth+third/c.depth):first*a.depth+second*b.depth+third*c.depth;
         const hidden=this.Occluded({x:left+x,y:top+y,depth});stats[hidden?"hidden":"visible"]++;
         if(!image) continue;
-        const offset=(y*width+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=hidden?Math.round(hiddenAlpha*255):255;
+        const offset=(y*width+x)*4;image.data[offset]=rgb[0];image.data[offset+1]=rgb[1];image.data[offset+2]=rgb[2];image.data[offset+3]=Math.round((hidden?hiddenAlpha:1)*alpha*255);
       }
     }
     if(!image) return;

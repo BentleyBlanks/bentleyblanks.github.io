@@ -651,33 +651,54 @@ export class FirstLevelWhiteboxField {
   }
 
   BuildGates() {
+    let airWallGateMat = null;
     for (const spec of this.layout.gates) {
-      // 外观表管得到的门/桥件共用外观材质（位姿在 mesh 上，几何留局部系）。
-      const look = this.looks && !IsTrainGate(spec) ? this.looks.LookOf(spec) : null;
-      const material = look ? this.looks.Material(look)
-        : this.layout.semanticColors?.[spec.semantic]
-        ? MakeSemanticMaterial(`FirstLevelWhitebox_${spec.semantic}_${spec.id}`,
-          this.layout.semanticColors[spec.semantic])
-        : MakeWhiteMaterial(`FirstLevelWhitebox_${spec.id}`);
-      const geometry = look ? this.looks.BoxGeometry(spec, look, (x, z) => this.TerrainHeight(x, z), { place: false })
-        : MakeBox(spec.w, spec.h, spec.d, 1, spec.id);
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(spec.x, spec.y, spec.z);
-      mesh.rotation.y = spec.ry || 0;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.name = `FirstLevelWhitebox_${spec.id}`;
-      // 车门跟着车厢一起平移，速度靶的账与车厢体块同一本（见 BuildWhiteBoxes）。
-      if (IsTrainGate(spec)) MarkDynamicPrepass(mesh);
-      this.scene.add(mesh);
-      this.meshes.push(mesh);
+      const hidden = spec.visual === false;
+      const debugAir = hidden && this.debugAirWalls && spec.tag === "airWall";
+      let mesh = null, material = null;
+      if (!hidden || debugAir) {
+        if (debugAir) {
+          airWallGateMat ??= MarkNoPrepass(new THREE.MeshBasicMaterial({
+            name: "FirstLevelAirWallDebugGate", color: 0xe64a19,
+            transparent: true, opacity: 0.34, depthWrite: false, side: THREE.DoubleSide,
+          }));
+          material = airWallGateMat;
+          mesh = new THREE.Mesh(MakeBox(spec.w, spec.h, spec.d, 1, spec.id), material);
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+          mesh.renderOrder = 10;
+        } else {
+          // 外观表管得到的门/桥件共用外观材质（位姿在 mesh 上，几何留局部系）。
+          const look = this.looks && !IsTrainGate(spec) ? this.looks.LookOf(spec) : null;
+          material = look ? this.looks.Material(look)
+            : this.layout.semanticColors?.[spec.semantic]
+            ? MakeSemanticMaterial(`FirstLevelWhitebox_${spec.semantic}_${spec.id}`,
+              this.layout.semanticColors[spec.semantic])
+            : MakeWhiteMaterial(`FirstLevelWhitebox_${spec.id}`);
+          const geometry = look ? this.looks.BoxGeometry(spec, look, (x, z) => this.TerrainHeight(x, z), { place: false })
+            : MakeBox(spec.w, spec.h, spec.d, 1, spec.id);
+          mesh = new THREE.Mesh(geometry, material);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          // 车门跟着车厢一起平移，速度靶的账与车厢体块同一本（见 BuildWhiteBoxes）。
+          if (IsTrainGate(spec)) MarkDynamicPrepass(mesh);
+        }
+        mesh.position.set(spec.x, spec.y, spec.z);
+        mesh.rotation.y = spec.ry || 0;
+        mesh.name = `FirstLevelWhitebox_${spec.id}`;
+        this.scene.add(mesh);
+        this.meshes.push(mesh);
+      }
       const collider = ColliderRecord(spec);
-      const open=!!spec.appearSignal;
-      if(open)mesh.visible=false;else this.colliders.push(collider);
+      const open = !!spec.appearSignal;
+      if (open) { if (mesh) mesh.visible = false; }
+      else this.colliders.push(collider);
       this.gates.set(spec.id, { spec, mesh, material, collider, open });
       this.stats.dynamicGates += 1;
-      this.stats.whiteBoxes += 1;
-      this.stats.structures += 1;
+      if (!hidden) {
+        this.stats.whiteBoxes += 1;
+        this.stats.structures += 1;
+      }
     }
   }
 
@@ -915,8 +936,10 @@ export class FirstLevelWhiteboxField {
     if (!gate || gate.open) return false;
     gate.open = true;
     // hideOpenGates：白盒文件场景（LayoutFromSceneDoc）的随信号体块是塌掉 / 炸掉的东西，消失而不是「白门升起」。
-    if (this.layout.scenario || this.layout.terrainSpec || this.layout.hideOpenGates) gate.mesh.visible = false;
-    else gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
+    if (gate.mesh) {
+      if (this.layout.scenario || this.layout.terrainSpec || this.layout.hideOpenGates) gate.mesh.visible = false;
+      else gate.mesh.position.y = gate.spec.y + gate.spec.h + 1.2;
+    }
     const handle = gate.collider._physicsHandle;
     if (this.physics && handle !== null && handle !== undefined) this.physics.RemoveSolid(handle);
     const index = this.colliders.indexOf(gate.collider);
@@ -930,9 +953,12 @@ export class FirstLevelWhiteboxField {
     const gate = this.gates.get(id);
     if (!gate || !gate.open) return false;
     gate.open = false;
-    gate.mesh.visible = true;
-    gate.mesh.position.y = gate.spec.y;
-    gate.mesh.position.z = gate.spec.z; gate.progress = undefined;
+    if (gate.mesh) {
+      gate.mesh.visible = true;
+      gate.mesh.position.y = gate.spec.y;
+      gate.mesh.position.z = gate.spec.z;
+    }
+    gate.progress = undefined;
     gate.collider = ColliderRecord(gate.spec);
     this.colliders.push(gate.collider);
     if(gate.spec.walkableId&&!this.walkableSurfaces.some(surface=>surface.id===gate.spec.walkableId)){

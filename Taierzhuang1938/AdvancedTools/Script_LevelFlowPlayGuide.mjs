@@ -134,7 +134,8 @@ class PlayGuideMapView extends FlowMapView {
     context.lineClip = [-32, -32, width + 32, height + 32];
 
     const nightStep = Math.round((baseFrame?.nightBlend || 0) * FLOW_DUSK.steps);
-    const key = JSON.stringify([pixelWidth, pixelHeight, baseFrame?.beat?.id || "", baseFrame?.signals || [], nightStep]);
+    const showAirWalls = options.showAirWalls !== false;
+    const key = JSON.stringify([pixelWidth, pixelHeight, baseFrame?.beat?.id || "", baseFrame?.signals || [], nightStep, showAirWalls]);
     let source = key === this.baseKey ? this.BaseSource(width, height, ratio) : null;
     if (!source) {
       const marginX = Math.round(width * 0.25), marginY = Math.round(height * 0.25);
@@ -149,7 +150,7 @@ class PlayGuideMapView extends FlowMapView {
       bg.setTransform(ratio, 0, 0, ratio, 0, 0);
       bg.lineClip = [-32, -32, baseWidth + 32, baseHeight + 32];
       bg.clearRect(0, 0, basePixelWidth / ratio, basePixelHeight / ratio);
-      this.DrawBase(bg, baseWidth, baseHeight, baseFrame, {});
+      this.DrawBase(bg, baseWidth, baseHeight, baseFrame, { airWalls: showAirWalls });
       this.baseKey = key;
       this.baseView = { center: [...this.center], scale: this.scale, width: baseWidth, height: baseHeight, ratio };
       source = this.BaseSource(width, height, ratio);
@@ -568,6 +569,7 @@ export class LevelFlowPlayGuide {
     this.follow = true;
     this.showRoutes = true;
     this.showLandmarks = true;
+    this.showAirWalls = true;
 
     this.mapData = null;
     this.mapView = null;
@@ -616,6 +618,7 @@ export class LevelFlowPlayGuide {
     const FitButton = Element("playMapFit");
     const RoutesButton = Element("playMapRoutes");
     const LandmarksButton = Element("playMapLandmarks");
+    const AirWallsButton = Element("playMapAirWalls");
     const ZoomInButton = Element("playMapZoomIn");
     const ZoomOutButton = Element("playMapZoomOut");
 
@@ -648,6 +651,14 @@ export class LevelFlowPlayGuide {
     if (LandmarksButton) {
       LandmarksButton.onclick = () => {
         this.showLandmarks = !this.showLandmarks;
+        this.SyncMapButtons();
+        this.Refresh(true);
+        this.refocusGame?.();
+      };
+    }
+    if (AirWallsButton) {
+      AirWallsButton.onclick = () => {
+        this.showAirWalls = !this.showAirWalls;
         this.SyncMapButtons();
         this.Refresh(true);
         this.refocusGame?.();
@@ -801,6 +812,7 @@ export class LevelFlowPlayGuide {
     setPressed("playMapFollow", this.follow);
     setPressed("playMapRoutes", this.showRoutes);
     setPressed("playMapLandmarks", this.showLandmarks);
+    setPressed("playMapAirWalls", this.showAirWalls);
   }
 
   Start({ variant, document: playDoc, mapData, startTime = 0 }) {
@@ -978,6 +990,7 @@ export class LevelFlowPlayGuide {
       this.mapView.DrawPlayFrame(guide, baseFrame, {
         showRoutes: this.showRoutes,
         showLandmarks: this.showLandmarks,
+        showAirWalls: this.showAirWalls,
       }, nowMs);
     }
   }
@@ -1134,6 +1147,7 @@ export class LevelFlowPlayGuide {
       follow: this.follow,
       showRoutes: this.showRoutes,
       showLandmarks: this.showLandmarks,
+      showAirWalls: this.showAirWalls,
       scale: this.mapView?.scale ?? null,
       center: this.mapView?.center ? [...this.mapView.center] : null,
       beatId: guide?.beatId ?? null,

@@ -78,6 +78,7 @@ button.selected .lfTabBadge{color:var(--ed-gold-text)}
 .lfPlayMapLegend .enemy{background:#c44537}
 .lfPlayMapLegend .civilian{background:#826ba6}
 .lfPlayMapLegend .target{border-radius:1px;transform:rotate(45deg);background:#2ea870}
+.lfPlayMapLegend .airwall{width:10px;height:6px;border-radius:1px;background:#d9323866;border:1px solid #d93238}
 .lfPlayUnitSummary{margin-left:auto;font:11px var(--ui-mono);color:var(--ed-text-3);font-variant-numeric:tabular-nums}
 .lfPlayDialogueToolbar{flex:none;display:flex;align-items:center;gap:4px;height:38px;padding:0 12px;border-bottom:1px solid var(--ed-rule-2);background:transparent}
 .lfPlayDialogueToolbar button{height:26px;padding:0 9px;border:1px solid transparent;border-radius:4px;background:transparent;box-shadow:none;color:var(--ed-text-3);font-size:12px;line-height:1}
@@ -304,6 +305,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfMapLegend .trigger { width: 10px; height: 10px; border: 1px dashed #277b9a; margin-left: 5px; }
 .lfMapLegend .spawn { color: #ac4031; }
 .lfMapLegend .cover { width: 10px; height: 12px; background: #244633; margin-left: 5px; clip-path: polygon(0 0,100% 0,100% 55%,85% 78%,50% 100%,15% 78%,0 55%); }
+.lfMapLegend .airwall { display: inline-block; width: 12px; height: 8px; margin-left: 5px; background: repeating-linear-gradient(-45deg, #d9323855, #d9323855 2px, #ff8c9088 2px, #ff8c9088 4px); border: 1px solid #c4242b; }
 .lfTooltip { position: absolute; max-width: 260px; padding: 8px 12px; border: 1px solid var(--lf-line); border-radius: 2px; background: var(--ed-black); color: #d0d6c8; box-shadow: 0 4px 18px #00000040; font-size: 14px; pointer-events: none; z-index: 3; }
 #mapLoading { position: absolute; inset: 0; display: grid; place-items: center; background: #101619f2; color: #bdbda7; border-radius: 3px; }
 

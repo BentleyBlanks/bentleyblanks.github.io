@@ -1897,4 +1897,65 @@ assert.deepEqual(UpgradeEncounterDocument(migratedBeishahe,defaults),migratedBei
   assert.deepEqual(dirty.map(run=>run.points),[[[40,40],[60,60]]],"non-finite points break the polyline");
   assert.deepEqual(ClipPolyline([[5,5]],box),[],"a single point draws nothing");
 }
+// Air-wall map extraction, viewport layer schema, and translucent software OverlayFace alpha blending.
+{
+  assert.ok(Array.isArray(map.airWalls) && map.airWalls.some(o => o.tag === "airWall"), "BuildEncounterMap exports scene airWalls for 2D/3D preview");
+  assert.ok(!map.objects.some(o => o.tag === "airWall"), "airWalls stay separate from solid map objects");
+  const packetWithAirWalls = structuredClone(packet);
+  packetWithAirWalls.context.viewports = {
+    count: 1, active: 0,
+    views: [{
+      type: "plan", mode: "stage", target: "player", center: [0, 0], scale: 4, followZoom: 1, yaw: 0, pitch: -0.5,
+      viewport: { width: 640, height: 360 },
+      layers: { routes: true, spawns: true, triggers: true, fire: true, names: true, importantLandmarks: true, landmarks: false, airWalls: true },
+    }],
+  };
+  assert.equal(ReadFramePacket(packetWithAirWalls, FLOW_TIMELINE).context.viewports.views[0].layers.airWalls, true);
+  packetWithAirWalls.context.viewports.views[0].layers.airWalls = false;
+  assert.equal(ReadFramePacket(packetWithAirWalls, FLOW_TIMELINE).context.viewports.views[0].layers.airWalls, false);
+  delete packetWithAirWalls.context.viewports.views[0].layers.airWalls;
+  assert.equal(ReadFramePacket(packetWithAirWalls, FLOW_TIMELINE).context.viewports.views[0].layers.airWalls, undefined, "legacy viewport layouts without airWalls remain valid");
+  const invalidAirWalls = structuredClone(packetWithAirWalls);
+  invalidAirWalls.context.viewports.views[0].layers.airWalls = "yes";
+  assert.throws(() => ReadFramePacket(invalidAirWalls, FLOW_TIMELINE));
+  // Software OverlayFace honors 8-digit #rrggbbaa alpha so 3D airWalls render semi-transparently without WebGL2.
+  const prevImageData = globalThis.ImageData;
+  globalThis.ImageData = class { constructor(w, h) { this.width = w; this.height = h; this.data = new Uint8ClampedArray(w * h * 4); } };
+  try {
+    let captured = null;
+    const swRaster = {
+      width: 8, height: 8, displayWidth: 8, displayHeight: 8, perspective: false, accelerated: false,
+      Occluded: () => false,
+      overlay: { width: 0, height: 0, getContext: () => ({ putImageData(img) { captured = img; } }) },
+    };
+    const fakeCtx = { drawImage() {} };
+    EncounterRaster.prototype.OverlayFace.call(swRaster, fakeCtx, [{ x: 0, y: 0, depth: 10 }, { x: 8, y: 0, depth: 10 }, { x: 8, y: 8, depth: 10 }, { x: 0, y: 8, depth: 10 }], "#ff000040", { visible: 0, hidden: 0 }, 0.08);
+    assert.ok(captured && captured.data[0] === 255 && captured.data[3] === 64, `software OverlayFace writes #rrggbbaa alpha cleanly (${captured?.data[3]})`);
+  } finally {
+    if (prevImageData === undefined) delete globalThis.ImageData;
+    else globalThis.ImageData = prevImageData;
+  }
+  // 3D DrawAirWalls must draw in oblique mode (camera distance ~far/2 = 750m) as well as perspective scene mode, and respect dynamic signals.
+  for (const mode of ["oblique", "scene"]) {
+    let faces = 0, strokes = 0;
+    const view3d = Object.assign(Object.create(FlowPerspectiveView.prototype), {
+      type: mode, freeCamera: mode === "scene" ? {} : null, width: 640, height: 360, focal: 320, scale: 4,
+      viewFar: 1500, sceneCamera: { near: 0.15, far: 1500, verticalFov: 60 },
+      center: [120, 560], centerHeight: 0, yaw: -0.45, pitch: 0.67,
+      eye: [120, 450, 560 - 600], right: [1, 0, 0], up: [0, 0.8, 0.6], forward: [0, -0.6, 0.8],
+      mapData: { airWalls: [
+        { id: "StaticWall", pos: [120, 0, 560], size: [10, 6, 0.4], yawDeg: 0, tag: "airWall", visual: false },
+        { id: "GateWall", pos: [122, 0, 560], size: [8, 6, 0.4], yawDeg: 0, tag: "airWall", visual: false, hideOn: "MgSilenced" },
+      ] },
+      Ground: () => 0,
+      CameraPoint: () => [0, 0, mode === "oblique" ? 750 : 40],
+      raster: { OverlayFace() { faces++; }, Stroke() { strokes++; } },
+    });
+    view3d.DrawAirWalls({}, { beat: { id: "09b" }, signals: [] });
+    assert.ok(faces >= 2 && strokes >= 8, `3D ${mode} view draws both static & active dynamic airWalls (${faces} faces, ${strokes} strokes)`);
+    const before = faces;
+    view3d.DrawAirWalls({}, { beat: { id: "10a" }, signals: ["MgSilenced"] });
+    assert.equal(faces - before, 1, `3D ${mode} view hides dynamic gate once its hideOn signal is active`);
+  }
+}
 console.log("ok  Encounter design: editable causal triggers, spawn caps and behaviors, continuous pursuit/tanks, full scene map, deterministic rewind, undo and PNG round-trip");

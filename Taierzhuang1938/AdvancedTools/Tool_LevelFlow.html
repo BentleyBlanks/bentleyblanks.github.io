@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" data-interface-theme href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261126PlayGuideUi2">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261126AirWallView">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -61,7 +61,7 @@
     <output id="fpsStatus" class="lfFpsStatus" data-level="idle" title="编辑器视口实际重绘帧率，每 0.5 秒更新；「静止」表示画面没有变化、没有重绘">— FPS</output>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
-  <template id="viewportLegend"><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体</div></template>
+  <template id="viewportLegend"><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体 <span class="airwall" aria-hidden="true"></span>空气墙</div></template>
   <main class="lfWorkspace">
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
@@ -114,6 +114,7 @@
               <span class="lfPlayMapSep" aria-hidden="true"></span>
               <button type="button" id="playMapRoutes" aria-pressed="true" title="显示当前节拍引导路线">路线</button>
               <button type="button" id="playMapLandmarks" aria-pressed="true" title="显示主要地名">地名</button>
+              <button type="button" id="playMapAirWalls" aria-pressed="true" title="显示空气墙边界">空气墙</button>
             </div>
             <div class="lfPlayMapZoom">
               <button type="button" id="playMapZoomOut" aria-label="缩小地图" title="缩小">−</button>
@@ -130,6 +131,7 @@
             <span><i class="enemy"></i>日军</span>
             <span><i class="civilian"></i>平民</span>
             <span><i class="target"></i>目标</span>
+            <span><i class="airwall"></i>空气墙</span>
             <span id="playMapUnitSummary" class="lfPlayUnitSummary"></span>
           </div>
         </div>

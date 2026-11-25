@@ -60,10 +60,13 @@ export function BuildEncounterMap(scene, options = {}) {
   const mapMaxZ = options.mapMaxZ ?? options.variantSpec?.mapMaxZ ?? (hasGengjiazhuang ? ENCOUNTER_MAP_MAX_Z : (scene.bounds?.maxZ ?? ENCOUNTER_MAP_MAX_Z));
   const southWaysZ = hasGengjiazhuang ? GENGJIAZHUANG_SOUTH_Z : FRONT_SHARED_SPLIT_Z - 5;
 
+  const IsAirWall = (object) => object.tag === "airWall" || object.material === "Whitebox/AirWall" || /空气墙/.test(object.group || "");
   const objects = scene.objects.filter((object) => object.pos && object.pos[2] < mapMaxZ
-    && object.layer !== "backdrop" && !/空气墙|^远景/.test(object.group || ""));
+    && object.layer !== "backdrop" && !IsAirWall(object) && !/^远景/.test(object.group || ""));
+  const airWalls = scene.objects.filter((object) => object.pos && object.pos[2] < mapMaxZ
+    && object.layer !== "backdrop" && IsAirWall(object));
   const farObjects = scene.objects.filter((object) => object.pos && !objects.includes(object)
-    && !String(object.group || "").includes("空气墙")).map((object) => {
+    && !IsAirWall(object)).map((object) => {
     if (object.size) return object;
     const params = object.params || {}, height = params.h || 1;
     const tree = object.asset === "Backdrop/Tree";
@@ -155,7 +158,7 @@ export function BuildEncounterMap(scene, options = {}) {
     .filter((r) => Array.isArray(r.points) && r.points.length >= 2)
     .map((r) => structuredClone(r));
   return {
-    bounds: [-160, 320, -480, mapMaxZ], objects, farObjects, roads, railways, trenches, labels, floors, ramps,
+    bounds: [-160, 320, -480, mapMaxZ], objects, airWalls, farObjects, roads, railways, trenches, labels, floors, ramps,
     planningPockets: scene.surface?.pockets || FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => (paint.poly || paint.line)?.some((point) => (point.z ?? point[1]) < mapMaxZ)),
     fields: hasGengjiazhuang ? [...FrontPaperFields(), ...village.L0610_FIELDS] : [...FrontPaperFields(), ...MergedPaperFields(mapMaxZ)],
@@ -190,11 +193,16 @@ export function BuildEncounterMap(scene, options = {}) {
     ].map((line) => line.map(Point)),
     smokeColumns: (scene.smokeColumns || []).filter((column) => column.z < mapMaxZ),
     playCorridor: hasGengjiazhuang ? null : [
-      [62, 355], [62, 435], [46, 466], [22, 496], [16, 610], [16, 706], [-60, 728], [-62, 764],
-      [-86, 782], [-106, 794], [-106, 822], [-82.2, 825], [-82.2, 874], [-102, 876], [-102, 916],
-      [-86, 956], [-78, 968], [-38, 968], [-40, 910], [-42, 876], [-77.8, 874], [-77.8, 828],
-      [-54, 828], [-4, 818], [68, 800], [132, 774], [194, 748], [230, 704], [233, 635], [235, 560],
-      [234, 492], [198, 468], [152, 435], [152, 355],
+      [82, 355], [82, 466], [80, 488], [100.2, 496], [100.2, 514.2], [83.5, 514.2], [83.5, 521.3],
+      [74, 521.3], [74, 531.5], [78.5, 531.5], [78.5, 563.5], [99.5, 563.5], [99.5, 579.5], [139, 579.5],
+      [142.5, 583], [152.5, 602.5], [158, 615.5], [158, 631], [118, 631], [118, 695], [116.5, 697.5],
+      [82.5, 697.5], [82.5, 759], [51, 759], [51, 785], [12, 795], [-44, 800], [-64, 808],
+      [-75.5, 815.5], [-82.2, 818.5], [-82.2, 874], [-99, 875.5], [-99, 895], [-76, 906], [-64, 955],
+      [-48, 955], [-58, 895], [-63, 876.5], [-77.8, 874], [-77.8, 828], [-55, 825.5], [-20, 816.5],
+      [20, 806.5], [62, 796], [103, 783], [119, 773], [125.5, 756], [125.5, 697], [177.5, 684.5],
+      [178.5, 638], [177.5, 600], [171, 586], [152, 567], [152, 555.5], [96, 555.5], [96, 545.5],
+      [87.5, 545.5], [87.5, 534.5], [93, 534.5], [93, 521.5], [113.5, 521.5], [113.5, 496],
+      [132, 488], [132, 471], [120, 466], [120, 355],
     ],
     river: hasGengjiazhuang ? village.L0610_RIVER.line.map(Point) : [],
     groves: hasGengjiazhuang ? village.L0610_GROVES : [],
