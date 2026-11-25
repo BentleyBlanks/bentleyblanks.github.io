@@ -88,14 +88,14 @@ export const MELEE_VARIANTS = Object.freeze({
 });
 export const MELEE_CLEAVE = Object.freeze({
   weapons: Object.freeze(["Dadao"]),
-  // 吃肉顿刀窗口：刀刃咬进躯干后在 windowS 秒内以 crawlN 极慢阻尼切入；满 minBiteS 秒后允许顺势甩鼠或再点左键触发「拖刃拉豁」。
-  windowS: 0.36, minBiteS: 0.065, crawlN: 0.065, exitS: 0.18,
-  // 触发拉豁：咬合中鼠标累计拉拽 ≥ ripStrokePx（或瞬时速度 ≥ ripSpeedPxPerS），或新按一次左键。
-  ripStrokePx: 42, ripSpeedPxPerS: 920,
+  // 吃肉顿刀窗口：刀刃咬进躯干后在 windowS 秒内以 crawlN 极慢阻尼切入；满 minBiteS 秒后允许顺势甩鼠、再点左键或按 F 触发「拖刃拉豁」。
+  windowS: 1.15, minBiteS: 0.055, crawlN: 0.11, exitS: 0.22,
+  // 触发拉豁：咬合中鼠标累计拉拽 ≥ ripStrokePx（或瞬时速度 ≥ ripSpeedPxPerS），或新按一次左键／F。
+  ripStrokePx: 26, ripSpeedPxPerS: 560,
   // 拉豁爆发：刀身高速撕出伤口，追加创伤与失衡，并沿刀刃扫掠切向把对手扯飞。
-  ripS: 0.24, ripDamage: 48, ripPoise: 65, wrenchSideM: 0.62, wrenchBackM: 0.28,
+  ripS: 0.34, ripDamage: 48, ripPoise: 65, wrenchSideM: 0.62, wrenchBackM: 0.28,
   // 世界空间咬合锚点（锁住刀口与躯干，直到拉豁或自然滑出）。
-  anchorShoulderM: 1.32, anchorTorsoM: 1.08, anchorSideM: 0.12, lockBlend: 0.78,
+  anchorShoulderM: 1.10, anchorTorsoM: 0.94, anchorSideM: 0.12, lockBlend: 0.82,
 });
 export const MELEE_SLIDE = Object.freeze({
   weapons: Object.freeze(["Dadao"]),
@@ -116,10 +116,10 @@ export const MELEE_CRUSH = Object.freeze({
   guardFacingDot: 0.82, maxPoise: 100, regenDelayS: 1.8, regenPerS: 16,
   // 每刀削减护枪架势：轻砍／普通拖刀 38（三刀必破），重劈／下劈 62（两重劈或一轻一重必破）。
   lightDrain: 38, heavyDrain: 62, chipDamage: 6,
-  // 硬磕反弹：刀身短促弹回（期间可立即衔接下一刀连砸），对手被震退。
-  bounceS: 0.20, enemyBraceS: 0.28, lightRepelM: 0.24, heavyRepelM: 0.38,
+  // 硬磕反弹：三拍完整呈现「咬铁相持 → 受力弹回 → 沉腕回架」，对手平滑滑退吃震而非瞬移闪烁。
+  bounceS: 0.44, enemyBraceS: 0.62, lightRepelM: 0.26, heavyRepelM: 0.40,
   // 架势清零震断破防：对手门户大开 crushedS 秒，可按 F 抢步处决或任意一刀重创斩杀。
-  crushRecoveryS: 0.12, crushedS: 1.95, crushRepelM: 0.50,
+  crushRecoveryS: 0.34, crushedS: 2.40, crushRepelM: 0.52,
   finishReachM: 2.25, finishDamage: 125, finishWindupScale: 0.5,
 });
 export const MELEE_FEEL = Object.freeze({
@@ -128,8 +128,8 @@ export const MELEE_FEEL = Object.freeze({
   clashKickPitchRad: -0.028, clashKickRollRad: 0.048, clashFovPunch: 0.72,
   fleshKickPitchRad: 0.034, fleshKickRollRad: 0.044, fleshFovPunch: 0.92,
   ripKickPitchRad: 0.046, ripKickRollRad: 0.068, ripFovPunch: 1.15,
-  hitstopBlockS: 0.055, hitstopSlideS: 0.045, hitstopFleshS: 0.075,
-  hitstopRipS: 0.095, hitstopCrushS: 0.105, hitstopScale: 0.08,
+  hitstopBlockS: 0.085, hitstopSlideS: 0.055, hitstopFleshS: 0.085,
+  hitstopRipS: 0.105, hitstopCrushS: 0.135, hitstopScale: 0.08,
 });
 export const MELEE_LODGE = Object.freeze({
   weapons: Object.freeze(["Dadao"]),

@@ -218,7 +218,10 @@ function BeforeMeleeStep() {
     ctx.meleeCombat.BeginScriptedGround(ctx.player, pendingGround, { reason: "labScripted" }); pendingGround = null;
   }
   ctx.meleeCombat.AddLook(input?.lookX || 0, input?.lookY || 0);
-  if (input && ctx.meleeCombat.CapturesLook) { input.lookX *= meleeViewFollow; input.lookY *= meleeViewFollow; }
+  if (input && ctx.meleeCombat.CapturesLook) {
+    const scale = ctx.meleeCombat.LookFollowScale ?? meleeViewFollow;
+    input.lookX *= scale; input.lookY *= scale;
+  }
 }
 
 function IsPanelActive() {

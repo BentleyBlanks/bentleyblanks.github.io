@@ -939,7 +939,7 @@ export class XBotSkin {
       strength: THREE.MathUtils.clamp(strength, 0.35, 2.2),
       kind,
       t: 0,
-      dur: kind === "crush" ? 0.44 : kind === "rip" ? 0.38 : 0.28,
+      dur: kind === "crush" ? 0.56 : kind === "rip" ? 0.48 : kind === "block" ? 0.46 : 0.32,
     };
   }
 

@@ -499,7 +499,9 @@ Test('cleave: a cut into flesh bites with drag; mouse pull or fresh click rips t
   assert.equal(b.e.health,140-52-48);
   const passive=Make('Dadao',LodgeAt); passive.c.SetVariant({impact:'cleave'});
   passive.c.Attack(passive.p); StepUntil(passive.c,()=>passive.c.Fighter(passive.p).state==='cleave',1);
-  Step(passive.c,.6); assert.equal(passive.c.Fighter(passive.p).state,'idle','exits cleanly without rip input');
+  // 0.55 s 后拉豁窗口仍保持打开，方便玩家从容观察并拖刃发力
+  Step(passive.c,.55); assert.equal(passive.c.Fighter(passive.p).state,'cleave','cleave window stays open comfortably past 0.55s');
+  Step(passive.c,.8); assert.equal(passive.c.Fighter(passive.p).state,'idle','exits cleanly without rip input');
   assert.equal(passive.c.stats.rips,0);
 });
 Test('slide: parrying or clashing into a bayonet locks onto the barrel; W grinds sparks forward and LMB cleaves',()=>{
@@ -530,13 +532,16 @@ Test('crush: frontal cuts clash off the rifle guard until guard poise shatters f
   c.Attack(p,false); StepUntil(c,()=>c.stats.guardBlocks===1,1);
   assert.equal(e.health,100,'frontal rifle block prevents flesh damage');
   assert(c.State().enemyGuard.guardPoise<100,'guard poise drops on block');
-  assert(Distance0(p,e)>1.5,'heavy iron chop drives the blocker backward');
+  assert.equal(c.Fighter(e).state,'guardBrace','blocker enters smooth guardBrace instead of teleporting');
+  assert.equal(c.State().player.action,'Light','guardBounce keeps swing clip instead of flashing to Obstructed');
+  Step(c,.38);
+  assert(Distance0(p,e)>1.5,'heavy iron chop smoothly slides the blocker backward');
   // 贴近一记重劈直接震断剩余护枪架势
-  e.position.z=-1.35; StepUntil(c,()=>c.Fighter(p).state==='idle',.5);
+  e.position.z=-1.35; StepUntil(c,()=>c.Fighter(p).state==='idle',.8);
   c.Attack(p,true); StepUntil(c,()=>c.stats.guardCrushes===1,1);
   assert.equal(c.Fighter(e).state,'crushed','guard shatters into crushed state');
   assert.equal(c.PromptView()?.key,'F');
-  StepUntil(c,()=>c.Fighter(p).state==='idle',.4);
+  StepUntil(c,()=>c.Fighter(p).state==='idle',.6);
   assert.equal(c.FinishCandidate(),e);
   assert(c.HandleInput('KeyF',true)); c.HandleInput('KeyF',false);
   StepUntil(c,()=>!e.alive,1.5); assert(!e.alive,'F executes the guard-crushed opponent');
@@ -554,7 +559,7 @@ Test('pofeng + drag combine all three signature interactions seamlessly',()=>{
   c.HandleInput('Mouse0',true); Drag(c,-45,6,3);
   StepUntil(c,()=>c.stats.guardBlocks===1,1);
   assert.equal(e.health,100);
-  StepUntil(c,()=>c.Fighter(p).state==='aim',.5);
+  StepUntil(c,()=>c.Fighter(p).state==='aim',.8);
   c.HandleInput('Mouse0',false); assert.equal(c.Fighter(p).state,'idle');
   // 2) 绕到侧翼甩刀 → 绕过护枪直接吃肉顿刀 → 再甩鼠标拖刃拉豁斩杀
   p.position.x=1.25; p.position.z=e.position.z; p.yaw=Math.PI/2;

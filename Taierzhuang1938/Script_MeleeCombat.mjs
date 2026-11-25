@@ -76,6 +76,12 @@ export class MeleeCombatDirector {
     return (this.Drag && this.held.has("Mouse0") && (f?.state === "aim" || (f?.state === "attack" && !!f.attack?.drag)))
       || f?.state === "cleave";
   }
+  /** 拖拽与拉豁时的视角跟随倍率：吃肉顿刀咬合期稳住镜头（0.12），让鼠标几乎全用来拉刀。 */
+  get LookFollowScale() {
+    const f = this.fighters.get(this.Player());
+    if (f?.state === "cleave") return 0.12;
+    return this.viewFollow;
+  }
   /** 拖拽时视角跟鼠标的比例（0 = 视角不动、只动刀，1 = 视角照常全跟）。 */
   SetViewFollow(value) { this.viewFollow = Clamp(Number.isFinite(+value) ? +value : D.viewFollow, 0, 1); return this.viewFollow; }
   /** 每帧喂一次鼠标位移（像素，lookY 向下为正）：拖拽挥砍拿它带刀、出刀。 */
@@ -364,7 +370,8 @@ export class MeleeCombatDirector {
   }
   UpdateCleaveAnchor(cleave, e, target) {
     const yaw = e.yaw || 0, side = -Math.sign(cleave.sweep || -1) * C.anchorSideM;
-    cleave.anchor = {
+    const live = this.host.BodyAnchor?.(target, { yaw, side, reverse: !!cleave.reverse });
+    cleave.anchor = live || {
       x: target.position.x + Math.cos(yaw) * side,
       y: (target.position.y || 0) + (cleave.reverse ? C.anchorTorsoM : C.anchorShoulderM),
       z: target.position.z - Math.sin(yaw) * side,
@@ -511,7 +518,7 @@ export class MeleeCombatDirector {
   CrushBlockEligible(e, f, target, tf) {
     return this.HasCrush && e === this.Player() && K.weapons.includes(f.weapon)
       && tf?.weapon === "Bayonet" && !f.attack?.finisher
-      && ["idle", "charge"].includes(tf.state) && tf.guardPoise > 0
+      && ["idle", "charge", "guardBrace"].includes(tf.state) && tf.guardPoise > 0
       && Facing(target, e) >= K.guardFacingDot;
   }
   ApplyGuardHit(f, target, tf) {
@@ -522,30 +529,63 @@ export class MeleeCombatDirector {
     const d = Distance(e, target) || 1;
     const point = {
       x: target.position.x + (e.position.x - target.position.x) / d * 0.42,
-      y: (target.position.y || 0) + 1.26,
+      y: (target.position.y || 0) + 1.12,
       z: target.position.z + (e.position.z - target.position.z) / d * 0.42,
     };
     const sweep = a.sweep || -1;
+    const stroke = this.StrokeOf(f);
+    const bounce = {
+      clip: f.clip || (heavy ? "Heavy" : "Light"),
+      n0: Clamp(this.AttackTime(f), 0.32, 0.56),
+      ...stroke,
+      sweep, heavy, crush: tf.guardPoise <= 0, anchor: point, serial: ++this.serial,
+    };
     if (tf.guardPoise <= 0) {
-      this.Repel(target, e, K.crushRepelM);
-      tf.poise = 0; tf.crushedBy = e;
+      this.Repel(target, e, K.crushRepelM * 0.45);
+      tf.poise = 0; tf.crushedBy = e; tf.guardBrace = null;
       this.SetState(tf, "crushed", K.crushedS, "Pushed");
       tf.crushYaw = Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z);
       tf.crushSide = sweep >= 0 ? 1 : -1;
       tf.nextThink = Math.max(tf.nextThink, this.time + K.crushedS);
-      this.SetState(f, "guardBounce", K.crushRecoveryS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+      this.SetState(f, "guardBounce", K.crushRecoveryS, bounce.clip);
+      f.bounceDrag = !!a.drag; f.bounceSweep = sweep; f.bounce = bounce;
       this.TriggerHitstop(F.hitstopCrushS);
       this.stats.guardCrushes++;
       this.Log("guardCrush", e, target, { point, sweep });
       return;
     }
-    this.Repel(target, e, heavy ? K.heavyRepelM : K.lightRepelM);
-    this.SetState(tf, "stagger", K.enemyBraceS, "Deflected");
+    // 碰撞瞬间仅做短促初震，其余后退在 guardBrace 里阻尼滑退，杜绝“瞬移闪烁”。
+    const totalRepel = heavy ? K.heavyRepelM : K.lightRepelM;
+    this.Repel(target, e, totalRepel * 0.30);
+    tf.guardBrace = {
+      by: e, remainM: totalRepel * 0.70, slideS: 0.36, heavy,
+      baseYaw: Math.atan2(target.position.x - e.position.x, target.position.z - e.position.z),
+      side: sweep >= 0 ? 1 : -1,
+    };
+    this.SetState(tf, "guardBrace", K.enemyBraceS, "Deflected");
     tf.nextThink = Math.max(tf.nextThink, this.time + K.enemyBraceS + 0.14);
-    this.SetState(f, "guardBounce", K.bounceS, "Obstructed"); f.bounceDrag = !!a.drag; f.bounceSweep = sweep;
+    this.SetState(f, "guardBounce", K.bounceS, bounce.clip);
+    f.bounceDrag = !!a.drag; f.bounceSweep = sweep; f.bounce = bounce;
     this.TriggerHitstop(F.hitstopBlockS);
     this.stats.guardBlocks++;
     this.Log("guardBlock", e, target, { point, guardPoise: tf.guardPoise, heavy, sweep });
+  }
+  StepGuardBrace(f, dt) {
+    const e = f.entity, b = f.guardBrace;
+    if (b && b.by && Alive(b.by) && f.t < b.slideS) {
+      const k = 1 - f.t / b.slideS;
+      const d = Distance(e, b.by) || 1;
+      const ax = (e.position.x - b.by.position.x) / d, az = (e.position.z - b.by.position.z) / d;
+      const step = (b.remainM * 2 * k / b.slideS) * dt;
+      this.Move(e, ax * step, az * step);
+    }
+    if (b) {
+      const u = Clamp(f.t / Math.max(f.duration, 1e-3), 0, 1);
+      // 前半段吃力侧身硬顶，后半段回正身位稳住枪口。
+      const sway = Math.sin(u * Math.PI) * (b.heavy ? 0.24 : 0.16) * b.side;
+      e.yaw = b.baseYaw + sway;
+    }
+    if (f.t >= f.duration) { f.guardBrace = null; this.SetState(f, "idle"); }
   }
   StepCrushed(f, dt) {
     const e = f.entity, by = f.crushedBy, k = Math.sqrt(Math.max(0, 1 - f.t / f.duration));
@@ -884,7 +924,7 @@ export class MeleeCombatDirector {
     const p=this.Player();
     return this.Opponents(p).find(e=>e!==partner && this.Weapon(e) && !e.meleeTraining?.passive
       && Distance(e,p)<=W[this.Weapon(e)].light.reach+.55 && this.Visible(e,p) && !this.BodyBlocker(e,p)
-      && !['stagger','fall','down','rise','qte','lodged','reel','cleaved','sliding','crushed'].includes(this.Fighter(e).state));
+      && !['stagger','fall','down','rise','qte','lodged','reel','cleaved','sliding','guardBrace','crushed'].includes(this.Fighter(e).state));
   }
   EscapeQte(threat) {
     const a=this.qte.active;if(!a)return;
@@ -924,11 +964,11 @@ export class MeleeCombatDirector {
       if (code === "KeyF" && pf.lodge) pf.lodge.held = !!down;
       return !["Escape", "Backquote", "AltLeft", "AltRight"].includes(code);
     }
-    // 吃肉顿刀：再按左键（或甩鼠标）触发拖刃拉豁。
+    // 吃肉顿刀：再按左键／F 或甩鼠标触发拖刃拉豁。
     if (pf?.state === "cleave" || pf?.state === "rip") {
       const wasHeld = this.held.has(code);
       if (down) this.held.add(code); else this.held.delete(code);
-      if (pf.state === "cleave" && code === "Mouse0" && down && !repeat && !wasHeld && pf.cleave) {
+      if (pf.state === "cleave" && (code === "Mouse0" || code === "KeyF") && down && !repeat && !wasHeld && pf.cleave) {
         pf.cleave.wantRip = true;
         if (pf.t >= C.minBiteS) this.Rip(pf);
       }
@@ -969,7 +1009,7 @@ export class MeleeCombatDirector {
     if (!target || !spec) return;
     const tf = this.Fighter(target), d = Distance(e, target);
     const yaw = Math.atan2(e.position.x - target.position.x, e.position.z - target.position.z);
-    if ((f.state !== "attack" || !f.attack.locked) && !["lodged", "reel", "cleaved", "sliding", "crushed"].includes(f.state)) {
+    if ((f.state !== "attack" || !f.attack.locked) && !["lodged", "reel", "cleaved", "sliding", "guardBrace", "crushed"].includes(f.state)) {
       e.yaw = (e.yaw || 0) + Clamp(Wrap(yaw - (e.yaw || 0)), -R.npcTurnRate * dt, R.npcTurnRate * dt);
     }
     if (f.state !== "idle") return;
@@ -1126,11 +1166,12 @@ export class MeleeCombatDirector {
     }
     if (f.state === "guardBounce") {
       if (f.t >= f.duration) {
-        const wasDrag = !!f.bounceDrag; f.bounceDrag = false; this.SetState(f, "idle");
+        const wasDrag = !!f.bounceDrag; f.bounceDrag = false; f.bounce = null; this.SetState(f, "idle");
         if (wasDrag && e === this.Player() && this.Drag && this.held.has("Mouse0") && !f.buffer) this.BeginAim(f, true);
       }
       return;
     }
+    if (f.state === "guardBrace") { this.StepGuardBrace(f, dt); return; }
     if (f.state === "crushed") { this.StepCrushed(f, dt); return; }
     if (f.state === "aim") { this.StepAim(f, dt); return; }
     if(f.state==='contact' && f.t>=f.duration) {
@@ -1456,8 +1497,42 @@ export class MeleeCombatDirector {
       const pf = this.fighters.get(this.Player()), p = pf?.slide?.progress ?? 0;
       Object.assign(result, { clip: `${f.weapon}Deflected`, action: "Deflected", animationNormalized: 0.16 + p * 0.52 + Math.sin(this.time * 38) * 0.015 });
     } else if (f.state === "guardBounce" && f.entity === this.Player()) {
+      // 三拍连续硬接动作（保留原挥砍片段与滚转/镜像，零硬切不闪烁）：
+      // 0–0.28 咬铁相持震颤 → 0.28–0.72 沿原刀轨受力弹回（破防则顺势压开）→ 0.72–1.0 沉腕回架势。
       const u = Clamp(f.t / Math.max(f.duration, 1e-3), 0, 1);
-      Object.assign(result, { clip: `${f.weapon}Obstructed`, action: "Obstructed", animationNormalized: u * 0.72, swingRoll: (f.bounceSweep || -1) * 0.18 * (1 - u) });
+      const b = f.bounce;
+      const clip = b?.clip || "Light";
+      const n0 = b?.n0 ?? 0.42;
+      let n;
+      if (b?.crush) {
+        if (u < 0.24) n = n0 + 0.03 * Smooth(u / 0.24);
+        else if (u < 0.72) n = n0 + 0.03 + 0.32 * Smooth((u - 0.24) / 0.48);
+        else n = (n0 + 0.35) * (1 - Smooth((u - 0.72) / 0.28));
+      } else {
+        const nBack = Math.max(0.06, n0 - (b?.heavy ? 0.30 : 0.24));
+        if (u < 0.28) n = n0 + 0.015 * Math.sin((u / 0.28) * Math.PI);
+        else if (u < 0.72) n = n0 + (nBack - n0) * Smooth((u - 0.28) / 0.44);
+        else n = nBack * (1 - Smooth((u - 0.72) / 0.28));
+      }
+      const w0 = b?.split ? this.RollWeight(n0, ...b.split) : 0;
+      const unroll = u <= 0.62 ? 0 : Smooth((u - 0.62) / 0.38);
+      const unmirror = u <= 0.74 ? 0 : Smooth((u - 0.74) / 0.26);
+      const bounceRoll = (b?.crush ? -0.18 : 0.22) * (b?.sweep || -1) * Math.sin(Math.PI * Clamp((u - 0.22) / 0.65, 0, 1));
+      Object.assign(result, {
+        clip: `${f.weapon}${clip}`, action: clip, animationNormalized: Clamp(n, 0, 1),
+        strokeSplit: b?.split || null, strokeReverse: !!b?.reverse,
+        swingRoll: (b?.roll || 0) * w0 * (1 - unroll) + bounceRoll,
+        swingMirror: b?.mirror ? w0 * (1 - unmirror) : 0,
+        weaponYawOffset: 0,
+        guardBounce: { u, heavy: !!b?.heavy, crush: !!b?.crush, sweep: b?.sweep || -1 },
+      });
+    } else if (f.state === "guardBrace") {
+      // 对手横枪吃震：前半段稳稳架住受震（慢速吃力压低 + 高频微颤），后半段顺势拉回端枪戒备。
+      const u = Clamp(f.t / Math.max(f.duration, 1e-3), 0, 1);
+      const n = u < 0.45
+        ? 0.22 + 0.30 * Smooth(u / 0.45) + Math.sin(this.time * 52) * 0.015 * (1 - u)
+        : 0.52 + 0.40 * Smooth((u - 0.45) / 0.55);
+      Object.assign(result, { clip: `${f.weapon}Deflected`, action: "Deflected", animationNormalized: Clamp(n, 0, 1) });
     } else if (f.state === "crushed") {
       const cycle = f.t / 0.72, index = Math.floor(cycle), u = cycle - index;
       const action = index % 2 ? "Hit" : "Pushed";
@@ -1536,7 +1611,7 @@ export class MeleeCombatDirector {
       this.SetState(f, "idle"); f.buffer = null; f.groundHoldS = null;
       f.lodge = null; f.lodgedBy = null; f.reelBy = null;
       f.cleave = null; f.cleavedBy = null; f.slide = null; f.slideBy = null;
-      f.crushedBy = null; f.guardPoise = K.maxPoise;
+      f.crushedBy = null; f.guardBrace = null; f.bounce = null; f.guardPoise = K.maxPoise;
       f.entity.meleeCombat = null;
     }
     this.Log("cancel", null, null, { reason });

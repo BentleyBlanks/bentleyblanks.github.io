@@ -4851,17 +4851,22 @@ export class Viewmodel {
     this.actionPivot.scale.x = pose.swingMirror ? Math.cos(Math.PI * pose.swingMirror) : 1;
     // 拖拽挥砍的架势：整副手臂连刀跟着鼠标偏出去（相机空间，米）。
     if (pose.aimOffset) { this.actionPivot.position.x += pose.aimOffset.x; this.actionPivot.position.y += pose.aimOffset.y; }
-    // 吃肉顿刀／拖刃拉豁：咬合段刀身往伤口里吃紧，拉豁瞬间顺着切向猛甩出去。
+    // 吃肉顿刀／拖刃拉豁：咬合段刀身往伤口里吃紧并随拖拽进度绷紧拉扯，拉豁瞬间顺着切向大弧度撕出。
     if (pose.cleave) {
-      const { bite = 0, rip = 0, sweep = -1 } = pose.cleave;
+      const { progress = 0, bite = 0, rip = 0, sweep = -1 } = pose.cleave;
       const sg = Math.sign(sweep || -1) || -1;
       if (rip > 0) {
         const burst = Math.sin(Math.PI * rip);
-        this.actionPivot.position.x += sg * burst * 0.024;
-        this.actionPivot.position.y -= burst * 0.018;
-        this.actionPivot.position.z -= burst * 0.016;
+        this.actionPivot.position.x += sg * burst * 0.082;
+        this.actionPivot.position.y -= burst * 0.042;
+        this.actionPivot.position.z -= burst * 0.022 - Math.sin(rip * Math.PI * 0.5) * 0.045;
+        this.actionPivot.rotateZ(-sg * burst * 0.24);
       } else {
-        this.actionPivot.position.z -= 0.028 * (1 - bite * 0.35);
+        const tug = progress * 0.032;
+        const buzz = 0.0018 + progress * 0.0032;
+        this.actionPivot.position.x += sg * tug + Math.sin(this.elapsed * 58) * buzz;
+        this.actionPivot.position.y -= progress * 0.014 + Math.cos(this.elapsed * 71) * buzz;
+        this.actionPivot.position.z -= 0.032 * (1 - bite * 0.25);
       }
     }
     // 磕枪顺刃：沿对方三八式枪管前压时，双手压刀往前顶住铁管并带高频摩擦震颤。
@@ -4877,11 +4882,28 @@ export class Viewmodel {
         this.actionPivot.position.z -= progress * 0.048;
       }
     }
-    // 横枪硬接反弹：砍在铁管木托上短促弹震。
-    if (pose.state === "guardBounce") {
-      const rebound = Math.sin(Math.PI * Math.min(1, pose.normalized || 0));
-      this.actionPivot.position.z += rebound * 0.048;
-      this.actionPivot.position.y += rebound * 0.022 + Math.sin(this.elapsed * 67) * 0.003 * (1 - (pose.normalized || 0));
+    // 横枪硬接三拍反弹：0–0.28 咬铁相持高频震颤 → 0.28–0.72 清晰后上弹开拉弧 → 0.72–1.0 沉腕回稳。
+    if (pose.guardBounce) {
+      const { u = 0, heavy = false, crush = false, sweep = -1 } = pose.guardBounce;
+      const sg = Math.sign(sweep || -1) || -1;
+      const k = heavy ? 1.25 : 1;
+      if (u < 0.28) {
+        const vib = (1 - u / 0.28) * 0.0045 * k;
+        this.actionPivot.position.x += Math.sin(this.elapsed * 97) * vib;
+        this.actionPivot.position.y += Math.cos(this.elapsed * 113) * vib;
+        this.actionPivot.position.z -= 0.024 * k;
+      } else {
+        const arc = Math.sin(Math.PI * Math.min(1, (u - 0.28) / 0.72));
+        if (crush) {
+          this.actionPivot.position.x += sg * arc * 0.062;
+          this.actionPivot.position.y -= arc * 0.028;
+          this.actionPivot.position.z -= arc * 0.022;
+        } else {
+          this.actionPivot.position.x -= sg * arc * 0.055 * k;
+          this.actionPivot.position.y += arc * 0.044 * k;
+          this.actionPivot.position.z += arc * 0.078 * k;
+        }
+      }
     }
     // 卡刀（及吃肉锁点、顺杆锁点共用世界锚点）：把锁定请求延迟到 _ApplyMeleeVideo 之后执行。
     if (pose.lodge) {

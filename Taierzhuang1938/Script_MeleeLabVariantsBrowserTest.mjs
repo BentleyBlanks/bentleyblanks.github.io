@@ -215,7 +215,10 @@ try {
   assert.equal(s.enemy.state, "cleaved", "enemy torso is coupled to the biting blade");
   assert.equal(s.prompt?.key, "拉豁", "crimson rip-through prompt ring shown");
   await Step(4); await Shot("09_CleaveBite");
-  await Flick(-32, 14, 2);
+  // 验证加宽后的拖刃拉豁窗口：等待 0.45 s 后仍处于咬合态且可轻甩触发拉豁
+  await Step(27);
+  assert.equal((await State()).player.state, "cleave", "cleave window stays generously open for comfortable rip");
+  await Flick(-20, 10, 2);
   for (let i = 0; i < 20 && (await State()).enemy.alive; i++) await Step(1);
   s = await State();
   assert.equal(s.stats.rips, 1, "mouse pull rips the blade through");
@@ -261,7 +264,7 @@ try {
   assert.equal(s.enemy.health, 100, "rifle guard absorbs flesh damage");
   assert(s.enemyGuard?.guardPoise < 100, "guard poise reduced");
   await Shot("13_GuardClashSparks");
-  for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
+  for (let i = 0; i < 45 && (await State()).player.state !== "idle"; i++) await Step(1);
   // 贴近重劈震断护枪架势 → F 抢步处决
   await page.evaluate(() => {
     const T = Taierzhuang, enemy = T.Debug.MeleeCombat.State().targets.find((t) => t.side === "ija");
@@ -289,7 +292,7 @@ try {
   await page.mouse.down(); await Flick(-42, 8, 3); await page.mouse.up();
   for (let i = 0; i < 40 && (await State()).stats.guardBlocks < 1; i++) await Step(1);
   assert.equal((await State()).stats.guardBlocks, 1, "pofeng blocks frontal drag cut");
-  for (let i = 0; i < 30 && (await State()).player.state !== "idle"; i++) await Step(1);
+  for (let i = 0; i < 45 && (await State()).player.state !== "idle"; i++) await Step(1);
   // 侧翼绕防直接吃肉顿刀 → 甩鼠拉豁
   await page.evaluate(() => {
     const T = Taierzhuang, enemy = T.Debug.MeleeCombat.State().targets.find((t) => t.side === "ija");
