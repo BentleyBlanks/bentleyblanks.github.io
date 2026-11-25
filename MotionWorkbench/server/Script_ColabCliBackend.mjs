@@ -13,6 +13,26 @@ const DEFAULT_COLAB_CLI = path.join(os.homedir(), ".local", "bin", "colab.exe");
 const idleStopTimers = new Map();
 const activeSessionNames = new Set();
 
+const RETRY_503_MAX_ATTEMPTS = 3;
+const RETRY_503_WAIT_MS = 5 * 60 * 1000;
+
+function isColab503Error(text) {
+  return /Service Unavailable|503|Allocation refused|412|no quota|rejected accelerator|机房暂满/i.test(String(text || ""));
+}
+
+async function waitBefore503Retry({ attempt, maxAttempts = RETRY_503_MAX_ATTEMPTS, waitMs = RETRY_503_WAIT_MS, onTick }) {
+  const deadline = Date.now() + waitMs;
+  while (true) {
+    const remMs = Math.max(0, deadline - Date.now());
+    const remSec = Math.ceil(remMs / 1000);
+    const mm = String(Math.floor(remSec / 60)).padStart(2, "0");
+    const ss = String(remSec % 60).padStart(2, "0");
+    onTick?.(`遇到 Colab 503 满载，将于 ${mm}:${ss} 后进行第 ${attempt + 1}/${maxAttempts} 次自动重试…`);
+    if (remMs <= 0) break;
+    await new Promise((r) => setTimeout(r, Math.min(30_000, remMs)));
+  }
+}
+
 function resolveColabExe(config) {
   const candidates = [config?.colabCliPath, DEFAULT_COLAB_CLI].filter(Boolean);
   for (const c of candidates) {
@@ -373,38 +393,52 @@ export async function runColabMocapJob({
   } else {
     let allocated = false;
     let lastAllocErr = "";
-    for (let i = 0; i < gpuChain.length; i++) {
-      const tryGpu = gpuChain[i];
-      const trySession = `mw_${tryGpu.toLowerCase()}`;
-      clearIdleStopTimer(trySession);
-      onProgress?.(8 + i * 2, `申请 Colab ${tryGpu} GPU`);
-      onLog?.(`[Colab CLI] colab new --gpu ${tryGpu} -s ${trySession}`);
-      const newArgs = ["new", "--gpu", tryGpu, "-s", trySession];
-      if (tryGpu === "A100") newArgs.push("--high-mem");
-      try {
-        await runColabCmd(exe, newArgs, {
-          timeoutMs: 150000,
-          envExtra: { COLAB_CLI_ASSIGN_RETRIES: "1", COLAB_CLI_RETRY_BACKOFF: "5" },
-        });
-        activeGpu = tryGpu;
-        sessionName = trySession;
-        activeSessionNames.add(sessionName);
-        onLog?.(`[Colab CLI] 已分配 ${tryGpu} GPU 运行时 (${trySession})`);
-        allocated = true;
-        break;
-      } catch (err) {
-        const cleanErr = String(err?.message || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-        const is503 = /Service Unavailable|503|Allocation refused|412|no quota|rejected accelerator|超时/i.test(cleanErr);
-        const errTail = cleanErr.split(/\r?\n/).filter((l) => l.trim() && !/^[┌┐└┘│─\s]+$/.test(l)).slice(-2).join(" ");
-        lastAllocErr = errTail || cleanErr.slice(0, 180);
-        onLog?.(`[Colab CLI] ${tryGpu} 暂不可用 (${is503 ? "机房暂满/503" : "分配失败"}): ${lastAllocErr.slice(0, 160)}`);
-        if (i + 1 < gpuChain.length) {
-          onLog?.(`[Colab CLI] 自动切换备选 GPU → ${gpuChain[i + 1]}…`);
+    for (let attempt = 1; attempt <= RETRY_503_MAX_ATTEMPTS && !allocated; attempt++) {
+      let saw503 = false;
+      for (let i = 0; i < gpuChain.length; i++) {
+        const tryGpu = gpuChain[i];
+        const trySession = `mw_${tryGpu.toLowerCase()}`;
+        clearIdleStopTimer(trySession);
+        onProgress?.(8 + i * 2, `申请 Colab ${tryGpu} GPU${attempt > 1 ? `（第 ${attempt}/${RETRY_503_MAX_ATTEMPTS} 次）` : ""}`);
+        onLog?.(`[Colab CLI] colab new --gpu ${tryGpu} -s ${trySession}${attempt > 1 ? ` [尝试 ${attempt}/${RETRY_503_MAX_ATTEMPTS}]` : ""}`);
+        const newArgs = ["new", "--gpu", tryGpu, "-s", trySession];
+        if (tryGpu === "A100") newArgs.push("--high-mem");
+        try {
+          await runColabCmd(exe, newArgs, {
+            timeoutMs: 150000,
+            envExtra: { COLAB_CLI_ASSIGN_RETRIES: "1", COLAB_CLI_RETRY_BACKOFF: "5" },
+          });
+          activeGpu = tryGpu;
+          sessionName = trySession;
+          activeSessionNames.add(sessionName);
+          onLog?.(`[Colab CLI] 已分配 ${tryGpu} GPU 运行时 (${trySession})`);
+          allocated = true;
+          break;
+        } catch (err) {
+          const cleanErr = String(err?.message || "").replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
+          const is503 = isColab503Error(cleanErr) || /超时/i.test(cleanErr);
+          if (is503) saw503 = true;
+          const errTail = cleanErr.split(/\r?\n/).filter((l) => l.trim() && !/^[┌┐└┘│─\s]+$/.test(l)).slice(-2).join(" ");
+          lastAllocErr = errTail || cleanErr.slice(0, 180);
+          onLog?.(`[Colab CLI] ${tryGpu} 暂不可用 (${is503 ? "机房暂满/503" : "分配失败"}): ${lastAllocErr.slice(0, 160)}`);
+          if (i + 1 < gpuChain.length) {
+            onLog?.(`[Colab CLI] 自动切换备选 GPU → ${gpuChain[i + 1]}…`);
+          }
         }
+      }
+      if (!allocated && saw503 && attempt < RETRY_503_MAX_ATTEMPTS) {
+        onLog?.(`[Colab CLI] 本轮 ${gpuChain.join("/")} 全部 503，等待 5 分钟后自动第 ${attempt + 1}/${RETRY_503_MAX_ATTEMPTS} 次重试…`);
+        await waitBefore503Retry({
+          attempt,
+          maxAttempts: RETRY_503_MAX_ATTEMPTS,
+          onTick: (msg) => onProgress?.(6, msg),
+        });
+      } else if (!allocated && !saw503) {
+        break;
       }
     }
     if (!allocated) {
-      throw new Error(`Google Colab 当前 ${gpuChain.join("/")} GPU 均暂不可用（机房 503 满载），请稍后重试。详情：${lastAllocErr.slice(0, 180)}`);
+      throw new Error(`Google Colab 当前 ${gpuChain.join("/")} GPU 均暂不可用（已尝试 ${RETRY_503_MAX_ATTEMPTS} 次、仍 503 满载），请稍后重试。详情：${lastAllocErr.slice(0, 180)}`);
     }
   }
 
@@ -609,29 +643,42 @@ async function _runColabMiniMaxH3JobInner({
   if (hasWarm) {
     onLog?.("[MiniMax-H3] 复用热机 Colab 96G G4 会话：mw_h3_g4");
   } else {
-    onProgress?.("申请 Colab 96G G4 GPU 运行时…");
-    onLog?.("[MiniMax-H3] colab new --gpu G4 -s mw_h3_g4");
-    try {
-      await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 240000 });
-      activeSessionNames.add(sessionName);
-    } catch (err) {
-      const raw = String(err?.message || "");
-      onLog?.(`[MiniMax-H3] 原始错误：${raw.slice(-600)}`);
-      if (/Service Unavailable|503/i.test(raw)) {
-        throw new Error("Google Colab 96G G4 分配接口返回 503 Service Unavailable（机房暂满或当前代理节点被限流），请稍后重试、切换代理节点，或改用 Seedance 引擎。");
+    let allocated = false;
+    for (let attempt = 1; attempt <= RETRY_503_MAX_ATTEMPTS && !allocated; attempt++) {
+      onProgress?.(`申请 Colab 96G G4 GPU 运行时${attempt > 1 ? `（第 ${attempt}/${RETRY_503_MAX_ATTEMPTS} 次）` : ""}…`);
+      onLog?.(`[MiniMax-H3] colab new --gpu G4 -s mw_h3_g4${attempt > 1 ? ` [尝试 ${attempt}/${RETRY_503_MAX_ATTEMPTS}]` : ""}`);
+      try {
+        await runColabCmd(exe, ["new", "--gpu", "G4", "-s", sessionName], { timeoutMs: 240000 });
+        activeSessionNames.add(sessionName);
+        allocated = true;
+      } catch (err) {
+        const raw = String(err?.message || "");
+        onLog?.(`[MiniMax-H3] 原始错误：${raw.slice(-600)}`);
+        if (isColab503Error(raw) && attempt < RETRY_503_MAX_ATTEMPTS) {
+          onLog?.(`[MiniMax-H3] G4 返回 503/满载，等待 5 分钟后自动第 ${attempt + 1}/${RETRY_503_MAX_ATTEMPTS} 次重试…`);
+          await waitBefore503Retry({
+            attempt,
+            maxAttempts: RETRY_503_MAX_ATTEMPTS,
+            onTick: (msg) => onProgress?.(msg),
+          });
+          continue;
+        }
+        if (/Service Unavailable|503/i.test(raw)) {
+          throw new Error(`Google Colab 96G G4 分配接口返回 503 Service Unavailable（已尝试 ${attempt} 次仍满载），请稍后重试、切换代理节点，或改用 Seedance 引擎。`);
+        }
+        if (/ProxyError|SSLEOFError|SSLError|RemoteDisconnected|UNEXPECTED_EOF/i.test(raw)) {
+          throw new Error("连接 Google Colab 时本机代理/SSL 断开（ProxyError / SSLEOFError），请检查或切换代理节点后重试。");
+        }
+        if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized/i.test(raw)) {
+          throw new Error("Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成授权后重试。");
+        }
+        const errLine = raw
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter((l) => l && !/^[┌┐└┘│─\s]+$/.test(l) && !/^\[colab\] Creating session/i.test(l))
+          .pop();
+        throw new Error(`申请 Colab 96G G4 失败：${(errLine || raw).slice(0, 220)}`);
       }
-      if (/ProxyError|SSLEOFError|SSLError|RemoteDisconnected|UNEXPECTED_EOF/i.test(raw)) {
-        throw new Error("连接 Google Colab 时本机代理/SSL 断开（ProxyError / SSLEOFError），请检查或切换代理节点后重试。");
-      }
-      if (/Enter the authorization code|accounts\.google\.com\/o\/oauth2|not authorized/i.test(raw)) {
-        throw new Error("Colab CLI 尚未完成 Google 授权，请点击「去登录 Colab」完成授权后重试。");
-      }
-      const errLine = raw
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter((l) => l && !/^[┌┐└┘│─\s]+$/.test(l) && !/^\[colab\] Creating session/i.test(l))
-        .pop();
-      throw new Error(`申请 Colab 96G G4 失败：${(errLine || raw).slice(0, 220)}`);
     }
   }
 
