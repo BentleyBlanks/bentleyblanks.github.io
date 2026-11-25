@@ -207,6 +207,7 @@ export function HeightGridSampler(terrain) {
     const ix = Math.min(cols - 1, Math.floor(gx)), iz = Math.min(rows - 1, Math.floor(gz));
     const u = gx - ix, v = gz - iz;
     const a = H(ix, iz), b = H(ix + 1, iz), c = H(ix, iz + 1), e = H(ix + 1, iz + 1);
+    if (Math.abs(a - e) < Math.abs(b - c)) return u >= v ? a + (b - a) * u + (e - b) * v : a + (e - c) * u + (c - a) * v;
     return u + v <= 1 ? a + (b - a) * u + (c - a) * v : e + (c - e) * (1 - u) + (b - e) * (1 - v);
   };
   let minY = Infinity, maxY = -Infinity;

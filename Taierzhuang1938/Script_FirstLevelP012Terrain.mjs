@@ -70,6 +70,7 @@ export function CreateP012Terrain(layout) {
     } else {
       a=NodeHeight(ix,iz); b=NodeHeight(ix+1,iz); c=NodeHeight(ix,iz+1); e=NodeHeight(ix+1,iz+1);
     }
+    if(Math.abs(a-e)<Math.abs(b-c)) return u>=v ? a+(b-a)*u+(e-b)*v : a+(e-c)*u+(c-a)*v;
     return u+v<=1 ? a+(b-a)*u+(c-a)*v : e+(c-e)*(1-u)+(b-e)*(1-v);
   };
   const textureTileM = layout.terrainSpec?.textureTileM || 8;
@@ -85,10 +86,19 @@ export function CreateP012Terrain(layout) {
       for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){
         const ix=x0+i,iz=z0+j,at=j*stride+i,px=minX+ix*stepX,pz=minZ+iz*stepZ;
         positions.set([px,NodeHeight(ix,iz),pz],at*3);uvs.set([px/textureTileM,textureZSign*pz/textureTileM],at*2);
-        // Global neighbours give identical lighting at adjacent chunk edges.
-        const dx=(NodeHeight(ix+1,iz)-NodeHeight(ix-1,iz))/(2*stepX),dz=(NodeHeight(ix,iz+1)-NodeHeight(ix,iz-1))/(2*stepZ),len=Math.hypot(dx,1,dz);
+        // Global 3x3 Sobel neighbours give identical, sawtooth-free lighting on diagonal slopes & chunk edges.
+        const hNW=NodeHeight(ix-1,iz-1),hN=NodeHeight(ix,iz-1),hNE=NodeHeight(ix+1,iz-1);
+        const hW=NodeHeight(ix-1,iz),hE=NodeHeight(ix+1,iz);
+        const hSW=NodeHeight(ix-1,iz+1),hS=NodeHeight(ix,iz+1),hSE=NodeHeight(ix+1,iz+1);
+        const dx=((hNE+2*hE+hSE)-(hNW+2*hW+hSW))/(8*stepX);
+        const dz=((hSW+2*hS+hSE)-(hNW+2*hN+hNE))/(8*stepZ);
+        const len=Math.hypot(dx,1,dz);
         normals.set([-dx/len,1/len,-dz/len],at*3);
-        if(i<nx&&j<nz&&!(cellOf&&cellOf[iz*cols+ix]>=0))indices.push(at,at+stride,at+1,at+1,at+stride,at+stride+1);
+        if(i<nx&&j<nz&&!(cellOf&&cellOf[iz*cols+ix]>=0)) {
+          const qa=NodeHeight(ix,iz),qb=NodeHeight(ix+1,iz),qc=NodeHeight(ix,iz+1),qe=NodeHeight(ix+1,iz+1);
+          if(Math.abs(qa-qe)<Math.abs(qb-qc)) indices.push(at,at+stride,at+stride+1,at,at+stride+1,at+1);
+          else indices.push(at,at+stride,at+1,at+1,at+stride,at+stride+1);
+        }
       }
       // Refined cells carry their own vertex grid; normals come from the refined surface itself.
       let next=stride*(nz+1);
@@ -102,7 +112,11 @@ export function CreateP012Terrain(layout) {
           uvs.set([px/textureTileM,textureZSign*pz/textureTileM],next*2);
           const dx=(SampleHeight(px+fx,pz)-SampleHeight(px-fx,pz))/(2*fx),dz=(SampleHeight(px,pz+fz)-SampleHeight(px,pz-fz))/(2*fz),len=Math.hypot(dx,1,dz);
           normals.set([-dx/len,1/len,-dz/len],next*3);
-          if(p<sub&&q<sub){const at=first+q*fineWidth+p;indices.push(at,at+fineWidth,at+1,at+1,at+fineWidth,at+fineWidth+1);}
+          if(p<sub&&q<sub){
+            const at=first+q*fineWidth+p,fa=fine[slot*fineCount+q*fineWidth+p],fb=fine[slot*fineCount+q*fineWidth+p+1],fc=fine[slot*fineCount+(q+1)*fineWidth+p],fe=fine[slot*fineCount+(q+1)*fineWidth+p+1];
+            if(Math.abs(fa-fe)<Math.abs(fb-fc)) indices.push(at,at+fineWidth,at+fineWidth+1,at,at+fineWidth+1,at+1);
+            else indices.push(at,at+fineWidth,at+1,at+1,at+fineWidth,at+fineWidth+1);
+          }
         }
       }
       yield {id:`${x0}_${z0}`,positions,normals,uvs,indices};

@@ -2950,13 +2950,13 @@ function BuildMergedScene() {
   for (const obj of ownObjects) {
     if (!obj.pos || obj.pos[1] === null || obj.tag === "airWall") continue;
     const hw = (obj.size?.[0] || 2) * 0.5 + 3, hd = (obj.size?.[2] || 2) * 0.5 + 3;
-    MarkProtect(obj.pos[0], obj.pos[2], hw, hd, 10);
+    MarkProtect(obj.pos[0], obj.pos[2], hw, hd, 18);
   }
   for (const seg of ownSegments) {
     for (let i = 1; i < (seg.points?.length || 0); i++) {
       const [ax, az] = seg.points[i - 1], [bx, bz] = seg.points[i];
       const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 8));
-      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, 5, 5, 10);
+      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, 5, 5, 18);
     }
   }
   for (const r of ownRoadRibbons) {
@@ -2964,19 +2964,29 @@ function BuildMergedScene() {
     for (let i = 1; i < pts.length; i++) {
       const ax = pts[i - 1][0] ?? pts[i - 1].x, az = pts[i - 1][1] ?? pts[i - 1].z;
       const bx = pts[i][0] ?? pts[i].x, bz = pts[i][1] ?? pts[i].z;
-      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 10));
-      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, (r.width || 4) * 0.6, (r.width || 4) * 0.6, 8);
+      const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 8));
+      for (let k = 0; k <= n; k++) MarkProtect(ax + (bx - ax) * k / n, az + (bz - az) * k / n, (r.width || 4) * 0.6 + 2, (r.width || 4) * 0.6 + 2, 22);
     }
   }
+  // 双线性采样保护权重（彻底消除 2 m 栅格最近邻取整导致的斜坡台阶/锯齿！）
+  const SampleProtect = (wx, wz) => {
+    const gx = Math.max(0, Math.min(maskW - 1.0001, (wx - minX) / maskStep));
+    const gz = Math.max(0, Math.min(maskH - 1.0001, (wz - INHERIT_MAX_Z) / maskStep));
+    const ix = Math.floor(gx), iz = Math.floor(gz);
+    const u = gx - ix, v = gz - iz;
+    const at = iz * maskW + ix;
+    const p00 = protect[at], p10 = protect[at + 1], p01 = protect[at + maskW], p11 = protect[at + maskW + 1];
+    return (p00 * (1 - u) + p10 * u) * (1 - v) + (p01 * (1 - u) + p11 * u) * v;
+  };
 
-  // 3) 写入河汊子南延河床下切 + 适度拓宽北沙河主河槽 + 开阔农田真实 SRTM 缓坡微起伏
+  // 3) 写入河汊子南延河床下切 + 适度拓宽北沙河主河槽 + 开阔农田柔和 SRTM 缓坡微起伏
   const refRelief = SampleBeishaheRelief(100, 560, geoCtx);
+  const modifiedMask = new Uint8Array(ownHeights.length);
   for (let iz = 0; iz <= outRows; iz++) {
     const wz = INHERIT_MAX_Z + iz * cellM;
     const rowOff = iz * width;
-    const northFade = iz < 6 ? (iz / 6) : 1;
-    const miz = Math.min(maskH - 1, Math.max(0, Math.round((wz - INHERIT_MAX_Z) / maskStep)));
-    const reliefNorthFade = iz <= SafeMinIz ? 0 : Math.min(1, (wz - (INHERIT_MAX_Z + SafeMinIz * cellM)) / 24);
+    const northFade = iz < 8 ? (iz / 8) : 1;
+    const reliefNorthFade = iz <= SafeMinIz ? 0 : Math.min(1, (wz - (INHERIT_MAX_Z + SafeMinIz * cellM)) / 36);
     for (let ix = 0; ix <= cols; ix++) {
       const wx = minX + ix * cellM;
       const at = rowOff + ix;
@@ -2986,22 +2996,39 @@ function BuildMergedScene() {
         const targetBed = Math.min(ownHeights[at], 0.25 - br.carveM * 1.05);
         const blendC = Math.min(1, br.bankT * 1.15) * (iz === 0 ? 0 : northFade);
         ownHeights[at] = ownHeights[at] + (targetBed - ownHeights[at]) * blendC;
+        if (iz > 2 && Math.abs(wx - (-80)) > 11) modifiedMask[at] = 1;
       }
       // 北沙河主河道在非村落/非桥墩处适度加深主水槽（与界外宽化主河道平顺对接）
       const sh = SampleShaheChannel(wx, wz, 0);
       if (sh.waterT > 0.01 && Math.abs(wx - (-80)) > 8.5) {
         const targetStream = Math.min(ownHeights[at], -2.65 - sh.waterT * 0.35);
         ownHeights[at] = ownHeights[at] + (targetStream - ownHeights[at]) * (sh.waterT * 0.65);
+        if (iz > 2) modifiedMask[at] = 1;
       }
-      // 开阔无人/无建筑农田叠加真实 SRTM N35E117 相对起伏（±1.25 m，零影响固定物件）
+      // 开阔无人/无建筑农田叠加柔和 SRTM N35E117 相对缓坡（±0.55 m，22 m 柔边过渡，零台阶零影响固定物件）
       if (reliefNorthFade > 0.001 && sh.bankT < 0.05 && br.bankT < 0.05) {
-        const mix = Math.min(maskW - 1, Math.max(0, Math.round((wx - minX) / maskStep)));
-        const openW = (1 - protect[miz * maskW + mix]) * reliefNorthFade;
-        if (openW > 0.01) {
-          const delta = Math.max(-1.1, Math.min(1.45, (SampleBeishaheRelief(wx, wz, geoCtx) - refRelief) * 0.32));
+        const openW = (1 - SampleProtect(wx, wz)) * reliefNorthFade;
+        if (openW > 0.005) {
+          const delta = Math.max(-0.55, Math.min(0.65, (SampleBeishaheRelief(wx, wz, geoCtx) - refRelief) * 0.14));
           ownHeights[at] += delta * openW;
+          if (iz > 2) modifiedMask[at] = 1;
         }
       }
+    }
+  }
+  // 对本次新改动的河岸/农田格点做一趟温和 3×3 二项平滑，消除 0.5 m 网格斜岸微台阶（不触碰拼接缝与保护区）
+  const smoothCopy = Float32Array.from(ownHeights);
+  for (let iz = 2; iz < outRows - 1; iz++) {
+    const rowOff = iz * width;
+    for (let ix = 1; ix < cols; ix++) {
+      const at = rowOff + ix;
+      if (!modifiedMask[at]) continue;
+      const avg = (
+        smoothCopy[at - width - 1] + 2 * smoothCopy[at - width] + smoothCopy[at - width + 1]
+        + 2 * smoothCopy[at - 1] + 4 * smoothCopy[at] + 2 * smoothCopy[at + 1]
+        + smoothCopy[at + width - 1] + 2 * smoothCopy[at + width] + smoothCopy[at + width + 1]
+      ) / 16;
+      ownHeights[at] = smoothCopy[at] + (avg - smoothCopy[at]) * 0.45;
     }
   }
 
