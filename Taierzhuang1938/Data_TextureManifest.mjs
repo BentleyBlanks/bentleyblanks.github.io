@@ -470,14 +470,20 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "Grenade", kind: "material", tier: "boot",
-    bake: "_blender/Script_GrenadeDetail.py",
-    source: { provider: "imagegen", date: "2026-09-06" },
+    toneClass: null,
+    toneReason: "木柄与发黑铁面共用作者 UV 图集，各自定色与烘焙",
+    metersPerTile: null,
+    bake: "_import/Script_BakeGrenadeTexture.py",
+    bakeRecord: "_import/TextureBakes/Texture_Grenade.json",
+    source: {
+      provider: "imagegen", date: "2026-11-26", ref: "OpenAI Images API / gpt-image-2",
+      prompt: "_import/Prompts/Texture_Grenade.txt",
+    },
     consumers: [{ file: "Script_Main.mjs", token: "Texture_Grenade" }],
-    legacy: "1536×768 不是 2 的幂；提示词在仓库外（OneDrive 源工程目录）",
     files: [
-      ["Texture_GrenadeBase.webp", "Base", 1536, 768],
-      ["Texture_GrenadeNormal.webp", "Normal", 1536, 768],
-      ["Texture_GrenadeOrm.webp", "Orm", 1536, 768],
+      ["Texture_GrenadeBase.webp", "Base", 1024, 1024],
+      ["Texture_GrenadeNormal.webp", "Normal", 512, 512],
+      ["Texture_GrenadeOrm.webp", "Orm", 256, 256],
     ],
   },
   {

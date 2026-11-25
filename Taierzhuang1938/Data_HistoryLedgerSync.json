@@ -5,6 +5,26 @@
   "repoCommit": "9cce1761ab97e25208af5badf05b5b35a49802e1",
   "assetReviews": [
     {
+      "asset": "GongxianGrenade",
+      "date": "2026-11-26",
+      "runtimeAsset": "Model/Model_Type24Grenade.glb",
+      "assetContract": "docs/Data_GrenadeAsset.md",
+      "scope": "Gongxian-pattern game exterior only. Preserve global review anchors and unrelated Notion cursors.",
+      "decision": "Creative exterior based on the factory display side view and the 1958 archive image. The documentation covers the visible profile without attributing a production batch or period color to Tengxian.",
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-25T16:41:10.982Z",
+          "scope": "Verified the new creative exterior row and its two image source links."
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-25T16:41:12.361Z",
+          "scope": "Verified the player-facing creative exterior note."
+        }
+      ]
+    },
+    {
       "asset": "BeishaheBridge",
       "date": "2026-10-26",
       "scope": "Independent reference-led candidate only; no replacement of the current whitebox bridge or story. Preserve global reviewedAt/repoCommit and unrelated page/source cursors.",

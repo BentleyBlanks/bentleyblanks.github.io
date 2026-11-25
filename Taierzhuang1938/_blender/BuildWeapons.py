@@ -474,8 +474,8 @@ def BuildServicePistol():
 
 def BuildGrenade():
     """Shared authored exterior, preserving the same TZM hand-grip coordinates."""
-    from Script_GrenadeDetail import BuildGeometry, JoinGeometry, TzmRoot
-    return TzmRoot([JoinGeometry(BuildGeometry())])
+    from Script_GrenadeDetail import BuildGeometry, TzmRoot
+    return TzmRoot(BuildGeometry())
 
 
 # ---------------------------------------------------------------------------

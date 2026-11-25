@@ -1,210 +1,265 @@
-"""Author the external surface of the Tengxian game prop, plus shared TZM/GLB.
+"""Build the closed Gongxian-pattern game prop and export the common GLB and TZM."""
 
-Run in an empty task-owned Blender scene. No functional interior is modelled.
-The imagegen sheet is an art reference, not a measured historical drawing.
-The legacy 0.22 m runtime envelope is retained for animation compatibility.
-"""
-import bpy
-import bmesh
 import json
 import math
-import sys
 from pathlib import Path
-import numpy as np
+import sys
+
+import bmesh
+import bpy
 from mathutils import Matrix, Vector
 
 PROJECT = Path(__file__).resolve().parents[1]
-SOURCE = Path.home() / 'OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeDetail_20260906'
+SOURCE = Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/GongxianGrenadeReference_20261126"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from TzmCore import Node, WriteTzm, MATERIAL_NAMES
+from TzmCore import Node, WriteTzm
 
-def Image(name, rgb, colorSpace):
-    height, width = rgb.shape[:2]
-    rgba = np.ones((height, width, 4), dtype=np.float32)
-    rgba[:, :, :3] = np.clip(rgb, 0, 1)
-    image = bpy.data.images.new(name, width=width, height=height, alpha=False)
-    image.colorspace_settings.name = colorSpace
-    image.pixels.foreach_set(rgba.ravel())
-    image.filepath_raw = str(SOURCE / (name + '.png'))
-    image.file_format = 'PNG'
-    image.save()
-    image.pack()
-    return image
+LENGTH = 0.22  # Existing game/animation envelope.
+GRIP_OFFSET = 0.035
+SEGMENTS = 96
+TRIANGLE_BUDGET = 10000
+ATLAS_GUTTER = 12 / 1024
+MESH_NAME = "Model_GongxianGrenade"
 
-def SurfaceMaps():
-    """Bake authored wood fibres / iron pores into a compact shared UV atlas."""
-    height, half = 1024, 1024
-    v, u = np.mgrid[0:height, 0:half].astype(np.float32)
-    u /= half - 1; v /= height - 1
-    rng = np.random.default_rng(19380317)
-    def Field(scaleX, scaleY, layers=8):
-        out = np.zeros_like(u)
-        for _ in range(layers):
-            ax, ay = rng.normal(size=2)
-            out += np.sin(2 * math.pi * (u * scaleX * ax + v * scaleY * ay) + rng.random() * 6.28)
-        return out / math.sqrt(layers * 2)
-    broad = Field(3, 2)
-    bend = .011 * np.sin(v*13 + u*5) + .008 * Field(2, 3)
-    fibre = np.sin((u + bend) * 610 + .9 * Field(7, 4))
-    fine = np.sin((u + bend * .8) * 1720 + Field(20, 7))
-    pores = np.maximum(0, fibre - .57)**3
-    wear = np.exp(-((v-.50)/.31)**4)
-    tone = .05*broad + .025*fibre + .012*fine - .14*pores
-    wood = np.stack([.46 + tone, .285 + tone*.72, .142 + tone*.4],axis=-1)
-    wood *= (1-.09*wear[:,:,None])
-    woodHeight = .22*fibre + .11*fine + .13*Field(45, 11)
-    metalMottle = Field(13, 18)
-    fineMetal = Field(130, 105,12)
-    edge = np.exp(-np.minimum(v,1-v)*125)
-    chips = np.clip((Field(23, 4)+edge*2.8-1.35)*1.5,0,1) * np.clip(edge*3,0,1)
-    oxide = np.clip(Field(19, 22)-1.1,0,1) * (.2+.8*edge)
-    iron = .185 + .014*metalMottle + .011*fineMetal + .19*chips
-    metal = np.stack([iron+.065*oxide, iron*.99-.018*oxide, iron*.94-.044*oxide],axis=-1)
-    ironHeight = .24*fineMetal + .10*metalMottle - .13*oxide
-    base = np.concatenate([wood,metal],axis=1)
-    relief = np.concatenate([woodHeight,ironHeight],axis=1)
-    dy, dx = np.gradient(relief)
-    normal = np.stack([-dx*.5,-dy*.5,np.ones_like(dx)],axis=-1)
-    normal /= np.linalg.norm(normal,axis=-1,keepdims=True)
-    normal = normal*.5+.5
-    woodRough = np.clip(.76-.12*wear+.035*broad,.56,.89)
-    metalRough = np.clip(.78+.06*metalMottle-.30*chips,.44,.91)
-    rough = np.concatenate([woodRough,metalRough],axis=1)
-    metallic = np.concatenate([np.zeros_like(u),np.clip(.45+.42*chips-.35*oxide,.08,.87)],axis=1)
-    orm = np.stack([np.ones_like(rough),rough,metallic],axis=-1)
-    # The selected imagegen albedo is a shipped source asset; preserve it verbatim.
-    baseImage=bpy.data.images.load(str(PROJECT/'Texture/Texture_GrenadeBase.webp'),check_existing=True)
-    baseImage.colorspace_settings.name='sRGB';baseImage.pack()
-    return [baseImage]+[Image('Texture_Grenade'+suffix,array,space) for suffix,array,space in
-            [('Normal',normal,'Non-Color'),('Orm',orm,'Non-Color')]]
+# Each point is (axial fraction, radius / total length). The visible side profile
+# follows the labeled factory display. The archival objects corroborate the broad
+# head, narrow waist and swollen grip. The continuous skin is just game geometry.
+PROFILE = (
+    # Heel, with a narrow edge and a dark face.
+    ("iron", (0.195, 0.264), (
+        (0.000, 0.049), (0.0015, 0.053), (0.004, 0.056), (0.010, 0.058),
+        (0.018, 0.058), (0.038, 0.0568), (0.048, 0.0556), (0.052, 0.0524),
+    )),
+    # Wooden handle. The thicker ends frame a comparatively narrow center.
+    ("wood", (0.032, 0.968), (
+        (0.052, 0.0524), (0.060, 0.0549), (0.078, 0.0633), (0.100, 0.0698),
+        (0.137, 0.0718), (0.171, 0.0704), (0.232, 0.0648), (0.295, 0.0583),
+        (0.364, 0.0544), (0.420, 0.0533), (0.467, 0.0560), (0.507, 0.0618),
+        (0.548, 0.0708), (0.578, 0.0816), (0.602, 0.0899), (0.606, 0.0905),
+    )),
+    # Short dark shoulder and recessed line under the head.
+    ("iron", (0.300, 0.432), (
+        (0.606, 0.0905), (0.609, 0.0930), (0.615, 0.0970), (0.622, 0.0978),
+        (0.628, 0.0980), (0.634, 0.1020), (0.642, 0.1195), (0.650, 0.1325),
+        (0.661, 0.1395), (0.671, 0.1405),
+    )),
+    # Slightly flared dark head with softly broken edges.
+    ("iron", (0.470, 0.725), (
+        (0.671, 0.1405), (0.680, 0.1407), (0.725, 0.1421), (0.801, 0.1443),
+        (0.880, 0.1463), (0.949, 0.1474), (0.978, 0.1471), (0.988, 0.1464),
+        (0.995, 0.1445), (1.000, 0.1404),
+    )),
+)
 
-def Lathe(name, profile, wood=False, segments=64):
-    verts, faces, coords = [], [], []
-    for k,(z,radius) in enumerate(profile):
-        for j in range(segments):
-            a = j * math.tau / segments
-            # Tiny broad casting / wood-turning imperfections affect the silhouette.
-            irregular = 0 if radius == 0 else (.00007 if wood else .00010)*math.sin(5*a+k*.8)*math.sin(k*.77)
-            r = radius + irregular
-            verts.append((r*math.cos(a),r*math.sin(a),z))
-    for k in range(len(profile)-1):
-        for j in range(segments):
-            j1=(j+1)%segments
-            faces.append((k*segments+j,k*segments+j1,(k+1)*segments+j1,(k+1)*segments+j))
-            # Atlas gutters avoid cross-material mip bleed.
-            x0=.015 if wood else .515
-            coords.append([(x0+.47*s/segments, .015+.97*t/(len(profile)-1))
-                           for s,t in [(j,k),(j+1,k),(j+1,k+1),(j,k+1)]])
-    mesh=bpy.data.meshes.new('Mesh_'+name)
-    mesh.from_pydata(verts,[],faces); mesh.update()
-    obj=bpy.data.objects.new('Model_'+name,mesh); bpy.context.scene.collection.objects.link(obj)
-    uv=mesh.uv_layers.new(name='UVMap')
-    for poly,uvs in zip(mesh.polygons,coords):
-        poly.use_smooth=True
-        for loop,co in zip(poly.loop_indices,uvs): uv.data[loop].uv=co
-    # Merge the duplicate vertices at the poles, keeping UV corner data.
-    bm=bmesh.new();bm.from_mesh(mesh)
-    bmesh.ops.remove_doubles(bm,verts=list(bm.verts),dist=.000001)
-    bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
-    bm.to_mesh(mesh);bm.free()
-    return obj
 
 def BuildGeometry():
-    # Z-up modelling coordinates; the head is on +Z for comfortable editing.
-    head=Lathe('GrenadeCastHead',[(.046,0),(.046,.017),(.047,.0232),(.049,.0247),
-        (.052,.025),(.061,.025),(.077,.025),(.093,.025),(.106,.0249),
-        (.1085,.0242),(.11,.0227),(.11,.018),(.11,.010),(.11,0)])
-    collar=Lathe('GrenadeCollar',[(.032,0),(.032,.0133),(.033,.0142),(.039,.0144),
-        (.043,.016),(.046,.018),(.048,.018),(.049,0)],segments=64)
-    handle=Lathe('GrenadeWoodHandle',[(-.104,0),(-.104,.013),(-.102,.014),(-.095,.0142),
-        (-.083,.0140),(-.067,.0133),(-.044,.0125),(-.019,.0121),(.004,.0124),
-        (.022,.013),(.034,.0133),(.038,.013),(.039,0)],wood=True)
-    cap=Lathe('GrenadeHeelCap',[(-.110,0),(-.110,.011),(-.1096,.0135),(-.108,.0143),
-        (-.103,.0144),(-.1005,.0141),(-.100,.0135),(-.100,0)],segments=64)
-    return head,collar,handle,cap
+    vertices, faces, faceUvs = [], [], []
+    previous = None
+    for region, (v0, v1), points in PROFILE:
+        u0 = 0.0 if region == "wood" else 0.5
+        u0 += ATLAS_GUTTER
+        uSpan = 0.5 - 2 * ATLAS_GUTTER
+        start, finish = points[0][0], points[-1][0]
+        for index, (height, radius) in enumerate(points):
+            # Reuse the boundary ring between adjacent materials.
+            if index == 0 and previous is not None:
+                continue
+            ring = len(vertices)
+            for segment in range(SEGMENTS):
+                angle = segment * math.tau / SEGMENTS
+                variation = (0.00033 * math.cos(3 * angle + height * 7)
+                             + 0.00022 * math.sin(7 * angle - height * 9))
+                r = LENGTH * (radius + variation)
+                vertices.append((r * math.cos(angle), r * math.sin(angle), LENGTH * (height - 0.5)))
 
-def JoinGeometry(objects):
-    bpy.ops.object.select_all(action='DESELECT')
-    for obj in objects: obj.select_set(True)
-    bpy.context.view_layer.objects.active=objects[0]
-    bpy.ops.object.join()
-    return objects[0]
+            if previous is not None:
+                lowerV = v0 + (v1 - v0) * ((points[index - 1][0] - start) / (finish - start))
+                upperV = v0 + (v1 - v0) * ((height - start) / (finish - start))
+                for segment in range(SEGMENTS):
+                    adjacent = (segment + 1) % SEGMENTS
+                    lowerU = u0 + uSpan * segment / SEGMENTS
+                    upperU = u0 + uSpan * (segment + 1) / SEGMENTS
+                    faces.append((previous + segment, previous + adjacent, ring + adjacent, ring + segment))
+                    faceUvs.append(((lowerU, lowerV), (upperU, lowerV), (upperU, upperV), (lowerU, upperV)))
+            previous = ring
 
-def TzmRoot(objects):
-    root=Node('root');body=root.Child('body')
-    for obj in objects:
-        bm=bmesh.new();bm.from_mesh(obj.data)
-        bm.transform(Matrix.Rotation(math.pi,4,'X'))
-        bmesh.ops.translate(bm,verts=list(bm.verts),vec=(0,0,-.035))
-        body.Add('grenade',bm,tile='sourceUv')
-    body.Child('muzzle',t=(0,0,-.145));body.Child('gripR',t=(0,0,0))
+    # Planar UVs across both closed faces. Separate atlas patches avoid a radial
+    # seam through the center and reserve the side strips for the rolled profile.
+    for ring, isHead, center, halfWidth in (
+        (0, False, (0.77, 0.108), 0.059),
+        (previous, True, (0.76, 0.865), 0.118),
+    ):
+        pole = len(vertices)
+        vertices.append((0, 0, vertices[ring][2]))
+        scale = halfWidth / math.hypot(*vertices[ring][:2])
+        for segment in range(SEGMENTS):
+            a = ring + segment
+            b = ring + (segment + 1) % SEGMENTS
+            if not isHead:
+                a, b = b, a
+            uvA = (center[0] + vertices[a][0] * scale, center[1] + vertices[a][1] * scale)
+            uvB = (center[0] + vertices[b][0] * scale, center[1] + vertices[b][1] * scale)
+            faces.append((pole, a, b))
+            faceUvs.append((center, uvA, uvB))
+
+    mesh = bpy.data.meshes.new("Mesh_GongxianGrenade")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    uv = mesh.uv_layers.new(name="UVMap")
+    for face, coordinates in zip(mesh.polygons, faceUvs, strict=True):
+        face.use_smooth = True
+        for loop, coordinate in zip(face.loop_indices, coordinates, strict=True):
+            uv.data[loop].uv = coordinate
+
+    obj = bpy.data.objects.new(MESH_NAME, mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
+
+
+def TzmRoot(obj):
+    root = Node("root")
+    body = root.Child("body")
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.transform(Matrix.Rotation(math.pi, 4, "X"))
+    bmesh.ops.translate(bm, verts=list(bm.verts), vec=(0, 0, -GRIP_OFFSET))
+    body.Add("grenade", bm, tile="sourceUv")
+    body.Child("muzzle", t=(0, 0, -LENGTH / 2 - GRIP_OFFSET))
+    body.Child("gripR", t=(0, 0, 0))
     return root
 
+
+def ValidateGeometry(mesh):
+    mesh.calc_loop_triangles()
+    triangles = len(mesh.loop_triangles)
+    if triangles > TRIANGLE_BUDGET:
+        raise ValueError(f"Grenade has {triangles:,} triangles, budget is {TRIANGLE_BUDGET:,}")
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(mesh)
+        if not all(edge.is_manifold and edge.is_contiguous for edge in bm.edges) or bm.calc_volume(signed=True) <= 0:
+            raise ValueError("Grenade exterior must be consistently wound and closed")
+    finally:
+        bm.free()
+    return triangles
+
+
+def BuildMaterial():
+    material = bpy.data.materials.new("Material_GongxianGrenade")
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+    textures = {}
+    for index, name in enumerate(("Base", "Normal", "Orm")):
+        image = bpy.data.images.load(str(PROJECT / "Texture" / f"Texture_Grenade{name}.webp"))
+        image.colorspace_settings.name = "sRGB" if name == "Base" else "Non-Color"
+        image.pack()
+        texture = nodes.new("ShaderNodeTexImage")
+        texture.label = name
+        texture.image = image
+        texture.location = (-640, 340 - index * 270)
+        textures[name] = texture
+
+    surface = nodes.get("Principled BSDF")
+    links.new(textures["Base"].outputs["Color"], surface.inputs["Base Color"])
+    normal = nodes.new("ShaderNodeNormalMap")
+    normal.location = (-300, 70)
+    normal.inputs["Strength"].default_value = 0.9
+    links.new(textures["Normal"].outputs["Color"], normal.inputs["Color"])
+    links.new(normal.outputs["Normal"], surface.inputs["Normal"])
+    orm = nodes.new("ShaderNodeSeparateColor")
+    orm.location = (-300, -200)
+    links.new(textures["Orm"].outputs["Color"], orm.inputs["Color"])
+    links.new(orm.outputs["Green"], surface.inputs["Roughness"])
+    links.new(orm.outputs["Blue"], surface.inputs["Metallic"])
+    return material
+
+
+def BuildStudio(scene):
+    world = bpy.data.worlds.new("World_GrenadeStudio")
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs[0].default_value = (0.23, 0.23, 0.23, 1)
+    world.node_tree.nodes["Background"].inputs[1].default_value = 0.50
+    scene.world = world
+    cameraData = bpy.data.cameras.new("Camera_GrenadeStudio")
+    camera = bpy.data.objects.new("Camera_GrenadeStudio", cameraData)
+    scene.collection.objects.link(camera)
+    camera.location = (0.24, -0.52, 0.16)
+    camera.rotation_euler = (-camera.location).to_track_quat("-Z", "Y").to_euler()
+    cameraData.type = "ORTHO"
+    cameraData.ortho_scale = 0.27
+    scene.camera = camera
+
+    for name, location, power, size in (
+        ("Key", (0.16, -0.22, 0.23), 2.3, 0.25),
+        ("Fill", (-0.24, -0.15, 0.12), 1.3, 0.28),
+        ("Rim", (0.15, 0.20, 0.15), 2.7, 0.19),
+    ):
+        data = bpy.data.lights.new(f"Light_{name}", "AREA")
+        data.energy = power
+        data.shape = "DISK"
+        data.size = size
+        light = bpy.data.objects.new(f"Light_{name}", data)
+        scene.collection.objects.link(light)
+        light.location = location
+        light.rotation_euler = (-light.location).to_track_quat("-Z", "Y").to_euler()
+
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 24
+    scene.cycles.use_denoising = True
+    scene.render.resolution_x = 920
+    scene.render.resolution_y = 920
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.film_transparent = True
+    scene.view_settings.view_transform = "AgX"
+    scene.render.filepath = str(SOURCE / "Preview_GongxianGrenade.png")
+
+
 def Build():
-    if any(o.type=='MESH' for o in bpy.context.scene.objects):
-        raise RuntimeError('Build requires an empty task scene; do not overwrite another asset')
-    SOURCE.mkdir(parents=True,exist_ok=True)
-    bpy.context.scene.unit_settings.system='METRIC'
-    head,collar,handle,cap=BuildGeometry()
-    images=[]
-    for suffix in ['Base','Normal','Orm']:
-        image=bpy.data.images.load(str(PROJECT/('Texture/Texture_Grenade'+suffix+'.webp')),check_existing=True)
-        image.colorspace_settings.name='sRGB' if suffix=='Base' else 'Non-Color'
-        image.pack();images.append(image)
-    material=bpy.data.materials.new('Material_GongxianGrenade');material.use_nodes=True
-    nodes=material.node_tree.nodes;links=material.node_tree.links
-    bsdf=nodes.get('Principled BSDF')
-    textures=[]
-    for i,image in enumerate(images):
-        node=nodes.new('ShaderNodeTexImage');node.image=image;node.location=(-600,300-i*300);textures.append(node)
-    links.new(textures[0].outputs['Color'],bsdf.inputs['Base Color'])
-    norm=nodes.new('ShaderNodeNormalMap');norm.inputs['Strength'].default_value=.85
-    links.new(textures[1].outputs['Color'],norm.inputs['Color']);links.new(norm.outputs['Normal'],bsdf.inputs['Normal'])
-    sep=nodes.new('ShaderNodeSeparateColor');links.new(textures[2].outputs['Color'],sep.inputs['Color'])
-    links.new(sep.outputs['Green'],bsdf.inputs['Roughness']);links.new(sep.outputs['Blue'],bsdf.inputs['Metallic'])
-    for obj in [head,collar,handle,cap]:obj.data.materials.append(material)
-    obj=JoinGeometry([head,collar,handle,cap]);obj.name='Model_GongxianGrenade'
-    obj['HistoricalScope']='Pre-1938 Chinese stick-grenade exterior interpretation; batch unverified'
-    obj['Reference']='Reference_GrenadeThreeView.png (imagegen); proportions are art interpretation'
-    obj['RuntimeAxis']='Head -Z; centred GLB; TZM grip origin offset -0.035m'
-    bpy.context.view_layer.update()
-    # Export TZM from the SAME mesh and atlas as the GLB.
-    root=TzmRoot([obj])
-    stats=WriteTzm(root,str(PROJECT/'Model/Model_Grenade.tzm.json'),'Grenade',
-        'Authored Gongxian-pattern exterior; imagegen reference; historical batch unverified',audit=True)
-    # Blender +Y maps to glTF -Z. Apply the rotation to vertices before export.
-    obj.data.transform(Matrix.Rotation(-math.pi/2,4,'X'))
-    bpy.ops.export_scene.gltf(filepath=str(PROJECT/'Model/Model_Type24Grenade.glb'),
-        export_format='GLB',use_selection=True,export_apply=True,export_yup=True,
-        export_animations=False,export_extras=True,export_materials='EXPORT',
-        export_image_format='JPEG',export_jpeg_quality=88)
-    # Restore the editable upright source pose after the runtime export.
-    obj.data.transform(Matrix.Rotation(math.pi/2,4,'X'))
-    refPath=SOURCE/'Reference_GrenadeThreeView.png'
-    if refPath.exists():
-        ref=bpy.data.images.load(str(refPath));ref.pack();ref.use_fake_user=True
-    scene=bpy.context.scene
-    world=bpy.data.worlds.new('World_GrenadeStudio');world.use_nodes=True
-    world.node_tree.nodes['Background'].inputs[0].default_value=(.19,.19,.19,1)
-    world.node_tree.nodes['Background'].inputs[1].default_value=.55;scene.world=world
-    cameraData=bpy.data.cameras.new('Camera_GrenadeStudio');camera=bpy.data.objects.new('Camera_GrenadeStudio',cameraData)
-    scene.collection.objects.link(camera);camera.location=(.25,-.50,.17)
-    camera.rotation_euler=(Vector((0,0,0))-camera.location).to_track_quat('-Z','Y').to_euler()
-    cameraData.type='ORTHO';cameraData.ortho_scale=.31;scene.camera=camera
-    for name,loc,power,size in [('Key',(.15,-.2,.28),18,.22),('Fill',(-.20,-.10,.06),9,.25),('Rim',(.12,.18,.18),23,.18)]:
-        data=bpy.data.lights.new('Light_'+name,'AREA');data.energy=power*.1;data.shape='DISK';data.size=size
-        light=bpy.data.objects.new('Light_'+name,data);scene.collection.objects.link(light);light.location=loc
-        light.rotation_euler=(-light.location).to_track_quat('-Z','Y').to_euler()
-    scene.render.engine='CYCLES';scene.cycles.samples=32
-    scene.render.resolution_x=1200;scene.render.resolution_y=1200;scene.render.resolution_percentage=100
-    scene.view_settings.view_transform='AgX'
-    scene.render.image_settings.file_format='PNG'
-    scene.render.filepath=str(SOURCE/'Preview_GrenadeStudio.png')
-    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Model_GongxianGrenade.blend'))
-    report={'tzm':stats,'glbBytes':(PROJECT/'Model/Model_Type24Grenade.glb').stat().st_size,
-            'source':bpy.data.filepath}
-    (SOURCE/'Data_GrenadeBuild.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+    scene = bpy.context.scene
+    if any(obj.type == "MESH" for obj in scene.objects):
+        raise RuntimeError("Build requires a task-owned empty scene")
+    SOURCE.mkdir(parents=True, exist_ok=True)
+    scene.unit_settings.system = "METRIC"
+
+    obj = BuildGeometry()
+    triangles = ValidateGeometry(obj.data)
+    obj.data.materials.append(BuildMaterial())
+    obj["HistoricalScope"] = "Gongxian-pattern exterior study. Tengxian issue batch unverified."
+    obj["Reference"] = "Factory display side view and Culture Taiwan 18000005525 archival photo (1958)."
+    obj["RuntimeAxis"] = "Head -Z. Centered GLB. TZM uses the existing grip origin."
+
+    tzm = PROJECT / "Model" / "Model_Grenade.tzm.json"
+    glb = PROJECT / "Model" / "Model_Type24Grenade.glb"
+    stats = WriteTzm(TzmRoot(obj), str(tzm), "Grenade",
+                     "Closed Gongxian-pattern exterior. Reference photos inform the visible silhouette.", audit=True)
+
+    bpy.ops.object.select_all(action="DESELECT")
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    # Blender +Y becomes glTF -Z. Restore the editable upright pose after export.
+    obj.data.transform(Matrix.Rotation(-math.pi / 2, 4, "X"))
+    try:
+        bpy.ops.export_scene.gltf(
+            filepath=str(glb), export_format="GLB", use_selection=True, export_apply=True,
+            export_yup=True, export_animations=False, export_extras=True,
+            export_materials="EXPORT", export_image_format="JPEG", export_jpeg_quality=93,
+        )
+    finally:
+        obj.data.transform(Matrix.Rotation(math.pi / 2, 4, "X"))
+    obj.data.update()
+
+    for path in sorted((SOURCE / "References").glob("Reference_*.jpg")):
+        reference = bpy.data.images.load(str(path))
+        reference.pack()
+        reference.use_fake_user = True
+    BuildStudio(scene)
+    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE / f"{MESH_NAME}.blend"))
+    report = {"triangles": triangles, "tzm": stats, "glbBytes": glb.stat().st_size, "source": bpy.data.filepath}
+    (SOURCE / "Data_GrenadeBuild.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf8")
     return report
 
-if __name__=='__main__':
-    result=Build()
+
+if __name__ == "__main__":
+    print(json.dumps(Build()))

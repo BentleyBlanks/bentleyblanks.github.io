@@ -5,7 +5,7 @@ import { MESHES, MESH_REV, MODEL_BASE, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS }
 /** 取一个模型的 url。id 不认识时返回 null（调用方退回程序化几何）。 */
 export function MeshUrl(id) {
   const entry = MESHES[id];
-  return entry ? `${MODEL_BASE}${entry.file}?v=${MESH_REV}` : null;
+  return entry ? `${MODEL_BASE}${entry.file}?v=${entry.version ?? MESH_REV}` : null;
 }
 
 /** 按类别列 id。 */
@@ -15,7 +15,7 @@ export function MeshIds(category = null) {
 
 /** 全部模型的 url，给 PreloadModels 用。 */
 export function AllMeshUrls() {
-  return MeshIds().map((id) => `${MODEL_BASE}${MESHES[id].file}?v=${MESH_REV}`);
+  return MeshIds().map(MeshUrl);
 }
 
 /** 越界或已退役的变体编号回到该武器的默认模型，兼容旧掉落和编辑器数据。 */

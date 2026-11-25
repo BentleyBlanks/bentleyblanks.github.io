@@ -178,11 +178,11 @@
    "name": "Grenade",
    "category": "weapon",
    "file": "Model_Grenade.tzm.json",
-   "triangles": 4480,
+   "triangles": 7872,
    "meshBlocks": 1,
    "nodes": 4,
    "joints": 0,
-   "bytes": 85066,
+   "bytes": 141243,
    "materials": [
     "grenade"
    ],
@@ -193,13 +193,13 @@
    ],
    "bounds": {
     "min": [
-     -0.025,
-     -0.02504,
+     -0.0324,
+     -0.03248,
      -0.145
     ],
     "max": [
-     0.0251,
-     0.02506,
+     0.03246,
+     0.03237,
      0.075
     ]
    }

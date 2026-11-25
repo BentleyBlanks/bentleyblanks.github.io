@@ -37,7 +37,7 @@ const presets = JSON.parse(fs.readFileSync(path.join(project, "_import", "Data_T
 // legacy 条目（2026-09-28 首次登记）。**只许变短**：某套规范化了（或删了）就把它从这里删掉；
 // 不许为了让新贴图过门禁往这里加名字 —— 新贴图必须按规范来。
 const LEGACY_IDS = new Set([
-  "WeaponSteelV2", "WeaponWoodV2", "Type89", "Grenade", "HandcartWood", "WoodCrate",
+  "WeaponSteelV2", "WeaponWoodV2", "Type89", "HandcartWood", "WoodCrate",
   "TreeBark", "BrickWall", "CityWallBrick", "CityWallCore", "CityWallStone", "CraterScorched",
   "MissionSoil", "PloughedSoil", "Ground", "RoofTile", "GateBrick", "GatePaintedWood",
   "GateRoofTile", "Sandbag", "WattleFence", "BrickWallSooty",

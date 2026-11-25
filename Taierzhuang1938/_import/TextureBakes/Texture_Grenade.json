@@ -1,0 +1,60 @@
+{
+  "generator": "audit",
+  "date": "2026-11-26",
+  "name": "Grenade",
+  "preset": null,
+  "source": null,
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_GrenadeBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 122664,
+      "sha256": "2885378987ec347c534655b224e91be8ca07734fe33532c6c1aecb82b6079d28"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_GrenadeNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 33470,
+      "sha256": "70bd7b21208b83bb48ff7b6ce7280982a229d2809a447388c2e42c8e04bea7b6"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_GrenadeOrm.webp",
+      "width": 256,
+      "height": 256,
+      "bytes": 59584,
+      "sha256": "9f5cc9624665b098da98dc3f430b192a24f129a215fc6ed5047972c9ff3a26b8"
+    }
+  ],
+  "totalBytes": 215718,
+  "metrics": {
+    "meanSrgb": [
+      0.3862,
+      0.3015,
+      0.2228
+    ],
+    "luma": 0.3035,
+    "lumaStd": 0.124,
+    "sat": 0.423,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.3367,
+    "seam": 0.1317,
+    "interior": 0.1325,
+    "seamRatio": 0.994,
+    "border": 0.599,
+    "swing": 0.0136,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

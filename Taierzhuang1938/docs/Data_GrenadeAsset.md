@@ -1,29 +1,24 @@
-# 滕县木柄手榴弹外观资产
+# 滕县巩式木柄手榴弹
 
-2026-09-06：用户要求 imagegen 三视图、BlenderMCP 细化并替换线上加载画面中的简模。
+游戏资产采用国产巩式外观。2026-11-26 用公开照片重校侧面轮廓，经 BlenderMCP 重建为一件封闭网格，并替换游戏实际使用的 GLB、TZM 与贴图。文件名里的 `Type24` 沿用旧版加载路径。
 
-## 历史范围
+## 参考照片
 
-采用战前国产巩式木柄弹的外观解释，表现深色铸造金属弹体、收颈、木柄和封闭尾盖。没有制作内部结构，也没有添加未经证实的厂号、日期或德军标记。
+| 图像 | 本次使用范围 |
+| --- | --- |
+| [国家文化记忆库藏品 18000005525](https://tcmb.culture.tw/zh-tw/detail?id=18000005525&indexCode=MOCCOLLECTIONS) | 照片所附记录写有民国四十七年九月，即 1958 年 9 月。馆藏目录将前排四件标为巩式木柄手榴弹，能辨认宽弹体、短收颈及局部木柄轮廓。斜拍和阴影限制了端面及颜色判断。 |
+| [《巩县兵工厂（3）》所载巩造兵器展板](https://www.wenxuecity.com/blog/201712/73559/13137.html) | 左侧单件提供清楚的侧面外形。取较宽、近直壁的弹体，短肩、细腰、尾端鼓起的木柄和窄尾盖。转载图未列展品编号、原始摄影信息或拍摄批次。 |
+| [布里斯托大学中国历史照片 Ro-n0107](https://hpcbristol.net/visual/ro-n0107)、[Ro-n0108](https://hpcbristol.net/visual/ro-n0108)、[Ro-n0438](https://hpcbristol.net/visual/ro-n0438)、[Ro-n0662](https://hpcbristol.net/visual/ro-n0662) | 同期中国军队装备影像。前两张属于同一组摆拍，单件被手遮挡或失去侧面，其他照片的物件范围较小。用于核对时代背景。 |
+| [同档案 JM04-082](https://hpcbristol.net/visual/jm04-082)、[JM02-098](https://hpcbristol.net/visual/jm02-098)、[JM03-049](https://hpcbristol.net/visual/jm03-049) | 1937 年上海影像。查阅原图后，单件过小或被遮挡，无法可靠区分具体厂型。 |
+| [黑水博物馆长柄模型](https://www.blackwater.tw/post/pair-of-models-of-republic-of-china-gongxian-arsenal-long-handled-stick-grenades)、[烟溪旧址陈列馆](https://www.yiyang.gov.cn/jgswglj/13937/13973/content_2092318.html) | 两处把展品标为模型。黑水件属于长柄外形，对照时保留本作短柄的轮廓。 |
+| [巩县旧址报道所述展室](https://www.sohu.com/a/936596460_121117083)、[抗日战争纪念网所载滕县战史](https://m.krzzjn.com/show-355-89383.html) | 分别支持巩式展陈与滕县守军用弹的背景，暂未提供可识别为滕县现场或同批次的单件外观照。 |
 
-- [抗日战争纪念网：徐州会战（一）——川军死守滕县](https://m.krzzjn.com/show-355-89383.html)记述战前补给的巩县手榴弹。该文属于后出的战史叙述，不能用来确定单件实物的生产批次。
-- [中国军网：蟠龙山峡响惊雷](https://www.81.cn/js_208592/16269819.html)记述1938年起的柳沟兵工厂及其仿制巩县小型木柄弹的背景。
-- [黑水博物馆：巩造木柄弹模型藏品](https://www.blackwater.tw/blog/tags/%E6%89%8B%E6%A6%B4%E5%BD%88)用于比较黑色金属与木柄的外观搭配；该馆明确标注为模型，不当作滕县战场出土物证。
+合用展板侧面与馆藏照片核对可见轮廓。两份图像的日期、视角和来源不同，仍缺 1938 年滕县守军所用批次的多角度照片。木色、铁面和磨损属于美术复原。游戏原有的 0.22 米长度是动画包络，继续沿用。
 
-这些材料支持时代与外观家族，不能证明三视图就是滕县守军某一确切批次。三视图为 imagegen 创作的美术参考，不是实物测绘图。游戏原有的0.22米包络为动画兼容保留，不宣称是这批历史实物的精确尺寸。删除旧展示文案中属于台儿庄第31师的用弹数字。
+## 运行时与重建
 
-## 资产与坐标
-
-- `Model/Model_Grenade.tzm.json`：加载展示、角色持握用；4,480三角、1材质，右手握点为原点。
-- `Model/Model_Type24Grenade.glb`：第一人称与投掷用；同一份网格，包围盒中心为原点。Type24仅为兼容保留的旧文件名。
-- `Texture/Texture_Grenade{Base,Normal,Orm}.webp`：共用UV图集，左半木柄、右半金属。底色使用内置 imagegen，法线与粗糙度/金属度由 Blender 侧程序场生成。网页编码保留在1536×768以内。
-- Blender编辑坐标中弹头朝+Z；GLB导出前转到Blender+Y，经glTF坐标转换后为游戏-Z。TZM直接旋转到游戏-Z，并沿Z平移-0.035米保持握点。`Script_ModelFacingTest.mjs`实际解码两份顶点云，验证宽弹体在-Z、木柄在+Z和全长包络。
-- `_blender/Script_GrenadeDetail.py`保留可重建几何、UV、程序表面生成函数、GLB/TZM导出和本地摄影棚设置；`BuildWeapons.BuildGrenade`复用相同几何入口。重建使用已交付的贴图，不重新调用生成服务。
-
-## 本地源工程
-
-`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeDetail_20260906/`
-
-其中保留 `Model_GongxianGrenade.blend`（贴图打包）、`Reference_GrenadeThreeView.png`、生成提示词、原始PNG材质及渲染预览。源工程、三视图及验收网页/截图不提交到Pages仓库。
-
-BlenderMCP在本任务独立空场景执行建模脚本，再导出两种游戏格式。模型无悬空零件和共面接缝；发布验收包括开机载荷预算、模块缓存图、资产规范、两路真实顶点朝向以及浏览器展示/战斗检查。
+- `Model/Model_Type24Grenade.glb` 用于第一人称和投掷，模型原点在包围盒中心。`Model/Model_Grenade.tzm.json` 用于角色持握与使用 TZM 的展示，原点在项目已有握点。两路弹头均朝游戏局部 -Z。
+- 两份文件各 **7,872 个三角面、1 个材质**。两种格式来自同一份闭合外表网格，现有动画挂点位置保留。
+- OpenAI Images API 的 `gpt-image-2` 生成木与铁的底色源图。[_import/Prompts/Texture_Grenade.txt](../_import/Prompts/Texture_Grenade.txt) 是实际提示词。[_import/Script_BakeGrenadeTexture.py](../_import/Script_BakeGrenadeTexture.py) 用源图重烘并组装共享图集，底色 1024²、法线 512²、ORM 256²。图片输入是美术材质。
+- 在专用空场景经 BlenderMCP 运行 [_blender/Script_GrenadeDetail.py](../_blender/Script_GrenadeDetail.py)，从仓库已交付的贴图重建两种模型格式，无需再生成图片。`BuildWeapons.BuildGrenade` 复用同一几何入口。
+- Blender 原工程、高清材质源图、参考原图和预览保存在本机 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GongxianGrenadeReference_20261126/`。2026-09-06 的创作三视图及旧源工程保留在原目录。

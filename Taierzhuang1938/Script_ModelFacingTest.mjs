@@ -221,9 +221,11 @@ Check(declaredNoses >= singleBodies, "ImportVehicles 每个 singleBody 源件都
 // The loading display / actor use TZM; the held and thrown prop use GLB.
 // Measure both finished payloads so a glTF axis conversion cannot silently diverge.
 const grenadeDoc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES.Grenade.file), "utf8"));
+const grenadeGlbFile = path.join(projectDir, "Model", "Model_Type24Grenade.glb");
+const grenadeGltf = LoadGlb(grenadeGlbFile).json;
 const grenadeClouds = [
   ["Grenade TZM", grenadeDoc.meshes.flatMap((_, i) => TzmMeshPoints(grenadeDoc, i))],
-  ["Grenade GLB", GlbPoints(path.join(projectDir, "Model", "Model_Type24Grenade.glb"))],
+  ["Grenade GLB", GlbPoints(grenadeGlbFile)],
 ];
 for (const [name, points] of grenadeClouds) {
   const lo = Math.min(...points.map((p) => p[2])), hi = Math.max(...points.map((p) => p[2]));
@@ -233,8 +235,15 @@ for (const [name, points] of grenadeClouds) {
   Check(frontRadius > rearRadius * 1.5, `${name} 宽弹体在 -Z、木柄在 +Z`, `${frontRadius.toFixed(4)} / ${rearRadius.toFixed(4)}`);
   Check(Math.abs(hi - lo - 0.22) < 0.0001, `${name} 保留 0.22 m 动画包络`);
 }
-Check(grenadeDoc.triangles === MESHES.Grenade.triangles && grenadeDoc.meshes.length === 1,
-  "木柄弹展示清单与实物面数一致，单材质合批");
+const grenadePrimitives = grenadeGltf.meshes.flatMap((mesh) => mesh.primitives);
+const grenadePrimitive = grenadePrimitives[0];
+const grenadeGlbTriangles = grenadeGltf.accessors[grenadePrimitive.indices].count / 3;
+const grenadeTzmTriangles = grenadeDoc.meshes.reduce((sum, mesh) => sum + mesh.idxCount / 3, 0);
+Check(grenadeDoc.triangles === MESHES.Grenade.triangles
+  && grenadeTzmTriangles === grenadeDoc.triangles && grenadeGlbTriangles === grenadeTzmTriangles
+  && grenadeDoc.meshes.length === 1 && grenadePrimitives.length === 1 && grenadeGltf.materials.length === 1
+  && (grenadePrimitive.mode ?? 4) === 4 && grenadeGlbTriangles <= 10_000,
+  "木柄弹 GLB 与 TZM 实际面数一致，单材质且不超过 1 万三角面", `${grenadeGlbTriangles} / ${grenadeTzmTriangles}`);
 
 // Locally authored food has no nose. Measure its long X axis, vertical tissue
 // layers and thin Z cross-section from the shipped GLB, after axis conversion.

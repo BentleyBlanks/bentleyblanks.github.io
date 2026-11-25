@@ -8,7 +8,7 @@
 
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 
-const URL = "./Model/Model_Type24Grenade.glb?v=grenade20260906";
+const URL = "./Model/Model_Type24Grenade.glb?v=grenade20261126";
 const loader = new GLTFLoader();
 let pending = null;
 
