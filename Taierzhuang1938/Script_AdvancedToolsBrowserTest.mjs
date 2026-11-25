@@ -325,7 +325,7 @@ try {
     }
     const SpreadOf = (rows, index) => Math.max(...rows.map(row => row[index])) - Math.min(...rows.map(row => row[index]));
     Check("两侧五处木面的底色都在同一棕色范围",
-      timber.albedo.every(([r, g, b]) => r >= 40 && r <= 90 && r > g && g > b)
+      timber.albedo.every(([r, g, b]) => r >= 80 && r <= 130 && r > g && g > b)
       && [0, 1, 2].every(index => SpreadOf(timber.albedo, index) < 14), JSON.stringify(timber.albedo));
     Check("木面粗糙度接近，前木反射不过亮",
       timber.roughness.every(([r, g, b]) => r >= 105 && r <= 190 && r === g && g === b)

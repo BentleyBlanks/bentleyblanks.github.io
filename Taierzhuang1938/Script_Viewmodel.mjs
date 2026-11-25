@@ -1507,7 +1507,7 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
 const SHEATH_HAND = new THREE.Vector3(0.010, -0.150, -0.470);
 // 刀扣上去的最后一段行程（米，沿枪管往前滑）。
 const BAYONET_SLIDE_Z = 0.145;
-const BAYONET_CARRY = { px: -0.015, py: 0.016, pz: 0.035, rx: 0.275, ry: 0.575, rz: 0.100 };
+const BAYONET_CARRY = { px: 0.010, py: -0.028, pz: 0.035, rx: 0.275, ry: 0.575, rz: 0.100 };
 // 出招时把"刺杀预备"压掉多少（0 = 完全压平）。留一点点斜度，收招回位才不生硬。
 const BAYONET_CARRY_STRIKE = 0.22;
 
@@ -1664,6 +1664,8 @@ export class Viewmodel {
     // 白刃期间把冲刺姿态"静音"的权重（0 = 冲刺姿态照常，1 = 完全按腰射姿态挥）。
     // 它不是弹簧：这条曲线不许过冲，过冲会让刀在收招时越过腰射姿态弹一下。见 Update。
     this.meleeSprintMute = 0;
+    // 白刃架势（含刺刀格斗）下让出腰射近景构图（rifleViewPivot），避免其 +7.6 cm 抬高叠在 BayonetGuard 上。
+    this.meleeViewFade = 0;
     // 落地下沉（2026-10-21）：原先 0.38 阻尼比，落地砸下去还要弹回来一下，连跳时枪一直在甩。
     // 0.62 只留一点点回弹，读起来是"膝盖接住了"，不是枪在弹簧上。
     this.landSpring = new Spring(170, 0.62);
@@ -2157,6 +2159,7 @@ export class Viewmodel {
     this.timedGrenadePose = null;
     this.carryOverride = null;
     this.bayonetCarry = this.bayonetFixed && this.weapon?.bayonet ? 1 : 0;
+    this.meleeViewFade = 0;
     this.boltOpen = false;
     this.pendingHoldOpen = false;
     this.flashTime = 999;
@@ -2486,10 +2489,12 @@ export class Viewmodel {
     this._UpdateRifleView(0, 0);
   }
 
-  _UpdateRifleView(ads, sprint) {
+  _UpdateRifleView(ads, sprint, meleeFade = this.meleeViewFade || 0) {
     // 逐帧拉栓的低位是在开镜（无近景构图）空间里解出来的：落得越低，腰射构图让得越多。
+    // 白刃架势（meleeCombat）与上刺刀预备（bayonetCarry）按原腰射框架编写，同样让出近景构图以免叠高遮挡视野。
+    const carryFade = Math.max(Clamp01(meleeFade), Clamp01(this.bayonetCarry || 0));
     const weight = FPS_RIFLE_VIEW[this.weaponId] && !this.mount
-      ? (1 - Clamp01(ads)) * (1 - Clamp01(sprint))
+      ? (1 - Clamp01(ads)) * (1 - Clamp01(sprint)) * (1 - carryFade)
         * (this.boltCycleState ? 1 - this.boltCycleState.lower : this.action?.skeletal ? 1 : RifleActionFraming(this.action?.kind, this.action?.t)) : 0;
     this.rifleViewPivot.position.copy(this.rifleViewPosition).multiplyScalar(weight);
     this.rifleViewPivot.quaternion.identity().slerp(this.rifleViewRotation, weight);
@@ -3341,7 +3346,11 @@ export class Viewmodel {
     this.wallPivot.position.z += this.wallLower * WALL_CARRY.backM;
 
     // --- FOV 补偿（世界 FOV 变了要重算）-------------------------------------
-    this._UpdateRifleView(ads, sprintValue);
+    const meleeViewTarget = input.meleeCombat ? 1 : 0;
+    this.meleeViewFade = step > 0
+      ? this.meleeViewFade + (meleeViewTarget - this.meleeViewFade) * (1 - Math.exp(-step * 14))
+      : meleeViewTarget;
+    this._UpdateRifleView(ads, sprintValue, this.meleeViewFade);
     if (!this.mount && Math.abs(worldFov - (this._lastWorldFov || 0)) > 0.05) {
       this._lastWorldFov = worldFov;
       if (adsInput < 0.02) this.worldFovBase = worldFov;   // 只在没开镜时校准基准
@@ -4669,7 +4678,8 @@ export class Viewmodel {
     const sx = this.actionPivot.scale.x;
     const ax = this.actionPivot.position.x, ay = this.actionPivot.position.y;
     const hardLock = !!this.lodgeLock?.hardLock;
-    if (Math.abs(roll) < 1e-4 && ay <= 1e-4 && !hardLock) return;
+    const bladeLift = this.weapon?.kind === "melee" && ay > 1e-4;
+    if (Math.abs(roll) < 1e-4 && !bladeLift && !hardLock) return;
     const mirrorSign = sx < 0 ? -1 : 1;
     // R_z(roll) * S(sx,1,1) * R_z(phi): sx<0 时反射会反转旋转方向，故取 -mirrorSign * roll 抵消。
     this.armAnchor.rotation.set(0, 0, -mirrorSign * roll);
@@ -4836,11 +4846,13 @@ export class Viewmodel {
     this.meleeVideoFrame = SampleMeleeVideo(pose);
     const frame = SampleMeleeFirstPerson(pose);
     if (!frame || !this.rig) return;
-    this.actionPivot.position.set(frame[0], frame[1], frame[2]);
+    // 刺刀白刃原烘焙带 +0.055 m 竖直抬举（适配旧 1/k 深度拉伸）；现步枪改用窄 FOV 投影后该抬举会把枪和左臂顶到准心线上。
+    const bayonetDropY = pose.weapon === "Bayonet" ? 0.055 : 0;
+    this.actionPivot.position.set(frame[0], frame[1] - bayonetDropY, frame[2]);
     this.actionPivot.rotation.set(frame[3], frame[4], frame[5], "YXZ");
     this.swingPivot.rotation.set(frame[6] || 0, frame[7] || 0, frame[8] || 0, "YXZ");
     if (this.meleeVideoFrame) {
-      this.actionPivot.position.set(0,pose.weapon === "Bayonet" ? .055 : 0,pose.weapon === "Bayonet" ? -.12 : 0);
+      this.actionPivot.position.set(0, 0, pose.weapon === "Bayonet" ? -.12 : 0);
       this.actionPivot.quaternion.identity();
       this.swingPivot.quaternion.identity();
     }

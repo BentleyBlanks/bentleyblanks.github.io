@@ -36,15 +36,16 @@ try{
  assert.equal(evidence.identity.version,'173R-20261125R26');assert.equal(evidence.identity.triangles,77396);
  assert.equal(evidence.identity.worldTriangles,77396);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  const timber=evidence.identity.materials.filter(material=>/^(MainWood_|FrontWood_|UpperWood_)/.test(material.part));
- assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-.17)<1e-5),'game preserves the shared walnut reflectance');
+ assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-.45)<1e-5),'game preserves the calibrated walnut dielectric reflectance');
  const oil=timber.find(material=>material.part.startsWith('MainWood_'));
  assert(oil.filmMap&&Math.abs(oil.coat-.20)<1e-5&&Math.abs(oil.coatRough-.33)<1e-5&&['','srgb-linear'].includes(oil.filmSpace),'the game binds the linear crest-finish mask and both physical factors');
  const foreOil=timber.find(material=>material.part.startsWith('FrontWood_'));
  assert(foreOil.filmMap&&Math.abs(foreOil.coat-.20)<1e-5&&Math.abs(foreOil.coatRough-.36)<1e-5&&['','srgb-linear'].includes(foreOil.filmSpace),'front film has its own linear wear mask and broad reflection');
  assert(timber.filter(material=>material!==oil&&material!==foreOil).every(material=>!material.filmMap&&material.coat===0));
  for(const m of evidence.identity.materials){
+  const isWood=/^(MainWood_|FrontWood_|UpperWood_)/.test(m.part);
   assert.equal(m.authored,true,m.part);assert.equal(m.materialClass,'authored',m.part);assert.equal(m.skin,false,m.part);
-  assert.deepEqual(m.color,[1,1,1],m.part+' uses the calibrated native texture');
+  assert.deepEqual(m.color,isWood?[2.2,2.45,2.85]:[2.8,2.8,2.8],m.part+' uses the calibrated runtime gain');
   if(m.filmMap)assert.equal(m.coatFilter,m.baseFilter,'oil and wood use the same oblique-view filtering');
  }
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert(['','srgb-linear'].includes(m.normal));assert(['','srgb-linear'].includes(m.orm));assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}

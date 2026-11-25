@@ -502,12 +502,13 @@ const nativeScene=new THREE.Group();nativeScene.add(handle,stockMesh);
 const portable={gltf:{scene:nativeScene,asset:doc.asset},materials:new Map()};
 ConfigureHanYang173R(portable,library);
 for(const part of [handle,stockMesh]){
- assert.deepEqual(part.material.color.toArray(),[1,1,1]);
+ assert.deepEqual(part.material.color.toArray(),HanYang173RBaseGain(part.name,'candidate',true));
  assert.equal(part.material.userData.externalMaterialClass,'authored');
  assert.equal(part.material.userData.materialShadingSurface.skin,false);
  const oldGain=HanYang173RBaseGain(part.name,'candidate'),legacy=HanYang173RBaseGain(part.name,'authored',true);
  assert(legacy.every((v,i)=>Math.abs(v*oldGain[i]-D.exposureGain)<1e-10));
 }
+assert.equal(stockMesh.material.specularIntensity,D.calibratedGain.woodSpecular);
 assert.equal(stockMesh.material.clearcoatMap.anisotropy,16);
 ConfigureHanYang173R(portable,null,4);
 assert.equal(stockMesh.material.clearcoatMap.anisotropy,4,'inspection paths also filter the oil mask');

@@ -37,8 +37,11 @@ export const HANYANG_BASE_MODE = (typeof location !== 'undefined'
 
 /** Linear colour multiplier for a legacy or calibrated base-colour atlas. */
 export function HanYang173RBaseGain(part, mode = HANYANG_BASE_MODE, calibrated = false) {
-  const g = D.exposureGain, C = D.baseCandidate;
-  if(calibrated && mode !== 'authored') return [1, 1, 1];
+  const g = D.exposureGain, C = D.baseCandidate, K = D.calibratedGain;
+  if(calibrated && mode !== 'authored') {
+    if(K) return D.wood.includes(part) ? [...K.wood] : [K.steel, K.steel, K.steel];
+    return [1, 1, 1];
+  }
   if(!calibrated && mode === 'authored') return [g, g, g];
   let gain = [g, g, g];
   if(C && D.wood.includes(part)) {
@@ -61,6 +64,10 @@ export function ConfigureHanYang173R(asset, library, rendererAnisotropy = librar
     const material = mesh.material;
     material.name = `HanYang173R_${mesh.name}`;
     material.color.fromArray(HanYang173RBaseGain(mesh.name,HANYANG_BASE_MODE,calibrated));
+    if(calibrated && HANYANG_BASE_MODE !== 'authored' && D.calibratedGain?.woodSpecular != null
+      && D.wood.includes(mesh.name) && 'specularIntensity' in material) {
+      material.specularIntensity = D.calibratedGain.woodSpecular;
+    }
     for(const slot of ['map','normalMap','roughnessMap','metalnessMap','aoMap','clearcoatMap'])
       if(material[slot]&&material[slot].anisotropy!==anisotropy) {material[slot].anisotropy=anisotropy;material[slot].needsUpdate=true;}
     library?.ConfigureExternalPbr(material,{mesh,preserveAuthored:true});

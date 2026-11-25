@@ -16,8 +16,16 @@ export const HANYANG_173R = Object.freeze({
   // 36/31; the Blender overview's wood is 51.
   exposureGain: 2.5,
   textureAnisotropy: 16,
-  // R24 stores the calibrated colour in each unique atlas. These gains are needed
-  // for older GLBs and for the historical gunBase=authored comparison.
+  // R24–R26 stores unique per-part atlases baked against the multi-light studio inspection
+  // bench, leaving game-space linear luminance very dark (~3.2% walnut wood, ~3.6–4.2% steel,
+  // and 0.17 dielectric specular on wood; in meleeLabDay 75–95% of pixels fell below 8/255).
+  // calibratedGain lifts the calibrated atlases into readable dark-walnut (~7.6% luma) and
+  // blued-steel (~10–12% luma) reflectance under game exposure (0.62) without touching GLB bytes.
+  calibratedGain: {
+    wood: [2.2, 2.45, 2.85],
+    steel: 2.8,
+    woodSpecular: 0.45,
+  },
   // 2026-11-03 底色校准（用户看过候选后定：「确实好很多，改了推吧」）。只调材质球上的底色倍率（material.color），
   // 贴图与 GLB 字节不动；`?gunBase=authored` 可切回旧的单一 exposureGain 对照。
   // 依据见 _shots/BaseColorCompare：木头 3.3% 低于实测最暗木材（≈9%）与 COD 二战木托（粗估 ≈9%）；

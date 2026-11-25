@@ -157,7 +157,7 @@ export class FpsSkeletalAnimation {
 
   CanUseIdle(input={}) {
     const vm=this.vm;
-    return !(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||vm.action||vm.flashTime<.6||(vm.rig?.assetVersion&&vm.boltOpen));
+    return !(input.meleeCombat||(vm.bayonetCarry||0)>.01||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||vm.action||vm.flashTime<.6||(vm.rig?.assetVersion&&vm.boltOpen));
   }
 
   // The clip owns the arms, the rifle and its moving parts for the whole reload;
@@ -181,7 +181,7 @@ export class FpsSkeletalAnimation {
     let toTarget=null;
     if(outLinear<1){
       // Evaluate the live post-reload target pose (Idle if hip-still, else live IK).
-      const wantIdle=!(input.meleeCombat||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||(vm.rig?.assetVersion&&vm.boltOpen))&&!!this.Clip('Idle');
+      const wantIdle=!(input.meleeCombat||(vm.bayonetCarry||0)>.01||(input.moveSpeed||0)>.05||vm.sprintSpring.value>.001||vm.adsSpring.value>.001||(vm.wallLower||0)>.001||vm.inertiaActive||(vm.rig?.assetVersion&&vm.boltOpen))&&!!this.Clip('Idle');
       this.SetCameraScale(1);
       if(wantIdle){
         this.Apply('Idle',LoopTime(this.clock,this.Clip('Idle').duration),{preserveParts:true});
@@ -269,7 +269,7 @@ export class FpsSkeletalAnimation {
       // the hands must follow the gun through IK, not hold the empty air.
       // Weapon inertia (`vm.inertiaActive`) is handled via `CanUseIdle` so the
       // Idle -> live IK transition crossfades smoothly instead of snapping in 1 frame.
-      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.wallLower||0)>.001||(vm.rig?.assetVersion&&vm.boltOpen)){
+      if(vm.action||vm.flashTime<.6||input.meleeCombat||(vm.bayonetCarry||0)>.01||(vm.wallLower||0)>.001||(vm.rig?.assetVersion&&vm.boltOpen)){
         this.idleWeight=0;
         return false;
       }
