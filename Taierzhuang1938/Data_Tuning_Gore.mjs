@@ -32,16 +32,66 @@ export const ENABLED = true;
  *   contains    —— 这一段被卸掉时一起飞走的下游段（整条胳膊/整条腿）。
  */
 export const LIMBS = Object.freeze({
-  upperArmL: Object.freeze({ bones: /^Bip\d+ L (UpperArm|Forearm|Hand|Finger)/, joint: "upperArmL", axisTo: "forearmL", capRadius: 0.075, mass: 3.5, halfLength: 0.28, contains: Object.freeze(["forearmL"]) }),
-  forearmL: Object.freeze({ bones: /^Bip\d+ L (Forearm|Hand|Finger)/, joint: "forearmL", axisTo: "handL", capRadius: 0.060, mass: 1.8, halfLength: 0.24, contains: Object.freeze([]) }),
-  upperArmR: Object.freeze({ bones: /^Bip\d+ R (UpperArm|Forearm|Hand|Finger)/, joint: "upperArmR", axisTo: "forearmR", capRadius: 0.075, mass: 3.5, halfLength: 0.28, contains: Object.freeze(["forearmR"]) }),
-  forearmR: Object.freeze({ bones: /^Bip\d+ R (Forearm|Hand|Finger)/, joint: "forearmR", axisTo: "handR", capRadius: 0.060, mass: 1.8, halfLength: 0.24, contains: Object.freeze([]) }),
-  thighL: Object.freeze({ bones: /^Bip\d+ L (Thigh|Calf|Foot|Toe)/, joint: "thighL", axisTo: "calfL", capRadius: 0.10, mass: 10, halfLength: 0.40, contains: Object.freeze(["calfL"]) }),
-  calfL: Object.freeze({ bones: /^Bip\d+ L (Calf|Foot|Toe)/, joint: "calfL", axisTo: "footL", capRadius: 0.075, mass: 4.5, halfLength: 0.30, contains: Object.freeze([]) }),
-  thighR: Object.freeze({ bones: /^Bip\d+ R (Thigh|Calf|Foot|Toe)/, joint: "thighR", axisTo: "calfR", capRadius: 0.10, mass: 10, halfLength: 0.40, contains: Object.freeze(["calfR"]) }),
-  calfR: Object.freeze({ bones: /^Bip\d+ R (Calf|Foot|Toe)/, joint: "calfR", axisTo: "footR", capRadius: 0.075, mass: 4.5, halfLength: 0.30, contains: Object.freeze([]) }),
+  upperArmL: Object.freeze({ bones: /^Bip\d+ L (UpperArm|Forearm|Hand|Finger)/, xbotBones: /^Left(Arm|ForeArm|Hand)/i, joint: "upperArmL", axisTo: "forearmL", xbotJoint: "LeftArm", xbotAxisTo: "LeftForeArm", capMesh: "Stump_Arm", capRadius: 0.075, mass: 3.5, halfLength: 0.28, contains: Object.freeze(["forearmL"]) }),
+  forearmL: Object.freeze({ bones: /^Bip\d+ L (Forearm|Hand|Finger)/, xbotBones: /^Left(ForeArm|Hand)/i, joint: "forearmL", axisTo: "handL", xbotJoint: "LeftForeArm", xbotAxisTo: "LeftHand", capMesh: "Stump_Forearm", capRadius: 0.060, mass: 1.8, halfLength: 0.24, contains: Object.freeze([]) }),
+  upperArmR: Object.freeze({ bones: /^Bip\d+ R (UpperArm|Forearm|Hand|Finger)/, xbotBones: /^Right(Arm|ForeArm|Hand)/i, joint: "upperArmR", axisTo: "forearmR", xbotJoint: "RightArm", xbotAxisTo: "RightForeArm", capMesh: "Stump_Arm", capRadius: 0.075, mass: 3.5, halfLength: 0.28, contains: Object.freeze(["forearmR"]) }),
+  forearmR: Object.freeze({ bones: /^Bip\d+ R (Forearm|Hand|Finger)/, xbotBones: /^Right(ForeArm|Hand)/i, joint: "forearmR", axisTo: "handR", xbotJoint: "RightForeArm", xbotAxisTo: "RightHand", capMesh: "Stump_Forearm", capRadius: 0.060, mass: 1.8, halfLength: 0.24, contains: Object.freeze([]) }),
+  thighL: Object.freeze({ bones: /^Bip\d+ L (Thigh|Calf|Foot|Toe)/, xbotBones: /^Left(UpLeg|Leg|Foot|Toe)/i, joint: "thighL", axisTo: "calfL", xbotJoint: "LeftUpLeg", xbotAxisTo: "LeftLeg", capMesh: "Stump_Thigh", capRadius: 0.10, mass: 10, halfLength: 0.40, contains: Object.freeze(["calfL"]) }),
+  calfL: Object.freeze({ bones: /^Bip\d+ L (Calf|Foot|Toe)/, xbotBones: /^Left(Leg|Foot|Toe)/i, joint: "calfL", axisTo: "footL", xbotJoint: "LeftLeg", xbotAxisTo: "LeftFoot", capMesh: "Stump_Calf", capRadius: 0.075, mass: 4.5, halfLength: 0.30, contains: Object.freeze([]) }),
+  thighR: Object.freeze({ bones: /^Bip\d+ R (Thigh|Calf|Foot|Toe)/, xbotBones: /^Right(UpLeg|Leg|Foot|Toe)/i, joint: "thighR", axisTo: "calfR", xbotJoint: "RightUpLeg", xbotAxisTo: "RightLeg", capMesh: "Stump_Thigh", capRadius: 0.10, mass: 10, halfLength: 0.40, contains: Object.freeze(["calfR"]) }),
+  calfR: Object.freeze({ bones: /^Bip\d+ R (Calf|Foot|Toe)/, xbotBones: /^Right(Leg|Foot|Toe)/i, joint: "calfR", axisTo: "footR", xbotJoint: "RightLeg", xbotAxisTo: "RightFoot", capMesh: "Stump_Calf", capRadius: 0.075, mass: 4.5, halfLength: 0.30, contains: Object.freeze([]) }),
   // 头是球：没有第二个端点可以定轴，轴由 neck→head 现算（见 Script_CharacterGore）。
-  head: Object.freeze({ bones: /^Bip\d+ Head$/, joint: "head", axisTo: null, capRadius: 0.06, mass: 4.5, halfLength: 0.11, sphere: true, contains: Object.freeze([]) }),
+  head: Object.freeze({ bones: /^Bip\d+ Head$/, xbotBones: /^Head$/i, joint: "head", axisTo: null, xbotJoint: "Head", xbotAxisTo: null, capMesh: "Stump_Neck", burstCapMesh: "Stump_HeadBurst", capRadius: 0.06, mass: 4.5, halfLength: 0.11, sphere: true, contains: Object.freeze([]) }),
+});
+
+/** 预切测试模型的钢盔独立区域编码（紧接 LIMBS 1..9 之后）。 */
+export const HELMET_CODE = 10;
+
+/** 雕刻 PBR 解剖断面盖与碎块合集 GLB（BlenderMCP 重建产物）。 */
+export const STUMP_ASSETS_URL = "./Model/GoreTest/Model_GoreStumpCaps.glb";
+
+/** 哪些伤害类型命中头部时走「爆头碎裂」而非完整飞头（重机枪 / 爆炸）。 */
+export const HEAD_BURST_KINDS = Object.freeze(["hmg", "blast"]);
+
+/** 断面湿血干涸曲线：刚断时湿润高光，约半分钟逐步凝固暗哑。 */
+export const STUMP_WETNESS = Object.freeze({
+  freshRoughness: 0.24,
+  dryRoughness: 0.72,
+  drySeconds: 26,
+});
+
+/** 钢盔弹飞参数（九〇式钢盔约 1.2 kg，高弹跳 + 高自旋）。 */
+export const HELMET_LAUNCH = Object.freeze({
+  speed: Object.freeze([3.2, 6.4]),
+  up: 3.4,
+  spin: 16,
+  mass: 1.25,
+  radius: 0.145,
+  restitution: 0.34,
+  friction: 0.55,
+  lifeS: 28,
+});
+
+/** 爆头碎肉 / 近炸碎块与撕裂布片喷射参数。 */
+export const GIB_BURST = Object.freeze({
+  headBurstCount: 8,
+  blastCount: 5,
+  hmgCount: 3,
+  bladeCount: 2,
+  lifeS: 14,
+  maxLive: 28,
+  speed: Object.freeze([2.8, 7.2]),
+  up: 2.5,
+  spin: 18,
+  radius: 0.045,
+});
+
+/** 飞出肢块落地与拖滑时在地面留下的血迹拖痕。 */
+export const GORE_DECAL_SMEAR = Object.freeze({
+  maxPerPart: 3,
+  minSpeedMs: 0.65,
+  cooldownS: 0.22,
+  size: Object.freeze([0.18, 0.36]),
 });
 
 /**

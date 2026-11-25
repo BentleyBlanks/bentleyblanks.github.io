@@ -94,7 +94,7 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
     tanketteAdvanceEastTrack: ["UpdateCamera"], aircraftEvacuationDitch: ["UpdateCamera"],
     encounterPlay: ["ScaleDt", "CapturesInput", "ApplyCamera"],
     cloth: ["UpdateCamera"], hair: ["UpdateCamera"], impacts: ["ScaleDt", "CapturesInput", "ApplyCamera"],
-    reactions: ["ScaleDt"], gore: ["ScaleDt"],
+    reactions: ["ScaleDt"], gore: ["ScaleDt", "CapturesInput", "ApplyCamera"],
   };
   const source = fs.readFileSync(new URL("./Script_SandboxRanges.mjs", import.meta.url), "utf8");
   for (const plugin of SANDBOX_PLUGINS) {

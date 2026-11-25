@@ -1843,6 +1843,7 @@ export class Actor {
 
   GetBoneHitboxes() {
     if (this.crowdHitboxes) return this._CrowdHitboxes();
+    if (this.goreSkin?.visible && typeof this.goreSkin.GetHitboxes === "function") return this.goreSkin.GetHitboxes();
     if (this.characterRig) return this.characterRig.GetHitboxes();
     this.root.updateWorldMatrix(true, true);
     const scale = this.root.getWorldScale(ACTOR_HITBOX_SCALE).y || 1;
@@ -1856,6 +1857,7 @@ export class Actor {
 
   RaycastHitboxes(origin, direction, maxDistance) {
     if (this.crowdHitboxes) return RaycastShapes(this._CrowdHitboxes(), origin, direction, maxDistance);
+    if (this.goreSkin?.visible && typeof this.goreSkin.Raycast === "function") return this.goreSkin.Raycast(origin, direction, maxDistance);
     if (this.characterRig) return this.characterRig.Raycast(origin, direction, maxDistance);
     let best = null;
     for (const shape of this.GetBoneHitboxes()) {
@@ -2186,7 +2188,7 @@ export class Actor {
   AddBulletWound(part, direction, info = {}) {
     if (!this.characterRig || this.disposed) return;
     this.woundBlood ||= new CharacterWounds(this.characterRig.root);
-    const shape = this.characterRig.GetHitboxes().find(h => info.shapeId ? h.id === info.shapeId
+    const shape = this.GetBoneHitboxes().find(h => info.shapeId ? h.id === info.shapeId
       : part === "arm" ? /Arm|forearm/.test(h.id) : part === "leg" ? /thigh|calf/.test(h.id) : h.part === part);
     let point = info.point && this.root.visible ? info.point : null;
     if (!point && shape) {

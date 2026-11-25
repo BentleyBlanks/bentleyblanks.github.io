@@ -293,12 +293,20 @@ const PLUGINS = {
     phase: GORE_RANGE_PHASE, World: GoreRangeField,
     Create: (h) => {
       const runtime = new GoreRange({
-        ai: h.ai, player: h.player, camera: h.camera, scene: h.scene, combat: h.combat, battlefield: h.battlefield, renderer: h.renderer,
+        ai: h.ai, player: h.player, camera: h.camera, scene: h.scene, combat: h.combat, battlefield: h.battlefield,
+        renderer: h.renderer, post: h.post, vfx: h.vfx, audio: h.audio, hud: h.hud, canvas: h.canvas, state: h.state,
+        Pickup: h.Pickup, Refill: h.Refill, GiveGrenade: h.GiveGrenade, SetViewmodelHidden: h.SetViewmodelHidden,
+        ctx: h.ctx,
         // 核心断肢系统的调试口（docs/Data_Dismemberment.md §8.3）。惰性取：建关时可能还没挂好。
         Gore: h.GoreDebug, CanUse: h.CanUse, Focus: h.Focus,
       });
-      // 慢动作按钮：乘一个倍率。
-      return Instance(runtime, { debugName: "GoreRange", updateSlot: "afterPlayer", ScaleDt: (dt) => dt * runtime.timeScale });
+      // 慢动作 / 暂停单步 + 自由观察相机接管输入与视角。
+      return Instance(runtime, {
+        debugName: "GoreRange", updateSlot: "afterPlayer",
+        ScaleDt: (dt) => runtime.ScaleDt(dt),
+        CapturesInput: () => runtime.CapturesInput(),
+        ApplyCamera: (camera) => runtime.ApplyCamera(camera),
+      });
     },
   },
   impacts: {

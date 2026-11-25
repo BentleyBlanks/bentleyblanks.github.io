@@ -99,14 +99,25 @@ export function InstallDebugApi(ctx) {
      * @param {string} limbId 肢体名（Limbs() 里的一个）
      * @param {[number,number,number]|null} dir 卸出去的方向，默认沿断口轴
      */
-    Sever: (soldierId, limbId, dir = null) => {
+    Sever: (soldierId, limbId, dir = null, options = null) => {
       const soldier = ctx.ai?.soldiers.find((s) => s.id === soldierId) || null;
       if (!soldier || !ctx.gore) return null;
       const direction = dir ? new THREE.Vector3(dir[0], dir[1], dir[2]) : null;
-      const plan = { limbs: [limbId], kind: "debug", point: null };
+      const plan = {
+        limbs: [limbId],
+        kind: options?.kind || "debug",
+        point: options?.point || null,
+        headBurst: !!options?.headBurst,
+      };
       if (soldier.alive) soldier.Kill(direction, plan);
-      else ctx.gore.Sever(soldier, plan.limbs, { direction, kind: plan.kind });
+      else ctx.gore.Sever(soldier, plan.limbs, { direction, kind: plan.kind, point: plan.point, headBurst: plan.headBurst });
       return ctx.gore.State();
+    },
+    PopHelmet: (soldierId, dir = null) => {
+      const soldier = ctx.ai?.soldiers.find((s) => s.id === soldierId) || null;
+      if (!soldier || !ctx.gore) return false;
+      const direction = dir ? new THREE.Vector3(dir[0], dir[1], dir[2]) : null;
+      return !!ctx.gore.PopHelmet?.(soldier, { direction, kind: "hmg" });
     },
     // 顺手写回 graphics.gore：不写的话下一次 ApplyGraphics（改个窗口大小就够）
     // 会拿设置面板那一位把这里刚关掉的又打开。

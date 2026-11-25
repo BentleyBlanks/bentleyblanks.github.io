@@ -650,7 +650,7 @@ export class Soldier extends SoldierFieldAccessors {
       try {
         const gore = this.director?.ctx?.gore;
         severed = gore?.Sever?.(this, sever.limbs, {
-          direction, kind: sever.kind, point: sever.point,
+          direction, kind: sever.kind, point: sever.point, falloff: sever.falloff, headBurst: !!sever.headBurst,
         })?.length || 0;
       } catch (error) {
         console.warn("[Gore] Sever 抛错，这一下按不断处理：", error);
@@ -755,8 +755,8 @@ export class Soldier extends SoldierFieldAccessors {
     if (!this.alive) {
       if (!this.scriptEssential && damage > 0) {
         try {
-          const hasSkin = !!(this.director && this.director.view && this.director.view.skins && this.director.view.skins.has(this));
-          const gore = hasSkin ? null : this.director?.ctx?.gore;
+          const skin = this.director?.view?.skins?.get?.(this) || null;
+          const gore = (skin && !skin.goreEnabled) ? null : this.director?.ctx?.gore;
           const sever = gore?.Resolve?.(this, { ...info, part, kind: info.kind || "bullet",
             damage: damage * mult, wouldDie: true });
           if (sever?.limbs?.length) gore.Sever(this, sever.limbs, { ...sever, direction });
@@ -779,8 +779,8 @@ export class Soldier extends SoldierFieldAccessors {
     // 先累计肢段弹伤，再根据本次是否致死选择断肢；只有调试 force 可额外致死。
     // 叙事保护的角色整条链都不进，剧情角色不会因内容表现失去保护。
     // 与 Kill 里那一层同一条理由：判定抛错就按「不断」处理，伤害链照常走完。
-    const hasSkin = !!(this.director && this.director.view && this.director.view.skins && this.director.view.skins.has(this));
-    const gore = (this.scriptEssential || hasSkin) ? null : this.director?.ctx?.gore;
+    const skin = this.director?.view?.skins?.get?.(this) || null;
+    const gore = (this.scriptEssential || (skin && !skin.goreEnabled)) ? null : this.director?.ctx?.gore;
     let sever = null;
     try {
       sever = gore?.Resolve?.(this, {

@@ -1,133 +1,143 @@
 // 断肢测试场（?gore=1）的场地数据。纯数据，零 three、零 Math.random。
 //
-// 口径：docs/Data_Dismemberment.md §9。这里只有坐标与内容字段，判定与视觉在
-// Data_Tuning_Gore / Script_Dismemberment / Script_CharacterGore，场地在
-// Script_GoreRangeField，运行时与面板在 Script_GoreRange / Script_GoreLab。
+// 2026-11-25 重构：从塑料灰白盒升级为「1938 滕县城郊军事院落 · 断肢实景测试场」——
+//   · 保留全部木桩 ID（L10_1..5 / L25_1..5 / C1..C3 / B_1..3）与核心坐标契约；
+//   · 撤除刀桩区绊脚的 0.30 m 红色高台，改为平地土坪 + 浅灰白灰墙血溅反差背板；
+//   · 枪线胸墙两侧留通行缺口，弹坑外侧加沙袋防爆土堤，新增一键实景演示与自由特写机位。
 //
-// 选址：x 3300–3380 / z 3300–3370，与另外五个测试场的 *_WORLD 都不重叠
-//   靶场 1290–1510 / 1300–1510、枪械白盒 2350–2460 / 2242–2480、
-//   爆炸场 2545–2655 / 2495–2700、操作白盒 3150–3248 / 3150–3225。
-// 地表是解析平地 y = 0（同 RangeField），所以下面每个 y 都是「离地多高」。
-//
-// 朝向约定同 Data_Range：玩家从 +Z 一侧进场往 -Z 打，木桩兵 yaw = Math.PI 面朝 +Z。
+// 选址：x 3300–3380 / z 3300–3370（解析平地 y = 0），玩家从 +Z 面向 -Z 进场。
 
 export const GORE_RANGE_ID = "GoreRange";
 
-/** 地皮边界（语义同 Data_Range.RANGE_WORLD）。 */
 export const GORE_RANGE_WORLD = Object.freeze({
   minX: 3300, maxX: 3380, minZ: 3300, maxZ: 3370, groundLimit: 3600,
 });
 
-/** 相机远平面：整片场地对角不到 110 m，收到 200 是白赚的剔除。 */
-export const GORE_RANGE_CAMERA_FAR = 200;
+export const GORE_RANGE_CAMERA_FAR = 220;
 
-/** 木桩兵一律面朝 +Z（玩家来的方向）。 */
+/** 木桩兵面朝 +Z（朝向射击位与观察机位）。 */
 const FACING = Math.PI;
 
 /**
- * 四个工位。id 同时是 HUD 路标名与 Debug.GoreRange 的工位参数。
- * radius 只影响路标圈，不影响场地几何。
- *
- * signZ / signY 是**立牌**的位置，floorZ 是地面那块副本（null = 不铺）。
- * 两个都写死而不是按 z 偏移算：观察台的牌子必须挂到身后那面白板上 ——
- * 按「工位 z 减四米半」算的话，它正好悬在出生点前一米九，一进场就糊满上半屏。
+ * 精切日军士兵A测试副本配置（不改动正式 Model_JapaneseSoldierA.glb）。
+ * 由 Script_BuildJapaneseSoldierAGoreTest.py + Script_PackJapaneseSoldierAGoreTest.mjs 生成。
  */
+export const GORE_TEST_CHARACTER = Object.freeze({
+  key: "ijaAGoreTest",
+  name: "日军士兵A·精切断肢版",
+  file: "./Model/GoreTest/Model_JapaneseSoldierAGoreTest.glb",
+  hipsScale: 0.9396,
+  heightM: 1.8376,
+  ownMaterial: true,
+  groom: "./Hair/Grooms/Groom_Game_JapaneseSoldierA.bin",
+  goreEnabled: true,
+});
+
+/** 四个实景工位（id 保持向后兼容）。 */
 export const GORE_RANGE_STATIONS = Object.freeze([
-  { id: "GoreLine", name: "01 枪线", x: 3340, z: 3350, radius: 12, color: "Blue",
-    signZ: 3345.5, signY: 2.9, floorZ: 3351.6 },
-  { id: "GoreCrater", name: "02 炸坑", x: 3364, z: 3336, radius: 6, color: "Orange",
-    signZ: 3331.5, signY: 2.9, floorZ: 3341.6 },
-  { id: "GoreBlade", name: "03 刀桩", x: 3316, z: 3336, radius: 6, color: "Red",
-    signZ: 3331.5, signY: 2.9, floorZ: 3340.5 },
-  { id: "GoreDeck", name: "04 观察台", x: 3340, z: 3365, radius: 5, color: "Cyan",
-    signZ: 3367.4, signY: 1.7, floorZ: null },
+  { id: "GoreLine", name: "01 枪械射界", x: 3340, z: 3348, radius: 12, color: "Brass",
+    signX: 3340, signZ: 3320.2, signY: 2.8, floorZ: null },
+  { id: "GoreCrater", name: "02 爆破弹坑", x: 3364, z: 3336, radius: 6, color: "Rust",
+    signX: 3364, signZ: 3329.8, signY: 2.5, floorZ: null },
+  { id: "GoreBlade", name: "03 白刃劈砍区", x: 3316, z: 3336, radius: 6, color: "Crimson",
+    signX: 3316, signZ: 3332.15, signY: 2.75, floorZ: null },
+  { id: "GoreDeck", name: "04 指挥观察坪", x: 3340, z: 3364.5, radius: 5, color: "Brass",
+    signX: 3340, signZ: 3366.65, signY: 2.1, floorZ: null },
 ]);
 
-/** 射击位胸墙：能站着依托射击的高度（与 Script_RangeField.FIRING_LINE 同一档）。 */
-export const GORE_FIRING_LINE = Object.freeze({ z: 3358, x0: 3331, x1: 3351, h: 0.92, d: 0.7 });
+/** 枪线沙袋胸墙（两侧留通行缺口，可随时步行上前近距离查验断面）。 */
+export const GORE_FIRING_LINE = Object.freeze({ z: 3358, x0: 3332, x1: 3348, h: 0.90, d: 0.68 });
 
 /** 枪线两排的名义距离（米），从胸墙量起。 */
 export const GORE_LINE_RANGES = Object.freeze([10, 25]);
 
-/** 炸坑：爆心与三道环线。引爆用的手榴弹数值照 Data_Weapons.Grenade（半径 6.5 / 伤害 130）。 */
-export const GORE_CRATER = Object.freeze({ x: 3364, z: 3336, rings: [1, 2, 3] });
+/** 炸坑：爆心与一二三米环。 */
+export const GORE_CRATER = Object.freeze({ x: 3364, z: 3336, rings: Object.freeze([1, 2, 3]) });
 
 /**
- * 刀桩台：台面 0.30 m，木桩兵站上去正好齐玩家胸口。
- *
- * 台子**必须浅**、木桩**必须站在前沿**：台面挡着玩家的脚，站在台前能贴到的
- * 最近距离就是「台前沿 + 人的半径」。头一版台深 2.4 m、木桩摆在台心，
- * 于是玩家离木桩 1.55 m —— 大刀够不着，连挥六刀一滴血都掉不了。
+ * 白刃劈砍区：取消旧版 0.30 m 绊脚高台，改为平地练兵坪 + 背后白灰反差墙（距木桩 3.5 m）。
+ * 保留字段结构给外部读取，h = 0 表示平地。
  */
-export const GORE_BLADE_STAND = Object.freeze({ x: 3316, z: 3335.1, w: 6.4, d: 1.8, h: 0.30 });
-/** 刀桩木桩兵站的那条线：离台前沿 0.3 m。 */
+export const GORE_BLADE_STAND = Object.freeze({ x: 3316, z: 3335.7, w: 8.6, d: 5.4, h: 0 });
 export const GORE_BLADE_POST_Z = 3335.7;
+export const GORE_BLADE_WALL = Object.freeze({ x: 3316, z: 3332.0, w: 10.4, h: 3.4, d: 0.32 });
 
-/** 观察台：退后看全场的 0.6 m 台子，身后一面白板当截图背景。 */
+/** 指挥观察坪：低矮木栈台（0.18 m 轻踏步）+ 院落背墙。 */
 export const GORE_OBSERVATION = Object.freeze({
-  deck: { x: 3340, z: 3365, w: 10, d: 4, h: 0.6 },
-  board: { x: 3340, z: 3367.6, w: 13, h: 4.2 },
+  deck: { x: 3340, z: 3364.5, w: 11, d: 3.8, h: 0.18 },
+  board: { x: 3340, z: 3366.8, w: 12.6, h: 3.4 },
 });
 
-/**
- * 木桩兵工位表。**全部是固定坐标**（零 Math.random）。
- *   station  归哪个工位（重置与 Detonate 按它筛）
- *   x / z    站位；yaw 面朝玩家
- *   weapon   手里那支枪（只影响外观与命中体，木桩兵不 Think）
- *   standY   站在台子上时的台面高度（刀桩用）
- *   rangeM   枪线两排的名义距离；ringM 炸坑的环号 —— 都只用来写牌子与断言
- */
+/** 木桩兵固定站位表（零 Math.random，与 Script_GoreRangeTest 契约全兼容）。 */
 export const GORE_RANGE_POSTS = Object.freeze([
   ...GORE_LINE_RANGES.flatMap((rangeM, row) => [3332, 3336, 3340, 3344, 3348].map((x, i) => Object.freeze({
     id: `L${rangeM}_${i + 1}`, station: "GoreLine", x, z: GORE_FIRING_LINE.z - rangeM,
     yaw: FACING, weapon: "Type38", rangeM, row,
   }))),
-  // 炸坑一圈六个：1 m 两个、2 m 两个、3 m 两个。3 m 的两个按 45° 斜放，
-  // 免得六个人排成一条直线（爆炸遮挡会让后面那个白站）。
-  Object.freeze({ id: "C1_E", station: "GoreCrater", x: 3365, z: 3336, yaw: FACING, weapon: "Type38", ringM: 1 }),
-  Object.freeze({ id: "C1_W", station: "GoreCrater", x: 3363, z: 3336, yaw: FACING, weapon: "Type38", ringM: 1 }),
+  Object.freeze({ id: "C1_E", station: "GoreCrater", x: 3365, z: 3336, yaw: Math.PI * 0.88, weapon: "Type38", ringM: 1 }),
+  Object.freeze({ id: "C1_W", station: "GoreCrater", x: 3363, z: 3336, yaw: -Math.PI * 0.88, weapon: "Type38", ringM: 1 }),
   Object.freeze({ id: "C2_S", station: "GoreCrater", x: 3364, z: 3338, yaw: FACING, weapon: "Type38", ringM: 2 }),
   Object.freeze({ id: "C2_N", station: "GoreCrater", x: 3364, z: 3334, yaw: FACING, weapon: "Type38", ringM: 2 }),
-  Object.freeze({ id: "C3_SE", station: "GoreCrater", x: 3366.121, z: 3338.121, yaw: FACING, weapon: "Type38", ringM: 3 }),
-  Object.freeze({ id: "C3_NW", station: "GoreCrater", x: 3361.879, z: 3333.879, yaw: FACING, weapon: "Type38", ringM: 3 }),
-  // 刀桩三个：站在 0.30 m 的台上。
-  ...[3313.8, 3316, 3318.2].map((x, i) => Object.freeze({
+  Object.freeze({ id: "C3_SE", station: "GoreCrater", x: 3366.121, z: 3338.121, yaw: Math.PI * 0.82, weapon: "Type38", ringM: 3 }),
+  Object.freeze({ id: "C3_NW", station: "GoreCrater", x: 3361.879, z: 3333.879, yaw: -Math.PI * 0.82, weapon: "Type38", ringM: 3 }),
+  // 白刃劈砍区三个平地目标（零 standY 绊脚，可贴身 360° 挥刀与特写检视）。
+  ...[3313.6, 3316, 3318.4].map((x, i) => Object.freeze({
     id: `B_${i + 1}`, station: "GoreBlade", x, z: GORE_BLADE_POST_Z,
-    yaw: FACING, weapon: "Type38", standY: GORE_BLADE_STAND.h,
+    yaw: FACING, weapon: "Type38",
   })),
 ]);
 
-/** 面板上每肢体一个按钮，顺序即按钮顺序；id 与 CHARACTER_HITBOX_PROFILE 的 shape id 同名。 */
+/** 面板上每肢体一个按钮（与 CHARACTER_HITBOX_PROFILE 同名）。 */
 export const GORE_LIMB_BUTTONS = Object.freeze([
   "upperArmL", "forearmL", "upperArmR", "forearmR",
   "thighL", "calfL", "thighR", "calfR", "head",
 ]);
 
-/** 慢动作档位（面板上那颗按钮）。 */
+/** 慢动作档位。 */
 export const GORE_SLOW_MOTION = 0.2;
+export const GORE_TIME_SCALES = Object.freeze([1, 0.2, 0.05]);
+
+/** 四个工位的快捷观察机位 / 玩家传送点。 */
+export const GORE_CAMERA_PRESETS = Object.freeze({
+  overview: Object.freeze({ pos: [3340, 2.6, 3362.5], lookAt: [3340, 1.0, 3345] }),
+  bladeClose: Object.freeze({ pos: [3317.3, 1.52, 3338.2], lookAt: [3316.0, 1.25, 3335.7] }),
+  craterClose: Object.freeze({ pos: [3361.2, 2.75, 3342.4], lookAt: [3364.0, 0.85, 3336.0] }),
+  lineClose: Object.freeze({ pos: [3341.4, 1.52, 3350.6], lookAt: [3340.0, 1.22, 3348.0] }),
+});
+
+/** 玩家传送工位（第一人称快速移步）。 */
+export const GORE_STATION_TELEPORTS = Object.freeze({
+  GoreLine: Object.freeze({ x: 3340, z: 3359.6, ry: 0 }),
+  GoreCrater: Object.freeze({ x: 3364, z: 3344.2, ry: 0 }),
+  GoreBlade: Object.freeze({ x: 3316, z: 3338.0, ry: 0 }),
+  GoreDeck: Object.freeze({ x: 3340, z: 3363.6, ry: 0 }),
+});
 
 export const GORE_RANGE_PHASE = Object.freeze({
   id: GORE_RANGE_ID, sandbox: true, sandboxKey: "gore", sandboxGlyph: "肢",
-  date: "断肢白盒", label: "断肢测试场", place: "枪线 · 炸坑 · 刀桩 · 观察台",
-  sky: "testSceneDay", ambience: "overcast", music: null, minutes: 600,
+  date: "断肢实景", label: "断肢测试场", place: "枪械射界 · 爆破弹坑 · 白刃劈砍 · 精切模型演示",
+  sky: "testSceneDay", ambience: "overcast", music: null, minutes: 580,
   story: GORE_RANGE_ID,
-  brief: ["四个工位共用正式伤害链：枪线两排在十米与二十五米，炸坑一圈六个木桩标着一二三米环，刀桩三个站在台上。",
-    "左上角面板可以开「下一发必断」、按肢体直接卸一段、重置木桩、引爆炸坑和放慢到零点二倍速。"],
-  objectives: ["自由测试断肢"],
-  mechanic: "左键射击 / 右键机瞄 / G 投弹 / 大刀劈砍；面板按钮走同一条死亡链。",
+  brief: [
+    "滕县城郊军事院落靶场：全员默认换装 BlenderMCP 精切版日军士兵A（零锯齿 9 处解剖切面、独立九〇式钢盔与雕刻 PBR 湿血断骨盖）。",
+    "左侧面板支持一键实景演示（大刀斩首/断臂、手雷近炸、机枪断肢、重机枪爆头碎裂），并可切自由观察相机与 0.2×/0.05× 慢动作特写检视。",
+  ],
+  objectives: ["检视断肢实景效果与刀/爆/枪三大演示"],
+  mechanic: "1/2/3 切汉阳造/捷克式机枪/大刀 · G 掷雷 · Alt 点左侧演示面板 · 自由相机 WASD+QE 漫游。",
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: "rearOnly" },
-  // 环境机队在 165–250 m 高空绕圈，这片场地相机只看 200 m：画不进画面却每帧更新
-  // 两百多个节点，与白刃场同样的账 —— 不要它。
   ambientAircraft: false,
-  bounds: { minX: GORE_RANGE_WORLD.minX, maxX: GORE_RANGE_WORLD.maxX,
-    minZ: GORE_RANGE_WORLD.minZ, maxZ: GORE_RANGE_WORLD.maxZ },
+  bounds: {
+    minX: GORE_RANGE_WORLD.minX, maxX: GORE_RANGE_WORLD.maxX,
+    minZ: GORE_RANGE_WORLD.minZ, maxZ: GORE_RANGE_WORLD.maxZ,
+  },
   cameraFar: GORE_RANGE_CAMERA_FAR,
   zones: GORE_RANGE_STATIONS.map((station) => ({ ...station })),
-  // 出生点在观察台前沿：再往前站就贴到胸墙上了（0.92 m 的墙在 2.6 m 外要占掉
-  // 画面下半屏，第一眼看不到场地）。这里离胸墙 4 m，一眼能看全两排木桩。
-  spawn: { x: 3340, z: 3362.4, ry: 0 }, hud: { objectiveMarkers: false },
-  loadoutOverride: { primary: "HanYang", secondary: null, melee: "Dadao",
-    throwables: { Grenade: 6, GrenadeBundle: 0 }, spareClips: 99,
-    note: "汉阳造、大刀、六枚手榴弹，备弹管够。" },
+  spawn: { x: 3340, z: 3360.2, ry: 0 },
+  hud: { objectiveMarkers: false },
+  loadoutOverride: {
+    primary: "HanYang", secondary: "Zb26", melee: "Dadao",
+    throwables: { Grenade: 12, GrenadeBundle: 4 }, spareClips: 99,
+    note: "汉阳造、捷克式轻机枪、二十九军大刀与充足手榴弹。",
+  },
 });

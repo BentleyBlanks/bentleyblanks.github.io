@@ -28,6 +28,8 @@ import { CharacterScaleHeight } from "./Script_CharacterModel.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
+import { CHARACTER_HITBOX_PROFILE } from "./Data_CharacterHitbox.mjs";
+import { RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { SetRifleSlingAnchors } from "./Script_RifleSlingCloth.mjs";
 import { DeathFallLocal } from "./Script_HitReactionLayer.mjs";
 import { YawToTurn } from "./Script_HitReaction.mjs";
@@ -366,9 +368,10 @@ const XBOT_TORSO_FIT = Object.freeze({
 
 /** 整套 X Bot 资源（一份）+ 每个人一份的 XBotSkin。 */
 export class XBotSkins {
-  constructor({ base = XBOT.base, characterKeys = null, loadCast = null } = {}) {
+  constructor({ base = XBOT.base, characterKeys = null, loadCast = null, customCharacters = null } = {}) {
     this.loadCast = loadCast;
     this.characterKeys=characterKeys;
+    this.customCharacters = customCharacters || null;
     this.base = base;
     this.loader = new GLTFLoader();
     this.ready = false;
@@ -420,10 +423,12 @@ export class XBotSkins {
   }
 
   async _LoadKit(key) {
-    const def = XBOT_CHARACTERS[key];
+    const def = this.customCharacters?.[key] || XBOT_CHARACTERS[key];
+    if (!def) return;
     try {
       const gltf = await (this.loadCast && def.ownMaterial ? this.loadCast(this.loader,def.file) : this.loader.loadAsync(def.file));
       const source = gltf.scene, mesh = FirstSkinnedMesh(source);
+      const goreMeta = gltf.asset?.extras?.tengxianGore || gltf.parser?.json?.asset?.extras?.tengxianGore || null;
       const { rest } = SkinRest(source, mesh);
       const restBones = new Map();
       source.traverse(o => {
@@ -450,7 +455,7 @@ export class XBotSkins {
           }
         } catch (error) { console.warn(`[XBot] ${def.name} hair load failed`, error); }
       }
-      this.kits.set(key, { key, def, source, clips, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)), groom });
+      this.kits.set(key, { key, def, source, clips, headY: rest.worldP[rest.Find("Head")].y, bodyVolumes, restBones, slingFit: this._SlingFit(TorsoSection(source)), groom, goreMeta });
     } catch (error) { console.warn(`[XBot] ${def.name} load failed, using X Bot`, error); }
   }
 
@@ -819,21 +824,33 @@ export class XBotSkins {
   }
 
   /** 给一个人挂 X Bot；资源没读完或这个人没有骨骼身体（旧的体块 / tzm 百姓）返回 null。 */
-  Attach(actor, { faction = "nra", castId = null, unitId = null, seed = unitId || "" } = {}) {
+  Attach(actor, { faction = "nra", castId = null, unitId = null, seed = unitId || "", kitKey = null, goreEnabled = false } = {}) {
     if (!this.ready || !actor?.characterRig?.root) return null;
-    return new XBotSkin(this, actor, faction, XBotLook({ faction, castId, unitId }), seed);
+    return new XBotSkin(this, actor, faction, XBotLook({ faction, castId, unitId }), seed, { kitKey, goreEnabled });
   }
 }
 
+const XBOT_GORE_BONE_MAP = Object.freeze({
+  pelvis: "Hips", chest: "Spine2", neck: "Neck", head: "Head", headCenter: "Head",
+  upperArmL: "LeftArm", forearmL: "LeftForeArm", handL: "LeftHand",
+  upperArmR: "RightArm", forearmR: "RightForeArm", handR: "RightHand",
+  thighL: "LeftUpLeg", calfL: "LeftLeg", footL: "LeftFoot",
+  thighR: "RightUpLeg", calfR: "RightLeg", footR: "RightFoot",
+});
+
 /** 一个人身上的 X Bot。 */
 export class XBotSkin {
-  constructor(skins, actor, faction, look, seed = "") {
+  constructor(skins, actor, faction, look, seed = "", options = {}) {
     this.skins = skins;
     this.actor = actor;
     this.rig = actor.characterRig;
     this.faction = faction;
     this.look = look;
-    this.kit = skins.KitFor(look, seed, faction);
+    this.kit = (options.kitKey && skins.kits.get(options.kitKey)) || skins.KitFor(look, seed, faction);
+    this.goreMeta = this.kit.goreMeta || null;
+    this.goreEnabled = !!(options.goreEnabled || this.kit.def?.goreEnabled);
+    this.severedHitboxes = null;
+    this.hitboxCache = null;
     this.model = CloneSkinned(this.kit.source);
     this.model.name = "XBot";
     this.model.traverse((o) => {
@@ -927,7 +944,54 @@ export class XBotSkin {
     this.meleeFlinch = null;
     this.inMelee = false;
     this.wounds = new CharacterWounds(this.model);
-    if (this.actor) this.actor.skinWounds = this.wounds;
+    this.goreBones = {};
+    for (const [role, name] of Object.entries(XBOT_GORE_BONE_MAP)) {
+      const b = this.bones.get(name);
+      if (b) this.goreBones[role] = b;
+    }
+    if (this.actor) {
+      this.actor.skinWounds = this.wounds;
+      if (this.goreEnabled) this.actor.goreSkin = this;
+    }
+  }
+
+  /** 按真实 65 骨 XBot 骨架生成与 CHARACTER_HITBOX_PROFILE 同口径的命中体（断肢测试场精确射线 / 刀劈 / 爆炸用）。 */
+  GetHitboxes() {
+    this.container.updateWorldMatrix(true, true);
+    if (!this.hitboxCache) {
+      this.hitboxCache = CHARACTER_HITBOX_PROFILE.map((spec) => ({
+        ...spec,
+        center: new THREE.Vector3(),
+        start: new THREE.Vector3(),
+        end: new THREE.Vector3(),
+        worldRadius: spec.radius,
+      }));
+    }
+    const scale = this.container.getWorldScale(_s).y || 1;
+    const out = [];
+    for (const shape of this.hitboxCache) {
+      if (this.severedHitboxes?.has(shape.id)) continue;
+      shape.worldRadius = shape.radius * scale;
+      if (shape.type === "sphere") {
+        const bone = this.goreBones[shape.role] || this.goreBones.head;
+        if (!bone) continue;
+        bone.matrixWorld.decompose(_p, _q, _s2);
+        // XBot Head 骨原点在枕骨/颈顶交界，沿头部 +Y 上移 9 cm 才对准颅心。
+        shape.center.set(0, 0.09 * scale, 0.015 * scale).applyQuaternion(_q).add(_p);
+        out.push(shape);
+      } else {
+        const ba = this.goreBones[shape.a], bb = this.goreBones[shape.b];
+        if (!ba || !bb) continue;
+        ba.getWorldPosition(shape.start);
+        bb.getWorldPosition(shape.end);
+        out.push(shape);
+      }
+    }
+    return out;
+  }
+
+  Raycast(origin, direction, maxDistance) {
+    return RaycastShapes(this.GetHitboxes(), origin, direction, maxDistance);
   }
 
   /** Trigger a short physical recoil on upper body/head/arms so hits read clearly even during Mixamo clips. */
@@ -1832,10 +1896,12 @@ export class XBotSkin {
       if (!mine || !object.matrix.equals(mine)) a.intended = object.matrix.clone();
     }
     const weapon = this._RifleInHands() ? this.attachments.find(a => a.holdsWeapon) : null;
-    const placed = weapon ? this._PlaceWeapon(weapon, pick, dt) : false;
+    const weaponHeldByGore = !!this.actor.goreWeaponHold;
+    const placed = weapon && !weaponHeldByGore ? this._PlaceWeapon(weapon, pick, dt) : false;
     if (!weapon) { this.lastMount = null; this.contact = null; for (const a of this.attachments) if (a.holdsWeapon) { a.looseDrop = null; a.handRel = null; } }
     if (!placed) { this.ikR = 0; this.ikL = 0; }
     for (const a of this.attachments) {
+      if (a.holdsWeapon && weaponHeldByGore) continue;
       if (a === weapon && placed) continue;
       this._ReanchorOne(a, a === weapon);
     }
@@ -2495,6 +2561,7 @@ export class XBotSkin {
     this.mixer.stopAllAction();
     this.wounds?.Clear();
     if (this.actor?.skinWounds === this.wounds) this.actor.skinWounds = null;
+    if (this.actor?.goreSkin === this) this.actor.goreSkin = null;
     this.hair?.Dispose();
     this.container.removeFromParent();
     for (const mesh of this.hidden) mesh.visible = true;

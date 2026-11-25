@@ -1,0 +1,520 @@
+{
+  "schema": 1,
+  "built": "2026-11-25",
+  "source": {
+    "file": "Model/Character/Model_JapaneseSoldierA.glb",
+    "sha256": "51d30a4ba5e9631557c0a48ec2bc5cbb2723191bb5bd558ecff65223497e0f0a"
+  },
+  "output": {
+    "file": "Model/GoreTest/Model_JapaneseSoldierAGoreTest.glb",
+    "bytes": 8298524,
+    "sha256": "8bd177ea09106483c2253df39970f43dec5d97c42476a3f1b9b13a3ec02f9a2e"
+  },
+  "hipsScale": 0.9396,
+  "crownM": 1.8376,
+  "headY": 1.6115,
+  "vertices": 34372,
+  "triangles": 42258,
+  "crossRegionTriangles": 0,
+  "regionTriangles": {
+    "torso": 16140,
+    "upperArmL": 485,
+    "forearmL": 3717,
+    "upperArmR": 555,
+    "forearmR": 3941,
+    "thighL": 1445,
+    "calfL": 2442,
+    "thighR": 1495,
+    "calfR": 2455,
+    "head": 7856,
+    "helmet": 1727
+  },
+  "cuts": {
+    "head": {
+      "stumpBone": "Neck",
+      "partBone": "Head",
+      "ringVerts": 136,
+      "radiusU": 0.08738,
+      "radiusV": 0.05944,
+      "maxRadiusU": 0.08986,
+      "maxRadiusV": 0.06179,
+      "stump": {
+        "offsetLocal": [
+          -0.24724,
+          5.82311,
+          4.08714
+        ],
+        "normalLocal": [
+          0,
+          0.97558,
+          0.21966
+        ],
+        "tangentULocal": [
+          0.01949,
+          -0.21962,
+          0.97539
+        ],
+        "tangentVLocal": [
+          0.99981,
+          0.00428,
+          -0.01902
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          -0.24724,
+          -3.17769,
+          0.81593
+        ],
+        "normalLocal": [
+          0,
+          -0.97558,
+          -0.21966
+        ],
+        "tangentULocal": [
+          0.01949,
+          -0.21962,
+          0.97539
+        ],
+        "tangentVLocal": [
+          0.99981,
+          0.00428,
+          -0.01902
+        ]
+      }
+    },
+    "upperArmL": {
+      "stumpBone": "LeftArm",
+      "partBone": "LeftArm",
+      "ringVerts": 47,
+      "radiusU": 0.07834,
+      "radiusV": 0.0734,
+      "maxRadiusU": 0.07866,
+      "maxRadiusV": 0.07449,
+      "stump": {
+        "offsetLocal": [
+          0.09864,
+          10.47794,
+          3.28869
+        ],
+        "normalLocal": [
+          0,
+          1,
+          0
+        ],
+        "tangentULocal": [
+          0.99174,
+          0,
+          0.12829
+        ],
+        "tangentVLocal": [
+          0.12829,
+          0,
+          -0.99174
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          0.09864,
+          10.47794,
+          3.28869
+        ],
+        "normalLocal": [
+          0,
+          -1,
+          0
+        ],
+        "tangentULocal": [
+          0.99174,
+          0,
+          0.12829
+        ],
+        "tangentVLocal": [
+          0.12829,
+          0,
+          -0.99174
+        ]
+      }
+    },
+    "forearmL": {
+      "stumpBone": "LeftForeArm",
+      "partBone": "LeftForeArm",
+      "ringVerts": 44,
+      "radiusU": 0.07019,
+      "radiusV": 0.06451,
+      "maxRadiusU": 0.0727,
+      "maxRadiusV": 0.0661,
+      "stump": {
+        "offsetLocal": [
+          -0.58756,
+          5.35453,
+          1.44917
+        ],
+        "normalLocal": [
+          0,
+          1,
+          0
+        ],
+        "tangentULocal": [
+          0.74309,
+          0,
+          0.66919
+        ],
+        "tangentVLocal": [
+          0.66919,
+          0,
+          -0.74309
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          -0.58756,
+          5.35453,
+          1.44917
+        ],
+        "normalLocal": [
+          0,
+          -1,
+          0
+        ],
+        "tangentULocal": [
+          0.74309,
+          0,
+          0.66919
+        ],
+        "tangentVLocal": [
+          0.66919,
+          0,
+          -0.74309
+        ]
+      }
+    },
+    "upperArmR": {
+      "stumpBone": "RightArm",
+      "partBone": "RightArm",
+      "ringVerts": 55,
+      "radiusU": 0.08067,
+      "radiusV": 0.07602,
+      "maxRadiusU": 0.08212,
+      "maxRadiusV": 0.07754,
+      "stump": {
+        "offsetLocal": [
+          0.15999,
+          11.19584,
+          3.16802
+        ],
+        "normalLocal": [
+          0,
+          1,
+          0
+        ],
+        "tangentULocal": [
+          -0.98603,
+          0,
+          -0.16654
+        ],
+        "tangentVLocal": [
+          -0.16654,
+          0,
+          0.98603
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          0.15999,
+          11.19584,
+          3.16802
+        ],
+        "normalLocal": [
+          0,
+          -1,
+          0
+        ],
+        "tangentULocal": [
+          -0.98603,
+          0,
+          -0.16654
+        ],
+        "tangentVLocal": [
+          -0.16654,
+          0,
+          0.98603
+        ]
+      }
+    },
+    "forearmR": {
+      "stumpBone": "RightForeArm",
+      "partBone": "RightForeArm",
+      "ringVerts": 52,
+      "radiusU": 0.06745,
+      "radiusV": 0.06484,
+      "maxRadiusU": 0.07003,
+      "maxRadiusV": 0.06732,
+      "stump": {
+        "offsetLocal": [
+          0.38267,
+          6.07245,
+          1.59009
+        ],
+        "normalLocal": [
+          0,
+          1,
+          0
+        ],
+        "tangentULocal": [
+          0.71536,
+          0,
+          -0.69876
+        ],
+        "tangentVLocal": [
+          -0.69876,
+          0,
+          -0.71536
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          0.38267,
+          6.07245,
+          1.59009
+        ],
+        "normalLocal": [
+          0,
+          -1,
+          0
+        ],
+        "tangentULocal": [
+          0.71536,
+          0,
+          -0.69876
+        ],
+        "tangentVLocal": [
+          -0.69876,
+          0,
+          -0.71536
+        ]
+      }
+    },
+    "thighL": {
+      "stumpBone": "LeftUpLeg",
+      "partBone": "LeftUpLeg",
+      "ringVerts": 93,
+      "radiusU": 0.10448,
+      "radiusV": 0.09896,
+      "maxRadiusU": 0.1082,
+      "maxRadiusV": 0.10275,
+      "stump": {
+        "offsetLocal": [
+          -3.15291,
+          32.44527,
+          -1.59639
+        ],
+        "normalLocal": [
+          0,
+          0.99997,
+          -0.00782
+        ],
+        "tangentULocal": [
+          0.52041,
+          -0.00668,
+          -0.85389
+        ],
+        "tangentVLocal": [
+          -0.85392,
+          -0.00407,
+          -0.5204
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          -3.15291,
+          32.44527,
+          -1.59639
+        ],
+        "normalLocal": [
+          0,
+          -0.99997,
+          0.00782
+        ],
+        "tangentULocal": [
+          0.52041,
+          -0.00668,
+          -0.85389
+        ],
+        "tangentVLocal": [
+          -0.85392,
+          -0.00407,
+          -0.5204
+        ]
+      }
+    },
+    "calfL": {
+      "stumpBone": "LeftLeg",
+      "partBone": "LeftLeg",
+      "ringVerts": 48,
+      "radiusU": 0.08086,
+      "radiusV": 0.07159,
+      "maxRadiusU": 0.08444,
+      "maxRadiusV": 0.07166,
+      "stump": {
+        "offsetLocal": [
+          -0.45044,
+          7.70806,
+          -2.17306
+        ],
+        "normalLocal": [
+          0,
+          0.99766,
+          0.06837
+        ],
+        "tangentULocal": [
+          0.22014,
+          0.06669,
+          -0.97319
+        ],
+        "tangentVLocal": [
+          -0.97547,
+          0.01505,
+          -0.21962
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          -0.45044,
+          7.70806,
+          -2.17306
+        ],
+        "normalLocal": [
+          0,
+          -0.99766,
+          -0.06837
+        ],
+        "tangentULocal": [
+          0.22014,
+          0.06669,
+          -0.97319
+        ],
+        "tangentVLocal": [
+          -0.97547,
+          0.01505,
+          -0.21962
+        ]
+      }
+    },
+    "thighR": {
+      "stumpBone": "RightUpLeg",
+      "partBone": "RightUpLeg",
+      "ringVerts": 100,
+      "radiusU": 0.10651,
+      "radiusV": 0.09681,
+      "maxRadiusU": 0.1148,
+      "maxRadiusV": 0.10288,
+      "stump": {
+        "offsetLocal": [
+          3.69839,
+          32.44213,
+          -2.00269
+        ],
+        "normalLocal": [
+          0,
+          0.99997,
+          -0.0078
+        ],
+        "tangentULocal": [
+          0.32554,
+          0.00737,
+          0.9455
+        ],
+        "tangentVLocal": [
+          0.94553,
+          -0.00254,
+          -0.32553
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          3.69839,
+          32.44213,
+          -2.00269
+        ],
+        "normalLocal": [
+          0,
+          -0.99997,
+          0.0078
+        ],
+        "tangentULocal": [
+          0.32554,
+          0.00737,
+          0.9455
+        ],
+        "tangentVLocal": [
+          0.94553,
+          -0.00254,
+          -0.32553
+        ]
+      }
+    },
+    "calfR": {
+      "stumpBone": "RightLeg",
+      "partBone": "RightLeg",
+      "ringVerts": 45,
+      "radiusU": 0.07809,
+      "radiusV": 0.06674,
+      "maxRadiusU": 0.07966,
+      "maxRadiusV": 0.07163,
+      "stump": {
+        "offsetLocal": [
+          0.99389,
+          7.7234,
+          -2.39843
+        ],
+        "normalLocal": [
+          0,
+          0.99766,
+          0.06835
+        ],
+        "tangentULocal": [
+          0.03151,
+          0.06832,
+          -0.99717
+        ],
+        "tangentVLocal": [
+          -0.9995,
+          0.00215,
+          -0.03144
+        ]
+      },
+      "part": {
+        "offsetLocal": [
+          0.99389,
+          7.7234,
+          -2.39843
+        ],
+        "normalLocal": [
+          0,
+          -0.99766,
+          -0.06835
+        ],
+        "tangentULocal": [
+          0.03151,
+          0.06832,
+          -0.99717
+        ],
+        "tangentVLocal": [
+          -0.9995,
+          0.00215,
+          -0.03144
+        ]
+      }
+    }
+  },
+  "helmet": {
+    "bone": "Head",
+    "offsetLocal": [
+      -0.12349,
+      9.6424,
+      2.13973
+    ],
+    "radius": 0.15787
+  }
+}

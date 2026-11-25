@@ -11,8 +11,10 @@
 // 用 mask 藏肢体的话，人身上没有胳膊了，地上的影子里还有。CPU 只删三角形，
 // 三条 pass 读的是同一份 index，天然一致，而且零新 program。
 
-import { ENABLED, LIMBS, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY, CORPSE_WHIP } from "./Data_Tuning_Gore.mjs";
+import { ENABLED, LIMBS, HELMET_CODE, SEVER_RULES, KIND_ALIASES, LIMB_POOLS, HIT_GEOMETRY, CORPSE_WHIP } from "./Data_Tuning_Gore.mjs";
 import { JointOwner, RaycastCapsule, RaycastSphere, RaycastEllipsoid } from "./Script_CharacterHitboxMath.mjs";
+
+export { HELMET_CODE };
 
 /** 冻结的肢体 id 数组（顺序即编码顺序，见 CodeForLimb）。 */
 export const LIMB_IDS = Object.freeze(Object.keys(LIMBS));
@@ -82,7 +84,8 @@ export function LimbForBone(boneName) {
   if (!name) return null;
   let best = null, bestDepth = -1;
   for (const id of LIMB_IDS) {
-    if (!LIMBS[id].bones.test(name)) continue;
+    const spec = LIMBS[id];
+    if (!spec.bones.test(name) && !(spec.xbotBones && spec.xbotBones.test(name))) continue;
     const depth = DEPTH_BY_LIMB.get(id) || 0;
     if (depth > bestDepth) { best = id; bestDepth = depth; }
   }
@@ -144,14 +147,20 @@ export function ClassifyVertices(boneNames, skinIndex, skinWeight, vertexCount) 
  * @param {Iterable<string>} severedLimbIds 已卸掉的肢体（根段，不必展开）
  * @returns {{ body: Uint32Array, parts: Map<string, Uint32Array>, dropped: number }}
  */
-export function FilterIndex(index, vertexLimb, severedLimbIds) {
+export function FilterIndex(index, vertexLimb, severedLimbIds, options = null) {
+  // 按深度升序写入 rootByCode：先写父段（如 upperArmL 覆盖 forearmL），后写已单切过的子段（forearmL），
+  // 这样「先断前臂、后鞭上臂」时已经飞走的前臂不会重新长回新切下来的上臂上。
+  const ordered = [...(severedLimbIds || [])]
+    .filter((root) => !!LIMBS[root])
+    .sort((a, b) => (DEPTH_BY_LIMB.get(a) || 0) - (DEPTH_BY_LIMB.get(b) || 0));
   const rootByCode = new Map();
-  for (const root of severedLimbIds || []) {
-    if (!LIMBS[root]) continue;
+  for (const root of ordered) {
     for (const id of LimbSubtree(root)) rootByCode.set(CodeForLimb(id), root);
   }
+  const stripHelmet = !!options?.stripHelmet;
   const total = index ? index.length : vertexLimb.length;
   const body = [];
+  const helmet = [];
   const parts = new Map();
   for (const root of new Set(rootByCode.values())) parts.set(root, []);
   let dropped = 0;
@@ -159,9 +168,14 @@ export function FilterIndex(index, vertexLimb, severedLimbIds) {
     const a = index ? index[t] : t;
     const b = index ? index[t + 1] : t + 1;
     const c = index ? index[t + 2] : t + 2;
-    const ra = rootByCode.get(vertexLimb[a]);
-    const rb = rootByCode.get(vertexLimb[b]);
-    const rc = rootByCode.get(vertexLimb[c]);
+    const ca = vertexLimb[a], cb = vertexLimb[b], cc = vertexLimb[c];
+    if (stripHelmet && ca === HELMET_CODE && cb === HELMET_CODE && cc === HELMET_CODE) {
+      helmet.push(a, b, c);
+      continue;
+    }
+    const ra = rootByCode.get(ca);
+    const rb = rootByCode.get(cb);
+    const rc = rootByCode.get(cc);
     if (ra === undefined && rb === undefined && rc === undefined) {
       body.push(a, b, c);
     } else if (ra !== undefined && ra === rb && rb === rc) {
@@ -172,7 +186,9 @@ export function FilterIndex(index, vertexLimb, severedLimbIds) {
   }
   const partsOut = new Map();
   for (const [root, list] of parts) partsOut.set(root, Uint32Array.from(list));
-  return { body: Uint32Array.from(body), parts: partsOut, dropped };
+  const out = { body: Uint32Array.from(body), parts: partsOut, dropped };
+  if (stripHelmet) out.helmet = Uint32Array.from(helmet);
+  return out;
 }
 
 /** 爆炸没给 shapeId 时的挑选权重：贴地炸先卸腿（爆心通常在脚边）。 */

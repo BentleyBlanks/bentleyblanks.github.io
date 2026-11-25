@@ -1058,10 +1058,24 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .hudEmplacement .empPrompt:empty {display:none}
 .hudEmplacement .empExit {margin-left:auto;opacity:.75}
 
-/* 断肢测试场（?gore=1）的左上角面板。版式照 .meleeLab 抄一份，只换类名与配色。 */
-.goreLab{--glMaxHeight:calc(100dvh - 36px);position:fixed;left:18px;top:18px;z-index:38;box-sizing:border-box;width:308px;max-width:calc(50vw - 36px);max-height:var(--glMaxHeight);overflow:auto;background:rgba(19,25,27,.93);color:#e9e6d9;border:1px solid #788280;border-top:3px solid #b4645c;padding:16px;font:13px/1.55 system-ui,sans-serif;box-shadow:0 10px 38px #0007;pointer-events:auto}
-.goreLab[hidden]{display:none}.glHeading{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:space-between;align-items:baseline;margin-bottom:12px}.glHeading b{font-size:18px}.glHeading span{font-size:11px;color:#b2b9b2}.glButtons{display:flex;gap:7px;margin-bottom:7px}.goreLab button{background:#c7b276;color:#172020;border:0;padding:8px 10px;cursor:pointer;flex:1}.goreLab button:focus-visible{outline:2px solid #fff}.glLimbLabel{color:#adb6ae;font-size:11px;margin:10px 0 5px}.glLimbs{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.goreLab .glLimb{background:#3c4a4c;color:#e9e6d9;font-size:11px;padding:6px 2px}.glStatus{display:block;color:#cdd9ad;margin:12px 0 8px}.glMeters,.glPosts{white-space:pre-line;font-variant-numeric:tabular-nums}.glMeters{padding:9px;background:#ffffff09}.glPosts{font-size:11px;margin:9px 0;color:#b8c7cb}.glControls{font-size:12px;color:#b9c2c0;border-top:1px solid #54615a;padding-top:10px;margin-bottom:0}
+/* 断肢测试场（?gore=1）：统一并入 .shellImpactLab 口径 —— 深炭橄榄渐变、象牙字、橄榄细线、黄铜金左强调条与衬线标题。 */
+.goreLab{top:12px;left:12px;width:324px;max-height:calc(100dvh - 24px)}
+.goreLab .siHead{padding:11px 14px 9px}
+.goreLab .siBody{padding:0 14px}
+.goreLab h3{margin:11px 0 5px}
+.goreLab .siButtons{gap:5px;margin:4px 0}
+.goreLab .siBtn{padding:5px 5px;font-size:11.5px}
+.goreLab .glDemoGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:5px 0}
+.goreLab .glDemoGrid .siBtn{padding:6px 5px;font-size:11.5px}
+.goreLab .glLimbs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:5px 0}
+.goreLab .glLimb{padding:5px 2px;font-size:11px}
+.goreLab .glStatus{display:block;color:#e6cb91;font-size:11.5px;margin:4px 0 5px}
+.goreLab .glMeters,.goreLab .glPosts{white-space:pre-line;font-variant-numeric:tabular-nums}
+.goreLab .glPosts{font-size:11px;margin:5px 0 0;color:#b8c0b4}
+.goreLab .glControls{font-size:10.5px;line-height:1.45;color:#a7a89e;border-top:1px solid #c1bdab28;padding-top:7px;margin:8px 0 0}
 .goreLabActive .hudMarkers,.goreLabActive .hudForceStatus,.goreLabActive .hudTop{display:none}
+.goreLabFree .hudCrosshair,.goreLabFree .hudState,.goreLabFree .hudCombat,.goreLabFree .hudMinimap,.goreLabFree .hudBrief,.goreLabFree .hudSubtitle,.goreLabFree .hudActions,.goreLabFree .hudTarget{display:none!important}
+body:has(.mnRoot:not(.off)) .goreLab,body:has(.mnRoot:not(.off)) .goreLab+.mlGuideHud{display:none!important}
 /* 炮击扬尘测试场面板（?impacts=1）：取设置页口径 —— 深色渐变底、象牙字、橄榄细线、金色左边选中条、衬线标题、直角控件。 */
 .shellImpactLab{position:fixed;left:14px;top:14px;z-index:38;box-sizing:border-box;width:318px;max-width:calc(50vw - 28px);max-height:calc(100dvh - 28px);overflow:auto;padding:0 0 12px;color:#deddd2;background:linear-gradient(180deg,rgba(21,24,22,.95),rgba(12,15,14,.93));border:1px solid #c1bdab40;border-left:2px solid #edca83;font:12.5px/1.5 var(--ui-font,system-ui,sans-serif);box-shadow:0 10px 38px #0008;pointer-events:auto;scrollbar-width:thin;scrollbar-color:#8a8e8070 transparent}
 .shellImpactLab[hidden]{display:none}
@@ -1099,7 +1113,6 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .shellImpactFree .hudCrosshair,.shellImpactFree .hudState,.shellImpactFree .hudCombat,.shellImpactFree .hudMinimap,.shellImpactFree .hudBrief,.shellImpactFree .hudSubtitle,.shellImpactFree .hudActions,.shellImpactFree .hudTarget{display:none!important}
 .shellImpactLab.hiddenPanel{display:none}
 @media(max-width:760px){.shellImpactLab{width:236px;max-width:calc(50vw - 18px);left:8px;top:8px;font-size:11px}.shellImpactLab .siHead b{font-size:15px}}
-@media(max-width:760px){.goreLab{--glMaxHeight:52dvh;top:10px;left:8px;width:228px;max-width:calc(50vw - 20px);padding:10px;font-size:11px}.glHeading b{font-size:14px}.glLimbs{grid-template-columns:repeat(3,1fr)}}
 
 /* Soft mission boundary: full viewport, readable battlefield, input passes through. */
 .hudMissionReturn { position:absolute; inset:0; z-index:18; pointer-events:none;
