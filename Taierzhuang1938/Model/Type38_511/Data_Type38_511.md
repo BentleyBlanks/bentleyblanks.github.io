@@ -1,14 +1,22 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v16
+## 当前交付版 v17
 
-游戏使用 `511-polished-grip-16`。近景 72,460 三角，普通 NPC 67,852 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+游戏使用 `511-rolled-edges-17`。近景 74,412 三角，普通 NPC 69,804 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 托底板、前箍和柄根 · 2026-11-26
+
+托底板沿原游戏模型与木托相接的外轮廓重新铺面，托底正面的反光顺着曲面过渡到一圈窄边。近景在正后和两侧掠射光下复核。实物侧照用于核对钢片与木托的交线和厚薄，托底正后方使用游戏模型的同机位前后对照。[托底侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)
+
+前段两道箍的边缘改为连续的小圆角，随光位带出窄反光。箍旁木料降低了整条漆光的亮度，保留木纹、红棕色和局部磨过的漆层。覆面上缘两侧共用一条连续的法线过渡。[前段实物特写](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+柄根的可见网格接到同行的外观壳面。使用现有游戏动画逐帧检查拉栓和换弹，分别覆盖 74 帧和 178 帧。Blender 回导验证了柄根、中箍挂环、托底板与木料三个接触处。 [实物后视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG)
 
 ## 栓柄钢面的双视角对照 · 2026-11-24
 

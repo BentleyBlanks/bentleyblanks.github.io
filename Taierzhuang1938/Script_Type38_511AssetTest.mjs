@@ -31,7 +31,7 @@ for(const primitive of insetPrimitives.slice(1)){
  assert.deepEqual(material.baseColorTexture,atlasMaterial.baseColorTexture);
  assert.deepEqual(material.metallicRoughnessTexture,atlasMaterial.metallicRoughnessTexture);
 }
-assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),72460);
+assert.equal(doc.meshes.flatMap(mesh=>mesh.primitives).reduce((sum,p)=>sum+doc.accessors[p.indices].count/3,0),D.triangles);
 assert(!doc.animations?.length&&!doc.skins?.length);
 for(const [index,image]of doc.images.entries()){assert.equal(image.uri,undefined);const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=contract.imagePayloads[index];assert.equal(expected.index,index);assert.equal(expected.name,image.name);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 assert.equal(contract.adaptation.notchWidthM,.0045);assert.equal(contract.adaptation.runtimeTriangles-contract.adaptation.sourceTriangles,132);
@@ -62,12 +62,12 @@ const asset={gltf,npcLod,materials:new Map()},library=new MaterialLibrary(null);
 ConfigureType38_511(asset,library);
 const fps=InstantiateType38_511(asset),world=InstantiateType38_511(asset,{batch:true});
 const npc=InstantiateType38_511(asset,{batch:true,npcLod:true});
-assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.tris,67852);assert.equal(npc.meshes.length,45);
+assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.meshes.length,45);
 for(let i=0;i<npc.meshes.length;i++){
  assert.equal(npc.meshes[i].material,fps.meshes[i].material);
  if(npc.meshes[i].userData.type38Part!==D.npcLodPart)assert.deepEqual(npc.meshes[i].geometry.attributes.position.array,world.meshes[i].geometry.attributes.position.array,'all other44 parts retain exact full geometry');
 }
-assert.equal(fps.tris,72460);assert.equal(world.tris,72460);assert.equal(fps.meshes.length,45);
+assert.equal(fps.tris,D.triangles);assert.equal(world.tris,D.triangles);assert.equal(fps.meshes.length,45);
 assert(fps.meshes.every((mesh,i)=>mesh.geometry!==world.meshes[i].geometry&&mesh.material===world.meshes[i].material));
 assert.equal(fps.nodes.get('boltBody').children.length,4);assert.equal(fps.nodes.get('dustCover').children.length,2);
 assert(fps.meshes.every((mesh,index)=>{
@@ -130,6 +130,31 @@ assert(rimFraction>.65&&rimFraction<1.05,'rounded wood lip must remain visible b
 const woodProbe=new THREE.Raycaster(new THREE.Vector3(.06,bandBox.max.y-.38*bandSpan,bandBox.min.z-.42*bandSpan),new THREE.Vector3(-1,0,0));
 woodProbe.layers.enableAll();
 assert.equal(woodProbe.intersectObjects(fps.meshes)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
+const FindPart=name=>fps.meshes.find(mesh=>mesh.userData.type38Part===name);
+const cap=FindPart('Exterior_ButtCap04');
+cap.geometry.computeBoundingBox();
+const capBox=cap.geometry.boundingBox,capCenter=capBox.getCenter(new THREE.Vector3());
+const capRay=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(0,0,-1));
+capRay.layers.enableAll();
+const facingNormals=[];
+for(const height of [-.3,0,.3])for(const side of [-.24,0,.24]){
+  capRay.ray.origin.set(capCenter.x+side*(capBox.max.x-capBox.min.x),
+    capCenter.y+height*(capBox.max.y-capBox.min.y),capBox.max.z+.08);
+  const hit=capRay.intersectObject(cap)[0];
+  assert(hit?.normal,'heel plate must present a continuous outer face');
+  facingNormals.push(hit.normal.normalize());
+}
+assert(facingNormals.every(n=>n.angleTo(facingNormals[4])<.16),'heel plate must have a smooth broad facing');
+const crownParts=D.dustCover.map(FindPart);
+const topRay=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(0,-1,0));
+topRay.layers.enableAll();
+for(const z of [-.225,-.193,-.161,-.121]){
+  const normals=[-.0002,.0002].map(x=>{
+    topRay.ray.origin.set(x,.12,z);
+    return topRay.intersectObjects(crownParts)[0]?.normal?.normalize();
+  });
+  assert(normals.every(Boolean)&&normals[0].angleTo(normals[1])<.16,'visible top faces must share a smooth highlight across the split');
+}
 const edgeStart=new THREE.Vector3(),edgeEnd=new THREE.Vector3(),corner=new THREE.Vector3(),normal=new THREE.Vector3(),tangent=new THREE.Vector3();
 for(const mesh of fps.meshes.filter(item=>item===woodRim||item===windowTrim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
  const geometry=mesh.geometry,{position,normal:normalAttr,tangent:tangentAttr}=geometry.attributes;
@@ -152,10 +177,10 @@ grip.computeBoundingBox();
 const gripBox=grip.boundingBox,gripSpan=gripBox.max.x-gripBox.min.x,angles=new Set();
 for(let index=0;index<gripPoints.count;index++){
  const phase=(gripPoints.getX(index)-gripBox.min.x)/gripSpan;
- if(phase>.26&&phase<.28)angles.add(Math.round(Math.atan2(gripNormals.getZ(index),gripNormals.getY(index))*100));
+ if(phase>.32&&phase<.38)angles.add(Math.round(Math.atan2(gripNormals.getZ(index),gripNormals.getY(index))*100));
 }
 assert(angles.size>=28,'handle neck must give a continuous round highlight, not the old four-flat silhouette');
-assert.equal(grip.index.count/3,1984);
+assert.equal(grip.index.count/3,2176);
 const rearShell=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess').geometry;
 rearShell.computeBoundingBox();
 const shellBox=rearShell.boundingBox,shellRadius=(shellBox.max.y-shellBox.min.y)/2;
@@ -202,4 +227,4 @@ for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_Middl
 }
 for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
-console.log('ok Type38 511: 72460 real triangles, 45 parts, 116 verified PBR images, private geometry/shared materials, open 4.5mm sight notch and independent bolt/cover');
+console.log(`ok Type38 511: ${D.triangles} triangles, 45 parts, 116 verified PBR images, continuous heel and crown shading`);

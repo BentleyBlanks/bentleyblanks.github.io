@@ -198,13 +198,13 @@
       "name": "三八式511（当前手持与世界模型）",
       "pack": "Type38_511/Model_Type38_511.glb",
       "sourceTriangles": 473796,
-      "actualTriangles": 72460,
-      "npcTriangles": 67852,
+      "actualTriangles": 74412,
+      "npcTriangles": 69804,
       "targetTriangles": 80000,
       "policy": "target",
       "sourceTexture": "用户提供Dots 511工程；高模及作者程序材质留OneDrive",
       "runtimeTexture": "45部件、116张内嵌图；木料与金属分区重做颜色和粗糙度，保留打包数据通道",
-      "note": "2026-11-23 重建后视可见的栓尾盘凸耳与中央凹部，区分托尾漆色；8万面上限，普通NPC共用材质及原照门LOD。"
+      "note": "2026-11-26 托底板及前段两道箍口重做圆角，修复栓柄外观衔接。8 万三角面预算，普通 NPC 共用材质及原照门 LOD。"
     },
     {
       "id": "RifleSlingFlatV3",

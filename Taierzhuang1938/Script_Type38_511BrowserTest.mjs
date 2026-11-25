@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {LaunchBrowser} from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import {ServeRoot} from './Script_DevServer.mjs';
+import {TYPE38_511 as specification} from './Data_Type38_511.mjs';
 const external=process.argv.find(arg=>arg.startsWith('--base-url='))?.slice(11).replace(/\/$/,'');
 const root=path.resolve(import.meta.dirname,'..'),out=path.join(import.meta.dirname,'_shots/Type38_511',external?'Online':'Local');
 await fs.mkdir(out,{recursive:true});
@@ -34,7 +35,8 @@ try{
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
- assert.equal(evidence.identity.version,'511-polished-grip-16');assert.equal(evidence.identity.parts,45);assert.equal(evidence.identity.triangles,72460);
+ assert.equal(evidence.identity.version,specification.version);
+ assert.equal(evidence.identity.parts,specification.parts);assert.equal(evidence.identity.triangles,specification.triangles);
  evidence.gripDirection=await page.evaluate(()=>{
   let finish;
   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
@@ -46,8 +48,8 @@ try{
  });
  assert(evidence.gripDirection?.physical&&evidence.gripDirection.strength>.3&&evidence.gripDirection.data==='');
  assert.deepEqual(evidence.gripDirection.scale,[128/1024,24/1024],'directional data must use its own padded atlas tile');
- assert.equal(evidence.identity.npcTriangles,67852);assert.equal(evidence.identity.nearNpcTriangles,72460);
- assert.equal(evidence.identity.worldTriangles,72460);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.npcTriangles,specification.npcTriangles);assert.equal(evidence.identity.nearNpcTriangles,specification.triangles);
+ assert.equal(evidence.identity.worldTriangles,specification.triangles);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
  assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
  assert(evidence.identity.materials.filter(m=>m.normal==='').length>=20);
  assert(evidence.identity.materials.filter(m=>m.clearcoat).length>=2);
@@ -202,23 +204,62 @@ try{
  });
  assert(evidence.ads.ads>.99);assert.equal(evidence.ads.glError,0);
  await page.screenshot({path:path.join(out,'Scene_GameAds.png')});
- evidence.mechanism=await page.evaluate(()=>{
+ const animation=await page.evaluate(async()=>{
+  const THREE=await import('three');
   const g=window.Tengxian;g.Debug.OpenEditor('firstPerson');const editor=g.editor.active;editor.SetWeapon('Type38');editor.SetPose('hip');editor.SetView('player');editor.SetAnimationClean(true);
   for(let i=0;i<90;i++)editor.Update(1/60);const vm=g.viewmodel;
-  vm.pendingHoldOpen=true;vm.TriggerBolt();let maxCover=0,maxBolt=0,frames=0,coverError=0;
-  while(vm.action&&frames<400){editor.Update(1/60);frames++;maxCover=Math.max(maxCover,vm.rig.parts.dustCover.position.z);maxBolt=Math.max(maxBolt,vm.rig.parts.bolt.position.z);coverError=Math.max(coverError,Math.abs(vm.rig.parts.dustCover.position.z-vm.rig.parts.bolt.position.z));}
-  return {frames,maxCover,maxBolt,coverError,holdOpen:vm.boltOpen,boltParts:vm.rig.group.getObjectByName('boltBody').children.length,
-   coverParts:vm.rig.parts.dustCover.children.length};
+  const {children}=vm.rig.group.getObjectByName('boltBody');
+  const handle=children.find(mesh=>mesh.userData.type38Part==='Exterior_HandleOval08');
+  const shell=children.find(mesh=>mesh.userData.type38Part==='T38_435F2_VisualBackingRearEnd');
+  handle.geometry.computeBoundingBox();
+  const {min,max}=handle.geometry.boundingBox,span=max.x-min.x;
+  const points=handle.geometry.attributes.position,root=new THREE.Vector3();
+  let count=0;
+  for(let i=0;i<points.count;i++){
+   if(points.getX(i)>min.x+span*.025)continue;
+   root.add(new THREE.Vector3().fromBufferAttribute(points,i));count++;
+  }
+  root.divideScalar(count);root.x=min.x;
+  const stem=root.clone();stem.x+=span*.21;
+  const ray=new THREE.Raycaster();
+  ray.layers.enableAll();
+  const origin=new THREE.Vector3(),end=new THREE.Vector3();
+  const HasSurfaceJoin=()=>{
+   handle.updateWorldMatrix(true,false);
+   shell.updateWorldMatrix(true,false);
+   origin.copy(stem).applyMatrix4(handle.matrixWorld);
+   end.copy(root).applyMatrix4(handle.matrixWorld);
+   ray.set(origin,end.clone().sub(origin).normalize());
+   ray.far=origin.distanceTo(end);
+   return ray.intersectObject(shell,false).length>0;
+  };
+  vm.pendingHoldOpen=true;vm.TriggerBolt();let maxCover=0,maxBolt=0,frames=0,coverError=0,detachedFrames=0;
+  while(vm.action&&frames<400){
+   editor.Update(1/60);frames++;
+   maxCover=Math.max(maxCover,vm.rig.parts.dustCover.position.z);maxBolt=Math.max(maxBolt,vm.rig.parts.bolt.position.z);
+   coverError=Math.max(coverError,Math.abs(vm.rig.parts.dustCover.position.z-vm.rig.parts.bolt.position.z));
+   if(!HasSurfaceJoin())detachedFrames++;
+  }
+  const mechanism={frames,maxCover,maxBolt,coverError,detachedFrames,holdOpen:vm.boltOpen,
+   boltParts:children.length,coverParts:vm.rig.parts.dustCover.children.length};
+  window.ProbeType38DisplayJoin=HasSurfaceJoin;
+  return mechanism;
  });
+ evidence.mechanism=animation;
  assert(evidence.mechanism.frames>20);assert(evidence.mechanism.maxCover>.115&&evidence.mechanism.maxBolt>.115);assert(evidence.mechanism.coverError<1e-8);assert(evidence.mechanism.holdOpen);
  assert.equal(evidence.mechanism.boltParts,4);assert.equal(evidence.mechanism.coverParts,2);
+ assert.equal(evidence.mechanism.detachedFrames,0,'the visible stem must meet the moving shell during every frame');
  await page.screenshot({path:path.join(out,'Scene_BoltOpen.png')});
  evidence.reload=await page.evaluate(()=>{
-  const g=window.Tengxian,editor=g.editor.active,vm=g.viewmodel;vm.TriggerReload({remainingRounds:0});let frames=0;
-  while(vm.action&&frames<500){editor.Update(1/60);frames++;}
-  return {frames,closed:!vm.boltOpen,action:vm.action?.kind??null,coverZ:vm.rig.parts.dustCover.position.z,glError:g.renderer.getContext().getError()};
+  const g=window.Tengxian,editor=g.editor.active,vm=g.viewmodel;vm.TriggerReload({remainingRounds:0});let frames=0,detachedFrames=0;
+  while(vm.action&&frames<500){
+   editor.Update(1/60);frames++;
+   if(!window.ProbeType38DisplayJoin())detachedFrames++;
+  }
+  return {frames,detachedFrames,closed:!vm.boltOpen,action:vm.action?.kind??null,coverZ:vm.rig.parts.dustCover.position.z,glError:g.renderer.getContext().getError()};
  });
  assert(evidence.reload.frames>60);assert(evidence.reload.closed&&evidence.reload.action===null&&Math.abs(evidence.reload.coverZ)<1e-6);assert.equal(evidence.reload.glError,0);
+ assert.equal(evidence.reload.detachedFrames,0,'the visible stem must remain joined through reload');
  // The tight case is a world BatchedMesh with GI, SSR and three CSM cascades,
  // rather than the FPS gun alone. Preserve both original clearcoat R/G slots
  // while proving their shared sampler links within the fragment-stage limit.
@@ -256,5 +297,5 @@ try{
  assert(requests.some(url=>/Model_Type38_511[^/]*\.glb/.test(url)));
  assert.deepEqual(errors,[]);
  await fs.writeFile(path.join(out,'Data_RuntimeAcceptance.json'),JSON.stringify({...evidence,errors},null,2));
- console.log('ok Type38 511: actual FPS/NPC/world 72460 triangles, 45 parts, PBR maps, ADS, 120mm independent bolt/cover, held-open reload and GI/batched sampler budget');
+ console.log(`ok Type38 511: FPS/NPC/world ${specification.triangles} triangles, ADS, connected handle through reload, PBR and batched sampler budget`);
 }finally{await browser.close();server?.close();}

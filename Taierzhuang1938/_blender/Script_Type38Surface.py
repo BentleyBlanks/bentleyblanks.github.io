@@ -15,6 +15,7 @@ from scipy.ndimage import distance_transform_edt, gaussian_filter
 from scipy.interpolate import PchipInterpolator
 
 from Script_Type38ExteriorFinish import FrameEngraving, PaintBandScuff, ReadGlb, WriteGlb
+from Script_Type38EdgeProfiles import BlendCoverCrown, ShapeButtCap, ShapeRolledBand
 
 
 SAMPLES = {
@@ -163,11 +164,13 @@ def ShapeHandle(doc, views, primitive):
     extent = upper[0]-lower[0]
     radius = (upper[1]-lower[1])*.5
     origin = (upper+lower)*.5
-    rings, segments = 31, 32
-    phase = np.array([.002,.01,.02,.035,.055,.083,.12,.17,.22,.27,.32,.37,.41,.45,.49,
+    segments = 32
+    # A simplified visible link shares the handle's display mesh and fills
+    # the void between the two moving surfaces throughout the game animation.
+    phase = np.array([-.118,-.089,-.052,-.019,.006,.02,.035,.055,.083,.12,.17,.22,.27,.32,.37,.41,.45,.49,
                       .53,.57,.61,.65,.69,.73,.77,.81,.85,.88,.91,.935,.957,.975,.988,.997])
-    profile = PchipInterpolator([0,.006,.03,.075,.13,.30,.39,.46,.50,.56,.64,.74,.80,.87,.92,.96,.985,1],
-                                [0,.63,.72,.54,.43,.42,.45,.49,.60,.83,1.05,1.16,1.17,1.12,.97,.75,.49,0])
+    profile = PchipInterpolator([-.12,-.053,-.019,.006,.03,.075,.13,.30,.39,.46,.50,.56,.64,.74,.80,.87,.92,.96,.985,1],
+                                [.44,.52,.59,.67,.72,.54,.43,.42,.45,.49,.60,.83,1.05,1.16,1.17,1.12,.97,.75,.49,0])
     angles = np.linspace(0,2*np.pi,segments+1)
     cosine, sine = np.cos(angles), np.sin(angles)
     positions, normals, tangents, uv, indices = [], [], [], [], []
@@ -183,9 +186,10 @@ def ShapeHandle(doc, views, primitive):
         positions.extend(ring)
         normals.extend(outward/np.linalg.norm(outward,axis=1,keepdims=True))
         tangents.extend(np.column_stack((tangent,-np.ones_like(angles))))
-        uv.extend(np.column_stack((.02+.96*np.full_like(angles,along),.02+.96*angles/(2*np.pi))))
+        chartU = .02+along*(.13 if along<0 else .96)
+        uv.extend(np.column_stack((np.full_like(angles,chartU),.02+.96*angles/(2*np.pi))))
     stride = segments+1
-    for ring in range(rings-1):
+    for ring in range(len(phase)-1):
         for section in range(segments):
             near = ring*stride+section
             far = near+stride
@@ -194,14 +198,13 @@ def ShapeHandle(doc, views, primitive):
         axis = 1 if tip else -1
         for section in range(segments):
             polar = len(positions)
-            positions.append([upper[0] if tip else lower[0],origin[1]+(extent*.035 if tip else 0),origin[2]])
+            positions.append([upper[0] if tip else lower[0]-.12*extent,origin[1]+(extent*.035 if tip else 0),origin[2]])
             normals.append([axis,0,0])
             angle = (angles[section]+angles[section+1])*.5
             tangents.append([0,-axis*np.cos(angle),-axis*np.sin(angle),-1])
-            uv.append([.98 if tip else .02,.02+.96*(section+.5)/segments])
-            start = section+((rings-1)*stride if tip else 0)
+            uv.append([.98 if tip else .003,.02+.96*(section+.5)/segments])
+            start = section+((len(phase)-1)*stride if tip else 0)
             indices.append((start,start+1,polar) if tip else (polar,start+1,start))
-    assert len(indices)==1984
     for slot, values in [(primitive['attributes'][key],np.asarray(value,'<f4')) for key,value in
                          [('POSITION',positions),('NORMAL',normals),('TANGENT',tangents),('TEXCOORD_0',uv)]] + [(primitive['indices'],np.asarray(indices,'<u2').reshape(-1,1))]:
         accessor = doc['accessors'][slot]
@@ -210,6 +213,7 @@ def ShapeHandle(doc, views, primitive):
         for key, function in [('min',np.min),('max',np.max)]:
             if key in accessor:
                 accessor[key] = function(values,axis=0).tolist()
+    return len(indices)
 
 
 def ShapeWindowTrim(doc, views, primitive):
@@ -664,8 +668,22 @@ def Build(cache):
         return subprocess.check_output(['git', '-C', str(repo), 'show', f'8fd3c955:Taierzhuang1938/Model/Type38_511/{file}'])
     doc, views, baseline = ReadGlb(Original('Model_Type38_511.glb'))
     assert baseline == '285f3258e5bf03d56f1aff6e9390a985e1640a98282e009a6ee30d9a27dda3bb'
+    baselineTriangles = sum(doc['accessors'][primitive['indices']]['count']//3
+                            for mesh in doc['meshes'] for primitive in mesh['primitives'])
     source = ReadSamples(cache)
     stats = {}
+    profileDeltas = {}
+    profiles = {
+        'Exterior_ButtCap04': ShapeButtCap,
+        'Exterior_MiddleBand57': ShapeRolledBand,
+        'T38_407F_VisualSkin_Exterior_FrontBandBody78': ShapeRolledBand,
+        'Exterior_HandleOval08': ShapeHandle,
+        'Exterior_FrontWindowBacking49': ShapeWindowTrim,
+        'Exterior_RetainedImportedBody74': PoseDisplayLoop,
+        'T38_440D2_IndependentVisibleRecess': ShapeRearMedallion,
+        'T38_430B_IndependentLeftCoverSkin': BlendCoverCrown,
+        'T38_430B_RetainedRightCoverHalf': BlendCoverCrown,
+    }
     def Slot(slot):
         return doc['images'][doc['textures'][slot['index']]['source']]['bufferView']
     def Load(slot):
@@ -691,15 +709,16 @@ def Build(cache):
         handle = part == 'Exterior_HandleOval08'
         disk = part == 'T38_440D2_IndependentVisibleRecess'
         loop = part == 'Exterior_RetainedImportedBody74'
-        if loop:
-            loopTriangles = PoseDisplayLoop(doc, views, primitive)
-        if handle:
-            ShapeHandle(doc, views, primitive)
-        if disk:
-            ShapeRearMedallion(doc, views, primitive)
+        butt = part == 'Exterior_ButtCap04'
+        band = part == 'Exterior_MiddleBand57'
+        frontBand = part == 'T38_407F_VisualSkin_Exterior_FrontBandBody78'
         trim = part == 'Exterior_FrontWindowBacking49'
-        if trim:
-            ShapeWindowTrim(doc, views, primitive)
+        if part in profiles:
+            before = doc['accessors'][primitive['indices']]['count']//3
+            profiles[part](doc,views,primitive)
+            delta = doc['accessors'][primitive['indices']]['count']//3-before
+            if delta:
+                profileDeltas[part] = delta
         field, padded, valid = SurfaceAtlas(doc, views, primitive, (width, height))
         if trim:
             orm[:,:,0]=np.where(padded,255,0)
@@ -710,7 +729,6 @@ def Build(cache):
         wood = 'Wood' in part
         transverse = (up * .92 + side * .42 + length * .023 + .0018 * np.sin(16 * length))
         along = length + side * .19
-        band = part == 'Exterior_MiddleBand57'
         bare = band or part in ('Exterior_HandleOval08', 'T38_435F2_VisualBackingRearEnd', 'T38_440D2_IndependentVisibleRecess', 'SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH', 'SightDetailV3_DecorativeConvexRoundSurface', 'Exterior_FoldedFrame12', 'SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY')
         patinaMap = source['steel'] if wood else source['Metal046BColor']
         weights = np.stack([normalSide,normalUp,normalLength]) ** 4
@@ -876,11 +894,21 @@ def Build(cache):
                 rough += 31*scuff
                 rough += inlay * (185-46*stripWear-10*rolled+9*lip+8*grainSteel-rough)
                 relief = relief*(1-inlay) + ((1.23+.30*stripWear)*rolled+.27*inlay)*Ramp(.006,.010,side)-.25*scuff
+            foreWear = Ramp(-.936,-.849,length)*(1-Ramp(-.557,-.502,length))
+            foreWear *= np.clip(.82+.11*stain+.12*fleck,.48,1)
+            if not separate:
+                foreWear *= 1-inlay
+            warmWood = Tint([68,36,18],[167,99,48],.42+.47*fibre+.09*stain)
+            color = Blend(color,warmWood,foreWear*(.29 if separate else .43))
+            varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.29*foreWear))
+            varnish[:,:,1] = np.rint(np.minimum(165,varnish[:,:,1]+23*foreWear))
+            rough += 16*foreWear
             Store(coat['clearcoatTexture'], varnish)
         else:
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
             lightTube = part in ('Exterior_LongRound44','Exterior_FrontOuterTube76')
             collar = part == 'T38_435F2_IndependentTailNeckExterior'
+            backing = part == 'T38_435F2_VisualBackingRearEnd'
             shoulder = part == 'T38_430L_VisibleUpperShoulderCoordination'
             if bare or collar or lightTube:
                 dark, light = ([108,104,97],[163,159,149]) if band else ([148,143,134],[192,189,179])
@@ -919,6 +947,22 @@ def Build(cache):
                     color = Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
                     rough = 86+7*flow+5*stain+4*brush
             metal = 251 - oxidation*(22 if bare else 41)
+            if backing:
+                visibleHeel = Ramp(.034,.064,up)
+                color = Blend(Tint([63,60,55],[113,108,98],.48+.18*flow+.12*stain),color,visibleHeel)
+                rough += (1-visibleHeel)*(27-8*brush)
+                metal -= (1-visibleHeel)*(11+5*oxidation)
+            if butt:
+                rim = 1-Ramp(.1,.89,np.abs(normalLength))
+                wear = rim*np.clip(.36+.24*stain+.18*grainSteel,0,.83)
+                color = Tint([48,44,39],[94,87,75],.39+.24*flow+.13*brush+.22*wear)
+                rough = 135-43*wear+9*brush+8*stain
+                metal = 227+17*wear-7*oxidation
+            if frontBand:
+                burnish = Ramp(.10,.68,np.abs(normalLength))*np.clip(.41+.22*stain+.13*grainSteel,.14,.8)
+                color = Blend(color,Tint([74,71,67],[139,133,122],.40+.15*flow),burnish)
+                rough += 6-29*burnish
+                metal -= 12-10*burnish
             if part == 'Exterior_LongRound44':
                 metal -= (1-silver)*(108+15*oxidation+12*distalOxide)
             if trim:
@@ -1055,16 +1099,15 @@ def Build(cache):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_PolishedGrip16'
+    doc['asset']['extras']['version'] = 'Type38_RolledEdges17'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
-    assert triangles == 72088+loopTriangles-924 and triangles <= 80000
+    assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
     digest = WriteGlb(folder/'Model_Type38_511.glb', doc, views)
     manifest = json.loads(Original('Data_Type38_511.json'))
-    manifest['exteriorTriangleDeltas']['Exterior_HandleOval08'] = manifest['exteriorTriangleDeltas'].get('Exterior_HandleOval08',0)-15
-    manifest['exteriorTriangleDeltas']['Exterior_RetainedImportedBody74'] = manifest['exteriorTriangleDeltas'].get('Exterior_RetainedImportedBody74',0)+loopTriangles-924
-    manifest['exteriorTriangleDeltas']['T38_440D2_IndependentVisibleRecess'] = manifest['exteriorTriangleDeltas'].get('T38_440D2_IndependentVisibleRecess',0)+1281
-    manifest.update(version=18, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    for part,delta in profileDeltas.items():
+        manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
+    manifest.update(version=19, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
