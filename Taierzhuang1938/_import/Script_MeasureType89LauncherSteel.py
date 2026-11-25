@@ -70,26 +70,60 @@ def BarrelFinish(folder):
 
 def StemFinish(folder):
     image, source = Photo(folder, 4)
-    # The rubbed steel above the engraved strip contains no graduation text.
-    bounds = [168, 363, 1426, 419]
-    x0, y0, x1, y1 = bounds
-    samples = np.array([[Sample(image, x, y) for x in np.linspace(x0, x1, 33)]
-                        for y in np.linspace(y1, y0, 11)])
-    source["sampleBounds"] = bounds
-    return FinishMap(samples, source, {"uCenter": .577, "uHalfSpan": .103, "vRange": [.120, .902]})
+    # Registration in the inspection scene puts the lower side of the rubbed
+    # rectangle at the smaller U. Stay above the stamped strip to its right.
+    xs = np.linspace(170, 1444, 61)
+    lower = np.interp(xs, [170, 658, 730, 1444], [473, 473, 443, 443])
+    samples = np.array([[Sample(image, x, y, radius=3) for x, y in zip(xs, 405 + t * (lower - 405))]
+                        for t in np.linspace(1, 0, 19)])
+    source["sampleBounds"] = [170, 405, 1444, 473]
+    source["lowerSampleEdge"] = [[170, 473], [658, 473], [730, 443], [1444, 443]]
+    footprint = {"uCenter": .549, "uHalfSpan": .043, "vRange": [.078, .934]}
+    field = FinishMap(samples, source, footprint)
+    lightness = samples @ LUMA
+    surround = np.median(lightness[:, (xs >= 748) & (xs <= 1360)], axis=1, keepdims=True)
+    exposed = np.clip((lightness - surround - 12) / 39, 0, 1)
+    edge = np.clip((xs - 184) / 22, 0, 1) * np.clip((674 - xs) / 20, 0, 1)
+    field["rubbedCoverage"] = np.rint(100 * exposed * edge).astype(int).tolist()
+    return field
 
 
 def ShoeFinish(folder):
     image, source = Photo(folder, 1)
-    # In the overall view the lower end of the convex plate carries the warm
-    # residue. Every strip stops inside that face and clear of the shadow.
-    strips = [[760, 1365, 1409], [724, 1359, 1428], [680, 1367, 1456],
-              [643, 1389, 1480], [603, 1394, 1491], [563, 1402, 1515],
-              [530, 1424, 1493], [490, 1442, 1468], [457, 1458, 1468]]
-    samples = np.array([[Sample(image, x, y, radius=3) for x in np.linspace(left, right, 11)]
-                        for y, left, right in strips])
+    # On the photographed convex face U increases downward and V toward the
+    # left. End each strip inside the steel, clear of the dark return and stem.
+    strips = [[457, 1458, 1468], [490, 1438, 1473], [530, 1419, 1493],
+              [563, 1402, 1515], [603, 1388, 1491], [643, 1375, 1480],
+              [680, 1356, 1456], [724, 1352, 1428], [760, 1363, 1409]]
+    yz, left, right = np.asarray(strips).T
+    ys = np.linspace(yz[0], yz[-1], 37)
+    lo = np.interp(ys, yz, left)
+    hi = np.interp(ys, yz, right)
+    samples = np.array([[Sample(image, x, y, radius=3) for x in np.linspace(rightX, leftX, 19)]
+                        for y, leftX, rightX in zip(ys, lo, hi)])
     source["sampleStrips"] = strips
-    return FinishMap(samples, source, {"uCenter": .500, "uHalfSpan": .383, "vRange": [.22, .79]}, planar=True)
+    footprint = {"uCenter": .500, "uHalfSpan": .383, "vRange": [.14, .585]}
+    field = FinishMap(samples, source, footprint, planar=True)
+    lightness = samples @ LUMA
+    warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    # Chroma distinguishes brown oxidation from a dark unlit blue-gray spot.
+    residue = np.clip((warmth - .035) / .255, 0, 1)
+    field["oxideCoverage"] = np.rint(100 * residue).astype(int).tolist()
+    return field
+
+
+def NeckFinish(folder):
+    image, source = Photo(folder, 6)
+    angles = np.linspace(-.132, .132, 23)
+    xs = 510 + 431 * np.sin(2 * np.pi * angles)
+    ys = np.linspace(468, 186, 21)
+    samples = np.array([[Sample(image, x, y, radius=8) for y in ys] for x in xs])
+    source["sampleBounds"] = [int(xs[0]), int(ys[-1]), int(xs[-1]), int(ys[0])]
+    field = FinishMap(samples, source, {"uCenter": .642, "uHalfSpan": .132, "vRange": [.23, .89]})
+    lightness = samples @ LUMA
+    warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    field["oxideCoverage"] = np.rint(100 * np.clip((warmth - .15) / .29, 0, 1)).astype(int).tolist()
+    return field
 
 
 def KnurlFrequency(folder):
@@ -117,7 +151,7 @@ def Main():
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     record["closeups"] = {"Barrel": BarrelFinish(args.photos), "Stem": StemFinish(args.photos),
-                          "Saddle": ShoeFinish(args.photos)}
+                          "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos)}
     record["knurl"] = KnurlFrequency(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
     encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",

@@ -26,7 +26,7 @@ FINISHES = {
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
-    "Saddle": (2, (119, 130, 136), (68, 60, 48), .59, (.48, .76), (.88, .34), .92),
+    "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
     "Tab": (2, (154, 151, 141), (66, 57, 48), .53, (.35, .66), (.97, .43), .74),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
@@ -35,6 +35,13 @@ FINISHES = {
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
+}
+
+# Finish, coverage channel, roughness, metallic, blend strength and relief attenuation.
+REGISTERED_FINISHES = {
+    "Stem": ((177, 162, 144), "rubbedCoverage", .406, .84, .49, .43),
+    "Saddle": ((121, 105, 82), "oxideCoverage", .74, .31, .65, .16),
+    "Neck": ((125, 101, 79), "oxideCoverage", .651, .47, .65, .15),
 }
 
 
@@ -214,11 +221,17 @@ def BakeRegion(name, sample, size, index, reference):
         heightField += .31 * shadowRibs
     if name in ("Barrel", "Neck"):
         stamp = (Engraving(size, (.398, .190), .245, .026) if name == "Barrel"
-                 else Engraving(size, (.424, .55), .23, .072))
+                 else Engraving(size, (.642, .510), .23, .072))
         rim = GaussianPeriodic(stamp, 1.5) - stamp * .54
-        heightField -= .57 * stamp
-        tonalDelta += 6 * rim - 10 * stamp
-        oxidation += .15 * stamp
+        if name == "Neck":
+            heightField -= .99 * stamp
+            tonalDelta += 6 * rim - 27 * stamp
+            oxidation += .21 * stamp
+            roughnessDelta += .05 * stamp
+        else:
+            heightField -= .57 * stamp
+            tonalDelta += 6 * rim - 10 * stamp
+            oxidation += .15 * stamp
 
     oxidation = np.clip(oxidation, .025, .964)
     mix = oxidation[..., None].astype(np.float32)
@@ -235,6 +248,14 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (rubbedColor - linear) * rubbed[..., None]
         rough += (.463 - rough) * rubbed
         metal += (.735 - metal) * rubbed
+    if name in REGISTERED_FINISHES:
+        tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
+        weight = ReferenceField(closeup, xx, vv, channel) * influence / 100
+        finish = SrgbToLinear(np.asarray(tint, dtype=np.float32) / 255)
+        linear += (finish - linear) * weight[..., None]
+        rough += (finishRoughness - rough) * weight
+        metal += (finishMetal - metal) * weight
+        heightField *= 1 - smoothing * weight
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
