@@ -70,8 +70,6 @@ SOLDIER_HEIGHT = {
 # 车比枪更容易越建越胖：每加一块装甲板都想往外挪一点，五块之后车就宽了半米，
 # 而巷宽 2.5 m 进不进得来是一条**玩法规则**（Data_Levels 抬头）。所以逐轴断言。
 VEHICLE_SPAN = {
-    "Type95HaGo": (2.07, 2.27, 4.38),
-    "Type97ChiHa": (2.475, 2.38, 5.50),
     "Type89Tank": (2.15, 2.56, 4.30),
 }
 VEHICLE_TOLERANCE = 0.08

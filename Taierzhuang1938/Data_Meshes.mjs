@@ -274,28 +274,6 @@ export const MESHES = {
       + "保留源 UV、逐角法线与原作者装甲/履带贴图；既有外廓和 4,089 三角保持不变。"
       + "装甲 6—17 mm，巷宽 < 2.5 m 进不来。炮塔是关节（turret），将来接载具系统直接转它。",
   },
-  Type95HaGo: {
-    file: "Model_Type95HaGo.tzm.json", category: "vehicle",
-    triangles: 82142, meshBlocks: 1, nodes: 8, joints: 1,
-    materials: ["armor"], mounts: VEHICLE_MOUNTS_TANK,
-    span: [2.07, 2.27, 4.38],
-    draws: { high: 1, medium: 1, low: 1 },
-    note: "九五式轻战车 Ha-Go。CC-BY 高模（Sketchfab / Jesper Landin）原始 82,142 三角；"
-      + "80,000 阈值只会减少 2.6%，按 5% 免减面规则保留原始拓扑。车体仍为单一 armor 网格，标准挂点与炮塔关节齐备。"
-      + "源件车头在 Blender 导入后的 -Y，ImportVehicles 按 sourceNose 翻正（2026-09-05 前炮口朝后）。",
-    // 单体网格没有炮管桶可探，朝向证据改用车体轮廓：驾驶员/机枪隆起在前（z≈-1.6 处
-    // 车体顶高 1.89 m），发动机舱盖在后（z≈+1.6 处 1.34 m）。ModelFacingTest 按这条复量。
-    facing: { probeZ: 1.6, frontHigherByM: 0.3 },
-  },
-  Type97ChiHa: {
-    file: "Model_Type97ChiHa.tzm.json", category: "vehicle",
-    triangles: 3968, meshBlocks: 4, nodes: 8, joints: 1,
-    materials: ["armor", "steel", "track"], mounts: VEHICLE_MOUNTS_TANK,
-    span: [2.475, 2.38, 5.5],
-    draws: { high: 4, medium: 4, low: 4 },
-    note: "九七式中战车 Chi-Ha。CC-BY（Sketchfab / snrnsrk5）原始 3,969 三角，不焊点、不减面；"
-      + "车体、履带、炮塔与炮管分桶导入，履带外廓宽度用于碰撞和巷宽判断。",
-  },
 
   Dougong: {
     file: "Model_Dougong.tzm.json", category: "prop",
@@ -384,7 +362,7 @@ export const WEAPON_MESH_BY_ID = {
   Type89Launcher: "Type89Launcher",
   OfficerSwordSet: "OfficerSwordSet",
   MediumMortar: "MediumMortar",
-  Type89Tank: "Type89Tank", Type95HaGo: "Type95HaGo", Type97ChiHa: "Type97ChiHa",
+  Type89Tank: "Type89Tank",
 };
 
 /** 保留通用变体接口；大刀统一使用带铁环、缠柄的二十九军战刀。 */

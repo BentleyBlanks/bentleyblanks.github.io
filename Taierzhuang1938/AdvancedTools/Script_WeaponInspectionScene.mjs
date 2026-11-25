@@ -3,7 +3,9 @@ import { WEAPONS } from "../Data_Weapons.mjs";
 import { BAYONET_MESH_BY_WEAPON, MESHES, WEAPON_MESH_BY_ID } from "../Data_Meshes.mjs";
 import { HANYANG_173R } from "../Data_HanYang173R.mjs";
 import { TYPE38_511 } from "../Data_Type38_511.mjs";
+import { OPTIONAL_VEHICLE_ASSETS, TYPE94_TANKETTE_ASSET } from "../Data_VehicleAssets.mjs";
 import { ActorFactory } from "../Script_Actor.mjs";
+import { InstantiateExternalProp } from "../Script_ExternalProps.mjs";
 import { ConfigureHanYang173R, InstantiateHanYang173R, LoadHanYang173R } from "../Script_HanYang173R.mjs";
 import { ConfigureType38_511, InstantiateType38_511, LoadType38_511 } from "../Script_Type38_511.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "../Script_MaterialPatches.mjs";
@@ -19,6 +21,16 @@ const GLB = {
   HanYang: { url: HANYANG_173R.url, Load: LoadHanYang173R, Configure: ConfigureHanYang173R, Instantiate: InstantiateHanYang173R },
   Type38_511: { url: TYPE38_511.url, Load: LoadType38_511, Configure: ConfigureType38_511, Instantiate: InstantiateType38_511 },
 };
+
+const VEHICLE_MODELS = [TYPE94_TANKETTE_ASSET, ...OPTIONAL_VEHICLE_ASSETS];
+export const INSPECTION_MODELS = Object.freeze(Object.fromEntries([
+  ...Object.entries(WEAPONS).filter(([, weapon]) => weapon.kind !== "vehicle"),
+  ...VEHICLE_MODELS.map((asset) => [asset.id, {
+    id: asset.id, kind: "vehicle", side: "ija", name: asset.name ?? asset.label,
+    fullName: asset.label, external: asset,
+  }]),
+]));
+
 const PITCH_BY_ASSET = { OfficerSwordSet: -Math.PI / 2, MediumMortar: Math.PI * .34 };
 const CHANNELS = Object.freeze({
   beauty: 0, normal: 1, tangent: 2, albedo: 3, roughness: 4, metallic: 5, ao: 6, reflection: 7, shadow: 8,
@@ -280,16 +292,18 @@ export class WeaponInspectionScene {
   }
 
   async Load(id, variant = 0) {
-    const weapon = WEAPONS[id];
+    const weapon = INSPECTION_MODELS[id];
+    const external = weapon.external;
     const meshId = WeaponMeshId(id, variant);
     const glb = GLB[meshId];
     const bayonetId = weapon.bayonet && BAYONET_MESH_BY_WEAPON[id];
     this.loadingMaterials ??= LoadMaterials(this.library);
-    const [textureFallbacks, glbAsset, , bladeAvailable] = await Promise.all([
+    const [textureFallbacks, glbAsset, , bladeAvailable, externalRoot] = await Promise.all([
       this.loadingMaterials,
       glb?.Load(),
       !glb && MESHES[meshId] ? this.LoadMesh(meshId) : null,
       bayonetId ? this.LoadMesh(bayonetId).then(() => true, () => false) : false,
+      external ? InstantiateExternalProp(external.catalogId, this.library) : null,
     ]);
     this.materials ??= this.factory.ActorMaterials("nra", Mulberry32(7));
 
@@ -306,20 +320,21 @@ export class WeaponInspectionScene {
     let muzzle = null;
     let grip = null;
     let nodes = null;
-    if (glb || weapon.kind === "vehicle") {
-      if (glb && !this.configuredGlbs.has(glbAsset)) {
+    if (external) {
+      if (!externalRoot) throw new Error(`模型无法实例化：${id}`);
+      // ExternalProps owns the cached geometry. Only the instance is mounted here.
+      body.add(externalRoot);
+    } else if (glb) {
+      if (!this.configuredGlbs.has(glbAsset)) {
         glb.Configure(glbAsset, this.library);
         this.configuredGlbs.add(glbAsset);
       }
-      // 车辆的炮塔在子节点，GLB 的材质随部件保留。
-      const instance = glb ? glb.Instantiate(glbAsset, { batch: true }) : this.factory.ModelInstance(meshId, this.materials);
+      const instance = glb.Instantiate(glbAsset, { batch: true });
       if (!instance) throw new Error(`模型无法实例化：${id}`);
       AddInstance(body, instance);
       nodes = instance.nodes;
-      if (glb) {
-        muzzle = MountPosition(instance, "muzzle");
-        grip = MountPosition(instance, "gripL");
-      }
+      muzzle = MountPosition(instance, "muzzle");
+      grip = MountPosition(instance, "gripL");
     } else {
       const built = this.factory.WeaponGeometry(id, variant, { includeBayonet: false });
       for (const [key, geometry] of built.geometries) {
@@ -362,7 +377,8 @@ export class WeaponInspectionScene {
     body.traverseVisible((object) => {
       if (object.isMesh) triangles += (object.geometry.index?.count ?? object.geometry.attributes.position.count) / 3;
     });
-    const file = glb?.url.slice("./Model/".length).split("?")[0] ?? MESHES[meshId]?.file ?? "程序化模型";
+    const glbUrl = external?.url ?? glb?.url;
+    const file = glbUrl?.slice("./Model/".length).split("?")[0] ?? MESHES[meshId]?.file ?? "程序化模型";
     return {
       group, body, pose, blade, muzzle, grip, nodes, size, file, triangles, ownedGeometry,
       textureFallback: textureFallbacks > 0,

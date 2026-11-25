@@ -41,7 +41,7 @@ import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { STRAW_SLEEPING_MAT_ASSETS } from "./Data_StrawSleepingMat.mjs";
 import { NAKAJIMA_KI4_ASSET } from "./Data_NakajimaKi4.mjs";
 import { AIRCRAFT_ASSETS } from "./Data_AircraftAssets.mjs";
-import { OPTIONAL_VEHICLE_ASSETS } from "./Data_VehicleAssets.mjs";
+import { OPTIONAL_VEHICLE_ASSETS, TYPE94_TANKETTE_ASSET } from "./Data_VehicleAssets.mjs";
 import {
   BuildSink, EXTERNAL_SANDBAG_ASSET_IDS, EXTERNAL_LEAFLESS_TREE_ASSET_IDS,
 } from "./Script_World.mjs";
@@ -294,7 +294,7 @@ const ASSETS = Object.freeze({
     node: "TimberShoring", category: "工事", solid: false, staticTint: 0xd4cec5 },
   eastTrackDrapedTimberShoring: { label: "覆旧帆布的沟壁支护", url: "./Model/TanketteAdvanceEastTrack/Model_GreyTimberShoring.glb?v=2026112403",
     category: "工事", solid: false },
-  type94Tankette: { label: "九四式轻装甲车", url: "./Model/Type94Tankette/Model_Type94Tankette.glb?v=20261030CurrentWearV106-43969e24",
+  [TYPE94_TANKETTE_ASSET.catalogId]: { label: TYPE94_TANKETTE_ASSET.label, url: TYPE94_TANKETTE_ASSET.url,
     category: "车辆", solid: false, staticYawDeg: { TurretYaw: 48 } },
   eastTrackBambooStretcher: { label: "竹竿布兜担架", url: "./Model/Model_BambooStretcher.glb?v=stretcher20260927", category: "生活道具", solid: false },
   eastTrackDressingBlanket: { label: "沟底旧毯", url: "./Model/Model_SingleBlanket.glb?v=20261023SingleBlanketShell",

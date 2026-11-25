@@ -158,7 +158,7 @@ export class ExplosionRangeField extends TestSceneField {
       this.vehicleCollider = null;
     }
     if (next) {
-      const hw = next === "Type97ChiHa" ? 1.25 : 1.08;
+      const hw = 1.08;
       this.vehicleCollider = {
         minX: padX - hw, maxX: padX + hw, minY: 0, maxY: 2.2, minZ: padZ - 2.3, maxZ: padZ + 2.3,
         tag: "testVehicle",

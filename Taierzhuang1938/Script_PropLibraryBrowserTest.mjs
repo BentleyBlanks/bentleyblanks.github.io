@@ -73,7 +73,8 @@ try {
     return {
       total: entries.length, categories,
       sources: Object.fromEntries(["glb", "tzm", "proc"].map((id) => [id, entries.filter((entry) => entry.source === id).length])),
-      retired: ["Tree", "Compound", "Hq", "Model_Dougong", "Model_WindowLattice", "External_tengxianShopFacade", "External_battlefieldRock", "External_wardDressingBundle"]
+      retired: ["Tree", "Compound", "Hq", "Model_Dougong", "Model_WindowLattice", "Model_Type95HaGo", "Model_Type97ChiHa",
+        "External_tengxianShopFacade", "External_battlefieldRock", "External_wardDressingBundle"]
         .filter((id) => entries.some((entry) => entry.id === id)),
       effects: entries.filter((entry) => entry.effect).length,
       rows: document.querySelectorAll("[data-prop]").length,
@@ -134,9 +135,12 @@ try {
       };
     });
   };
-  const tank = await Inspect("Model_Type97ChiHa");
+  const tank = await Inspect("Model_Type89Tank");
   Check("tzm 战车真建出来并显示尺寸与面数", tank.meshes > 0 && tank.triangles > 0 && tank.size.every((value) => value > 0.5)
-    && tank.shown.every((text) => text !== "—") && tank.file.includes("Model_Type97ChiHa.tzm.json"), JSON.stringify({ ...tank, base: undefined, normal: undefined, sides: undefined }));
+    && tank.shown.every((text) => text !== "—") && tank.file.includes("Model_Type89Tank.tzm.json"), JSON.stringify({ ...tank, base: undefined, normal: undefined, sides: undefined }));
+  const tankette = await Inspect("External_type94Tankette");
+  Check("九四式轻装甲车载入独立 GLB", tankette.triangles > 0 && tankette.glError === 0
+    && tankette.file.includes("Type94Tankette/Model_Type94Tankette.glb"), tankette.file);
   const cart = await Inspect("External_cart");
   Check("外部 GLB 载入并给出来源文件", cart.meshes > 0 && cart.file.includes("Model_Handcart.glb") && cart.glError === 0, cart.file);
   const pixels = await page.locator("#view").screenshot();

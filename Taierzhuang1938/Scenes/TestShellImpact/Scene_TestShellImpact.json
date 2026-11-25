@@ -47,7 +47,7 @@
     {"id":"Drum12","name":"汽油桶 Drum12","kind":"prop","x":3814,"z":3770,"ry":20.4,"meta":{"kind":"drum","tilt":0}},
     {"id":"Drum13","name":"汽油桶 Drum13","kind":"prop","x":3752,"z":3798,"ry":22.1,"meta":{"kind":"drum","tilt":1}},
     {"id":"Mg_Type92Hmg","name":"九二式重机枪","kind":"prop","x":3756,"z":3797.3,"meta":{"kind":"mg","weaponId":"Type92Hmg"}},
-    {"id":"Tank_Type95HaGo","name":"战车阵地 Type95HaGo","kind":"prop","x":3940,"z":3788,"ry":1.5708,"meta":{"kind":"tank","tankId":"Type95HaGo"}},
+    {"id":"Launch_Shell37","name":"37 毫米试射点","kind":"prop","x":3940,"z":3788,"meta":{"kind":"directLaunch","munitionId":"Shell37"}},
     {"id":"Tank_Type89Tank","name":"战车阵地 Type89Tank","kind":"prop","x":3940,"z":3810,"ry":1.5708,"meta":{"kind":"tank","tankId":"Type89Tank"}}
   ],
   "objects": [

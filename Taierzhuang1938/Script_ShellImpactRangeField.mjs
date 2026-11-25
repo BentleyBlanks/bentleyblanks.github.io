@@ -55,11 +55,16 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
   }
 
   _TankSpecs() {
-    const markers = (this.layout?.landmarks || []).filter((m) => m.meta?.kind === "tank" && m.meta?.tankId);
+    const markers = (this.layout?.landmarks || []).filter((m) => m.meta?.kind === "tank" && Object.hasOwn(SHELL_IMPACT_TANKS, m.meta.tankId));
     if (markers.length) {
       return Object.fromEntries(markers.map((m) => [m.meta.tankId, { x: m.x, z: m.z, yaw: m.ry || 0 }]));
     }
     return SHELL_IMPACT_TANKS;
+  }
+
+  DirectLaunchPoint(spec) {
+    const marker = this.layout?.landmarks?.find((entry) => entry.meta?.kind === "directLaunch" && entry.meta.munitionId === spec.id);
+    return marker ? { ...spec.launchPoint, x: marker.x, z: marker.z } : spec.launchPoint;
   }
 
   async PrepareAssets() {

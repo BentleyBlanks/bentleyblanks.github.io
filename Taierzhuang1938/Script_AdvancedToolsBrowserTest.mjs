@@ -196,6 +196,8 @@ try {
 
   // --- 3. 独立页面 ----------------------------------------------------------------------
   if (!only || only.has("weapon")) {
+    const vehicleIds = ["Type94Tankette", "Type89MediumTank"];
+    const assetIds = [...Object.values(WEAPONS).filter((weapon) => weapon.kind !== "vehicle").map((weapon) => weapon.id), ...vehicleIds];
     const { page: center, errors } = await OpenPage(`${base}ControlCenter.html`, { viewport: { width: 1440, height: 900 } });
     const requests = [];
     center.context().on("request", (request) => requests.push({ url: request.url(), method: request.method() }));
@@ -218,7 +220,10 @@ try {
     Check("控制中心启动有独立窗口名的只读枪械检查台",
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
       && independent.opener?.endsWith("/ControlCenter.html") && independent.standalone && independent.noWrites
-      && independent.models === Object.keys(WEAPONS).length, JSON.stringify(independent));
+      && independent.models === assetIds.length, JSON.stringify(independent));
+    const vehicleGroup = page.locator(".model-group").filter({ has: page.getByRole("heading", { name: "载具", exact: true }) });
+    const listedVehicles = await vehicleGroup.locator("[data-model]").evaluateAll((rows) => rows.map((row) => row.dataset.model));
+    Check("载具栏只列九四式和八九式乙型", listedVehicles.join(",") === vehicleIds.join(","), listedVehicles.join(","));
     const ReadPixels = () => page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
       stage.Draw();
@@ -549,20 +554,29 @@ try {
         tool.scene.Draw();
         details[id] = {
           minY: new Box3().setFromObject(model.body, true).min.y,
-          pitch: model.pose.rotation.x, span: model.size.toArray(), turret: !!model.nodes?.get("turret"), triangles: model.triangles,
+          pitch: model.pose.rotation.x, span: model.size.toArray(),
+          turret: !!(model.body.getObjectByName("TurretYaw") || model.body.getObjectByName("Node_TurretYaw")), triangles: model.triangles,
           file: model.file,
         };
       }
       return details;
-    }, Object.keys(WEAPONS));
+    }, assetIds);
     Check("所有模型条目都能绘制", Object.values(assets).every((model) => model?.triangles > 0),
       Object.entries(assets).filter(([, model]) => !model?.triangles).map(([id]) => id).join(","));
-    const { Type92Hmg, MediumMortar, OfficerSwordSet, Type89Tank, HanYang, Type38 } = assets;
+    const { Type92Hmg, MediumMortar, OfficerSwordSet, Type94Tankette, Type89MediumTank, HanYang, Type38 } = assets;
     Check("架设武器按各自姿态落地，军刀横放，车辆保留炮塔，GLB 使用原模型",
-      [Type92Hmg, MediumMortar, Type89Tank].every((model) => Math.abs(model?.minY) < .005)
+      [Type92Hmg, MediumMortar, Type94Tankette, Type89MediumTank].every((model) => Math.abs(model?.minY) < .005)
       && Math.abs(Type92Hmg.pitch) < .001 && MediumMortar.pitch > 1 && MediumMortar.pitch < 1.15
       && MediumMortar.span[1] > MediumMortar.span[0] * .9 && OfficerSwordSet?.span[0] > OfficerSwordSet?.span[1] * 5
-      && Type89Tank.turret && /173R.*\.glb$/.test(HanYang?.file) && /511.*\.glb$/.test(Type38?.file));
+      && Type94Tankette?.turret && /Model_Type94Tankette\.glb$/.test(Type94Tankette.file)
+      && Type89MediumTank?.turret && /Model_Type89MediumTank\.glb$/.test(Type89MediumTank.file)
+      && /173R.*\.glb$/.test(HanYang?.file) && /511.*\.glb$/.test(Type38?.file));
+    for (const id of vehicleIds) {
+      await search.fill(id);
+      await Inspect(id);
+      if (shots) await page.screenshot({ path: path.join(shotDir, `WeaponInspection_${id}.png`) });
+    }
+    await search.clear();
     await page.setViewportSize({ width: 390, height: 844 });
     await Inspect("ZhongZheng");
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionMobile.png") });

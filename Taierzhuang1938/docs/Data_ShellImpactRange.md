@@ -77,13 +77,13 @@ junction 由管线按端点自动认：交通壕×射击壕 (6,-8)、交通壕×
   （`Script_FirstLevelSmokeOrigins`）的程序化做法——圆柱 + 两道箍，三种漆色，其中几只倒在地上；走 `BuildSink` 合批并登记碰撞盒。
 - **九二式三脚架重机枪**（`Model_Type92Hmg.tzm.json`）一挺，架在射击壕南沿左段 (-44,-2.7)，枪口朝北；网格烘进 `BuildSink`。
 - **枯树** 9 棵：`Script_BreakableTrees.Load(field, placements)` 的新可选参数（不传 = 第一关那份），**炮击能打断**。
-- **战车炮阵地**：场地东侧两辆现有战车（`Type95HaGo`、`Type89Tank`，动态模型），局部 (140,-12)、(140,10)，炮口朝西。
+- **平射阵地**：东侧局部 (140,-12) 为 37 mm 试射点，(140,10) 为八九式 57 mm 炮口，朝西。
 
 静态几何都进 `BuildSink`；布景不压壕沟也不踩弃土垄（沙袋与机枪故意摆在沟沿，只要求不在开挖范围里）——`Script_ShellImpactRangeTest` 逐件核对。
 
 ## 弹种与投送
 
-装药读 `Data_Explosives.EXPLOSIVES[id].fillingKg`；半径 / 伤害取 `Data_Weapons`（手榴弹、集束、掷弹筒、战车炮、迫击炮），105 / 150 / 航弹是测试场名义值。
+装药读 `Data_Explosives.EXPLOSIVES[id].fillingKg`。手榴弹、集束、掷弹筒、八九式战车炮和迫击炮的半径与伤害取自 `Data_Weapons`，其余弹种使用测试场名义值。
 `Combat.Blast` 的 `kind`：手榴弹 `grenade`、集束 `tank`、航弹 `bomb`，炮弹命中后 `FireShell` 自己调 `Blast(..., "shell", ..., shell.kind)`。
 **explosiveId 一律传弹种自己的 id**（扬尘靠它定装药量）。
 
@@ -92,7 +92,7 @@ junction 由管线按端点自动认：交通壕×射击壕 (6,-8)、交通壕×
 | `Grenade` | 手榴弹 | 0.165 | 直接起爆（hand） | 55°（取证值） | — | 6.5 / 130 |
 | `GrenadeBundle` | 集束手榴弹 | 1.155 | 直接起爆（hand） | 55° | — | 4.2 / 620 |
 | `Shell50` | 掷弹筒 50 mm | 0.153 | 高抛，北侧 55 m | 70° | 3.9 s | 5 / 110 |
-| `Shell37` | 战车炮 37 mm | 0.058 | 九五式，东侧阵地平射 | ≈2° | 0.55 s | 3.4 / 120 |
+| `Shell37` | 战车炮 37 mm | 0.058 | 东侧试射点平射 | ≈2° | 0.55 s | 3.4 / 120 |
 | `Shell57` | 战车炮 57 mm | 0.25 | 八九式，东侧阵地平射 | ≈3° | 0.6 s | 4 / 160 |
 | `Shell82` | 迫击炮 82 mm | 0.553 | 高抛，北侧 70 m | 70° | 4.4 s | 7 / 150 |
 | `Shell75` | 野炮 75 mm | 0.81 | 北侧 100 m | 45° | 3.15 s | 7 / 150 |
@@ -104,7 +104,7 @@ junction 由管线按端点自动认：交通壕×射击壕 (6,-8)、交通壕×
 - **落角算法**（`Data_ShellImpactRange` 的 `LobFlightS` / `ArrivalAngleDeg` / `DropPlan`，纯函数，测试共用）：弹从落点水平 D 米外、高出落点 h 米的 `from`
   起飞，飞行 T 秒，抛物线（重力取 `Script_Combat.GRAVITY` = 19.6）；命中点弹道与水平面夹角 θ 满足 `tanθ = (h + g·T²/2) / D`，已知 D、θ 反推
   `T = √(2·(D·tanθ − h) / g)`，`FireShell(from, 落点, { flight: T })`。浏览器测试在命中前最后两个采样点量实际落角，与名义值差 < 3°。
-- **平射**从战车炮口（`field.TankMuzzle(id)`）打；落点在沟里时低伸弹道会先撞上沟沿 / 抛土垄，在那儿起爆——这正是「浅落角打沟」要看的，不算失效。
+- **平射**从场景登记的试射点或战车炮口（`field.TankMuzzle(id)`）发射，弹道经过沟沿或弃土垄时先在碰撞点起爆。
   要打开阔地或碉堡请选 `OpenFront20` / `BunkerSide`。
 - **航空炸弹**不借 `Script_BombBallistics`（那套带空气阻力，面向轮番轰炸）：自己积分的无阻力下落，真实重力 9.81，水平速度使落角为名义值；
   下落途中沿路射线检测（撞树 / 碉堡 / 沟沿都会提前起爆），落地调 `Blast(..., "bomb", ..., "Bomb250kg")`。没做飞机掠过（非必须）。

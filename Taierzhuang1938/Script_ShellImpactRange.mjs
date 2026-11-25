@@ -261,11 +261,11 @@ export class ShellImpactRange {
     return !hit || hit.t >= 40 - 0.05;
   }
 
-  /** 战车炮平射：从场地东侧阵地的炮口低伸飞来。 */
+  /** 战车炮平射：从场地东侧试射点或战车炮口低伸飞来。 */
   DeliverDirect(spec, point, record) {
-    const muzzle = this.field.TankMuzzle?.(spec.tankId);
-    const place = SHELL_IMPACT_TANKS[spec.tankId];
-    const from = muzzle || new THREE.Vector3(place.x, this.Ground(place.x, place.z) + 2, place.z);
+    const muzzle = spec.tankId ? this.field.TankMuzzle?.(spec.tankId) : null;
+    const place = this.field.DirectLaunchPoint(spec) ?? SHELL_IMPACT_TANKS[spec.tankId];
+    const from = muzzle ?? new THREE.Vector3(place.x, this.Ground(place.x, place.z) + (place.heightM ?? 2), place.z);
     const horizontal = Math.hypot(point.x - from.x, point.z - from.z);
     record.flightS = spec.flightS; record.from = from.toArray();
     // 命中点弹道与水平面夹角：tanθ = (h + g·T²/2) / D（h = 炮口高出落点）。

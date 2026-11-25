@@ -36,31 +36,6 @@ BUDGET = VEHICLE_TRIANGLE_LIMIT
 BUILD_STATS = {}
 
 SOURCES = {
-    "Type95HaGo": {
-        "file": os.path.join("Model_Type95HaGo", "scene.gltf"),
-        "span": (2.07, 2.27, 4.38),
-        # 这件高模被作者按表面切成 13 个 Object_* 网格，源文件没有车体/履带/炮塔
-        # 语义层级；完整保留原始网格，运行时用 shared armor 材质重漆。
-        "parts": [("Object_", "armor", False)],
-        "singleBody": True,
-        # 这件源 glTF 的车头在 Blender 导入后的 -Y（Sketchfab 场景 glTF 的 +Z）：
-        # 前部驾驶员/机枪隆起高、尾部发动机舱盖低。单体网格没有炮管可探，
-        # 车头方向只能在这里声明；漏了就是炮口朝后。
-        "sourceNose": "-Y",
-        "note": "CC-BY Type 95 Ha-Go（Sketchfab / Jesper Landin）→ 九五式轻战车。"
-                "源件 82.8k 面，按 4.38 × 2.07 × 2.27 m 归一后原样保留；"
-                "源 glTF 没有可分离的炮塔/履带节点，保留完整外形为单一装甲网格。",
-    },
-    "Type97ChiHa": {
-        "file": os.path.join("Model_Type97ChiHa", "scene.gltf"),
-        # 原始网格外廓宽度 2.475 m；运行时碰撞/巷宽与 Data_Weapons 使用同一值。
-        "span": (2.475, 2.38, 5.50),
-        "parts": [("Hull", "armor", False), ("Track", "track", False),
-                  ("Turret", "armor", True), ("Barrel", "steel", True)],
-        "note": "CC-BY Type 97 Chi-Ha（Sketchfab / snrnsrk5）→ 九七式中战车。"
-                "车体、履带、炮塔与炮管按源节点分桶，几何实际外廓为 5.50 × 2.475 × 2.38 m，"
-                "运行时按 armor/track/steel 三桶重漆。",
-    },
     "Type89Tank": {
         "sourceAppearance": True,
         "file": os.path.join("Model_Type89ChiRo", "scene.gltf"),

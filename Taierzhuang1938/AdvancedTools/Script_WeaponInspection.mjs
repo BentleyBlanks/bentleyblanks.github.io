@@ -1,6 +1,5 @@
 import * as THREE from "three";
-import { WEAPONS } from "../Data_Weapons.mjs";
-import { WeaponInspectionScene } from "./Script_WeaponInspectionScene.mjs";
+import { INSPECTION_MODELS, WeaponInspectionScene } from "./Script_WeaponInspectionScene.mjs";
 import { ShowWeaponModelInspector } from "./Script_WeaponModelInspector.mjs";
 import { BindWeaponReferenceViewport } from "./Script_WeaponReferenceViewport.mjs";
 
@@ -64,7 +63,7 @@ function SyncSelection() {
 
 function FilterCatalog() {
   const query = search.value.trim().toLocaleLowerCase();
-  const matches = Object.values(WEAPONS).filter((weapon) =>
+  const matches = Object.values(INSPECTION_MODELS).filter((weapon) =>
     [weapon.id, weapon.name, weapon.fullName, Kind(weapon)].some((field) => field?.toLocaleLowerCase().includes(query)));
   list.replaceChildren();
   Text("catalogCount", matches.length);
@@ -120,9 +119,9 @@ function SetStatus(state, message = "", canRetry = false) {
 }
 
 async function Select(id, variant = 0) {
-  if (!stage || !Object.hasOwn(WEAPONS, id)) return null;
+  if (!stage || !Object.hasOwn(INSPECTION_MODELS, id)) return null;
   const version = ++selectionVersion;
-  const weapon = WEAPONS[id];
+  const weapon = INSPECTION_MODELS[id];
   selected = id;
   SyncSelection();
   Text("modelName", weapon.name);

@@ -41,7 +41,7 @@ export const EXPLOSIVES = {
 };
 
 export const VEHICLE_EXPLOSIVES = {
-  Type89Tank: "Shell57", Type95HaGo: "Shell37", Type97ChiHa: "Shell57",
+  Type89Tank: "Shell57",
 };
 
 export const TERRAIN_DEFORMATION = Object.freeze({

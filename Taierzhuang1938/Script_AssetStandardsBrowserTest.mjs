@@ -129,15 +129,15 @@ try {
   Check("「需处理 / 待复核」只留源缺席的九二式", attention.join(",") === "Type92Hmg", attention.join(","));
 
   await page.click('.as-navItem[data-view="vehicle"]');
-  await page.click('#assetRows tr[data-id="Type95HaGo"]');
+  await page.click('#assetRows tr[data-id="Type89Tank"]');
   const before = await page.evaluate(() => ({ status: document.getElementById("detailStatus").textContent, derive: document.getElementById("detailDerive").textContent,
     hash: location.hash }));
-  Check("九五式详情：5% 免减面推导、地址带深链", before.status === "原始拓扑保留" && /保留原始拓扑/.test(before.derive) && /2\.6%/.test(before.derive)
-    && /view=vehicle/.test(before.hash) && /id=Type95HaGo/.test(before.hash), JSON.stringify(before));
+  Check("八九式原始拓扑保留，详情地址带深链", before.status === "原始拓扑保留" && /保留原始拓扑/.test(before.derive)
+    && /view=vehicle/.test(before.hash) && /id=Type89Tank/.test(before.hash), JSON.stringify(before));
   await page.fill("#fieldSource", "90000");
   const after = await page.evaluate(() => ({
     status: document.getElementById("detailStatus").textContent, tone: document.getElementById("detailStatus").className,
-    row: document.querySelector('#assetRows tr[data-id="Type95HaGo"] .as-pill')?.textContent, nav: document.querySelector('.as-navItem[data-view="vehicle"] .as-dot').className,
+    row: document.querySelector('#assetRows tr[data-id="Type89Tank"] .as-pill')?.textContent, nav: document.querySelector('.as-navItem[data-view="vehicle"] .as-dot').className,
     state: document.getElementById("saveState").textContent, title: document.title, save: document.getElementById("saveButton").disabled,
   }));
   Check("改原始面数即时重算：90,000 > 80,000 且降幅 > 5% → 偏离分类阈值（详情、表格、导航同步变红）",
@@ -146,7 +146,7 @@ try {
   await page.screenshot({ path: path.join(shotDir, "AssetStandards_VehicleEdit.png") });
   const [download] = await Promise.all([page.waitForEvent("download"), page.click("#downloadButton")]);
   const downloaded = JSON.parse(fs.readFileSync(await download.path(), "utf8"));
-  Check("下载 JSON 带上本页修改", download.suggestedFilename() === "Data_AssetStandards.json" && downloaded.sourceAssets.Type95HaGo.sourceTriangles === 90000);
+  Check("下载 JSON 带上本页修改", download.suggestedFilename() === "Data_AssetStandards.json" && downloaded.sourceAssets.Type89Tank.sourceTriangles === 90000);
   await page.click('.as-navItem[data-view="external"]');
   const external = await page.$$eval("#assetRows tr[data-id]", (rows) => rows.length);
   Check("外部 GLB 表逐件列出", external === spec.externalGlb.length, String(external));

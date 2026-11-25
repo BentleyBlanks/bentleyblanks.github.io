@@ -40,6 +40,12 @@ export const PLACEABLE = [
 
 export const PLACEABLE_CATEGORIES = ["景观", "院落小件", "工事", "建筑", "模型", "特效"];
 
+const VEHICLE_MATERIAL_RECIPES = {
+  type89Armor: "Type89Armor",
+  type89Barrel: "Type89Armor",
+  type89Track: "Type89Track",
+};
+
 /**
  * 用正片同一个 InstantiateModel 建一个 tzm 条目的可见节点。modelDocs 里要先有该模型的文档。
  * 返回 { loaded, colliders, meshes }（tzm 道具不登记碰撞盒）。
@@ -49,7 +55,7 @@ export function BuildPlaceableVisual(target, entry, item, { library, modelDocs =
   if (!doc) return { loaded: false, colliders: [], meshes: 0 };
   const spec = MESHES[entry.model];
   const materials = {};
-  for (const name of spec.materials) materials[name] = ResolveTengxianMaterial(name, library);
+  for (const name of spec.materials) materials[name] = ResolveTengxianMaterial(VEHICLE_MATERIAL_RECIPES[name] ?? name, library);
   const built = InstantiateModel(doc, { materials });
   built.root.position.set(item.x, item.h || 0, item.z);
   built.root.rotation.y = item.ry || 0;

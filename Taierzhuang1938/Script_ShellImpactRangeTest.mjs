@@ -106,11 +106,11 @@ Check(() => {
   }
   // 战车炮平射：落角很浅（< 5°），不是高抛。
   for (const m of SHELL_IMPACT_MUNITIONS.filter((spec) => spec.delivery === "direct")) {
-    const tank = SHELL_IMPACT_TANKS[m.tankId];
-    assert.ok(tank, `${m.id} 的战车 ${m.tankId} 有发射阵地`);
-    const horizontal = Math.hypot(tank.x - SHELL_IMPACT_TARGETS[0].x, tank.z - SHELL_IMPACT_TARGETS[0].z);
+    const launchPoint = m.launchPoint ?? SHELL_IMPACT_TANKS[m.tankId];
+    assert.ok(launchPoint, `${m.id} 有发射阵地`);
+    const horizontal = Math.hypot(launchPoint.x - SHELL_IMPACT_TARGETS[0].x, launchPoint.z - SHELL_IMPACT_TARGETS[0].z);
     assert.ok(horizontal > 100 && horizontal < 200, `阵地离落点约 150 m（${horizontal.toFixed(0)} m）`);
-    assert.ok(ArrivalAngleDeg(horizontal, 1.6, m.flightS) < 5);
+    assert.ok(ArrivalAngleDeg(horizontal, launchPoint.heightM ?? 1.6, m.flightS) < 5);
   }
 }, "弹道几何：落角 = 名义值（高抛 / 野炮 / 航弹 / 平射）");
 

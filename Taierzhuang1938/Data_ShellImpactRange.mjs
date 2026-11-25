@@ -131,13 +131,12 @@ export const SHELL_IMPACT_TREES = Object.freeze([
  * 投送方式：
  *   hand    直接在落点起爆（手榴弹 / 集束手榴弹），附一个典型的抛出落角做取证用。
  *   lob     高抛（掷弹筒 / 迫击炮 / 榴弹炮）：从落点北侧 rangeM 远、按落角 angleDeg 反推的弹道进来。
- *   direct  战车炮平射：从场地东侧约 150 m 外的战车炮口低伸飞来（flightS 是飞行时间）。
+ *   direct  战车炮平射：从场地东侧试射点或八九式炮口低伸飞来（flightS 是飞行时间）。
  *   field   野炮：45° 左右的中弧线，用 lob 同一套公式。
  *   drop    航空炸弹：从 altitudeM 高处近乎垂直落下，落角 angleDeg（无动力自由下落，自己积分）。
  * 落角 angleDeg 是命中点弹道与水平面的夹角；平射的落角由飞行时间与射距反算，这里的 angleDeg 只是名义值。
- * 伤害 / 半径尽量取自 Data_Weapons，没有的（105 / 150 / 航弹）是测试场的名义值，装药量一律读 Data_Explosives。
+ * 伤害 / 半径尽量取自 Data_Weapons，没有的使用测试场名义值，装药量一律读 Data_Explosives。
  */
-const gun = (id) => ({ radiusM: WEAPONS[id].gunRadiusM, damage: WEAPONS[id].gunDamage });
 export const SHELL_IMPACT_MUNITIONS = Object.freeze([
   { id: "Grenade", explosiveId: "Grenade", blastKind: "grenade", delivery: "hand", angleDeg: 55,
     radiusM: WEAPONS.Grenade.radiusM, damage: WEAPONS.Grenade.damage },
@@ -145,10 +144,10 @@ export const SHELL_IMPACT_MUNITIONS = Object.freeze([
     radiusM: WEAPONS.GrenadeBundle.radiusM, damage: WEAPONS.GrenadeBundle.damage },
   { id: "Shell50", explosiveId: "Shell50", blastKind: "shell", delivery: "lob", angleDeg: 70, rangeM: 55,
     radiusM: WEAPONS.Type89Launcher.radiusM, damage: WEAPONS.Type89Launcher.damage },
-  { id: "Shell37", explosiveId: "Shell37", blastKind: "shell", delivery: "direct", tankId: "Type95HaGo",
-    flightS: 0.55, ...gun("Type95HaGo") },
+  { id: "Shell37", explosiveId: "Shell37", blastKind: "shell", delivery: "direct",
+    launchPoint: Object.freeze({ ...L(140, -12), heightM: 2 }), flightS: 0.55, radiusM: 3.4, damage: 120 },
   { id: "Shell57", explosiveId: "Shell57", blastKind: "shell", delivery: "direct", tankId: "Type89Tank",
-    flightS: 0.6, ...gun("Type89Tank") },
+    flightS: 0.6, radiusM: WEAPONS.Type89Tank.gunRadiusM, damage: WEAPONS.Type89Tank.gunDamage },
   { id: "Shell82", explosiveId: "Shell82", blastKind: "shell", delivery: "lob", angleDeg: 70, rangeM: 70,
     radiusM: WEAPONS.MediumMortar.radiusM, damage: WEAPONS.MediumMortar.damage },
   { id: "Shell75", explosiveId: "Shell75", blastKind: "shell", delivery: "field", angleDeg: 45, rangeM: 100,
@@ -194,7 +193,6 @@ export function DropPlan(altitudeM, angleDeg, g = BOMB_GRAVITY) {
 
 /** 战车炮的发射阵地：场地东侧约 140 m，炮口朝西（-X）。 */
 export const SHELL_IMPACT_TANKS = Object.freeze({
-  Type95HaGo: Object.freeze({ id: "Type95HaGo", ...L(140, -12), yaw: Math.PI / 2 }),
   Type89Tank: Object.freeze({ id: "Type89Tank", ...L(140, 10), yaw: Math.PI / 2 }),
 });
 

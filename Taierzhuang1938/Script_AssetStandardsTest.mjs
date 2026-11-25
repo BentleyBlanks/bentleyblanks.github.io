@@ -70,7 +70,7 @@ for (const [id, record] of Object.entries(SOURCE_ASSET_STANDARDS)) {
   }
 }
 // 八九式重掷弹筒现在有单独的外观来源和面数上限。
-Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 16 && missing.length === 0,
+Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 14 && missing.length === 0,
   "现有源模型均进入资产规范清单", missing.join("、"));
 Check(!WEAPONS.Mauser96 && Object.values(LOADOUTS).every((loadout) =>
   [loadout.primary, loadout.secondary, loadout.melee].every((id) => !id || WEAPONS[id]))
@@ -128,8 +128,9 @@ function PointTriangleDistance(point,[a,b,c]) {
 if (WeaponShelved("ServicePistol")) console.log("skip 军用手枪握把与换匣检查（手枪暂时停用）");
 else CheckServicePistolGrip();
 
-Check(MESHES.Type95HaGo.triangles === 82142,
-  "九五式到 80k 仅降 2.6%，保留 82,142 原始三角", String(MESHES.Type95HaGo.triangles));
+Check(["Type95HaGo", "Type97ChiHa"].every((id) => !WEAPONS[id] && !MESHES[id] && !SOURCE_ASSET_STANDARDS[id]
+  && !built.has(id) && !fs.existsSync(path.join(projectDir, "Model", `Model_${id}.tzm.json`))),
+  "退役的九五式和九七式无运行时登记或发布模型");
 Check(EXTERNAL_GLB_STANDARDS.length === 64
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='Type38_511'&&record.actualTriangles===74412&&record.targetTriangles===80000)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='RifleSlingFlatV3'&&record.actualTriangles===6584&&record.targetTriangles===6584)

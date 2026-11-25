@@ -103,7 +103,7 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     RoofTile: library.Get("RoofTile", { roughness: 0.85, metalness: 0 }),
   });
 
-  const ids = id ? [id] : ["Type95HaGo", "Type97ChiHa", "Type89Tank"];
+  const ids = id ? [id] : ["Type89Tank"];
   const out = [];
   for (const modelId of ids) {
     const entry = MESHES[modelId];

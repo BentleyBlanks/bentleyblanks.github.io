@@ -14,13 +14,6 @@ const EnemyModeLabel = (mode) => (
       : T("range.explosion.enemyModeHold")
 );
 
-const VehicleShortLabel = (id, fallbackName) => (
-  id === "Type89Tank" ? T("range.explosion.veh89")
-    : id === "Type95HaGo" ? T("range.explosion.veh95")
-      : id === "Type97ChiHa" ? T("range.explosion.veh97")
-        : fallbackName
-);
-
 export class ExplosionRangeLab {
   constructor(host) {
     this.host = host;
@@ -40,7 +33,7 @@ export class ExplosionRangeLab {
     ).join("");
     const vehicleButtons = `<button type="button" class="siBtn exVehicle" data-vehicle="">${T("range.explosion.vehNone")}</button>`
       + EXPLOSION_VEHICLES.map((v) =>
-        `<button type="button" class="siBtn exVehicle" data-vehicle="${v.id}">${VehicleShortLabel(v.id, v.name)}</button>`
+        `<button type="button" class="siBtn exVehicle" data-vehicle="${v.id}">${v.name}</button>`
       ).join("");
 
     this.root.innerHTML = `
