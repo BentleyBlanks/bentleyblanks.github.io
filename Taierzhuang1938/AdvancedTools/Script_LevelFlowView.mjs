@@ -4,7 +4,7 @@ import { Clamp, Distance, Lerp } from "./Script_LevelFlowGeometry.mjs";
 import { DrawFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 import { IsMainlineLandmark, LandmarkMode } from "./Script_LevelFlowMap.mjs";
 import { FLOW_FIELD_COLORS, FLOW_RENDERING, FLOW_ZOOM, FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
-import { MakeRoadPath } from "../Script_RoadPath.mjs";
+import { MakeRoadPath, GapsToRuns, SampleRun, ResolveRailwayGaps } from "../Script_RoadPath.mjs";
 
 const LINE_CLIP_PAD=32,BASE_OVERSCAN=0.2,BASE_SCALE_TOLERANCE=0.05;
 const roadSplineCache = new WeakMap();
@@ -373,6 +373,52 @@ export class FlowMapView {
     for(const trench of map.trenches) SmoothLine(context,trench.points.map(Screen),"#ead9b7",Math.max(1,(trench.width-0.3)*scale));
     SmoothLine(context,map.river.map(Screen),"#9bb5ba66",10*scale);
     SmoothLine(context,map.river.map(Screen),"#a6c5cf",6*scale);
+    for (const railSpec of map.railways || []) {
+      if (!Array.isArray(railSpec.points) || railSpec.points.length < 2) continue;
+      let path;
+      try { path = MakeRoadPath(railSpec.points); } catch { continue; }
+      const gauge = railSpec.gauge ?? 1.50;
+      const bedHalf = railSpec.bed?.topHalf ?? 1.9;
+      const bedGaps = ResolveRailwayGaps(path, railSpec.bed?.gaps, railSpec.bed?.zGaps ?? railSpec.zGaps);
+      const sleeperGaps = ResolveRailwayGaps(path, railSpec.sleeperGaps, railSpec.sleeperZGaps ?? railSpec.zGaps);
+      const railGaps = ResolveRailwayGaps(path, railSpec.railGaps, railSpec.railZGaps ?? railSpec.zGaps);
+      // 1) 道砟床底带
+      for (const [a, b] of GapsToRuns(path.length, bedGaps)) {
+        const pts = SampleRun(path, a, b, 6).map((sm) => Screen([sm.x, sm.z]));
+        SmoothLine(context, pts, "#7d756888", (bedHalf * 2 + 1.4) * scale);
+        SmoothLine(context, pts, "#605a52cc", (bedHalf * 2) * scale);
+      }
+      // 2) 枕木横线（按缩放自适应步距避免缩远成一团黑）
+      const tieLen = (railSpec.sleeper?.length ?? 2.54) * 0.5;
+      const baseSpacing = railSpec.sleeper?.spacing ?? 0.68;
+      const step = Math.max(baseSpacing, 3.2 / Math.max(0.2, scale));
+      context.strokeStyle = "#4d3a29";
+      context.lineWidth = Math.max(0.9, Math.min(2.6, 0.24 * scale));
+      context.beginPath();
+      for (const [a, b] of GapsToRuns(path.length, sleeperGaps)) {
+        for (let s = a; s <= b; s += step) {
+          const p = path.At(s);
+          const nx = p.tz, nz = -p.tx;
+          const p0 = Screen([p.x - nx * tieLen, p.z - nz * tieLen]);
+          const p1 = Screen([p.x + nx * tieLen, p.z + nz * tieLen]);
+          if (Math.max(p0[0], p1[0]) < -8 || Math.min(p0[0], p1[0]) > width + 8
+            || Math.max(p0[1], p1[1]) < -8 || Math.min(p0[1], p1[1]) > height + 8) continue;
+          context.moveTo(p0[0], p0[1]);
+          context.lineTo(p1[0], p1[1]);
+        }
+      }
+      context.stroke();
+      // 3) 双钢轨（暗钢轮廓 + 轨面高光）
+      for (const [a, b] of GapsToRuns(path.length, railGaps)) {
+        const samples = SampleRun(path, a, b, 6);
+        for (const side of [-1, 1]) {
+          const off = side * gauge * 0.5;
+          const pts = samples.map((sm) => Screen([sm.x + sm.tz * off, sm.z - sm.tx * off]));
+          Line(context, pts, "#2c2f32", Math.max(1.2, 0.16 * scale));
+          Line(context, pts, "#b4bcc2", Math.max(0.6, 0.07 * scale));
+        }
+      }
+    }
     const signals=EncounterSignals(frame);
     for(const object of map.objects) {
       if(!VisibleEncounterObject(object,signals)||/Lintel/.test(object.id)) continue;

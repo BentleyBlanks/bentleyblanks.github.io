@@ -402,6 +402,11 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
           .filter((r) => Array.isArray(r.points) && r.points.length >= 2 && LineTouches(area, r.points.map((p) => (Array.isArray(p) ? { x: p[0], z: p[1] } : p)), (r.width || 4) * 0.6))
           .map((r) => ({ ...r, points: r.points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z])) })),
       } : {}),
+      ...(scene.ways?.railways?.length ? {
+        railways: scene.ways.railways
+          .filter((r) => Array.isArray(r.points) && r.points.length >= 2)
+          .map((r) => structuredClone(r)),
+      } : {}),
       trenches: [...Lines(scene.ways?.trenches), ...Lines(SceneTrenchLines(slicePlan))],
     },
     ...(slicePlan ? { trenchPlan: slicePlan } : {}),

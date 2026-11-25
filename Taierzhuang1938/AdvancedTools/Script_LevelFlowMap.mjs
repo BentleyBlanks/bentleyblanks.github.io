@@ -151,8 +151,11 @@ export function BuildEncounterMap(scene, options = {}) {
   const openings = objects.flatMap((object) => object.meta?.openings || []).filter((opening) => Array.isArray(opening.p));
   labels.push(...openings.filter((opening) => !labels.some((label) => label.kind === opening.kind && Math.hypot(label.p[0] - opening.p[0], label.p[1] - opening.p[1]) < 1))
     .map((opening) => ({ ...opening, y: opening.y + opening.h / 2, name: opening.kind === "door" ? "屋门" : "窗洞", detail: true })));
+  const railways = (scene.ways?.railways || [])
+    .filter((r) => Array.isArray(r.points) && r.points.length >= 2)
+    .map((r) => structuredClone(r));
   return {
-    bounds: [-160, 320, -480, mapMaxZ], objects, farObjects, roads, trenches, labels, floors, ramps,
+    bounds: [-160, 320, -480, mapMaxZ], objects, farObjects, roads, railways, trenches, labels, floors, ramps,
     planningPockets: scene.surface?.pockets || FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => (paint.poly || paint.line)?.some((point) => (point.z ?? point[1]) < mapMaxZ)),
     fields: hasGengjiazhuang ? [...FrontPaperFields(), ...village.L0610_FIELDS] : [...FrontPaperFields(), ...MergedPaperFields(mapMaxZ)],

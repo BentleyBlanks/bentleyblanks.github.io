@@ -874,6 +874,9 @@ export function LayoutFromSceneDoc(doc) {
       ...(doc.ways?.roadRibbons?.length ? {
         roadRibbons: doc.ways.roadRibbons.map((r) => ({ ...r, points: r.points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z])) })),
       } : {}),
+      ...(doc.ways?.railways?.length ? {
+        railways: doc.ways.railways.map((r) => structuredClone(r)),
+      } : {}),
       trenches: (doc.ways?.trenches || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),
     },
   };

@@ -34,7 +34,10 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { SET_MATERIALS as OPENING_SET_MATERIALS } from "./Data_OpeningSet0103.mjs";
 import { TerrainContactField } from "./Script_TerrainContact.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
-import { WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater, BuildRibbonWater } from "./Script_FirstLevelWhiteboxLooks.mjs";
+import {
+  WhiteboxLooks, LoadWhiteboxTextureSets, BuildWhiteboxWater, BuildRibbonWater,
+  PrepareWhiteboxRailwayAssets, BuildInstancedRailTrackKit,
+} from "./Script_FirstLevelWhiteboxLooks.mjs";
 import { WHITEBOX_RAILWAY_LOOKS, PlanRoofShells } from "./Data_FirstLevelWhiteboxMaterials.mjs";
 import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing, AddScenePropModels } from "./Script_FirstLevelPropDressing.mjs";
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
@@ -166,6 +169,7 @@ export class FirstLevelWhiteboxField {
     // 2026-09-28 B1：布局写了 materialLooks 才按外观表画 PBR（PrepareAssets 里建）；
     // 归档夹具与 Node 测试保持平色语义材质。
     this.looks = null;
+    this.railTrackKit = null;
     this.waterMesh = null;
     this.trainOffsetM = 0; this.trainMeshes = []; this.trainColliders = [];
     this.gates = new Map();
@@ -214,6 +218,14 @@ export class FirstLevelWhiteboxField {
         this.materials.get(key)?.dispose();
         this.materials.set(key, this.looks.RailwayMaterial(key));
       }
+    }
+    const hasRailways = !!(this.layout.railway || this.layout.ways?.railways?.length);
+    if (hasRailways && typeof document !== "undefined") {
+      this.railTrackKit = await PrepareWhiteboxRailwayAssets({
+        library: this.library,
+        materials: this.materials,
+        sharedMaterials: this.sharedFortificationMaterials,
+      });
     }
     if (this.layout.ground?.terrainLayers && this.layout.SampleGroundSurface && typeof document !== "undefined") {
       // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
@@ -444,11 +456,43 @@ export class FirstLevelWhiteboxField {
       this.stats.whiteBoxes += 1;
       this.stats.structures += 1;
     }
-    // 铁路走共享样条PCG（道砟堤 + 枕木双轨逐点贴地形），断面只在布局的 railway spec 里。
-    // 不登记碰撞：道砟顶只高出土面 0.1 m，弹坑挖下去时一块静态路基盒会悬成隐形台子。
-    if (this.layout.railway) {
-      const railway = BuildRailwayFromSpec(sink, this.layout.railway, { groundAt: (x, z) => this.TerrainHeight(x, z) });
-      this.stats.railway = { bedChunks: railway.bed.chunks, ties: railway.track.ties, railSegs: railway.track.railSegs };
+    // 铁路走共享样条PCG（道砟堤 + 枕木双轨逐点贴地形），断面只在布局的 railway / ways.railways spec 里。
+    // 不登记碰撞：道砟顶只高出土面 0.04..0.18 m（高堤已在高度图里），不建隐形墙也不阻塞弹坑/寻路。
+    const railwaySpecs = [
+      ...(this.layout.railway ? [this.layout.railway] : []),
+      ...(this.layout.ways?.railways || []),
+    ];
+    if (railwaySpecs.length) {
+      const railGroundAt = (x, z) => this.TerrainHeight(x, z);
+      this._EnsureFallbackRailwayMaterials();
+      const sleeperSpots = this.railTrackKit ? [] : null;
+      const fishplateSpots = this.railTrackKit ? [] : null;
+      let bedChunks = 0, ties = 0, railSegs = 0, joints = 0;
+      for (const spec of railwaySpecs) {
+        if (!Array.isArray(spec?.points) || spec.points.length < 2) continue;
+        const railway = BuildRailwayFromSpec(sink, spec, {
+          groundAt: railGroundAt,
+          sleeperSpotsOut: sleeperSpots,
+          fishplateSpotsOut: fishplateSpots,
+          clipBounds: this.bounds,
+        });
+        bedChunks += railway.bed.chunks;
+        ties += railway.track.ties;
+        railSegs += railway.track.railSegs;
+        joints += railway.track.joints || 0;
+      }
+      if (this.railTrackKit && (sleeperSpots?.length || fishplateSpots?.length)) {
+        BuildInstancedRailTrackKit({
+          kit: this.railTrackKit,
+          sleeperSpots: sleeperSpots || [],
+          fishplateSpots: fishplateSpots || [],
+          materials: this.materials,
+          fallbackMaterial: this.whiteMaterial,
+          scene: this.scene,
+          meshesOut: this.meshes,
+        });
+      }
+      this.stats.railway = { bedChunks, ties, railSegs, joints, instancedKit: !!this.railTrackKit };
     }
     // 村内道路与田间小路样条条带（Script_RoadSpline.BuildRoadRibbon）：仅在未启用分层地表贴图混合时铺平色条带，
     // 启用 terrainLayers 时道路直接由 Splat 权重（CartTrack）+ 解析车辙在地面着色器里渲染，避免平色片遮挡地表贴图。
@@ -1036,6 +1080,30 @@ export class FirstLevelWhiteboxField {
     };
   }
 
+  _EnsureFallbackRailwayMaterials() {
+    const defaults = [
+      ["railBallast", 0x6b675f, 0.95, 0],
+      ["RailBallast", 0x6b675f, 0.95, 0],
+      ["railEarth", 0x8d7e64, 0.96, 0],
+      ["railSleeperWood", 0x4f3d2d, 0.92, 0],
+      ["SleeperWood", 0x4f3d2d, 0.92, 0],
+      ["railSleeperEnd", 0x433426, 0.94, 0],
+      ["railSteel", 0x4e4741, 0.56, 0.72],
+      ["RailSteel", 0x4e4741, 0.56, 0.72],
+      ["railHead", 0xbec4c8, 0.24, 0.88],
+      ["railFastener", 0x3e3731, 0.68, 0.68],
+    ];
+    for (const [key, color, roughness, metalness] of defaults) {
+      if (this.materials.has(key)) continue;
+      const mat = new THREE.MeshStandardMaterial({
+        name: `FirstLevelWhitebox_${key}`, color, roughness, metalness,
+      });
+      mat.userData.firstLevelWhitebox = true;
+      mat.userData.whiteboxSemantic = key;
+      this.materials.set(key, mat);
+    }
+  }
+
   Dispose() {
     SetInteriorVolumes(null);
     this.trailSystem?.DetachGround(this); this.trailSystem = null;
@@ -1057,6 +1125,7 @@ export class FirstLevelWhiteboxField {
     }
     this.meshes.length = 0;
     this.looks?.Dispose(); this.looks = null; this.waterMesh = null;
+    this.railTrackKit = null;
     this.trenchSurface?.Dispose(); this.trenchSurface = null;
     this.terrainContact?.Dispose(); this.terrainContact = null;
     this.fortificationModels=null;this.fortificationPlacements=[];this.sharedFortificationMaterials.clear();

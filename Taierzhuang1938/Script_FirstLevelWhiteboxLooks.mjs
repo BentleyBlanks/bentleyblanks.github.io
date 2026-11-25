@@ -17,6 +17,7 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { MakeWhiteboxWeatherPatch, MakeWhiteboxWeatherUniforms } from "./Script_MaterialPatches.mjs";
 import { WHITEBOX_WEATHERING } from "./Data_Tuning_Materials.mjs";
 import { CreateWaterSurface } from "./Script_Water.mjs";
+import { ManagedGLTFLoader } from "./Script_ModelImports.mjs";
 import {
   WHITEBOX_LOOKS, WHITEBOX_RAILWAY_LOOKS, WHITEBOX_ROOF_SHELL as ROOF_SHELL, ResolveWhiteboxLook, WhiteboxTint,
 } from "./Data_FirstLevelWhiteboxMaterials.mjs";
@@ -422,4 +423,158 @@ export function BuildRibbonWater(block, scene) {
   geometry.computeBoundingSphere();
   const flow = /^Pond_/.test(block.id || "") ? [-0.04, 0.02] : [-1, 0.2];
   return CreateWaterSurface({geometry,scene,preset:"muddyRiver",flow,name:block.id});
+}
+
+/**
+ * 为白盒 / EncounterPlay 场景的铁路样条按需加载既有 PBR 贴图套（道砟 / 枕木 / 钢轨）
+ * 与 BlenderMCP 烘焙的倒角木枕 + 垫板道钉 + 鱼尾板套件（零内嵌图）。
+ * 归并到 WhiteboxLooks 模块以保持 FirstLevelWhiteboxField 纯程序化白盒门禁不变。
+ */
+export async function PrepareWhiteboxRailwayAssets({ library, materials, sharedMaterials }) {
+  if (library?.LoadExternalSet) {
+    const sets = [
+      ["RailBallast", "./Texture/Texture_RailBallast"],
+      ["BeishaheSleeper", "./Texture/Texture_BeishaheSleeper"],
+      ["BeishaheSleeperEnd", "./Texture/Texture_BeishaheSleeperEnd"],
+      ["BeishaheSteel", "./Texture/Texture_BeishaheSteel"],
+    ];
+    await Promise.all(sets.map(async ([name, stem]) => {
+      if (library.baked?.has?.(name)) return;
+      try {
+        await library.LoadExternalSet(name, {
+          albedo: `${stem}Base.webp`,
+          normal: `${stem}Normal.webp`,
+          orm: `${stem}Orm.webp`,
+        }, { timeoutMs: 20000 });
+      } catch (error) {
+        console.warn(`[FirstLevelWhiteboxLooks] 铁路贴图 ${name} 未加载，退回色块/程序化材质`, error);
+      }
+    }));
+  }
+  const RegisterShared = (key, mat) => {
+    if (!mat) return;
+    const old = materials.get(key);
+    if (old && old !== mat && !sharedMaterials.has(old)) old.dispose();
+    sharedMaterials.add(mat);
+    materials.set(key, mat);
+  };
+  if (library?.Get) {
+    if (library.baked?.has?.("RailBallast")) {
+      const ballastMat = library.Get("RailBallast", { repeat: [2.67, 2.67], normalScale: 1.15, color: 0xdcdad4, roughness: 0.96, metalness: 0 });
+      RegisterShared("railBallast", ballastMat);
+      RegisterShared("RailBallast", ballastMat);
+    }
+    if (library.baked?.has?.("Ground")) {
+      RegisterShared("railEarth", library.Get("Ground", { repeat: [1.6, 1.6], normalScale: 0.9, color: 0xb09f82, roughness: 0.96, metalness: 0 }));
+    }
+    if (library.baked?.has?.("BeishaheSleeper")) {
+      const sleeperStatic = library.Get("BeishaheSleeper", { repeat: [1, 1], normalScale: 1.1, color: 0xded6cc, roughness: 0.92, metalness: 0 });
+      RegisterShared("SleeperWood", sleeperStatic);
+      // InstancedMesh 使用独立克隆材质，避免与静态 Mesh 共享材质引起 Three.js instancing 标志切换重查 program
+      const sleeperInst = CloneLibraryMaterial(sleeperStatic);
+      materials.get("railSleeperWood")?.dispose();
+      materials.set("railSleeperWood", sleeperInst);
+    }
+    if (library.baked?.has?.("BeishaheSleeperEnd")) {
+      const endInst = CloneLibraryMaterial(library.Get("BeishaheSleeperEnd", { repeat: [1, 1], normalScale: 1.0, color: 0xd6cec2, roughness: 0.94, metalness: 0 }));
+      materials.get("railSleeperEnd")?.dispose();
+      materials.set("railSleeperEnd", endInst);
+    }
+    if (library.baked?.has?.("BeishaheSteel")) {
+      const steelMat = library.Get("BeishaheSteel", { repeat: [1.2, 1.2], normalScale: 0.85, color: 0x8f877f, roughness: 0.58, metalness: 0.72 });
+      RegisterShared("railSteel", steelMat);
+      RegisterShared("RailSteel", steelMat);
+      const fastInst = CloneLibraryMaterial(library.Get("BeishaheSteel", { repeat: [1.5, 1.5], normalScale: 0.9, color: 0x6a6058, roughness: 0.68, metalness: 0.68 }));
+      materials.get("railFastener")?.dispose();
+      materials.set("railFastener", fastInst);
+    }
+  }
+  if (library?.Plain) {
+    RegisterShared("railHead", library.Plain("RailHeadPolished", { color: 0xc2c8cc, roughness: 0.24, metalness: 0.88 }));
+  }
+  try {
+    const loader = new ManagedGLTFLoader();
+    const gltf = await loader.loadAsync("./Model/RailTrack/Model_RailSleeperKit.glb");
+    const matMap = {
+      Mat_SleeperWood: "railSleeperWood",
+      Mat_SleeperEnd: "railSleeperEnd",
+      Mat_RailFastener: "railFastener",
+    };
+    const parts = new Map();
+    const Collect = (rootName, node) => {
+      const list = parts.get(rootName) || [];
+      node.traverse((child) => {
+        if (!child.isMesh || !child.geometry) return;
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        const matName = mats[0]?.name || "";
+        list.push({
+          geometry: child.geometry.clone(),
+          materialKey: matMap[matName] || "railSleeperWood",
+        });
+      });
+      if (list.length) parts.set(rootName, list);
+    };
+    gltf.scene.updateMatrixWorld(true);
+    for (const child of gltf.scene.children) {
+      const key = child.name.replace(/\.\d+$/, "");
+      if (/^(Sleeper_[012]|Fishplate_Joint)$/.test(key)) Collect(key, child);
+    }
+    return parts.has("Sleeper_0") ? parts : null;
+  } catch (error) {
+    console.warn("[FirstLevelWhiteboxLooks] 铁路枕木套件 GLB 未加载，使用程序化倒角枕木", error);
+    return null;
+  }
+}
+
+/** 按 Z 分块批量创建静态 InstancedMesh（倒角枕木 + 垫板道钉 + 鱼尾板）。 */
+export function BuildInstancedRailTrackKit({
+  kit, sleeperSpots, fishplateSpots, materials, fallbackMaterial, scene, meshesOut, chunkM = 500,
+}) {
+  if (!kit) return;
+  const dummy = new THREE.Object3D();
+  dummy.rotation.order = "YXZ";
+  const AddChunked = (partName, spots, meshTag) => {
+    const prims = kit.get(partName);
+    if (!prims?.length || !spots.length) return;
+    const buckets = new Map();
+    for (const spot of spots) {
+      const key = Math.floor(spot.z / chunkM);
+      let list = buckets.get(key);
+      if (!list) { list = []; buckets.set(key, list); }
+      list.push(spot);
+    }
+    for (const [chunkKey, list] of buckets) {
+      for (let pi = 0; pi < prims.length; pi += 1) {
+        const { geometry, materialKey } = prims[pi];
+        const mat = materials.get(materialKey) || fallbackMaterial;
+        const inst = new THREE.InstancedMesh(geometry.clone(), mat, list.length);
+        inst.name = `FirstLevelWhitebox_${meshTag}_${chunkKey}_${pi}`;
+        for (let i = 0; i < list.length; i += 1) {
+          const sp = list[i];
+          dummy.position.set(sp.x, sp.y, sp.z);
+          dummy.rotation.set(0, sp.ry, sp.pitch || 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+        }
+        inst.instanceMatrix.needsUpdate = true;
+        inst.computeBoundingBox();
+        inst.computeBoundingSphere();
+        inst.castShadow = true;
+        inst.receiveShadow = true;
+        inst.matrixAutoUpdate = false;
+        scene.add(inst);
+        meshesOut.push(inst);
+      }
+    }
+  };
+  const byVariant = [[], [], []];
+  for (const sp of sleeperSpots) byVariant[(sp.variant || 0) % 3].push(sp);
+  for (let v = 0; v < 3; v += 1) {
+    const name = kit.has(`Sleeper_${v}`) ? `Sleeper_${v}` : "Sleeper_0";
+    AddChunked(name, byVariant[v], `RailSleeperV${v}`);
+  }
+  if (fishplateSpots.length && kit.has("Fishplate_Joint")) {
+    AddChunked("Fishplate_Joint", fishplateSpots, "RailFishplate");
+  }
 }

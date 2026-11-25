@@ -10,6 +10,7 @@
 import assert from "node:assert/strict";
 import {
   MakeRoadPath, GapsToRuns, SampleRun, DistanceToPolyline, PredicateGaps, MakeRailwayProfile,
+  VIGNOLES_RAIL_PROFILE, ResolveRailwayGaps,
 } from "./Script_RoadPath.mjs";
 
 // --- 直线（两点）：逐位退化 ---
@@ -151,6 +152,31 @@ import {
     assert.ok(Math.abs(railway.RailTopAt(s) - railway.CrownAt(s) - 0.22) < 1e-9, "轨顶 = 道砟顶 + 0.22");
     assert.ok(Math.abs(railway.RailTopNear(p.x + 0.7, p.z) - railway.RailTopAt(s)) < 1e-9, "世界坐标查到同一个轨顶");
   }
+}
+
+// --- 工程锚点纵断面 + 世界 Z 缺口换算 + Vignoles 41 kg/m 钢轨截面 ---
+{
+  const spec = {
+    points: [[-80, -400], [-80, 1000]],
+    gauge: 1.50,
+    crown: {
+      step: 4, filletM: 20, clampLo: 0.04,
+      anchors: [{ z: -400, y: -1.5 }, { z: 120, y: 2.86 }, { z: 375, y: 2.64 }, { z: 1000, y: 2.64 }],
+    },
+    zGaps: [[828, 872]],
+    sleeperZGaps: [[828, 872], [883.8, 888.2]],
+    rail: { footLift: 0.092, h: 0.14 },
+  };
+  const groundAt = (x, z) => (z >= 375 ? 2.60 : z > 828 && z < 872 ? -2.7 : 0.2);
+  const railway = MakeRailwayProfile(spec, groundAt);
+  // 平直高堤段保持 2.64 m，轨顶保持 2.872 m（与桥面零错台）
+  assert.ok(Math.abs(railway.CrownAt(railway.path.ClosestS(-80, 600)) - 2.64) < 1e-6, "平直高堤段道砟顶恒定 2.64 m");
+  assert.ok(Math.abs(railway.RailTopAt(railway.path.ClosestS(-80, 828)) - 2.872) < 1e-6, "桥头轨顶精确 2.872 m");
+  assert.equal(railway.bedGaps.length, 1, "桥段世界 Z 缺口正确换算为 1 段弧长缺口");
+  assert.equal(railway.sleeperGaps.length, 2, "枕木缺口包含桥段 + 平交道口");
+  assert.equal(railway.railGaps.length, 1, "钢轨仅在桥段断开、道口连续");
+  assert.equal(VIGNOLES_RAIL_PROFILE.length, 14, "Vignoles 工字轨断面为 14 点闭合轮廓");
+  assert.ok(Math.abs(ResolveRailwayGaps(railway.path, [], [[828, 872]])[0][0] - 1228) < 1e-6, "z=828 映射至 s=1228");
 }
 
 console.log("ok  RoadPathTest — 样条中心线契约全部通过");

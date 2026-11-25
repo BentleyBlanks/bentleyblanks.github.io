@@ -7,7 +7,7 @@ import { FLOW_RENDERING, FLOW_SCENE_CAMERA, FLOW_VIEW_HORIZONTAL_FOV_DEG, FLOW_Z
 import { DrawEncounterSky } from "./Script_LevelFlowSky.mjs";
 import { SpeechHeadHeight } from "./Script_LevelFlowDialogue.mjs";
 import { ApplyEncounterSky } from "./Script_LevelFlowSkyBlend.mjs";
-import { EncounterBoxGeometry, CachedEncounterShadows, ShadeEncounterFace } from "./Script_LevelFlowLighting.mjs";
+import { EncounterBoxGeometry, CachedEncounterShadows, CachedEncounterRailways, ShadeEncounterFace } from "./Script_LevelFlowLighting.mjs";
 
 function Normalize(vector) {const length=Math.hypot(...vector)||1;return vector.map(value=>value/length);}
 function Cross(a,b) {return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
@@ -400,7 +400,7 @@ export class FlowPerspectiveView extends FlowMapView {
     this.raster.shadowVertices=this.shadowVertices;
     const staticKey=JSON.stringify([width,height,this.type,this.center,this.scale,this.yaw,this.pitch,this.eye,this.aim,this.fov,near,far,renderScale,texturedTerrain,FLOW_RENDERING.skyBlend,[...signals]]);
     const cacheStatic=this.frameDrawing&&!this.navigationActive;
-    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects;
+    const cached=cacheStatic&&staticKey===this.staticKey&&this.staticTerrain===this.mapData.terrain&&this.staticAccelerated===this.raster.accelerated&&this.staticObjects===this.mapData.objects&&this.staticFarObjects===this.mapData.farObjects&&this.staticRailways===this.mapData.railways;
     if(cached) {
       cpu?.Begin("恢复静态缓存");
       if(this.raster.accelerated) {
@@ -451,6 +451,27 @@ export class FlowPerspectiveView extends FlowMapView {
     }
     this.terrainTriangles=this.raster.triangles;
     cpu?.End();
+    if (this.mapData.railways?.length) {
+      cpu?.Begin("铁路PCG");
+      const railChunks = CachedEncounterRailways(this.mapData, point => this.Ground(point), !!this.lighting);
+      for (const chunk of railChunks) {
+        const camera = this.CameraPoint(chunk.center, objectCamera);
+        if (!SphereInView(camera, chunk.radius)) continue;
+        if (this.raster.accelerated) {
+          this.raster.WorldBatch(chunk.vertices);
+        } else {
+          const v = chunk.vertices;
+          for (let i = 0; i < v.length; i += 27) {
+            const p0 = [v[i], v[i + 1], v[i + 2]];
+            const p1 = [v[i + 9], v[i + 10], v[i + 11]];
+            const p2 = [v[i + 18], v[i + 19], v[i + 20]];
+            const rgb = [v[i + 3], v[i + 4], v[i + 5]];
+            Face([p0, p1, p2], "#5f5a52", [rgb, rgb, rgb]);
+          }
+        }
+      }
+      cpu?.End();
+    }
     cpu?.Begin("静态物件");
     const gpuRiverShader = this.raster.accelerated && !!this.mapData.terrain?.surfaceMaps?.()?.geo;
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
@@ -524,7 +545,7 @@ export class FlowPerspectiveView extends FlowMapView {
       }
       this.staticAccelerated=this.raster.accelerated;
       this.staticTerrain=this.mapData.terrain;
-      this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;
+      this.staticKey=staticKey;this.staticObjects=this.mapData.objects;this.staticFarObjects=this.mapData.farObjects;this.staticRailways=this.mapData.railways;
       this.staticCoverBoxes=coverBoxes;this.staticTerrainTriangles=this.terrainTriangles;this.staticTriangles=this.raster.triangles;
       cpu?.End();
     }

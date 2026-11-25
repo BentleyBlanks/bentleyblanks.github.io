@@ -72,6 +72,8 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
   const northRoads = (base.doc.ways?.roads || []).filter((line) => line.some((pt) => PointZ(pt) < maxZ));
   const northRoadRibbons = (base.doc.ways?.roadRibbons || []).filter((ribbon) => (ribbon.points || []).some((pt) => PointZ(pt) < maxZ));
   const northWayTrenches = (base.doc.ways?.trenches || []).filter((line) => line.some((pt) => PointZ(pt) < maxZ));
+  const ownRailIds = new Set((doc.ways?.railways || []).map((r) => r.id).filter(Boolean));
+  const northRailways = (base.doc.ways?.railways || []).filter((r) => !ownRailIds.has(r.id));
 
   const baseSurface = base.doc.surface, ownSurface = doc.surface;
   const surface = baseSurface || ownSurface ? {
@@ -110,6 +112,9 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
       roads: [...northRoads, ...(doc.ways?.roads || [])],
       ...(northRoadRibbons.length || doc.ways?.roadRibbons?.length ? {
         roadRibbons: [...northRoadRibbons, ...(doc.ways?.roadRibbons || [])],
+      } : {}),
+      ...(northRailways.length || doc.ways?.railways?.length ? {
+        railways: [...northRailways, ...(doc.ways?.railways || [])],
       } : {}),
       trenches: [...northWayTrenches, ...(doc.ways?.trenches || [])],
     },

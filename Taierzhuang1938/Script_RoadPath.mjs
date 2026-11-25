@@ -212,14 +212,73 @@ export function PredicateGaps(path, where, { step = 4, margin = step } = {}) {
 }
 
 /**
- * 轨面高程：地面（可另取旁侧采样点避开垫地）→ 箱式平滑 → 抬 lift → 对本地
- * 地面夹持。铁路的顶面必须比地面平顺（坡度 ≲2%），直接逐点贴地会得到
- * 过山车 —— 这正是车站那条 0.46 m 低路基的做法，收拢成可复用的剖面。
- * 原在 Script_RoadSpline（那边仍 re-export）；本体挪到纯数学层是因为
- * 围墙规划（Script_WallPlan）也要在纯 Node 里用它，不能拖起 three。
+ * 1938 津浦铁路 41 kg/m 扁底钢轨（Vignoles）标准断面（纯数学，单位米）：
+ * 坐标为 [横向偏移 lat, 轨底起高度 y]，顺时针/闭合用于沿样条扫掠。
+ * 轨底宽 126 mm、轨腰厚 20 mm、轨头宽 66 mm、全高 140 mm；
+ * 标准轨距内缘 1.435 m ⇒ 两轨中心距 = 1.435 + 0.065 = 1.500 m（中心偏移 ±0.750 m）。
+ */
+export const VIGNOLES_RAIL_PROFILE = Object.freeze([
+  Object.freeze([-0.063, 0.000]),
+  Object.freeze([+0.063, 0.000]),
+  Object.freeze([+0.063, 0.014]),
+  Object.freeze([+0.011, 0.032]),
+  Object.freeze([+0.011, 0.098]),
+  Object.freeze([+0.033, 0.112]),
+  Object.freeze([+0.033, 0.134]),
+  Object.freeze([+0.025, 0.140]),
+  Object.freeze([-0.025, 0.140]),
+  Object.freeze([-0.033, 0.134]),
+  Object.freeze([-0.033, 0.112]),
+  Object.freeze([-0.011, 0.098]),
+  Object.freeze([-0.011, 0.032]),
+  Object.freeze([-0.063, 0.014]),
+]);
+
+/**
+ * 折线高程锚点 + 竖曲线圆角（真实铁路坡度平顺过渡，无过冲、无锯齿）。
+ * @param {Array<[number,number]>} anchors 已按弧长 s 递增的 [[s, y], ...]
+ * @param {number} s 弧长（米）
+ * @param {number} filletM 变坡点两侧各半圆角长度（米）
+ */
+function EvalAnchoredElevation(anchors, s, filletM = 20) {
+  if (!anchors || !anchors.length) return 0;
+  if (anchors.length === 1 || s <= anchors[0][0]) return anchors[0][1];
+  const last = anchors[anchors.length - 1];
+  if (s >= last[0]) return last[1];
+  // 先求所在折线段
+  let idx = 0;
+  while (idx < anchors.length - 2 && anchors[idx + 1][0] < s) idx += 1;
+  const Linear = (pos) => {
+    if (pos <= anchors[0][0]) return anchors[0][1];
+    if (pos >= last[0]) return last[1];
+    let k = 0;
+    while (k < anchors.length - 2 && anchors[k + 1][0] < pos) k += 1;
+    const [s0, y0] = anchors[k], [s1, y1] = anchors[k + 1];
+    const span = Math.max(1e-6, s1 - s0);
+    return y0 + ((y1 - y0) * (pos - s0)) / span;
+  };
+  if (!(filletM > 0)) return Linear(s);
+  // 用 ±filletM 五点对称平滑核消除变坡折角，单调保形且不过冲
+  const r = filletM;
+  return (
+    Linear(s - r) * 0.12
+    + Linear(s - r * 0.5) * 0.22
+    + Linear(s) * 0.32
+    + Linear(s + r * 0.5) * 0.22
+    + Linear(s + r) * 0.12
+  );
+}
+
+/**
+ * 轨面高程：支持两条模式——
+ *   1) 贴地平滑模式（默认，兼容历史调用）：地面（可另取旁侧采样点避开垫地）→ 箱式平滑 → 抬 lift → 对本地地面夹持；
+ *   2) 工程锚点纵断面模式（anchors）：给定 [[s, y], ...]（或 { z, y } 按样条换算弧长），按铁路竖曲线平滑放坡，
+ *      再施加可选 clampLo / clampHi 保证道砟始终高出地面。
+ * 站间采用线性插值，消除 4 m 采样步进造成的枕木/钢轨微台阶；任意 s 仍严格满足 [clampLo, clampHi] 凸性夹持。
  */
 export function MakeCrownProfile(path, {
   groundAt, step = 4, smooth = 0, lift = 0, clampLo = null, clampHi = null, probeOffset = 0,
+  anchors = null, filletM = 20,
 }) {
   const n = Math.max(2, Math.round(path.length / step) + 1);
   const stride = path.length / (n - 1);
@@ -232,45 +291,87 @@ export function MakeCrownProfile(path, {
       ? Math.max(local[i], groundAt(p.x + p.tz * probeOffset, p.z - p.tx * probeOffset))
       : local[i];
   }
-  const Idx = (s) => Math.min(n - 1, Math.max(0, Math.round(s / stride)));
-  const SmoothAt = (i) => {
-    if (!smooth) return base[i];
-    let sum = 0, cnt = 0;
-    for (let k = -smooth; k <= smooth; k += 1) {
-      sum += base[Math.min(n - 1, Math.max(0, i + k))];
-      cnt += 1;
+  let resolvedAnchors = null;
+  if (Array.isArray(anchors) && anchors.length) {
+    resolvedAnchors = anchors.map((entry) => {
+      if (Array.isArray(entry)) return [entry[0], entry[1]];
+      if (Number.isFinite(entry.s)) return [entry.s, entry.y];
+      if (Number.isFinite(entry.z)) return [path.ClosestS(entry.x ?? path.points[0][0], entry.z), entry.y];
+      return [0, entry.y ?? 0];
+    }).sort((a, b) => a[0] - b[0]);
+  }
+  const crown = new Float64Array(n);
+  for (let i = 0; i < n; i += 1) {
+    let crownY;
+    if (resolvedAnchors) {
+      crownY = EvalAnchoredElevation(resolvedAnchors, i * stride, filletM) + lift;
+    } else if (!smooth) {
+      crownY = base[i] + lift;
+    } else {
+      let sum = 0, cnt = 0;
+      for (let k = -smooth; k <= smooth; k += 1) {
+        sum += base[Math.min(n - 1, Math.max(0, i + k))];
+        cnt += 1;
+      }
+      crownY = sum / cnt + lift;
     }
-    return sum / cnt;
+    if (clampLo != null) crownY = Math.max(crownY, local[i] + clampLo);
+    if (clampHi != null) crownY = Math.min(crownY, local[i] + clampHi);
+    crown[i] = crownY;
+  }
+  const SampleArray = (arr, s) => {
+    const clamped = Math.min(Math.max(s, 0), path.length);
+    const f = clamped / stride;
+    const i0 = Math.min(n - 1, Math.max(0, Math.floor(f)));
+    const i1 = Math.min(n - 1, i0 + 1);
+    const t = f - i0;
+    return arr[i0] * (1 - t) + arr[i1] * t;
   };
   return {
-    At: (s) => {
-      const i = Idx(s);
-      let crownY = SmoothAt(i) + lift;
-      if (clampLo != null) crownY = Math.max(crownY, local[i] + clampLo);
-      if (clampHi != null) crownY = Math.min(crownY, local[i] + clampHi);
-      return crownY;
+    At: (s) => SampleArray(crown, s),
+    LocalAt: (s) => SampleArray(local, s),
+    SlopeAt: (s) => {
+      const ds = Math.min(2, path.length * 0.1) || 1;
+      const s0 = Math.max(0, s - ds), s1 = Math.min(path.length, s + ds);
+      return s1 > s0 ? (SampleArray(crown, s1) - SampleArray(crown, s0)) / (s1 - s0) : 0;
     },
-    LocalAt: (s) => local[Idx(s)],
   };
+}
+
+/** 将世界 z 区间 [[z0,z1],...] 或弧长区间 [[s0,s1],...] 统一折算为弧长缺口。 */
+export function ResolveRailwayGaps(path, gaps = [], zGaps = []) {
+  const out = [];
+  for (const g of gaps || []) if (Array.isArray(g) && g.length >= 2) out.push([g[0], g[1]]);
+  const refX = path.points[0][0];
+  for (const g of zGaps || []) {
+    if (!Array.isArray(g) || g.length < 2) continue;
+    const s0 = path.ClosestS(refX, g[0]);
+    const s1 = path.ClosestS(refX, g[1]);
+    out.push([Math.min(s0, s1), Math.max(s0, s1)]);
+  }
+  return out;
 }
 
 /**
  * 数据驱动铁路的纵断面：中心线 + 道砟顶（上面那份 MakeCrownProfile）+ 轨顶。
- * spec 是 Data_* 里的纯数据（形状见 Data_FirstLevelMissionLayout.MISSION_RAILWAY）。
- * 建几何的 Script_RoadSpline.BuildRailwayFromSpec 与布局里「车轮落在轨顶上」
- * 读的是同一份剖面 —— 轮子和钢轨不许各算各的高度（第一关旧白盒把钢轨写死在
- * y=0.76，地面其实在 0 附近，整条轨悬空 0.7 m）。
+ * spec 是 Data_* 或场景 ways.railways 里的纯数据（形状见 Data_FirstLevelMissionLayout.MISSION_RAILWAY）。
+ * 建几何的 Script_RoadSpline.BuildRailwayFromSpec、Encounter 编辑器 2D/3D 渲染与布局查询共用同一份剖面。
  */
 export function MakeRailwayProfile(spec, groundAt) {
   const path = MakeRoadPath(spec.points);
-  const crown = MakeCrownProfile(path, { groundAt, ...spec.crown });
-  const railTopLift = spec.rail.lift + spec.rail.h / 2;
+  const crown = MakeCrownProfile(path, { groundAt, ...(spec.crown || {}) });
+  const rail = spec.rail || { lift: 0.16, h: 0.14 };
+  const railTopLift = (rail.footLift != null ? rail.footLift + (rail.h ?? 0.14) : rail.lift + (rail.h ?? 0.14) / 2);
   return {
     path,
     CrownAt: crown.At,
     LocalAt: crown.LocalAt,
+    SlopeAt: crown.SlopeAt,
     RailTopAt: (s) => crown.At(s) + railTopLift,
     RailTopNear: (x, z) => crown.At(path.ClosestS(x, z)) + railTopLift,
+    bedGaps: ResolveRailwayGaps(path, spec.bed?.gaps, spec.bed?.zGaps ?? spec.zGaps),
+    sleeperGaps: ResolveRailwayGaps(path, spec.sleeperGaps, spec.sleeperZGaps ?? spec.zGaps),
+    railGaps: ResolveRailwayGaps(path, spec.railGaps, spec.railZGaps ?? spec.zGaps),
   };
 }
 

@@ -477,6 +477,8 @@ function BuildMergedScene() {
     if (!raw.pos || raw.pos[2] < SOURCE_START_Z) continue;
     if (raw.id.startsWith("WA1_")) continue;
     if (SKIP_BASE_IDS.has(raw.id)) continue;
+    // 桥南旧版 20m 方盒占位轨道改由 ways.railways 共享 PCG 样条（道砟+倒角枕木+垫板道钉+Vignoles工字钢轨）全线生成
+    if (/^Rail(?:Bed|Line)_\d+/.test(raw.id)) continue;
     if (raw.id === "MA3_WallR") {
       ownObjects.push(
         {
@@ -506,6 +508,19 @@ function BuildMergedScene() {
     const shifted = ShiftObject(raw);
     if (shifted.id === "RailWalk_S1" || shifted.id === "RailWalk_S2") {
       shifted.hideOn = "BridgeBlown";
+    }
+    // 桥面轨道与南北 PCG 样条全线对齐（枕木顶 y=2.72 m、标准轨距中心 ±0.75 m、轨顶 y=2.87 m，零错台！）
+    if (/^RailSleeper_S\d+/.test(shifted.id)) {
+      shifted.pos[1] = 2.56;
+      shifted.size = [2.70, 0.16, 0.24];
+    } else if (/^RailWalk_S\d+$/.test(shifted.id)) {
+      shifted.pos[1] = 2.68;
+      shifted.size[1] = 0.04;
+    } else if (/^RailTrack_S\d+([WE])$/.test(shifted.id)) {
+      const isWest = shifted.id.endsWith("W");
+      shifted.pos[0] = isWest ? -80.75 : -79.25;
+      shifted.pos[1] = 2.73;
+      shifted.size = [0.08, 0.14, shifted.size[2]];
     }
     ownObjects.push(shifted);
   }
@@ -1841,20 +1856,22 @@ function BuildMergedScene() {
         { id: `RailCross_S${si}_${off}`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-80.0, 1.32, Fix(zMid + off)], size: [2.2, 0.18, 0.18], solid: false, ...hideProp, group: brG },
       );
     }
-    // 轨内护轨与外缘护木
+    // 轨内护轨与外缘护木 + 桥面钢轨顶磨耗亮面带（与桥头 PCG 钢轨无错台衔接）
     ownObjects.push(
-      { id: `RailGuard_S${si}W`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-80.42, 2.54, zMid], size: [0.06, 0.12, 10.9], solid: false, ...hideProp, group: brG },
-      { id: `RailGuard_S${si}E`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-79.58, 2.54, zMid], size: [0.06, 0.12, 10.9], solid: false, ...hideProp, group: brG },
+      { id: `RailGuard_S${si}W`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-80.44, 2.71, zMid], size: [0.06, 0.12, 10.9], solid: false, ...hideProp, group: brG },
+      { id: `RailGuard_S${si}E`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-79.56, 2.71, zMid], size: [0.06, 0.12, 10.9], solid: false, ...hideProp, group: brG },
+      { id: `RailTrackTop_S${si}W`, asset: "Whitebox/Box", material: "Whitebox/Coping", pos: [-80.75, 2.866, zMid], size: [0.066, 0.012, 11.0], solid: false, ...hideProp, group: brG },
+      { id: `RailTrackTop_S${si}E`, asset: "Whitebox/Box", material: "Whitebox/Coping", pos: [-79.25, 2.866, zMid], size: [0.066, 0.012, 11.0], solid: false, ...hideProp, group: brG },
     );
   }
   // 中墩避车台（[-82.4, 850] 与 [-77.6, 850]）
   for (const [side, rx, railX] of [["W", -82.35, -83.10], ["E", -77.65, -76.90]]) {
     ownObjects.push(
-      { id: `RailRefuge_${side}_Deck`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [rx, 2.40, 850], size: [1.55, 0.16, 1.60], standOn: true, group: brG },
-      { id: `RailRefuge_${side}_Bracket`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [rx, 1.85, 850], size: [1.45, 0.55, 1.40], solid: false, group: brG },
-      { id: `RailRefuge_${side}_Post1`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 2.56, 849.25], size: [0.08, 1.05, 0.08], solid: false, group: brG },
-      { id: `RailRefuge_${side}_Post2`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 2.56, 850.75], size: [0.08, 1.05, 0.08], solid: false, group: brG },
-      { id: `RailRefuge_${side}_Rail`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 3.55, 850], size: [0.08, 0.08, 1.60], solid: false, group: brG },
+      { id: `RailRefuge_${side}_Deck`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [rx, 2.56, 850], size: [1.55, 0.16, 1.60], standOn: true, group: brG },
+      { id: `RailRefuge_${side}_Bracket`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [rx, 1.98, 850], size: [1.45, 0.58, 1.40], solid: false, group: brG },
+      { id: `RailRefuge_${side}_Post1`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 2.72, 849.25], size: [0.08, 1.05, 0.08], solid: false, group: brG },
+      { id: `RailRefuge_${side}_Post2`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 2.72, 850.75], size: [0.08, 1.05, 0.08], solid: false, group: brG },
+      { id: `RailRefuge_${side}_Rail`, asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [railX, 3.71, 850], size: [0.08, 0.08, 1.60], solid: false, group: brG },
     );
   }
   // 1D) 桥头行车标识（津浦 561 粁里程碑 + 限速桥牌）
@@ -1955,14 +1972,11 @@ function BuildMergedScene() {
     pos: [-126, null, 825.5], size: [42, 0.82, 1.6], yawDeg: -6, group: z2G,
   });
 
-  // --- 三区：桥北东翼——北段拆轨现场、路基排水涵洞、桥北土坎细化、北坡道哨卡与弃车 ---
+  // --- 三区：桥北东翼——路基备用轨料/枕木垛、路基排水涵洞、桥北土坎细化、北坡道哨卡与弃车 ---
+  // （轨道本体由 ways.railways 全线 PCG 铺设，不再用 RailDismantle_Ballast1..3 盖住轨面）
   const z3G = "08–13合并/桥圈/三区_桥北拆轨与交火带";
   ownObjects.push(
-    // 北段拆轨现场（x:-82..-73, z:750..820，兑现范长江 1938.2 北沙河以北拆轨取枕木史料）
-    { id: "RailDismantle_Ballast1", asset: "Whitebox/Box", material: "Whitebox/Step", pos: [-80.0, 2.58, 764.0], size: [2.8, 0.24, 16.0], solid: false, group: z3G },
-    { id: "RailDismantle_Ballast2", asset: "Whitebox/Box", material: "Whitebox/Step", pos: [-80.0, 2.58, 792.0], size: [2.8, 0.24, 16.0], solid: false, group: z3G },
-    { id: "RailDismantle_Ballast3", asset: "Whitebox/Box", material: "Whitebox/Step", pos: [-80.0, 2.58, 814.0], size: [2.8, 0.24, 14.0], solid: false, group: z3G },
-    // 东坡滑落的撬弯残轨与拆剩枕木散垛（严格避开 MergedRailAmbush/BridgeGun/BridgeRush 路径）
+    // 路基东/西坡备用散轨与备用枕木垛（严格避开 MergedRailAmbush/BridgeGun/BridgeRush 路径）
     { id: "RailScrap_Rail1", asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-75.6, null, 762.5], size: [0.16, 0.16, 7.2], yawDeg: 26, group: z3G },
     { id: "RailScrap_Rail2", asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-74.8, null, 785.2], size: [0.16, 0.16, 6.4], yawDeg: -18, group: z3G },
     { id: "RailScrap_Rail3", asset: "Whitebox/Box", material: "Whitebox/Metal", pos: [-75.4, null, 804.8], size: [0.16, 0.16, 6.8], yawDeg: 14, group: z3G },
@@ -2112,8 +2126,8 @@ function BuildMergedScene() {
   // --- 六区：南岸路夜行带 & “桥南小庄”（3 座鲁南空院 + 老槐树井台土地龛 + 撤退弃物） ---
   const z6G = "08–13合并/桥圈/六区_南岸夜行与桥南小庄";
   ownObjects.push(
-    // 南段铁路人行道口木铺面（z=886，恰在 13e 跨铁路处，非碰撞铺面保 0 穿墙）
-    { id: "RailCrossS_Planks", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [-80.0, 2.66, 886.0], size: [3.6, 0.10, 4.2], solid: false, group: z6G },
+    // 南段铁路人行道口木铺面（z=886，恰在 13e 跨铁路处，顶面 y=2.85 齐平轨顶 y=2.87，非碰撞铺面保 0 穿墙）
+    { id: "RailCrossS_Planks", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [-80.0, 2.74, 886.0], size: [3.6, 0.11, 4.2], solid: false, group: z6G },
     { id: "RailCrossS_PostW1", asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [-82.8, null, 883.4], size: [0.18, 1.15, 0.18], group: z6G },
     { id: "RailCrossS_PostE1", asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [-77.2, null, 888.6], size: [0.18, 1.15, 0.18], group: z6G },
     // 南段铁路石砌排水涵洞（z=926）& 里程碑（[-83.5, 945]）
@@ -2716,6 +2730,8 @@ function BuildMergedScene() {
     { id: "FieldDitch_NorthBank", line: NorthBankDitchPts.map(([x, z]) => ({ x, z })), halfW: 0.90, feather: 0.45, color: "#9b8768", strength: 0.68 },
     { id: "FieldDitch_EastN", line: EastFieldDitchNPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
     { id: "FieldDitch_EastS", line: EastFieldDitchSPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
+    // 津浦铁路道砟路基碎石带底色（桥北与桥南全线，避免路堤顶面混出青麦色）
+    { id: "RailNorth", line: [{ x: -80, z: 355 }, { x: -80, z: 828 }], halfW: 3.1, feather: 1.0, color: "#4a4640", strength: 0.92 },
   );
 
   // Build updated ways.roads & typed spline roadRibbons (Script_RoadPath / Script_RoadSpline)
@@ -2983,6 +2999,80 @@ function BuildMergedScene() {
     }
   }
 
+  // 津浦铁路全线共享 PCG 样条（北起远景 z=-1200，经前沿西翼/北沙河村西/桥北高堤，四孔钢梁桥 z=828..872 留口，
+  // 桥南经道口 z=886 贯通至远景 z=1650；Three.js Play 与 Encounter 编辑器 2D/3D 共用同一份 spec）
+  const ownRailways = [
+    {
+      id: "JinpuMainline",
+      points: [[-80, -1200], [-80, 1650]],
+      gauge: 1.50,
+      crown: {
+        step: 4,
+        filletM: 22,
+        clampLo: 0.04,
+        anchors: [
+          { z: -1200, y: 7.45 },
+          { z: -700, y: 6.50 },
+          { z: -600, y: 5.05 },
+          { z: -480, y: -1.50 },
+          { z: -240, y: -1.35 },
+          { z: -120, y: -0.30 },
+          { z: 0, y: 0.95 },
+          { z: 120, y: 2.86 },
+          { z: 260, y: 2.64 },
+          { z: 375, y: 2.64 },
+          { z: 828, y: 2.64 },
+          { z: 872, y: 2.64 },
+          { z: 990, y: 2.64 },
+          { z: 1650, y: 0.60 },
+        ],
+      },
+      // 四孔钢梁桥（z=828..872）保留可爆破桥面物件；桥南乡道平交道口（z=886）仅断枕木、双轨连续穿过道口板
+      zGaps: [[828.0, 872.0]],
+      sleeperZGaps: [[828.0, 872.0], [883.8, 888.2]],
+      railZGaps: [[828.0, 872.0]],
+      bed: {
+        material: "railBallast",
+        topHalf: 1.90,
+        slope: 1.50,
+        embed: 0.35,
+        step: 4,
+        chunkLen: 44,
+        subBallast: {
+          material: "railEarth",
+          ballastThick: 0.28,
+          ballastSlope: 1.50,
+          slope: 1.55,
+        },
+      },
+      sleeper: {
+        material: "SleeperWood",
+        fastenerMaterial: "railFastener",
+        along: 0.23,
+        h: 0.16,
+        length: 2.54,
+        lift: 0.00,
+        spacing: 0.68,
+        jitter: 0.025,
+        ryJitter: 0.012,
+        beveled: true,
+        fasteners: true,
+      },
+      rail: {
+        material: "railSteel",
+        wearMaterial: "railHead",
+        profile: "vignoles",
+        h: 0.14,
+        footLift: 0.092,
+        lift: 0.162,
+        segLen: 12,
+        step: 4,
+        chunkLen: 56,
+        jointSpacing: 10,
+      },
+    },
+  ];
+
   const maxZ = INHERIT_MAX_Z + outRows * cellM; // 990
   const mergedDoc = {
     schema: "tengxian-scene/1",
@@ -3008,10 +3098,14 @@ function BuildMergedScene() {
     backdrop: {
       ...baseDoc.backdrop,
       siteBounds: { minX: -160, maxX: 320, minZ: -480, maxZ },
-      paint: (baseDoc.backdrop?.paint || []).filter((e) => InSouth(e.poly || e.line)).map(ShiftPaintEntry),
+      paint: [
+        ...(baseDoc.backdrop?.paint || []).filter((e) => InSouth(e.poly || e.line)).map(ShiftPaintEntry),
+        { id: "RailBackdropNorth", line: [{ x: -80, z: -3200 }, { x: -80, z: -480 }], halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88 },
+        { id: "RailBackdropSouth", line: [{ x: -80, z: 990 }, { x: -80, z: 3200 }], halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88 },
+      ],
     },
     paint: ownPaint,
-    ways: { roads: ownRoads, roadRibbons: ownRoadRibbons, trenches: ownWayTrenches },
+    ways: { roads: ownRoads, roadRibbons: ownRoadRibbons, railways: ownRailways, trenches: ownWayTrenches },
     trenches: {
       seed: baseDoc.trenches.seed,
       earthProfile: baseDoc.trenches.earthProfile,
