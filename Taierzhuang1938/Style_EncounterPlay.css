@@ -4,7 +4,7 @@
 .encounterHint{position:fixed;top:63%;left:0;width:100%;text-align:center;color:#fff;z-index:26;text-shadow:0 2px 3px #000;font:15px system-ui}
 .encounterObserver{position:fixed;left:50%;top:0;width:50%;height:100%;z-index:20;background:#111;border-left:2px solid #636b74;box-sizing:border-box}
 .encounterObserver[hidden]{display:none}.encounterObserver>div{height:30px;background:#252b32;display:flex;gap:6px;padding:3px 8px;box-sizing:border-box}.encounterObserver canvas{width:100%;height:calc(100% - 30px);display:block}
-.encounterDual #view,.encounterDual #hud{width:50%!important}.encounterDual .encounterPlayHud{max-width:calc(50% - 52px)}.encounterDual .encounterDialogue{left:3%;width:44%}.encounterDual .encounterHint{width:50%}
+.encounterDual #view,.encounterDual #hud{width:50%!important}.encounterDual #hud{z-index:2}.encounterDual .encounterPlayHud{max-width:calc(50% - 52px)}.encounterDual .encounterDialogue{left:3%;width:44%}.encounterDual .encounterHint{width:50%}
 .encounterPrimary{position:fixed;left:0;top:0;width:50%;height:100%;pointer-events:none;z-index:1}.encounterDual #view{opacity:0}
 .encounterObserver button,.encounterObserver select{background:#303740;color:#e6e8ea;border:1px solid #65707a;border-radius:3px;font:12px system-ui;padding:2px 7px}
 .encounterDialogue,
@@ -15,7 +15,7 @@
 .encounterSpeech{position:fixed;z-index:24;display:block}
 .encounterSpeech[hidden]{display:none}
 .encounterDialogue p{white-space:pre-line}
-.encounterGame .hudObjective,.encounterGame .hudHint,.encounterGame .hudActions,.encounterGame .hudBrief,.encounterGame .hudTitle{display:none!important}
+.encounterGame .hudObjective,.encounterGame .hudHint,.encounterGame .hudBrief,.encounterGame .hudTitle{display:none!important}
 .encounterFailure{position:fixed;left:0;top:38%;width:100%;z-index:27;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;color:#f1ece4;text-shadow:0 2px 4px #000;font:15px/1.5 system-ui;animation:encounterFailureIn .35s ease-out}
 .encounterFailure[hidden]{display:none}
 .encounterFailure strong{font-size:30px;letter-spacing:.12em;color:#e0a39a}

@@ -1565,6 +1565,16 @@ export class Hud {
     this.pendingTitle = null;
   }
 
+  /** Clear brief/title staging timers when the active mode hides brief/title cards. */
+  ClearStaging() {
+    this.briefTimer = 0;
+    this.titleTimer = 0;
+    this.pendingTitle = null;
+    this.el.brief.classList.remove("on");
+    this.el.title.classList.remove("on");
+    this.root.classList.remove("staging");
+  }
+
   /** 屏幕空间的占领点图标。ER2：交叉刀剑＝待打，旗帜＝已占。 */
   UpdateMarkers(objectives, camera, project, currentIndex = 0, showAll = false) {
     const box = this.el.markers;

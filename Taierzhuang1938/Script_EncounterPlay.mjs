@@ -176,7 +176,7 @@ export class EncounterPlay {
   }
   BuildUi() {
     document.body.classList.add(this.isCampaign?"encounterCampaign":"encounterGame");
-    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261123CampaignSync",import.meta.url).href;document.head.append(this.style);
+    this.style=document.createElement("link");this.style.rel="stylesheet";this.style.href=new URL("./Style_EncounterPlay.css?v=20261126HudActions",import.meta.url).href;document.head.append(this.style);
     this.speech=new EncounterPlayDialogue(this.host,this.view,id=>{
       const position=this.Position(id),soldier=this.entries.get(id)?.soldier;
       return position?{position,pose:soldier?.stance}:null;
@@ -269,6 +269,7 @@ export class EncounterPlay {
     await PaintFrame();
     if(this.disposed||!this.active)return;
     this.PreparePlayerLoadout();
+    this.host.hud.ClearStaging?.();
     if(this.previousMissionCoverRules===undefined)this.previousMissionCoverRules=this.host.ai.missionCoverRules;
     if(this.previousMissionReactions===undefined)this.previousMissionReactions=this.host.ai.missionReactions;
     this.host.ai.missionCoverRules=true;
@@ -338,6 +339,7 @@ export class EncounterPlay {
     this.hudKey=null;
     this.music=null;
     this.PreparePlayerLoadout();
+    this.host.hud.ClearStaging?.();
     const frame=this.variant.evaluate(this.plan.time,this.plan.document);
     const p=frame.actors.find(a=>a.id==="player");
     this.host.player.Spawn(...p.p,EncounterPlayerYaw(this.plan.beat));
@@ -1103,7 +1105,7 @@ export class EncounterPlay {
     ctx.ClearFirearmRequests();
     ctx.router.SetSuppressed(true);
     ctx.router.SetSuppressed(false);
-    ctx.menu?.Close();this.host.hud.HideDeathCard?.();ctx.viewmodel.ResetDeath?.();
+    ctx.menu?.Close();this.host.hud.HideDeathCard?.();this.host.hud.ClearStaging?.();ctx.viewmodel.ResetDeath?.();
     if(this.isCampaign&&ctx.hudRoot)ctx.hudRoot.style.display="";
     ctx.viewmodel.Equip(this.host.Weapon(),state.weaponVariants[state.activeSlot]||0,{instant:true});
     ctx.SyncBayonet();

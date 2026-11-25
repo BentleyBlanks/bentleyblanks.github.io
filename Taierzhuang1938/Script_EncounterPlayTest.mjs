@@ -391,6 +391,10 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
    "EncounterPlay PaintFrame must fall back when document.hidden is true so background/occluded tabs never deadlock Play loading");
   assert.match(playHostSrc,/TouchLoadProgress\(step\)/,"LevelFlowPlay must reset the stall deadline as loading steps advance");
   assert.match(playHostSrc,/Play 加载超时（停在：/,"LevelFlowPlay timeout toast must report the stalled step");
+  const playCss=fs.readFileSync(new URL("./Style_EncounterPlay.css",import.meta.url),"utf8");
+  assert.doesNotMatch(playCss,/\.encounterGame\s+\.hudActions\b/,"Encounter Play must keep .hudActions visible so reload/interact prompts render");
+  assert.match(playCss,/\.encounterDual\s+#hud\{[^}]*z-index:\s*2/,"Dual-viewport Encounter Play must layer #hud above .encounterPrimary");
+  assert.match(playRuntimeSrc,/hud\.ClearStaging\?\.\(\)/,"Encounter Play must clear hidden brief/title staging timers so ammo and reload prompts are not suppressed");
  }
 }
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync, playtest 2D guide and independent scene");
