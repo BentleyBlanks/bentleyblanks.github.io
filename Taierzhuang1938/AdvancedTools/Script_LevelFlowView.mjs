@@ -625,10 +625,12 @@ export class FlowMapView {
       const selected=selection?.type==="trigger"&&selection.id===trigger.id;
       this.DrawArea(context,trigger.area,trigger.active?"#277b9a":"#54889b",selected?`${trigger.mode==="time"?"◷ ":""}${trigger.label}`:"",selected,{type:"trigger",id:trigger.id,text:`${trigger.label} · ${trigger.firedAt===null?"路线未经过":trigger.active?"已触发":"等待触发"}`});
     }
-    if(layers.spawns) for(const group of frame.groups.filter(relevant)) {
+    for(const group of frame.groups.filter(relevant)) {
       const selected=selection?.type==="group"&&selection.id===group.id,color=group.side==="friend"?FLOW_COLORS.friend:FLOW_COLORS.enemy;
-      this.DrawArea(context,group.area,color,selected?group.label:"",selected,{type:"group",id:group.id,text:`${group.label} · 已出 ${group.spawned}/${group.count} · 在场 ${group.live}`});
-      const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#fcf4e4",color);
+      if(layers.spawns) {
+        this.DrawArea(context,group.area,color,selected?group.label:"",selected,{type:"group",id:group.id,text:`${group.label} · 已出 ${group.spawned}/${group.count} · 在场 ${group.live}`});
+        const p=Screen(group.area.center);Polygon(context,[[p[0],p[1]-6],[p[0]-5,p[1]+4],[p[0]+5,p[1]+4]],"#fcf4e4",color);
+      }
       if(layers.routes||selected) {
         for(let index=0;index<(group.memberPlans?.length||0);index++) {
           const path=GroupPath(group,index);this.DrawPath(context,path,color+"99",selected?2:1,[5,4]);
@@ -639,7 +641,6 @@ export class FlowMapView {
           this.DrawPath(context,route,color+"77",selected?2:1,[5,4]);
           if(route.length>1) this.DrawArrow(context,route.at(-2),route.at(-1),color+"99",1);
         }
-
       }
     }
     if(layers.fire) for(const effect of frame.effects.filter((item)=>item.kind==="fire")) {

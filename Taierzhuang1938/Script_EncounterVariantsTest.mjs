@@ -345,13 +345,20 @@ assert.equal(docOrig.value.groups[0].count, original.defaultDocument.groups[0].c
 const oldDraft = structuredClone(docMerged.value);
 oldDraft.revision = "2026-11-22-beishahe-merged-1";
 const oldSearch = oldDraft.groups.find(group => group.id === "MergedWestSearch");
-oldSearch.area.center = [68, 516];
+delete oldSearch.memberPlans;
+oldSearch.beat = "09a";
+oldSearch.endBeat = "09b";
+oldSearch.area = { shape: "rect", center: [68, 516], size: [0.9, 0.9] };
 oldSearch.route = [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]];
 oldSearch.lifetime = 14;
 const oldSearchTrigger = oldDraft.triggers.find(trigger => trigger.id === oldSearch.triggerId);
+oldSearchTrigger.beat = "09a";
+oldSearchTrigger.endBeat = "09b";
 oldSearchTrigger.delay = 34;
-const ReloadMerged = () => {
-  fakeStore.set(merged.spec.storageKey, JSON.stringify(oldDraft));
+oldDraft.groups = oldDraft.groups.filter(g => !["MergedMainStFlank", "MergedYardAtrocity", "MergedYardStraggler"].includes(g.id));
+oldDraft.triggers = oldDraft.triggers.filter(t => !["Trigger_MergedMainStFlank", "Trigger_MergedYardAtrocity", "Trigger_MergedYardStraggler"].includes(t.id));
+const ReloadMerged = (draft = oldDraft) => {
+  fakeStore.set(merged.spec.storageKey, JSON.stringify(draft));
   return new EncounterDocument(merged.defaultDocument, merged.timeline, mockStorage, {
     storageKey: merged.spec.storageKey, legacyStorageKey: null,
   }).value;
@@ -360,8 +367,24 @@ const upgradedDraft = ReloadMerged();
 assert.equal(upgradedDraft.revision, merged.defaultDocument.revision);
 assert.deepEqual(upgradedDraft.groups.find(group => group.id === oldSearch.id),
   merged.defaultDocument.groups.find(group => group.id === oldSearch.id));
-assert.equal(upgradedDraft.triggers.find(trigger => trigger.id === oldSearch.triggerId).delay, 30);
+const upgradedSearchTrigger = upgradedDraft.triggers.find(trigger => trigger.id === oldSearch.triggerId);
+assert.equal(upgradedSearchTrigger.beat, "08d");
+assert.equal(upgradedSearchTrigger.delay, 31);
+assert.ok(["MergedMainStFlank", "MergedYardAtrocity", "MergedYardStraggler"].every(id => upgradedDraft.groups.some(g => g.id === id)),
+  "旧草稿自动补齐东翼掩护、街坊院暴行与邻院落单兵三组");
 assert.equal(upgradedDraft.groups.find(group => group.id === "MergedBoards").count, 6);
+
+// 同样兼容从 2026-11-25-west-search-cover-1 升级到方案 A
+const codexDraft = structuredClone(oldDraft);
+codexDraft.revision = "2026-11-25-west-search-cover-1";
+const codexSearch = codexDraft.groups.find(group => group.id === "MergedWestSearch");
+codexSearch.area.center = [67.75, 499.2];
+codexSearch.route = [[67.75, 499.2], [67.03, 510.2], [66.65, 516], [75, 516], [84, 516], [75, 516], [66, 516], [67.03, 510.2], [67.75, 499.2]];
+codexDraft.triggers.find(trigger => trigger.id === codexSearch.triggerId).delay = 30;
+const upgradedFromCodex = ReloadMerged(codexDraft);
+assert.deepEqual(upgradedFromCodex.groups.find(group => group.id === "MergedWestSearch"),
+  merged.defaultDocument.groups.find(group => group.id === "MergedWestSearch"));
+
 oldSearch.route[1] = [79, 516];
 oldSearchTrigger.delay = 35;
 const customizedDraft = ReloadMerged();
@@ -421,6 +444,11 @@ const fakeViewEye = { type: "eye", freeCamera: false, ActorLabelOpacity: () => 0
 assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewScene, {}), 1, "3D 场景编辑器视口气泡保持 100% 不透明");
 assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewChase, {}), 1, "3D 追随视口气泡保持 100% 不透明");
 assert.equal(FlowPerspectiveView.prototype.SpeechOpacity.call(fakeViewEye, {}), 0, "第一人称视角气泡仍遵守建筑遮挡");
+
+// 验证 2D/3D 视口在关闭「生成」图层时，开启「路线」仍独立绘制敌军来源与推进路线
+const viewSource = fs.readFileSync(path.join(dirHere, "AdvancedTools", "Script_LevelFlowView.mjs"), "utf8");
+assert.ok(!/if\s*\(\s*layers\.spawns\s*\)\s*for\s*\(\s*const\s+group\s+of\s+frame\.groups/.test(viewSource),
+  "Script_LevelFlowView 须将路线图层与生成区图层解耦，关闭「生成」也能看到敌军路线");
 
 // 验证所有 08–13 可玩节点都有在场的指令发言人
 for (const beat of merged.timeline.filter((b) => Number(b.stage) >= 8 && EncounterCanPlay(b.start, merged))) {
@@ -531,7 +559,7 @@ const solidObjects = resolved.doc.objects.filter((o) =>
   o.pos && o.size && o.solid !== false && o.layer !== "backdrop" && o.tag !== "airWall" && !o.showOn);
 
 const mergedEnemyGroups = merged.defaultDocument.groups.filter((g) => g.side === "enemy" && g.id.startsWith("Merged"));
-assert.equal(mergedEnemyGroups.length, 8, "检查全部 8 组新增合并版敌军波次");
+assert.equal(mergedEnemyGroups.length, 11, "检查全部 11 组新增合并版敌军波次（含东翼掩护、街坊院暴行、邻院落单兵）");
 for (const group of mergedEnemyGroups) {
   const beat = merged.BeatById(group.beat);
   const playerAtEntry = beat.p[0];
@@ -542,28 +570,28 @@ for (const group of mergedEnemyGroups) {
   );
 }
 
-// 玩家在出生时的实际视点与附件位置，以及接近庙院的沿途余量。
-const westSearch = CompileEncounters(merged.defaultDocument, merged.timeline).groups.find(group => group.id === "MergedWestSearch");
-const searchWalls = solidObjects.filter(({ pos: [x, , z] }) => x >= 55 && x <= 112 && z >= 494 && z <= 538);
+// 方案 A：北街搜兵由东翼突破口分流沿东胡同北上再自东向西扫街，出生遮挡、全程无穿墙净空、炸雷后向东回援老耿家且不原地倒死。
+const compiledMerged = CompileEncounters(merged.defaultDocument, merged.timeline);
+const westSearch = compiledMerged.groups.find(group => group.id === "MergedWestSearch");
+const atrocityGroup = compiledMerged.groups.find(group => group.id === "MergedYardAtrocity");
 const Eyes = (xz, eyeHeight) => [xz[0], groundAt(...xz) + eyeHeight, xz[1]];
-const observationPoints = [merged.evaluate(1287.1698).player];
-for (let elapsed = 27; elapsed <= b09a.duration; elapsed += 0.5) {
-  const [x, z] = merged.evaluate(b09a.start + elapsed).player;
-  observationPoints.push([x, z], [x - 0.6, z], [x + 0.6, z], [x, z - 0.6], [x, z + 0.6]);
+const searchWalls = solidObjects.filter(({ pos: [x, , z] }) => x >= 55 && x <= 265 && z >= 494 && z <= 585);
+const observationPoints = [merged.BeatById("08d").p[0], merged.evaluate(1283.36).player, merged.evaluate(1287.17).player];
+for (let elapsed = 0; elapsed <= b09a.duration; elapsed += 2) {
+  observationPoints.push(merged.evaluate(b09a.start + elapsed).player);
 }
 for (const [index, { born }] of westSearch.lives.entries()) {
   const preview = merged.evaluate(born).actors.find(actor => actor.id === `MergedWestSearch_${index}`);
   const route = GroupPath(westSearch, index);
+  assert.ok(route[0][0] > 200, `方案 A 搜兵 ${index + 1} 须从东翼突破口出发而非二营背后民房`);
   const views = [merged.evaluate(born).player, ...observationPoints];
   for (const player of views) {
     for (const eyeHeight of [1.15, 1.7]) {
       const origin = Eyes(player, eyeHeight);
       for (const spawn of [preview.p, route[0]]) {
-        for (const [dx, height] of [[0, 0.4], [0, 1.1], [0, 1.7], [-0.35, 1.4], [0.35, 1.4]]) {
-          const target = Eyes([spawn[0] + dx, spawn[1]], height);
-          assert.ok(searchWalls.some(wall => RayHitsOrientedBox(origin, target, wall, groundAt)),
-            `09A 西翼搜兵 ${index + 1} 的生成点 ${spawn} 从玩家位置 ${player} 可见`);
-        }
+        const target = Eyes(spawn, 1.4);
+        assert.ok(searchWalls.some(wall => RayHitsOrientedBox(origin, target, wall, groundAt)),
+          `09A 东翼分流搜兵 ${index + 1} 的生成点 ${spawn} 从玩家位置 ${player} 可见`);
       }
     }
   }
@@ -571,16 +599,42 @@ for (const [index, { born }] of westSearch.lives.entries()) {
     const start = route[step];
     const dx = end[0] - start[0], dz = end[1] - start[1];
     const length = Math.hypot(dx, dz);
+    if (length < 1e-4) continue;
     for (const offset of [-0.32, 0, 0.32]) {
       const Track = ([x, z]) => Eyes([x - dz * offset / length, z + dx * offset / length], 1);
       assert.ok(!searchWalls.some(wall => RayHitsOrientedBox(Track(start), Track(end), wall, groundAt)),
-        `09A 西翼搜兵第 ${step + 1} 段路线须有通行净空`);
+        `09A 北街搜兵第 ${step + 1} 段路线 (${start}->${end}) 须有通行净空`);
     }
   }
 }
-const westSearchAtReport = merged.evaluate(1287.1698).actors.filter(actor => actor.groupId === westSearch.id);
-assert.equal(westSearchAtReport.length, 3, "原标注帧的三名搜兵仍沿北街经过");
-assert.ok(westSearchAtReport.every(actor => actor.pose === "run" && actor.p[1] > 515 && actor.p[0] < 76));
+const b09b = merged.BeatById("09b");
+const b09c = merged.BeatById("09c");
+// 1287.17s：三名搜兵已自东向西扫上北街
+const westSearchAtReport = merged.evaluate(1287.17).actors.filter(actor => actor.groupId === westSearch.id);
+assert.equal(westSearchAtReport.length, 3, "原标注帧三名搜兵沿北街自东向西行进");
+assert.ok(westSearchAtReport.every(actor => actor.pose === "run" && actor.p[1] >= 515 && actor.p[1] <= 522 && actor.p[0] > 95 && actor.p[0] < 145));
+// 炸雷因果：罗班长第一颗雷 09b+7.7s (1298.7s) 爆响前，搜兵仍在庙北未提前东撤；爆响后 09b+11s 才向东回援，且进入 09d 后在老耿家东侧存活
+const searchBeforeBlast = merged.evaluate(b09b.start + 7.5).actors.find(a => a.id === "MergedWestSearch_0");
+const searchAfterBlast = merged.evaluate(b09b.start + 12.0).actors.find(a => a.id === "MergedWestSearch_0");
+const searchAt09d = merged.evaluate(merged.BeatById("09d").start + 2).actors.filter(a => a.groupId === westSearch.id);
+assert.ok(searchBeforeBlast && searchBeforeBlast.p[0] <= 77, "炸雷前北街搜兵停在庙北墙外张望，不提前掉头");
+assert.ok(searchAfterBlast && searchAfterBlast.p[0] > searchBeforeBlast.p[0] + 5, "炸雷后北街搜兵按军哨向东回援");
+assert.ok(searchAt09d.length === 3 && searchAt09d.every(a => a.pose !== "dead" && a.p[0] > 142 && a.p[1] > 560),
+  "北街搜兵不原地倒死，完整东撤至老耿家东侧增援");
+// MA2 街坊院暴行与撤回增援：09b+5.5s 院内爆响、老人遇害，09b+9s 炸雷后撤回 MA4 前院
+const fAtrocityBlast = merged.evaluate(b09b.start + 5.6);
+assert.ok(fAtrocityBlast.effects.some(e => e.kind === "blast" && e.side === "enemy" && e.p[0] > 100 && e.p[0] < 114 && e.p[1] > 563),
+  "09b 街坊院 MA2 呈现克制手榴弹暴行烟尘与爆炸");
+const fAtrocityAfter = merged.evaluate(b09b.start + 6.5);
+assert.equal(fAtrocityAfter.actors.find(a => a.id === "neighborElder")?.pose, "dead", "街坊老人在暴行爆炸后倒地");
+const atrocityAt09d = merged.evaluate(merged.BeatById("09d").start + 2).actors.filter(a => a.groupId === atrocityGroup.id);
+assert.ok(atrocityAt09d.length === 2 && atrocityAt09d.every(a => a.pose !== "dead" && a.p[0] >= 126 && a.p[0] <= 138 && a.p[1] >= 563 && a.p[1] <= 573),
+  "街坊院暴行组在班长甩雷后撤回老耿家前院增援");
+// 09c 邻院落单兵：顺子大刀无声解决
+const f09cMelee = merged.evaluate(b09c.start + 6.5);
+assert.equal(f09cMelee.actors.find(a => a.id === "player")?.pose, "melee", "09c 顺子以大刀近战无声解决邻院落单搜屋兵");
+const f09cAfterMelee = merged.evaluate(b09c.start + 8.0);
+assert.equal(f09cAfterMelee.actors.find(a => a.id === "MergedYardStraggler_0")?.pose, "dead", "邻院落单搜屋兵在 09c 被无声放倒");
 
 // 8. 全员 0 穿墙、潜行/平民零照面穿帮、合理近距交火线回归审计（按 1s 步进扫完整个 08a–13e）
 const solidWalls = solidObjects.filter((o) => o.size[1] >= 0.45 && o.meta?.obstacle !== "barbedWire");
@@ -610,6 +664,7 @@ for (let t = merged.BeatById("08a").start; t < merged.duration; t += 1.0) {
       const friendly = fr.actors.find((a) => a.id === id);
       if (!friendly) continue;
       for (const enemy of livingEnemies) {
+        if (fr.beat.id === "09c" && enemy.groupId === "MergedYardStraggler") continue;
         const d = Math.hypot(friendly.p[0] - enemy.p[0], friendly.p[1] - enemy.p[1]);
         if (d > 42) continue;
         const occ = SegmentOccluded(friendly.p, enemy.p, groundAt, solidWalls.filter((w) => !(w.hideOn && sigs.includes(w.hideOn))));

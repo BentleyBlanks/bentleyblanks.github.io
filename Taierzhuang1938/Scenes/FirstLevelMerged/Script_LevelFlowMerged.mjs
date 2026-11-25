@@ -124,7 +124,8 @@ export function MergedActors(beat, time, player, progress, timeline) {
   const Beat = (id) => timeline.find((entry) => entry.id === id);
   const At = (id, fraction = 0) => Beat(id).start + Beat(id).duration * fraction;
   const Follow = (delay) => PlayerAt(Math.max(At("08a"), time - delay), timeline);
-  const actors = [Actor("player", "顺子", "player", "person", player, beat.cover ? "kneel" : beat.pose, { lookAt: beat.lookAt })];
+  const playerPose = beat.id === "09c" && progress >= 0.18 && progress <= 0.34 ? "melee" : beat.cover ? "kneel" : beat.pose;
+  const actors = [Actor("player", "顺子", "player", "person", player, playerPose, { lookAt: beat.lookAt })];
 
   // 老耿驴车：08a 抵沟口 → 08b 妮儿牵过板桥 → 08c 前 62% 沿主街抢先抵达西南救护所（远早于东翼日军抵中街）→ 10c 空袭焚毁
   const cartEnd = At("08c", 0.62);
@@ -384,6 +385,17 @@ export function MergedActors(beat, time, player, progress, timeline) {
     }
   }
 
+  // 街坊院（MA2）平民：08c–09b 前半被东翼分流搜院日军逼在正房门前，09b+5.5s 院内手榴弹闷响后老人遇害、妇人跪地泣不成声
+  if (time >= At("08c") && time < At("11c")) {
+    const atrocityHit = time >= At("09b") + 5.8;
+    actors.push(
+      Actor("neighborElder", "街坊老人", "civilian", "person", [106.8, 571.0], atrocityHit ? "dead" : "kneel",
+        { status: atrocityHit ? "遭街坊院搜院日军暴行杀害" : "被搜院日军逼在街坊院正房门前" }),
+      Actor("neighborMother", "街坊妇人", "civilian", "person", [108.2, 571.2], "kneel",
+        { status: atrocityHit ? "缩在街坊院烟尘中悲泣" : "被搜院日军推搡在街坊院内惊呼" }),
+    );
+  }
+
   // 七二七团二营环形守备兵力与扛门板本村汉子（正面战壕 + 东西侧翼折回阵地 + 炮楼哨 + 村心预备班 + 东南桥头警戒）
   if (time < At("10a") || beat.id === "11b") {
     actors.push(Actor("sentry", "二营哨兵", "friend", "person", [101.8, 475.6], "stand"));
@@ -500,17 +512,18 @@ export function MergedEffects(beat, time, progress, actors, timeline) {
     EmitFriendlyFire(["player", "liu", "luo", "he", "yao", "bn2_mgWest", "bn2_west1", "bn2_mgEast", "bn2_east1"], 85, (e) => e.p[1] < 475);
     EmitFriendlyFire(["bn2_eastFlank1"], 65, (e) => e.p[0] > 195 && e.p[1] > 540);
   } else if (beat.id === "08d" && progress >= 0.35) {
-    // 08d 后半拍：东翼侧包进老耿家的机枪沿主街朝大槐树石碾口扫射封路（24m 直视），班长三人压上主街正面交火
+    // 08d 后半拍：东翼侧包进老耿家的机枪与街东掩护组交叉扫射主街大槐树口，班长三人压上主街正面交火
     effects.push({ kind: "fire", a: [131.6, 573.1], b: [133.5, 549.5], side: "enemy", heavy: true, phase: (time * 5.2) % 1 });
-    if (progress >= 0.65) EmitFriendlyFire(["luo", "he", "yao"], 48, (e) => e.groupId === "MergedHouseGun" && e.p[0] < 145);
+    effects.push({ kind: "fire", a: [141.0, 564.0], b: [133.5, 549.5], side: "enemy", heavy: false, phase: (time * 4.3 + 0.4) % 1 });
+    if (progress >= 0.65) EmitFriendlyFire(["luo", "he", "yao"], 48, (e) => ["MergedHouseGun", "MergedMainStFlank"].includes(e.groupId) && e.p[0] < 150);
   } else if (["09a", "09b", "09c"].includes(beat.id)) {
-    // 顺子与刘文财处于潜行禁火态绝不开火；只有班长三人在主街掩体后正面死咬老耿家封街机枪组！
-    EmitFriendlyFire(["luo", "he", "yao"], 38, (e) => e.groupId === "MergedHouseGun" && e.p[0] < 145);
+    // 顺子与刘文财处于潜行禁火态绝不开火；只有班长三人在主街掩体后正面死咬老耿家封街机枪与街东侧翼组！
+    EmitFriendlyFire(["luo", "he", "yao"], 42, (e) => ["MergedHouseGun", "MergedMainStFlank"].includes(e.groupId) && e.p[0] < 150);
   } else if (beat.id === "09d") {
-    // 顺子与刘文财突入老耿家后院，严格优先打眼前最近的敌人（先灶屋守卫，后正房机枪组），最大 18m
-    EmitFriendlyFire(["player", "liu"], 18, (e) => e.p[0] >= 124 && e.p[0] <= 140 && e.p[1] >= 563 && e.p[1] <= 579);
+    // 顺子与刘文财突入老耿家后院，优先打眼前最近的敌人（灶屋、院内增援、正房机枪组），最大 22m
+    EmitFriendlyFire(["player", "liu"], 22, (e) => e.p[0] >= 124 && e.p[0] <= 142 && e.p[1] >= 562 && e.p[1] <= 579);
     if (progress < 0.65) {
-      EmitFriendlyFire(["luo", "he", "yao"], 34, (e) => e.groupId === "MergedHouseGun");
+      EmitFriendlyFire(["luo", "he", "yao"], 38, (e) => ["MergedHouseGun", "MergedMainStFlank", "MergedWestSearch"].includes(e.groupId) && e.p[0] < 155);
     }
   } else if (beat.id === "12b") {
     EmitFriendlyFire(["player", "liu"], 78, (e) => e.groupId === "MergedRailAmbush");
@@ -540,6 +553,16 @@ export function MergedEffects(beat, time, progress, actors, timeline) {
   EmitLuoGrenade("09b", 7.8, [130.5, 569.0]);
   EmitLuoGrenade("09d", 0.5, [131.6, 571.2]);
   EmitLuoGrenade("09d", 13.5, [132.4, 571.5]);
+
+  // 09b 街坊院（MA2）搜院日军朝正房/窖口砸进手榴弹（克制表现暴行烟尘与闷响，先于班长救场炸雷 2.2s）
+  const b09b = Beat("09b");
+  if (b09b) {
+    const atrocityAge = time - (b09b.start + 3.5);
+    if (atrocityAge >= 0 && atrocityAge <= 4.2) {
+      if (atrocityAge < 2.0) effects.push({ kind: "grenade", a: [107.0, 569.0], b: [105.2, 572.8], phase: atrocityAge / 2.0, side: "enemy" });
+      else effects.push({ kind: "blast", p: [105.2, 572.8], age: atrocityAge - 2.0, side: "enemy" });
+    }
+  }
 
   // 10c 空袭三机低空俯冲扫射救护所（随村南扩 +80m）
   if (beat.id === "10c") {

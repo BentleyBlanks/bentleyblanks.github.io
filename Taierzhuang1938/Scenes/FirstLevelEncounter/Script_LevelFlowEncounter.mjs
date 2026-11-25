@@ -745,31 +745,57 @@ function UpgradeExistingEncounterDocument(input,defaults) {
   return UpgradeTankDestruction(UpgradeTankApproach(UpgradeOpeningDefense(UpgradeAmbush(UpgradeCampCover(value,defaults),defaults),defaults),defaults),defaults);
 }
 
-function UpgradeMergedWestSearch(document, defaults) {
-  const next = defaults.groups.find(group => group.id === "MergedWestSearch");
-  const group = document.groups.find(group => group.id === next?.id);
-  const previousRoute = [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]];
-  if (!group || group.spawnOffsets || group.memberPlans
-    || group.area.shape !== "rect" || group.area.size.some(size => size !== 0.9)
-    || JSON.stringify(group.area.center) !== JSON.stringify(previousRoute[0])
-    || JSON.stringify(group.route) !== JSON.stringify(previousRoute)) return;
+function UpgradeMergedEastFlank(document, defaults) {
+  const replaceGroupIfUntouched = (id, legacyRoutes, legacyMeta = {}) => {
+    const next = defaults.groups.find(group => group.id === id);
+    const group = document.groups.find(group => group.id === id);
+    if (!next || !group || group.spawnOffsets || group.memberPlans) return;
+    const routeJson = JSON.stringify(group.route);
+    const matchedRoute = legacyRoutes.find(route => JSON.stringify(route) === routeJson);
+    if (!matchedRoute || JSON.stringify(group.area.center) !== JSON.stringify(matchedRoute[0])) return;
+    const idx = document.groups.indexOf(group);
+    document.groups[idx] = structuredClone(next);
+    const nextTrigger = defaults.triggers.find(trigger => trigger.id === next.triggerId);
+    const trigger = document.triggers.find(trigger => trigger.id === group.triggerId);
+    if (nextTrigger && trigger && trigger.mode === "time"
+      && (!legacyMeta.triggerBeats || legacyMeta.triggerBeats.includes(trigger.beat))
+      && (!legacyMeta.triggerDelays || legacyMeta.triggerDelays.includes(trigger.delay))) {
+      Object.assign(trigger, structuredClone(nextTrigger));
+    }
+  };
 
-  group.area = structuredClone(next.area);
-  group.route = structuredClone(next.route);
-  if (group.lifetime === 14) group.lifetime = next.lifetime;
-  if (group.note === "自村西北沿北街贴关帝庙 3.8m 北外实墙搜索（全程与庙内主角隔墙绝不打照面），闻主街班长手榴弹声后撤回转援") group.note = next.note;
-  const trigger = document.triggers.find(trigger => trigger.id === group.triggerId);
-  if (trigger?.id === next.triggerId && trigger.mode === "time" && trigger.beat === "09a" && trigger.delay === 34) {
-    trigger.delay = defaults.triggers.find(trigger => trigger.id === next.triggerId).delay;
+  replaceGroupIfUntouched("MergedWestSearch", [
+    [[68, 516], [80, 516], [84, 516], [76, 516], [68, 516]],
+    [[67.75, 499.2], [67.03, 510.2], [66.65, 516], [75, 516], [84, 516], [75, 516], [66, 516], [67.03, 510.2], [67.75, 499.2]],
+  ], { triggerBeats: ["09a"], triggerDelays: [30, 34] });
+
+  replaceGroupIfUntouched("MergedHouseGun", [
+    [[256, 573], [216, 572], [185, 569], [157, 564], [140, 560], [131.6, 560], [131.6, 562.8], [131.6, 571.5], [131.6, 573.1], [131.6, 575.2]],
+  ], { triggerBeats: ["08c"], triggerDelays: [14] });
+
+  replaceGroupIfUntouched("MergedKitchenGuard", [
+    [[256, 573], [216, 572], [185, 569], [157, 564], [140, 560], [131.6, 560], [131.6, 562.8], [131.6, 564.8], [127.5, 565.0], [127.5, 566.2], [127.5, 568.8]],
+  ], { triggerBeats: ["08c"], triggerDelays: [16] });
+
+  for (const addedId of ["MergedMainStFlank", "MergedYardAtrocity", "MergedYardStraggler"]) {
+    const nextGroup = defaults.groups.find(group => group.id === addedId);
+    if (nextGroup && !document.groups.some(group => group.id === addedId)) {
+      document.groups.push(structuredClone(nextGroup));
+      const nextTrigger = defaults.triggers.find(trigger => trigger.id === nextGroup.triggerId);
+      if (nextTrigger && !document.triggers.some(trigger => trigger.id === nextTrigger.id)) {
+        document.triggers.push(structuredClone(nextTrigger));
+      }
+    }
   }
 }
 
 export function UpgradeEncounterDocument(input,defaults) {
   if(defaults.id!=="FirstLevelEncounter") {
     const cloned=structuredClone(input);
+    const mergedLegacyRevisions = ["2026-11-22-beishahe-merged-1", "2026-11-25-west-search-cover-1"];
     if (input.id === "L1_BeishaheMerged" && input.id === defaults.id
-      && input.revision === "2026-11-22-beishahe-merged-1" && input.revision !== defaults.revision) {
-      UpgradeMergedWestSearch(cloned, defaults);
+      && mergedLegacyRevisions.includes(input.revision) && input.revision !== defaults.revision) {
+      UpgradeMergedEastFlank(cloned, defaults);
     }
     cloned.id=defaults.id;
     cloned.revision=defaults.revision;
