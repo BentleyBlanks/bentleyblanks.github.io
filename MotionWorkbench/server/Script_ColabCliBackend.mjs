@@ -662,7 +662,14 @@ async function _runColabMiniMaxH3JobInner({
       for (const kv of envs) args.push("--env", kv);
       const proc = spawn(exe, args, {
         windowsHide: true,
-        env: { ...process.env, NO_COLOR: "1", RICH_DISABLE: "1" },
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          RICH_DISABLE: "1",
+          PYTHONUTF8: "1",
+          PYTHONIOENCODING: "utf-8",
+          PYTHONUNBUFFERED: "1",
+        },
       });
 
       let buf = "";
