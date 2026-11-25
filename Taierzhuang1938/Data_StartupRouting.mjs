@@ -1,11 +1,21 @@
 // Gameplay and explicit developer views retain their original entry contracts.
 // Test-range switches come from the one registry (Data_SandboxRanges, zero imports, safe for the router bundle).
 import { SANDBOX_RANGE_KEYS } from './Data_SandboxRanges.mjs';
+import { LOCAL_CONTROL_CENTER } from './Data_DevToolsSplit.mjs';
 
-const DEVELOPER_KEYS = ['phase', 'shot', 'editor', 'whitebox', 'jiehe', 'missionStage', 'poseTest'];
+const GAME_KEYS = ['phase', 'shot', 'whitebox', 'jiehe', 'missionStage', 'poseTest', ...SANDBOX_RANGE_KEYS];
 
 export function IsMenuStartup(params) {
-  return params.get('menu') !== '0' && ![...DEVELOPER_KEYS, ...SANDBOX_RANGE_KEYS].some(key => params.has(key));
+  return params.get('menu') !== '0' && !params.has('editor') && !GAME_KEYS.some(key => params.has(key));
+}
+
+export function LocalControlCenterUrl(href, params) {
+  if (!LOCAL_CONTROL_CENTER || params.get('editor') !== 'tools' || params.has('tool')
+    || params.get('menu') === '0' || GAME_KEYS.some(key => params.has(key))) return null;
+  const url = new URL(LOCAL_CONTROL_CENTER, href);
+  url.search = params.toString();
+  url.searchParams.delete('editor');
+  return url;
 }
 
 export function SandboxUrl(href, key, {stage = null} = {}) {

@@ -158,6 +158,8 @@ Check("发布构建的游戏包换进了 Script_DevToolsSplitStub、不含 Advan
   deploy.gameInputs.filter((file) => file.startsWith("AdvancedTools/")).join(", "));
 Check("发布构建的菜单包换进了 Data_DevToolsSplitStub、不含 AdvancedTools/", deploy.menuInputs.includes("Data_DevToolsSplitStub.mjs")
   && !deploy.menuInputs.includes("Data_DevToolsSplit.mjs") && !deploy.menuInputs.some((file) => file.startsWith("AdvancedTools/")));
+const deployEntry = deploy.files.find((file) => file.name === "Script_EntryBrowserBundle.mjs");
+Check("发布构建的启动路由剔除独立控制中心地址", !deployEntry.code.includes("AdvancedTools/ControlCenter.html"));
 Check("发布构建里留在游戏里的工具仍在（Script_Editor、白盒入口）",
   ["Script_Editor.mjs", "Script_EditorBlockoutEntry.mjs"].every((file) => deploy.gameInputs.includes(file)));
 Check("游戏宿主通过入口调用 PCG 独立工具", !full.gameInputs.some((file) => /Script_Editor(Splines|PropPcg)/.test(file)));

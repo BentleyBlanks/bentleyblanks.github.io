@@ -74,8 +74,11 @@ async function OpenPage(url, { viewport = { width: 1280, height: 720 }, waitUnti
 try {
   // --- 1. 控制中心 -----------------------------------------------------------------
   if (!only || only.has("center")) {
-    const { page, errors } = await OpenPage(`${base}ControlCenter.html`);
+    const legacyUrl = new URL("../?editor=tools", base).href;
+    const { page, errors } = await OpenPage(legacyUrl, { waitUntil: "commit" });
+    await page.waitForURL(`${base}ControlCenter.html`);
     await page.waitForSelector("[data-home-tool]", { timeout: 60000 });
+    Check("旧工具首页链接进入独立控制中心", page.url() === `${base}ControlCenter.html`, page.url());
     const info = await page.evaluate(() => ({
       title: document.title, brand: document.querySelector(".edMenuBrand")?.textContent,
       groups: [...document.querySelectorAll(".edHomeGroup")].map((group) => ({ id: group.dataset.group, label: group.querySelector(".edHomeGroupLabel")?.textContent })),

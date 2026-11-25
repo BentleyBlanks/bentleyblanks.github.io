@@ -8,3 +8,5 @@
 // 守门：Script_DevToolsIsolationTest.mjs。
 
 export const SPLIT_TOOLS_AVAILABLE = true;
+// 只供本地启动路由使用，地址相对游戏入口。
+export const LOCAL_CONTROL_CENTER = "./AdvancedTools/ControlCenter.html";

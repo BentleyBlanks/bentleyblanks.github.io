@@ -2,3 +2,4 @@
 // 导出名必须与原表一致 —— Script_DevToolsIsolationTest 逐个对账。
 
 export const SPLIT_TOOLS_AVAILABLE = false;
+export const LOCAL_CONTROL_CENTER = null;

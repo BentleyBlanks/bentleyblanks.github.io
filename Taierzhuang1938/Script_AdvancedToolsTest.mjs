@@ -20,6 +20,8 @@ import http from "node:http";
 import { once } from "node:events";
 import { PreviewRuntimeRevision } from "../scripts/Script_LocalPreviewRuntime.mjs";
 import { TOOL_INFO, TOOL_MENUS } from "./Data_DevTools.mjs";
+import { SANDBOX_RANGE_KEYS } from "./Data_SandboxRanges.mjs";
+import { LocalControlCenterUrl } from "./Data_StartupRouting.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
 import { ControlCenterCards, CONTROL_CENTER_TITLE } from "./AdvancedTools/Script_ControlCenter.mjs";
 import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
@@ -33,6 +35,14 @@ function Check(name, ok, detail = "") {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}${detail ? "  — " + detail : ""}`);
 }
 const Same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+const gameHref = "http://127.0.0.1:8080/Taierzhuang1938/index.html";
+const controlCenter = LocalControlCenterUrl(gameHref, new URLSearchParams("editor=tools&audio=0"));
+Check("旧工具首页地址跳转并保留通用参数", controlCenter?.href === `${ControlCenterUrl(8080)}?audio=0`);
+const gameQueries = ["tool=actor", "menu=0", "phase=0", "whitebox=p012", "shot=1", "poseTest=1",
+  ...SANDBOX_RANGE_KEYS.map((key) => `${key}=1`)];
+Check("具名工具、游戏宿主、关卡和测试场仍走游戏入口", gameQueries.every((query) =>
+  LocalControlCenterUrl(gameHref, new URLSearchParams(`editor=tools&${query}`)) === null));
 
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);

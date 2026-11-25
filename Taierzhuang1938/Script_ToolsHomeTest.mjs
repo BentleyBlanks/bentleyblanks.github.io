@@ -1,4 +1,4 @@
-// 高级工具首页（?editor=tools 不带关卡，Data_ToolsHome / Script_EditorHome）的浏览器回归：
+// 游戏内高级工具首页（?editor=tools&menu=0，Data_ToolsHome / Script_EditorHome）的浏览器回归：
 //   1. 不建任何关卡：PHASES 只有 ToolsHome 那一片，工具首页显示、空 Inspector 不显示；
 //   2. 摄影棚类工具在首页上直接开，Esc 回首页，枪械检查台打开独立窗口；
 //   3. 场景类工具弹「载入哪一关」，选一关后整页换到 ?phase=N&editor=tools&tool=<id>；
@@ -20,7 +20,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height } }), errors = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
-    await page.goto(`${base}?editor=tools&audio=0`, { waitUntil: "domcontentloaded", timeout: 180000 });
+    await page.goto(`${base}?editor=tools&menu=0&audio=0`, { waitUntil: "domcontentloaded", timeout: 180000 });
     await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.editor?.panelOpen, null, { timeout: 300000 });
     const state = await page.evaluate(() => ({
       phases: window.Tengxian.editor.host.game.PHASES.map((p) => p.id),

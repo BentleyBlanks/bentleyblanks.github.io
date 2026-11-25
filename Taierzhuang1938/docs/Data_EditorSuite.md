@@ -91,7 +91,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 | 路子 | 什么时候能用 |
 | --- | --- |
-| 菜单 设置 → 高级工具 | 主菜单或暂停菜单。右栏按 `Data_DevTools.TOOL_MENUS` 分组列出全部工具（清单与文案在 `TOOL_INFO`，编辑器的 `static label / hint` 与 `window.open` 参数也读它），点一项直接开：独立窗口类就地弹窗、留在设置页，其余在游戏宿主里进工作台并打开它，标题菜单（独立启动）换到 `?editor=tools&tool=<id>`；「打开高级工具」按钮仍进工作台 / 工具首页。暂停菜单进来的退出后回设置页 |
+| 菜单 设置 → 高级工具 | 主菜单或暂停菜单。右栏按 `Data_DevTools.TOOL_MENUS` 分组列出全部工具（清单与文案在 `TOOL_INFO`，编辑器的 `static label / hint` 与 `window.open` 参数也读它）。独立工具在新标签页打开，其余在游戏宿主内打开，标题菜单的单工具链接为 `?editor=tools&tool=<id>`。从独立标题菜单打开高级工具总入口时，本地进控制中心，发布版进游戏内工具首页。暂停菜单进来的退出后回设置页 |
 | 菜单 设置 → Debug工具（右栏） | 暂停菜单（Esc）。勾上后「继续」即可边打边看；暂停菜单开着时开发工具层整层收起 |
 | 高级工具菜单栏 → Debug工具 | 高级工具开着时（含工具首页）。同一套开关，开完退出高级工具照样留着（keepOnClose） |
 | 点右上角齿轮 | **没拿指针锁**的时候（开局那张「进城」页、或玩家按过 Esc）；打开的是高级工具 |
@@ -103,7 +103,9 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正在播时 Esc 归过场（跳过），不会顺手把编辑器也关了。
 
-### 工具首页（`?editor=tools` 不带关卡）
+### 游戏内工具首页
+
+本地 `?editor=tools` 总入口转到 `AdvancedTools/ControlCenter.html`。本地带 `tool`、关卡或测试场参数的链接仍进游戏宿主。本地可用 `?editor=tools&menu=0` 直接打开游戏内工具首页，Pages 发布版的 `?editor=tools` 总入口也在这里。
 
 从标题菜单进高级工具**不建任何关卡**：PHASE_TABLE 换成 `Data_ToolsHome.TOOLS_HOME_PHASE` 一片空地
 （`Script_ToolsHomeField`，只为引擎有地方站），画面由整页的工具首页（`Script_EditorHome`）盖住，

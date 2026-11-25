@@ -57,7 +57,7 @@ export async function BuildBrowserBundle(projectDir = path.dirname(fileURLToPath
     absWorkingDir: projectDir, entryPoints: ['Script_Entry.mjs'], bundle: true,
     format: 'esm', platform: 'browser', target: 'es2022', write: false,
     minify: true, keepNames: true, logLevel: 'silent',
-    plugins: [{name: 'runtime-entries', setup(builder) {
+    plugins: [...plugins, {name: 'runtime-entries', setup(builder) {
       builder.onResolve({filter: /^\.\/Script_(Main|MenuStartup)\.mjs$/}, args => ({
         path: args.path.includes('MenuStartup') ? menuUrl : bundleUrl, external: true,
       }));

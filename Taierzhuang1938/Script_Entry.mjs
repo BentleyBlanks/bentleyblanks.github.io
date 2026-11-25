@@ -1,7 +1,11 @@
-import {IsMenuStartup} from './Data_StartupRouting.mjs';
+import {IsMenuStartup, LocalControlCenterUrl} from './Data_StartupRouting.mjs';
 
 try {
-  if (IsMenuStartup(new URLSearchParams(location.search))) {
+  const params = new URLSearchParams(location.search);
+  const controlCenter = LocalControlCenterUrl(location.href, params);
+  if (controlCenter) {
+    location.replace(controlCenter);
+  } else if (IsMenuStartup(params)) {
     await import('./Script_MenuStartup.mjs');
   } else {
     // Preserve the flat development preload graph only for a real game/developer entry.

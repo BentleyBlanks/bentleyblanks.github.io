@@ -70,8 +70,7 @@ function OpenTool(id) {
   const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('editor', 'tools'); url.searchParams.set('tool', id);
   location.assign(url.href);
 }
-// 高级工具要游戏宿主：标题菜单不装编辑器，点了才带 editor=tools 换到游戏入口。剔除开发工具后不响应。
-// 不带关卡参数 = 工具首页：不建任何关卡，等人自己选工具（Data_ToolsHome）。
+// 总入口交给 Script_Entry：本地进控制中心，发布版进游戏内工具首页。剔除开发工具后不响应。
 function OpenTools() {
   if (!DEV_TOOLS_ENABLED) return;
   const url = new URL(SandboxUrl(location.href, null)); url.searchParams.set('editor', 'tools');
@@ -81,7 +80,7 @@ function OpenTools() {
 const DebugToolStates = () => DEBUG_TOOL_IDS.map(id => ({id, on: false, available: false}));
 document.addEventListener('keydown', event => {
   if (event.code === 'Backquote' && !event.repeat && !settings.IsOpen && !event.target.closest?.('input, textarea, select')) {
-    // Developer tools need the game host; load it only after this explicit shortcut.
+    // Route to the developer tools only after this explicit shortcut.
     if (!DEV_TOOLS_ENABLED) return;
     event.preventDefault();
     OpenTools();
