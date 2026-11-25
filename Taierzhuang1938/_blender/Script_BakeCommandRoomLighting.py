@@ -56,7 +56,7 @@ for mat in bpy.data.materials:
     tree=mat.node_tree
     for node in tree.nodes:node.select=False
     node=tree.nodes.new('ShaderNodeTexImage');node.name='CommandRoomBakedLighting';node.image=atlas;node.select=True;tree.nodes.active=node
-scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=512;scene.cycles.use_denoising=True
+scene.render.engine='CYCLES';scene.cycles.device='CPU';scene.cycles.samples=384;scene.cycles.use_denoising=True
 scene.render.bake.use_pass_direct=True;scene.render.bake.use_pass_indirect=True;scene.render.bake.use_pass_color=False
 scene.render.bake.margin=3;scene.render.bake.margin_type='EXTEND';scene.render.bake.use_clear=True
 # Sewing thread is below the atlas texel size. Baking its hairline shadow creates
@@ -70,9 +70,27 @@ finally:
 raw=SOURCE/'Textures'/'Texture_CommandRoomLighting.exr'
 atlas.filepath_raw=str(raw);atlas.file_format='OPEN_EXR';atlas.save()
 pixels=np.empty(len(atlas.pixels),dtype=np.float32);atlas.pixels.foreach_get(pixels)
-pixels=pixels.reshape((-1,4));peak=float(pixels[:,:3].max())
-assert peak<32.0, f'Lighting exceeds the fixed /32 encoding: {peak}'
-pixels[:,:3]/=32.0;pixels[:,3]=1
+hdr=pixels.reshape((2048,2048,4))[:,:,:3].copy()
+# Cycles bake(type='DIFFUSE') does not run OIDN on baked maps; strip Monte Carlo
+# indirect-GI RGB speckle in linear HDR space while preserving UV chart borders
+# and sharp shadow edges via separable edge-preserving bilateral filtering.
+valid=(hdr.max(axis=2)>1e-6).astype(np.float32)
+for _ in range(2):
+    for axis in (1,0):
+        acc=np.zeros_like(hdr);wsum=np.zeros(hdr.shape[:2],dtype=np.float32)
+        cLuma=np.maximum(hdr.mean(axis=2),1e-4)
+        for d in range(-4,5):
+            sw=math.exp(-(d*d)/(2*2.4*2.4))
+            sh=np.roll(hdr,d,axis=axis);sv=np.roll(valid,d,axis=axis)
+            sLuma=np.maximum(sh.mean(axis=2),1e-4)
+            rel=np.abs(sLuma-cLuma)/np.maximum(cLuma,sLuma)
+            w=sw*np.exp(-(rel*rel)/(2*0.42*0.42))*sv
+            acc+=sh*w[:,:,None];wsum+=w
+        hdr=np.where((wsum>1e-6)[:,:,None]&(valid>0.5)[:,:,None],acc/np.maximum(wsum,1e-6)[:,:,None],hdr)
+peak=float(hdr.max())
+assert peak<16.0, f'Lighting exceeds the fixed /16 encoding: {peak}'
+pixels=pixels.reshape((2048,2048,4))
+pixels[:,:,:3]=hdr/16.0;pixels[:,:,3]=1
 atlas.pixels.foreach_set(pixels.ravel());atlas.update()
 png=SOURCE/'Textures'/'Texture_CommandRoomLighting.png'
 scene.view_settings.view_transform='Standard';scene.view_settings.look='None';scene.view_settings.exposure=0;scene.view_settings.gamma=1
@@ -103,7 +121,7 @@ for mat in bpy.data.materials:
 bpy.ops.export_scene.gltf(filepath=str(GAME/'Model'/'Model_CommandRoom.glb'),export_format='GLB',use_selection=True,export_cameras=True,export_lights=False,export_animations=False,export_extras=True,export_texcoords=True,export_image_format='NONE',export_vertex_color='ACTIVE')
 for mat,a,b in links:mat.node_tree.links.new(a,b)
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Scene_CommandRoom.blend'))
-record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':512,'encoding':'sRGB(linear diffuse irradiance / 32)','scale':32,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'relativeTexelDensity':density}
+record={'source':str(raw),'deliveryInput':str(png),'size':[2048,2048],'samples':384,'encoding':'sRGB(linear diffuse irradiance / 16)','scale':16,'peakLinear':peak,'uvChannel':1,'meshes':len(objects),'noAlbedo':True,'denoisedHdrBilateral':True,'relativeTexelDensity':density}
 (GAME/'_shots'/'CommandRoom'/'Data_CommandRoomLighting.json').write_text(json.dumps(record,indent=2),encoding='utf-8')
 print(json.dumps(record))
 result=record

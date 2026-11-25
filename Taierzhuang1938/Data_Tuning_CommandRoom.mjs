@@ -1,23 +1,23 @@
 // Dedicated static menu set. Values are authored against the three approved references.
 export const COMMAND_ROOM = Object.freeze({
-  version: "202611260030",
+  version: "202611260120",
   model: "./Model/Model_CommandRoom.glb",
   background: 0x26292c,
   cameraNear: 0.05,
   cameraFar: 80,
-  exposure: 1.85,
-  depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .12, focusPadding: .025,
-    aperture: 10, maxRadius: 3.2,
+  exposure: 2.02,
+  depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .18, focusPadding: .025,
+    aperture: 4.5, maxRadius: 1.35,
     panelBlur: 7.5, transitionSeconds: .18 }),
   parallax: Object.freeze({ horizontal: .0425, vertical: .0225, focusDistance: 1.65, aimFollow: .28, responseSeconds: .045 }),
   // UV1 irradiance from Blender Cycles, separate from all surface albedos.
-  bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 32, intensity: 3.141592653589793 }),
-  outside: Object.freeze({ color: 0xdce4ee, intensity: .42 }),
+  bakedLighting: Object.freeze({ name: "CommandRoomLighting", scale: 16, intensity: 3.141592653589793 }),
+  outside: Object.freeze({ color: 0xdce4ee, intensity: .45 }),
   // A one-time capture of this room supplies the ink glass's window reflection.
-  reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 1.8,
-    detailMaterials: Object.freeze(["CommandRoomInkLid", "CommandRoomCapBrass", "CommandRoomCapEnamel"]), detailIntensity: .65 }),
+  reflection: Object.freeze({ material: "CommandRoomInkGlass", size: 256, near: .02, far: 16, intensity: 2.4,
+    detailMaterials: Object.freeze(["CommandRoomInkLid", "CommandRoomCapBrass", "CommandRoomCapEnamel"]), detailIntensity: 1.35 }),
   glass: Object.freeze({ transmission: .99, roughness: .055, thickness: .0035, attenuationColor: 0xbe781f, attenuationDistance: .018 }),
-  cabinet: Object.freeze({ tint: 0xe6e4df, roughness: .98 }),
+  cabinet: Object.freeze({ tint: 0xeeece6, roughness: .98 }),
   materials: Object.freeze([
     { name: "CommandRoomFarmland", kind: "print", normal: 0, tint: 0xffffff },
     { name: "CommandRoomWood", kind: "pbr", normal: 0.45, tint: 0xffffff },

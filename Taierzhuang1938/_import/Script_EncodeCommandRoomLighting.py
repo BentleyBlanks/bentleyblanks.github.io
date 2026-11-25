@@ -13,4 +13,4 @@ with Image.open(args.source) as image:
     rgb.save(target,lossless=True,method=6)
     with Image.open(target) as decoded:
         assert decoded.convert('RGB').tobytes()==rgb.tobytes(), 'Irradiance must round-trip without chroma loss'
-print(json.dumps({'path':str(target),'bytes':target.stat().st_size,'size':[2048,2048],'encoding':'sRGB(linear diffuse irradiance / 32)'}))
+print(json.dumps({'path':str(target),'bytes':target.stat().st_size,'size':[2048,2048],'encoding':'sRGB(linear diffuse irradiance / 16)'}))

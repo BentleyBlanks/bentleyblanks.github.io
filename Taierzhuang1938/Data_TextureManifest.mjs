@@ -253,7 +253,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "CommandRoomLighting", kind: "lightmap", tier: "lazy",
-    packing: "Lossless RGB = sRGB(linear diffuse irradiance / 32); UV1; direct + indirect, no albedo",
+    packing: "Lossless RGB = sRGB(linear diffuse irradiance / 16); UV1; direct + indirect, no albedo",
     bake: "_blender/Script_BakeCommandRoomLighting.py",
     source: { provider: "procedural", date: "2026-10-04", ref: "_blender/Script_BakeCommandRoomLighting.py" },
     consumers: [{ file: "Data_Tuning_CommandRoom.mjs", token: "CommandRoomLighting" }],
