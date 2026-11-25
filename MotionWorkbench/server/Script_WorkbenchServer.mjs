@@ -1268,7 +1268,7 @@ async function handleApi(req, res, urlObj) {
         beat: String(body.beat || ""),
         cameraRule:
           body.cameraRule ||
-          "45°斜向半俯视固定机位 · 纯白无缝背景 · 全程头脚完整入画 · 裸手清晰十指",
+          "45°斜向半俯视固定机位 · 极浅哑光冷灰(#e6e8eb)无缝背景 · 全程头脚完整入画 · 裸手清晰十指",
         description: String(body.description || ""),
         videoPrompt: String(body.videoPrompt || ""),
       },
@@ -1367,9 +1367,10 @@ async function handleApi(req, res, urlObj) {
     const body = await readJsonBody(req);
     const provider = body.provider || state.config.storyboardImageProvider || "seedream";
     const rawPrompt = body.prompt || shot.prompt || task.stage1.videoPrompt;
-    const prompt = rawPrompt.includes("左右分色")
-      ? rawPrompt
-      : `${rawPrompt}。${LIMB_COLOR_SUIT_RULE}，人物全身头顶至双脚完整入画，头脚留白充足，四肢清晰无遮挡。`;
+    const prompt =
+      rawPrompt.includes("解剖左右分色") || rawPrompt.includes("左右分色")
+        ? rawPrompt
+        : `${rawPrompt}。${LIMB_COLOR_SUIT_RULE}，人物全身头顶至双脚完整入画，头脚留白充足，四肢清晰无遮挡。`;
 
     if (action === "quote") {
       if (provider === "seedream") {
