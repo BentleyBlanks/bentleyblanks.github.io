@@ -87,6 +87,8 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
             if ring == paintBand and abs((angle + stopAngle) / 2 - pi / 2) < 0.032:
                 band = "Stripe"
             u0, u1 = angle / (2 * pi), stopAngle / (2 * pi)
+            if band == "Stripe":
+                u0, u1 = ((a - pi / 2 + .032) / .064 for a in (angle, stopAngle))
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
             smooth.append(not toothed)
@@ -113,7 +115,7 @@ def Stem(collection):
         for i in range(count):
             j = (i + 1) % count
             tile = "Channel" if i == 3 else "Recess" if i in (2, 4) else "Edge" if i in (1, 5) else "Stem"
-            u0, u1 = i / count, (i + 1) / count
+            u0, u1 = (0, 1) if tile == "Channel" else (i / count, (i + 1) / count)
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(tile, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
             smooth.append(i >= 7)

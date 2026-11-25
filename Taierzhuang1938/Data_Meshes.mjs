@@ -223,15 +223,15 @@ export const MESHES = {
 
   Type89Launcher: {
     file: "Model_Type89Launcher.tzm.json", category: "weapon",
-    version: "type89-launcher-surface-fit-20261126",
+    version: "type89-launcher-neck-detail-20261126",
     triangles: 9700, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["type89LauncherSteel"], mounts: WEAPON_MOUNTS,
     span: [0.12804, 0.06149, 0.413], lengthM: 0.413,
     draws: { high: 1, medium: 1, low: 1 },
     pbrSets: [{ name: "Type89LauncherSteel",
-      albedo: "./Texture/Texture_Type89LauncherSteelBase.webp?v=type89-surface-registration-20261126",
-      normal: "./Texture/Texture_Type89LauncherSteelNormal.webp?v=type89-surface-registration-20261126",
-      orm: "./Texture/Texture_Type89LauncherSteelOrm.webp?v=type89-surface-registration-20261126" }],
+      albedo: "./Texture/Texture_Type89LauncherSteelBase.webp?v=type89-neck-detail-20261126",
+      normal: "./Texture/Texture_Type89LauncherSteelNormal.webp?v=type89-neck-detail-20261126",
+      orm: "./Texture/Texture_Type89LauncherSteelOrm.webp?v=type89-neck-detail-20261126" }],
     note: "按馆藏照片重建的八九式重掷弹筒游戏外观。窄长钢制支柱、侧面滚花旋钮与弧形驻钣。保留现有手持和预演挂点。",
   },
   Type11: {

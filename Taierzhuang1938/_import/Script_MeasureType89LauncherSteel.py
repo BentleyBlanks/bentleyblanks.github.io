@@ -115,7 +115,8 @@ def ShoeFinish(folder):
 def NeckFinish(folder):
     image, source = Photo(folder, 6)
     angles = np.linspace(-.132, .132, 23)
-    xs = 510 + 431 * np.sin(2 * np.pi * angles)
+    imageCenter, imageRadius = 510, 431
+    xs = imageCenter + imageRadius * np.sin(2 * np.pi * angles)
     ys = np.linspace(468, 186, 21)
     samples = np.array([[Sample(image, x, y, radius=8) for y in ys] for x in xs])
     source["sampleBounds"] = [int(xs[0]), int(ys[-1]), int(xs[-1]), int(ys[0])]
@@ -123,6 +124,31 @@ def NeckFinish(folder):
     lightness = samples @ LUMA
     warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
     field["oxideCoverage"] = np.rint(100 * np.clip((warmth - .15) / .29, 0, 1)).astype(int).tolist()
+    # The five strokes use the photographed outline and its uneven baseline.
+    # All coordinates are pixels in the local reference photograph.
+    field["stampTrace"] = {
+        "bounds": [208, 286, 729, 413],
+        "imageCenter": imageCenter, "imageRadius": imageRadius,
+        "imageYForVRange": [int(ys[0]), int(ys[-1])],
+        "axialCenterImageY": 346,
+        "axialScale": .447,
+        "strokes": [
+            [8, [[251, 296], [241, 311], [231, 331], [222, 351], [243, 351], [275, 349]]],
+            [7, [[251, 299], [255, 320], [259, 346], [260, 370]]],
+            [8, [[366, 304], [353, 319], [340, 341], [327, 360], [357, 360], [388, 359]]],
+            [7, [[366, 306], [366, 332], [365, 358], [365, 383]]],
+            [8, [[460, 310], [443, 312], [431, 322], [425, 341], [425, 363],
+                 [431, 381], [444, 393], [462, 396], [478, 392], [491, 379], [497, 359],
+                 [496, 339], [490, 323], [478, 313], [460, 310]]],
+            [8, [[543, 328], [550, 316], [563, 308], [581, 307], [597, 311], [609, 320],
+                 [613, 333], [607, 347], [592, 357], [574, 368], [557, 378],
+                 [542, 390], [565, 390], [589, 389], [617, 389]]],
+            [7, [[654, 324], [663, 313], [676, 307], [690, 306], [704, 310], [712, 321],
+                 [712, 333], [701, 342], [685, 348], [667, 351]]],
+            [8, [[686, 348], [703, 350], [713, 358], [716, 370], [711, 381], [700, 389],
+                 [687, 393], [672, 392], [658, 386], [652, 377]]],
+        ],
+    }
     return field
 
 

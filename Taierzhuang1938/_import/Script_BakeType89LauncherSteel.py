@@ -30,7 +30,7 @@ FINISHES = {
     "Tab": (2, (154, 151, 141), (66, 57, 48), .53, (.35, .66), (.97, .43), .74),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
-    "Neck": (2, (148, 144, 131), (60, 51, 43), .55, (.34, .70), (.94, .34), .77),
+    "Neck": (2, (142, 138, 125), (60, 51, 43), .55, (.385, .70), (.94, .34), .77),
     "Recess": (1, (41, 39, 36), (24, 22, 20), .61, (.67, .85), (.32, .16), .28),
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
@@ -41,7 +41,7 @@ FINISHES = {
 REGISTERED_FINISHES = {
     "Stem": ((177, 162, 144), "rubbedCoverage", .406, .84, .49, .43),
     "Saddle": ((121, 105, 82), "oxideCoverage", .74, .31, .65, .16),
-    "Neck": ((125, 101, 79), "oxideCoverage", .651, .47, .65, .15),
+    "Neck": ((124, 100, 75), "oxideCoverage", .708, .46, .65, .15),
 }
 
 
@@ -119,6 +119,34 @@ def Engraving(size, center, width, height):
             closest = [(x + step * (index + px * .83), y + py * height) for px, py in stroke]
             draw.line(closest, fill=255, width=max(1, round(height * .063)), joint="curve")
     return np.asarray(image.filter(ImageFilter.GaussianBlur(max(.5, height * .022))), dtype=np.float32) / 255
+
+
+def TracedNeckStamp(data, xx, vv):
+    trace = data["stampTrace"]
+    left, top, right, bottom = trace["bounds"]
+    scale = 3
+    image = Image.new("L", ((right-left)*scale, (bottom-top)*scale))
+    draw = ImageDraw.Draw(image)
+    for width, points in trace["strokes"]:
+        path = [((x-left)*scale, (y-top)*scale) for x, y in points]
+        draw.line(path, fill=255, width=width*scale, joint="curve")
+    field = np.asarray(image.filter(ImageFilter.GaussianBlur(1.35*scale)), dtype=np.float32) / 255
+
+    footprint = data["footprint"]
+    angular = xx[0] - footprint["uCenter"]
+    imageX = trace["imageCenter"] + trace["imageRadius"] * np.sin(2*np.pi*angular)
+    v0, v1 = footprint["vRange"]
+    y0, y1 = trace["imageYForVRange"]
+    pivot = v0 + (trace["axialCenterImageY"]-y0) * (v1-v0) / (y1-y0)
+    # Preserve the on-screen stamp proportions in the registered neck view.
+    sampledV = pivot + (vv[:, 0]-pivot) / trace["axialScale"]
+    imageY = y0 + (y1-y0) * (sampledV-v0) / (v1-v0)
+    columns = (imageX-left)*scale
+    rows = (imageY-top)*scale
+    across = np.array([np.interp(columns, np.arange(field.shape[1]), line, left=0, right=0) for line in field])
+    mask = np.array([np.interp(rows, np.arange(field.shape[0]), line, left=0, right=0) for line in across.T]).T
+    mask[:, np.abs(angular) > footprint["uHalfSpan"]] = 0
+    return mask.astype(np.float32)
 
 
 def SampleTile(sample, width, height, index):
@@ -221,13 +249,13 @@ def BakeRegion(name, sample, size, index, reference):
         heightField += .31 * shadowRibs
     if name in ("Barrel", "Neck"):
         stamp = (Engraving(size, (.398, .190), .245, .026) if name == "Barrel"
-                 else Engraving(size, (.642, .510), .23, .072))
+                 else TracedNeckStamp(closeup, xx, vv))
         rim = GaussianPeriodic(stamp, 1.5) - stamp * .54
         if name == "Neck":
-            heightField -= .99 * stamp
-            tonalDelta += 6 * rim - 27 * stamp
-            oxidation += .21 * stamp
-            roughnessDelta += .05 * stamp
+            heightField -= .84 * stamp
+            tonalDelta += 8 * rim - 17.5 * stamp
+            oxidation += .14 * stamp
+            roughnessDelta += .044 * stamp
         else:
             heightField -= .57 * stamp
             tonalDelta += 6 * rim - 10 * stamp
