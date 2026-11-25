@@ -78,6 +78,123 @@ def FollowFrontBandOutline(streams, bandBounds):
     return ShapeFrontBandFace(shaped, bandBounds)
 
 
+def InsertTimberSections(streams, indices, sections):
+    """Split crossing triangles without moving UVs or other vertex fields."""
+    values = {key: list(array) for key, array in streams.items()}
+    faces = indices.reshape(-1, 3).tolist()
+    for z in sections:
+        cuts, clipped = {}, []
+        for face in faces:
+            depths = [values['POSITION'][index][2] for index in face]
+            if not min(depths) < z < max(depths):
+                clipped.append(face)
+                continue
+            sides = [[], []]
+            for first, second in zip(face, face[1:] + face[:1]):
+                a, b = values['POSITION'][first][2], values['POSITION'][second][2]
+                if a <= z:
+                    sides[0].append(first)
+                if a >= z:
+                    sides[1].append(first)
+                if not min(a, b) < z < max(a, b):
+                    continue
+                edge = tuple(sorted((first, second)))
+                if edge not in cuts:
+                    cuts[edge] = len(values['POSITION'])
+                    t = (z - a) / (b - a)
+                    for array in values.values():
+                        array.append(array[first] + (array[second] - array[first]) * t)
+                for side in sides:
+                    side.append(cuts[edge])
+            for side in sides:
+                clipped.extend([side[0], side[i], side[i+1]] for i in range(1, len(side)-1))
+        faces = clipped
+    return ({key: np.asarray(array, dtype=streams[key].dtype) for key, array in values.items()},
+            np.asarray(faces, dtype=indices.dtype).reshape(-1, 1))
+
+
+def SmoothWeight(t):
+    t = np.clip(t, 0., 1.)
+    return t*t*(3.-2.*t), 6.*t*(1.-t)
+
+
+def SetTimberFrames(streams, jacobian):
+    normals = np.linalg.solve(jacobian.transpose(0,2,1), streams['NORMAL'][:, :, None])[:, :, 0]
+    normals /= np.linalg.norm(normals, axis=1)[:, None]
+    streams['NORMAL'] = normals.astype('<f4')
+    if 'TANGENT' in streams:
+        tangent = streams['TANGENT'].copy()
+        direction = np.einsum('ijk,ik->ij', jacobian, tangent[:, :3])
+        direction -= (direction*normals).sum(axis=1)[:, None]*normals
+        tangent[:, :3] = direction / np.linalg.norm(direction, axis=1)[:, None]
+        tangent[:, 3] = np.where(tangent[:, 3] < 0, -1., 1.)
+        streams['TANGENT'] = tangent
+
+
+def SeatFrontBandTimber(streams, indices, bounds):
+    """Seat the lower oval below the steel over the full width of the band."""
+    low, high = bounds
+    streams = FollowFrontBandOutline(streams, bounds)
+    cutPlanes = (low[2]+.004, low[2]+.010, high[2]+.001, high[2]+.015)
+    streams, indices = InsertTimberSections(streams, indices, cutPlanes)
+    points = streams['POSITION'].astype(np.float64)
+    x, y, z = points.T.copy()
+    entry, entrySlope = SmoothWeight((z-low[2])/.012)
+    exit, exitSlope = SmoothWeight((high[2]+.018-z)/.016)
+    lower, lowerSlope = SmoothWeight((.033-y)/.009)
+    side, sideSlope = SmoothWeight((abs(x)-.005)/.006)
+    flank = .18+.82*side
+    scale = 1.-.083*entry*exit*lower*flank
+    dx = -.083*entry*exit*lower*.82*sideSlope*np.sign(x)/.006
+    dy = .083*entry*exit*lowerSlope*flank/.009
+    dz = -.083*lower*flank*(entrySlope*exit/.012-entry*exitSlope/.016)
+    height = y-.027
+    jacobian = np.broadcast_to(np.eye(3), (len(points), 3, 3)).copy()
+    jacobian[:, 0, 0] = scale+x*dx
+    jacobian[:, 0, 1] = x*dy
+    jacobian[:, 0, 2] = x*dz
+    jacobian[:, 1, 0] = height*dx
+    jacobian[:, 1, 1] = scale+height*dy
+    jacobian[:, 1, 2] = height*dz
+    points[:, 0], points[:, 1] = x*scale, .027+height*scale
+    streams['POSITION'] = points.astype('<f4')
+    SetTimberFrames(streams, jacobian)
+    return streams, indices
+
+
+def SeatRearBandTimber(name, streams):
+    """Carry the ends of the three cosmetic wood shells under the metal lips."""
+    settings = {'FrontWood_ContinuousOval': (-.59150, .00205, 1., .022),
+                'MainWood_ContinuousLowerShoulder': (-.57813, .00300, -1., .030),
+                'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront': (-.57900, .00205, -1., .045)}
+    if name not in settings:
+        return streams
+    end, reach, direction, inset = settings[name]
+    points = streams['POSITION'].astype(np.float64)
+    x, _, z = points.T.copy()
+    fade = .010
+    amount, slope = SmoothWeight(1. + direction*(z-end)/fade)
+    slope *= direction/fade
+    scale = 1.-inset*amount
+    points[:, 0] = x*scale
+    points[:, 2] = z+direction*reach*amount
+    jacobian = np.broadcast_to(np.eye(3), (len(points), 3, 3)).copy()
+    jacobian[:, 0, 0] = scale
+    jacobian[:, 0, 2] = -inset*x*slope
+    jacobian[:, 2, 2] = 1.+direction*reach*slope
+    # Preserve the original vertex streams outside the joint.
+    mask = amount > 0.
+    seated = {**streams, 'POSITION': points.astype('<f4')}
+    for semantic in ('NORMAL', 'TANGENT'):
+        if semantic in streams:
+            seated[semantic] = streams[semantic].copy()
+    frames = {key: array[mask] for key, array in seated.items() if key in ('NORMAL', 'TANGENT')}
+    SetTimberFrames(frames, jacobian[mask])
+    for key, array in frames.items():
+        seated[key][mask] = array
+    return seated
+
+
 def ShapeStockEnd(name, streams, bounds):
     """Round the assembled rear outline using a common, fading lattice bend."""
     if not name.startswith(('MainWood_', 'ButtCap_')):

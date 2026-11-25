@@ -44,7 +44,7 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
   assert.equal(Math.abs(ts[i][3]),1);
  }
 }
-assert.equal(triangles,report.triangles);assert.equal(triangles,77396);
+assert.equal(triangles,report.triangles);assert.equal(triangles,79009);
 assert.equal(doc.asset.extras.gameTriangles,triangles);
 assert.equal(report.exteriorFinish.triangleLimit,80000);assert(triangles<=report.exteriorFinish.triangleLimit);
 for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
@@ -54,12 +54,19 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 const detailCharts=new Set(['HY150_ExteriorSideRelief_Neg','HY150_ExteriorSideRelief_Pos','HY151_LowRearShoulder','Trigger_FlatCurvedExternalStrip']);
 const heelName='RearBand_ExternalAttachmentBridge';
-const contactImages=new Set(['ButtCap_LimitedProfileBlend_ORM','LongOuterSteel_TrueRound_ORM']);
-const retainedImages=report.texturePayloads.filter(image=>!image.name.startsWith('FrontBand_')
- && !D.wood.some(part=>image.name.startsWith(part+'_')) && !contactImages.has(image.name))
+const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat']);
+const refinishedSteel=new Set(['HandledCylinder','HandleNeck','HandleRoot','RearSmallCover','RearSmallPin',
+ 'RearCockingExterior','RearOuterCover_RoundedSideReturn','RearTopExternalLever',
+ 'ReceiverOuterCollar','RearBand_ControlledCrown',heelName]);
+const contactImages=new Set(['FrontBand_ContinuousEnvelopeContact_ORM','LongOuterSteel_TrueRound_ORM']);
+const retainedImages=report.texturePayloads.filter(({name})=>{
+ const part=name.slice(0,name.lastIndexOf('_'));
+ return !refinishedSteel.has(part)&&!part.startsWith('Sight_')&&!contactImages.has(name)
+  && (!D.wood.includes(part)||name==='MainWood_ContinuousLowerShoulder_OilFilm');
+})
  .map(image=>image.name+':'+image.sha256+'\n').sort();
-assert.equal(retainedImages.length,118);
-assert.equal(createHash('sha256').update(retainedImages.join('')).digest('hex'),'5d3fce8cdfca6320387323e082cb161d0399e5324007b3dfca86b15c7b9b76ac','untouched R25 texture payloads remain byte-identical');
+assert.equal(retainedImages.length,74);
+assert.equal(createHash('sha256').update(retainedImages.join('')).digest('hex'),'7cd5fe17f2d79f557370773cc8c718a7d488162aac45d373f67d49230f66b695','untouched R26 texture payloads remain byte-identical');
 assert.equal(doc.asset.extras.calibratedBaseColor,true);
 assert(doc.materials.every(mat=>(mat.pbrMetallicRoughness.baseColorFactor||[1,1,1,1]).every(v=>v===1)),'native albedo is stored in the texture');
 // Compare real surface samples with R23 after its calibrated linear multiplier.
@@ -113,7 +120,7 @@ for(const part of report.parts){
   assert(delta.toR2M<.005&&delta.fromR2M<.005&&Math.max(delta.toR2M,delta.fromR2M)>.001,part.part);
   continue;
  }
- if(part.part===frontWood){assert(delta.toR2M>.018&&delta.toR2M<.019&&delta.fromR2M<.002);continue;}
+ if(part.part===frontWood){assert(delta.toR2M>.018&&delta.toR2M<.019&&delta.fromR2M<.003);continue;}
  if(part.part==='UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'){
   assert(delta.fromR2M>.0045&&delta.fromR2M<.0056&&delta.toR2M<.0055,'the visible timber shoulder is deliberately lowered');
   const timber=doc.nodes.find(node=>node.name===part.part),coords=Read(doc.meshes[timber.mesh].primitives[0].attributes.POSITION);
@@ -234,7 +241,6 @@ const impressed=wearLandmarks.map(([section,height])=>ForeFinishAt(section,heigh
 const surrounding=wearLandmarks.map(([section,height])=>ForeFinishAt(section+.014,height+.095));
 assert(impressed.every(([film])=>film<20),'both branches of the fork and the other registered impressions interrupt the oil film on the actual UV islands');
 assert(MedianOil(impressed.map(v=>v[1]))>MedianOil(surrounding.map(v=>v[1]))+17,'abraded fibre beds remain rougher than the surrounding satin finish');
-foreSurface.dispose();foreMesh.material.dispose();
 function MedianOil(samples){return samples.sort((left,right)=>left-right)[Math.floor(samples.length/2)];}
 const baselineSurface=createHash('sha256');
 const frontBandPrimitive=doc.meshes[doc.nodes.find(node=>node.name==='FrontBand_ContinuousEnvelopeContact').mesh].primitives[0];
@@ -246,7 +252,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  const primitive=doc.meshes[node.mesh].primitives[0],attrs=primitive.attributes;
  const indexAccessor=doc.accessors[primitive.indices],indexData=Payload(indexAccessor.bufferView);
  const IndexAt=offset=>indexAccessor.componentType===5125?indexData.readUInt32LE(offset*4):indexData.readUInt16LE(offset*2);
- if(!/^(MainWood_|FrontWood_|FrontBand_)/.test(node.name)){
+ if(!D.wood.includes(node.name)&&node.name!==heelName&&!bevelParts.has(node.name)){
   baselineSurface.update(indexData);
   for(const semantic of ['POSITION','NORMAL','TEXCOORD_0','TANGENT'])baselineSurface.update(Payload(doc.accessors[attrs[semantic]].bufferView));
  }
@@ -278,7 +284,11 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  }
 
 }
-assert.equal(baselineSurface.digest('hex'),'0bee4319f970847f21d16f48067e66b25bf8ae8aa739ffad75648a6be316b60f','meshes outside the three local contour edits retain their R25 streams');
+assert.equal(baselineSurface.digest('hex'),'314528f95f33158739280cc4f97faaff0708c2198e14d2508cb1e54e29e893d1','meshes outside the seating, trim and bevel edits retain their R26 streams');
+assert.deepEqual(new Set(Object.keys(report.exteriorFinish.inspectionBevels)),bevelParts);
+for(const [name,{before,after}] of Object.entries(report.exteriorFinish.inspectionBevels)){
+ assert(after!==before&&report.parts.find(part=>part.part===name).gameTriangles===after,name+' exports the rounded edges');
+}
 assert.deepEqual(report.exteriorFinish.closedFittings,{RearBand_ExternalAttachmentBridge:{before:18,after:76},RearStock_ExternalAttachmentBridge:{before:18,after:68}});
 for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachmentBridge'))){
  const prim=doc.meshes[node.mesh].primitives[0],positions=Read(prim.attributes.POSITION),uvs=Read(prim.attributes.TEXCOORD_0),indices=doc.accessors[prim.indices],bytes=Payload(indices.bufferView),edges=new Map();
@@ -412,6 +422,42 @@ for(let i=1;i<32;i++){
  assert(SliceDepth(forePrimitive,forePos,1,level).near>=SliceDepth(frontBandPrimitive,bandVertices,1,level).near-1e-6,'timber stays within the visible outer curve at each sampled height');
 }
 assert(Math.abs(nose.min.z-frontBand.min.z)<.002,'front wood visually fills the band instead of stopping behind it');
+
+function SeamSurface(name){
+ const node=doc.nodes.find(item=>item.name===name);
+ const primitive=doc.meshes[node.mesh].primitives[0],indices=doc.accessors[primitive.indices];
+ const geometry=new THREE.BufferGeometry();
+ geometry.setAttribute('position',new THREE.Float32BufferAttribute(Read(primitive.attributes.POSITION).flat(),3));
+ const bytes=Payload(indices.bufferView),width=indices.componentType===5125?4:2;
+ geometry.setIndex(Array.from({length:indices.count},(_,i)=>bytes.readUIntLE((indices.byteOffset||0)+i*width,width)));
+ return new THREE.Mesh(geometry,foreMesh.material);
+}
+
+function CheckBandSeating(band,wood,depths,section){
+ const ray=new THREE.Raycaster();
+ for(const depth of depths){
+  for(let i=0;i<72;i++){
+   const angle=(i+.5)*Math.PI/36;
+   const outward=new THREE.Vector3(Math.cos(angle),Math.sin(angle),0);
+   ray.set(new THREE.Vector3(0,.027,depth).addScaledVector(outward,.05),outward.clone().negate());
+   const steel=ray.intersectObject(band,false)[0];
+   const timber=ray.intersectObjects(wood,false)[0];
+   assert(steel&&timber,`${section}: each sampled cross-section meets both surfaces`);
+   assert(timber.distance>steel.distance+.00005,`${section}: timber intersects the exposed face at ${angle}`);
+  }
+ }
+}
+
+// Side-on projections miss a low shoulder slipping through the band.
+const frontSeam=SeamSurface('FrontBand_ContinuousEnvelopeContact');
+const rearSeam=SeamSurface('RearBand_ControlledCrown');
+const lowerTimber=SeamSurface('MainWood_ContinuousLowerShoulder');
+const upperTimber=SeamSurface('UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront');
+CheckBandSeating(frontSeam,[foreMesh],Array.from({length:17},(_,i)=>-.9073+i*.00094),'front band');
+CheckBandSeating(rearSeam,[foreMesh],[-.5905,-.5900],'fore-end under the rear band');
+CheckBandSeating(rearSeam,[lowerTimber,upperTimber],[-.5803,-.5797],'stock under the rear band');
+for(const mesh of [frontSeam,rearSeam,lowerTimber,upperTimber,foreMesh])mesh.geometry.dispose();
+foreMesh.material.dispose();
 assert(cheeks.every(p=>Math.abs(p.x)>.009),'protective cheeks leave the central cocking body exposed');
 const cap=PartPositions('RearSmallCover'),capBox=new THREE.Box3().setFromPoints(cap),capSize=capBox.getSize(new THREE.Vector3());
 assert(capSize.x>.015&&capSize.y>.015,'rear disc has a complete circular silhouette');

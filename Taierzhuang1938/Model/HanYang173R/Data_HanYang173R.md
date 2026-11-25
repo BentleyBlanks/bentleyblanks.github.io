@@ -5,7 +5,7 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **77,396 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
+- Game geometry: **79,009 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
 - R3 uses a unique atlas for each of the three wood pieces and keeps the grain lengthwise on the sides and samples the caps in the same object-space coordinates. Base colour, roughness/metalness and tangent-space normals are baked from a continuous object-space finish into the final UVs. The steel is darker in protected regions; age and wear vary across its surface rather than following the mesh triangles.
 - The exterior revisions shape the wood shoulder and nose, the two band profiles and the rounded rear outline. The surface-distance record compares digital meshes. The historical photographs supply visual references.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
@@ -168,6 +168,14 @@ The three timber atlases share an object-space walnut stain and grain field. Loc
 
 The front band has a taller outline and a flatter lower turn, based on the published front-band photograph. The wood end follows the visible shell. The assembled end is an estimate informed by the side photograph. At the butt, the wood sits beneath the backplate surface. See the `FrontSeam` and `ButtCap` views in the Blender review. [Xu Jilin, Chinese National Geography gallery](https://www.dili360.com/ch/mag/detail/62.htm) · [Steven Lu, side photograph](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
 
+### R27 inspection bench details
+
+The front forearm has local support sections that seat its lower shoulder under the band throughout the joint. The three timber ends meet the rear band under its lips. The narrower lower trim and the resting loop follow the visible outline in the side photograph. The viewing angle and the visible contours guided the trim and bevels. [Steven Lu, length comparison](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg)
+
+The exposed action, handle stem and tail use lower-contrast satin steel with fine pitting. The stock's side glyph is removed from pigment, roughness and normals. Blender bevels and new UV/tangent frames give the sight and raised receiver edges a narrow glint. The material study combines the visible steel from the museum specimen and the sight in Lu's upper-surface photograph. The photographed wear and the game lighting give different highlights. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
+
+The asset test casts rays across both band joints, including oblique directions around the front band. Matched camera captures from the actual inspection bench and its Albedo, Roughness and Reflection views are in the archive's `Review` folder.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
@@ -180,6 +188,7 @@ Under the external source directory, `ExteriorFinish_20261122/Input_R2.glb` and 
 node scripts/Script_BlenderMcp.mjs start --task HanYangExterior
 node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangExterior.py --timeout 600
 node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangExteriorAudit.py --timeout 240
+node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangInspectionBevel.py --timeout 240
 node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangContactBake.py --timeout 600
 node scripts/Script_BlenderMcp.mjs exec --file Taierzhuang1938/_blender/Script_HanYangDetailUv.py --timeout 600
 python Taierzhuang1938/_import/Script_HanYangScanLibrary.py

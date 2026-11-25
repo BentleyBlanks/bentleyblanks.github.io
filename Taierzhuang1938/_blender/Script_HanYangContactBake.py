@@ -80,7 +80,7 @@ importDirectory=Path.cwd()/'Taierzhuang1938/_import'
 assert (importDirectory/'Script_HanYangTimberFrames.py').is_file(),'Start the owned Blender session from the worktree root'
 sys.path.insert(0,str(importDirectory))
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
-from Script_HanYangBandProfiles import FollowFrontBandOutline, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBandProfiles import SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 incoming = ReadMesh(revision/'Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
 approved = ReadMesh(revision/'Input_ExteriorGeometry.glb', 'e125056b12391f022f7e22969bb3acdf192295be711995b6ac43b958b31f47ec')
 charts = json.loads((revision/'Data_Charts.json').read_text())
@@ -108,13 +108,21 @@ stock['sourceVertex']=np.arange(len(positions))
 stock,faces,_=RepairTimberFrames(stockName,stock,faces)
 timber[stockName]=timber[stockName][stock['sourceVertex']]
 parts[stockName]=stock['POSITION'],stock['NORMAL'],faces
-np.savez_compressed(revision/'Data_TimberHandling.npz', **timber)
 bandPoints=parts['FrontBand_ContinuousEnvelopeContact'][0].astype(np.float64)
 bandBounds=(bandPoints.min(axis=0),bandPoints.max(axis=0))
-name='FrontWood_ContinuousOval'
-positions,normals,faces=parts[name]
-shaped=FollowFrontBandOutline({'POSITION':positions,'NORMAL':normals},bandBounds)
-parts[name]=shaped['POSITION'],shaped['NORMAL'],faces
+for name in timber:
+    positions, normals, faces = parts[name]
+    streams = {'POSITION': positions, 'NORMAL': normals}
+    if name == 'FrontWood_ContinuousOval':
+        streams['handling'] = timber[name]
+        streams, faces = SeatFrontBandTimber(streams, faces, bandBounds)
+        timber[name] = streams.pop('handling')
+    streams = SeatRearBandTimber(name, streams)
+    parts[name] = streams['POSITION'], streams['NORMAL'], faces.reshape(-1, 3)
+np.savez_compressed(revision/'Data_TimberHandling.npz', **timber)
+with np.load(revision/'Data_InspectionBevels.npz', allow_pickle=False) as bevels:
+    name = 'ReceiverOuterCollar'
+    parts[name] = bevels[name+'_POSITION'], bevels[name+'_NORMAL'], bevels[name+'_indices'].reshape(-1, 3)
 for name in ('FrontBand_ContinuousEnvelopeContact', 'RearBand_ControlledCrown'):
     positions, normals, faces = parts[name]
     shaped = ShapeBandProfile(name, {'POSITION': positions, 'NORMAL': normals})
