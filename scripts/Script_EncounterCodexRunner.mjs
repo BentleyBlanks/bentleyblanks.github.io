@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { createRequire } from "node:module";
@@ -8,12 +8,35 @@ import { createRequire } from "node:module";
 export const ENCOUNTER_CODEX_MODEL = "gpt-6.1-sol";
 export const ENCOUNTER_CODEX_EFFORT = "high";
 
+// The Codex desktop app rewrites thread storage when it updates, and older npm CLIs
+// then fail every thread/resume ("paginated_threads is not supported yet"). Prefer the
+// app's bundled codex.exe, which always matches the stored threads.
+let desktopCommand;
+export function DesktopCodexCommand() {
+  if (process.env.CODEX_CLI_PATH && fs.existsSync(process.env.CODEX_CLI_PATH)) return process.env.CODEX_CLI_PATH;
+  if (process.platform !== "win32") return null;
+  // WindowsApps cannot be listed, so ask the package manager for the install folder (cached).
+  if (desktopCommand === undefined) {
+    try {
+      const folder = execFileSync("powershell.exe", ["-NoProfile", "-Command", "(Get-AppxPackage OpenAI.Codex | Select-Object -First 1).InstallLocation"],
+        { encoding: "utf8", windowsHide: true, timeout: 15000 }).trim();
+      const file = path.join(folder, "app/resources/codex.exe");
+      desktopCommand = folder && fs.existsSync(file) ? file : null;
+    } catch { desktopCommand = null; }
+  }
+  return desktopCommand;
+}
+
 export function SpawnAppServer(rootDir, configArgs = []) {
   const entry = path.join(process.env.APPDATA || "", "npm/node_modules/@openai/codex/bin/codex.js");
+  const desktop = DesktopCodexCommand();
   let command = fs.existsSync(entry) ? process.execPath : process.platform === "win32" ? "codex.exe" : "codex";
   const args = ["app-server", "--listen", "stdio://", ...configArgs];
   let commandArgs = fs.existsSync(entry) ? [entry, ...args] : args;
-  if (process.platform === "win32" && fs.existsSync(entry)) {
+  if (desktop) {
+    command = desktop;
+    commandArgs = args;
+  } else if (process.platform === "win32" && fs.existsSync(entry)) {
     const packageName = `@openai/codex-win32-${process.arch}`;
     const platformRoot = path.dirname(createRequire(entry).resolve(`${packageName}/package.json`));
     const target = process.arch === "arm64" ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
