@@ -2879,36 +2879,11 @@ function BuildMergedScene() {
   ];
 
   // ---------------------------------------------------------------------------
-  // 5B) 河汊子支流南延（z=355..870，绕过北沙河村与铁路涵洞汇入沙河）+ 开阔农田真实 SRTM 微起伏
-  //     严格构建固定 Y 物件 / 村落 / 铁路 / 道路 / 壕沟安全保护掩码，确保零浮空、零埋入、零穿墙。
+  // 5B) 河汊子支流南延（z=355..892，绕过北沙河村与铁路涵洞顺流汇入沙河）+ 开阔农田真实 SRTM 微起伏
+  //     水面统一由河流 Shader 渲染（不再摆悬空刚体水盒），严格构建固定 Y 物件/村落/铁路/道路/壕沟保护掩码。
   // ---------------------------------------------------------------------------
   const geoCtx = BeishaheGeoContext("FirstLevelMerged", { minX, maxX: minX + cols * cellM, minZ: INHERIT_MAX_Z, maxZ: INHERIT_MAX_Z + outRows * cellM });
-  // 1) 河汊子南延水体与铁路涵洞端墙（跳过 x≈-80 铁路路基涵洞段）
-  const branchPts = HECHAZI_MERGED_SOUTH;
-  for (let i = 1; i < branchPts.length; i++) {
-    const [ax, az] = branchPts[i - 1], [bx, bz] = branchPts[i];
-    const segLen = Math.hypot(bx - ax, bz - az);
-    const steps = Math.max(1, Math.ceil(segLen / 18));
-    for (let s = 0; s < steps; s++) {
-      const t0 = s / steps, t1 = (s + 1) / steps;
-      const mx = ax + (bx - ax) * (t0 + t1) * 0.5;
-      const mz = az + (bz - az) * (t0 + t1) * 0.5;
-      if (Math.abs(mx - (-80)) < 7.5 && mz < 450) continue; // 铁路路基涵洞内不摆水面块
-      const len = segLen / steps + 1.8;
-      const yawDeg = Fix(Math.atan2(bx - ax, bz - az) * 180 / Math.PI);
-      ownObjects.push({
-        id: `HechaBranchWater_${i}_${s}`,
-        asset: "Whitebox/Box",
-        material: "Whitebox/Water",
-        pos: [Fix(mx), -1.68, Fix(mz)],
-        size: [9.6, 0.5, Fix(len)],
-        yawDeg,
-        solid: false,
-        group: "08–13合并/地形水系",
-      });
-    }
-  }
-  // 铁路路基两侧石砌涵洞端墙（x = -74.8 / -85.2, z = 412）
+  // 铁路路基两侧石砌涵洞端墙（x = -74.6 / -85.4, z = 412）
   for (const [side, cx] of [["E", -74.6], ["W", -85.4]]) {
     ownObjects.push({
       id: `HechaRailCulvert_${side}`,

@@ -452,8 +452,10 @@ export class FlowPerspectiveView extends FlowMapView {
     this.terrainTriangles=this.raster.triangles;
     cpu?.End();
     cpu?.Begin("静态物件");
+    const gpuRiverShader = this.raster.accelerated && !!this.mapData.terrain?.surfaceMaps?.()?.geo;
     for(const object of [...this.mapData.objects,...this.mapData.farObjects]) {
       if(!VisibleEncounterObject(object,signals)) continue;
+      if(gpuRiverShader && (object.meta?.waterRibbon || (object.material==="Whitebox/Water" && /^(RiverWater|TributaryWater|HechaTailWater|HechaBranchWater|SandRiver)/i.test(object.id||"")))) continue;
       const [x,y,z]=object.pos,[w,h,d]=object.size||[1,1,1];
       const ribbon=object.meta?.waterRibbon;
       if(ribbon) {
