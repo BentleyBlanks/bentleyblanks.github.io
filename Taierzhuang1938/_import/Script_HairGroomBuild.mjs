@@ -813,6 +813,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
   const LiftAt = (p) => { const r = frame.Regions(p), l = style.lift; return Mix(Mix(l.side, l.back, r.back), l.top, r.top); };
   // 1. 导向发丝
   const roots = PoissonRoots(sampler, rng, style.guideSpacing, Weight, 9000);
+  const guideSkin = mesh.boneJoints ? roots.map(root => SampleSkinWeights(mesh, root)) : null;
   const guides = [], guideRoots = [], guideNormals = [], guideComb = [];
   for (const r of roots) {
     const comb = CombDir(style, frame, r.p, r.n);
@@ -849,7 +850,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     const b = BindStrand(s.p, s.n, guideRoots, gGrid, near);
     if (!b) continue;
     const lenScale = Clamp((1 - style.lengthJitter * rng()) * Mix(0.4, 1, Smooth(0, 1, w)), 0.05, 1);
-    strands.push({ ids: b.ids, w: b.w, seed: rng(), len: lenScale });
+    strands.push({ ids: b.ids, w: b.w, seed: rng(), len: lenScale, skin: guideSkin ? SampleSkinWeights(mesh, s) : null });
   }
   for (let i = strands.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [strands[i], strands[j]] = [strands[j], strands[i]]; }
   // 3. 包围盒、消光体素
@@ -894,6 +895,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
   for (let i = 0; i < extBlur.length; i++) density[i] = Math.round(Math.sqrt(extBlur[i] / (extMax || 1)) * 255);   // 开方存，暗部精度够
   // 4. 发片
   const cards = { pos: [], tan: [], nrm: [], uv: [], data: [], idx: [] };
+  if (guideSkin) { cards.boneJoints = []; cards.boneWeights = []; }
   const cfg = style.cards, tileList = tiles[cfg.tile];
   for (let layer = 0; layer < cfg.layers; layer++) {
     const lrng = Rng(HashString(groomId + ':cards:' + layer));
@@ -912,7 +914,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
       });
       const comb = CombDir(style, frame, pk.p, pk.n);
       const edge = Mix(0.55, 1, Smooth(0.25, 0.9, Weight(pk.p, pk.n, pk)));   // 发际线附近的发片窄一些
-      CardStrip(cards, sp, pk.n, comb, cfg.width * Mix(0.8, 1.15, lrng()) * edge, tileList[Math.floor(lrng() * tileList.length)], lrng(), layer / Math.max(1, cfg.layers - 1));
+      CardStrip(cards, sp, pk.n, comb, cfg.width * Mix(0.8, 1.15, lrng()) * edge, tileList[Math.floor(lrng() * tileList.length)], lrng(), layer / Math.max(1, cfg.layers - 1), guideSkin ? SampleSkinWeights(mesh, pk) : null);
     }
   }
   // 5. 头发壳
@@ -947,6 +949,7 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     }
     const net = SurfaceNets(Blur(closed), vn, bmin.map((v) => v + vox * 0.5), vox, 0.5);
     const tan = [], nrm = [], data = [];
+    const hullJoints = [], hullWeights = [];
     const segGrid = new Grid3(0.01);
     guides.forEach((g, gi) => g.forEach((p, k) => segGrid.Add(p, gi * K + k)));
     for (let i = 0; i < net.pos.length; i += 3) {
@@ -955,6 +958,20 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
       for (const id of segGrid.Near(p, 0.012, near)) { const gi = (id / K) | 0, k = id % K; const d = Len(Sub(guides[gi][k], p)); if (d < bd) { bd = d; best = [gi, k]; } }
       let t = [0, -1, 0];
       if (best) { const g = guides[best[0]], k = Math.min(K - 2, best[1]); t = Norm(Sub(g[k + 1], g[k])); }
+      if (guideSkin) {
+        // The density hull is a surface around the guides. Carry the influence of
+        // the closest fibre down its length, including at a closed voxel gap.
+        if (!best) {
+          let closest = 0;
+          for (let gi = 0; gi < guides.length; gi++) for (const point of guides[gi]) {
+            const d = Len(Sub(point, p));
+            if (d < bd) { bd = d; closest = gi; }
+          }
+          best = [closest, 0];
+        }
+        hullJoints.push(...guideSkin[best[0]].joints);
+        hullWeights.push(...guideSkin[best[0]].weights);
+      }
       tan.push(...t); nrm.push(0, 1, 0); data.push(1, 0);
     }
     // 法线：面法线累加
@@ -973,6 +990,10 @@ function BuildHair(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = n
     const baseVertex = shell.pos.length / 3;
     for (const key of ['pos', 'nrm', 'tan', 'data']) shell[key].push(...cap[key]);
     shell.idx.push(...cap.idx.map(index => index + baseVertex));
+    if (guideSkin) {
+      shell.boneJoints = hullJoints.concat(cap.boneJoints);
+      shell.boneWeights = hullWeights.concat(cap.boneWeights);
+    }
     shell.rootCapTriangles = cap.idx.length / 3;
   }
   // 6. 头皮染色片：贴着头皮 0.15 mm，发丝 / 发片档下压暗发根之间透出来的光头皮（UE MetaHuman 靠头皮贴图做同一件事）
@@ -1001,8 +1022,11 @@ function BuildBraid(frame, cfg) {
   const ear = frame.earMask?.marks || frame.m.ear;
   const startY = ear.yMax - cfg.startBelowEar;
   const startZ = frame.m.skullBack + cfg.backOffset;
+  const CenterAt = t => [frame.centerX + cfg.sway * Math.sin(Math.PI * t), startY - cfg.length * t,
+    startZ + cfg.backTravel * Math.pow(t, 1.2)];
   const segments = cfg.segments ?? 96, sides = cfg.sides ?? 8;
   const out = {pos:[], nrm:[], tan:[], data:[], idx:[], progress:[]};
+  out.anchors = [0, .2, .5, 1].map(CenterAt); // pure Head, Neck, Spine2 and Spine1 rings in BindBraidSkin
   for (let strand = 0; strand < 3; strand++) {
     const base = out.pos.length / 3;
     for (let step = 0; step <= segments; step++) {
@@ -1010,9 +1034,8 @@ function BuildBraid(frame, cfg) {
       const phase = Math.PI * 2 * (cfg.turns * t + strand / 3);
       const orbit = cfg.orbit * Smooth(0, .12, t) * (1 - .38 * t);
       const radius = cfg.radius * (1 - .58 * t);
-      const x = frame.centerX + cfg.sway * Math.sin(Math.PI * t) + orbit * Math.cos(phase);
-      const y = startY - cfg.length * t;
-      const z = startZ + cfg.backTravel * Math.pow(t, 1.2) + orbit * Math.sin(phase) * .72;
+      const [cx, y, cz] = CenterAt(t);
+      const x = cx + orbit * Math.cos(phase), z = cz + orbit * Math.sin(phase) * .72;
       const tangent = Norm([cfg.sway * Math.PI * Math.cos(Math.PI * t), -cfg.length, cfg.backTravel * 1.2 * Math.pow(Math.max(t, .001), .2)]);
       for (let side = 0; side < sides; side++) {
         const angle = Math.PI * 2 * side / sides, nx = Math.cos(angle), nz = Math.sin(angle);
@@ -1116,18 +1139,18 @@ function BuildBeard(groomId, style, frame, mesh, sdf, sampler, tiles, exclude = 
   }
   return { cards, stubble, cardCount, maxDroppedWeight };
 }
-function BindBeardSkin(beard, game) {
-  const parts = [beard.cards, beard.stubble].filter(part => part?.boneJoints?.length);
+function BindGroomSkin(game, parts, maxDroppedWeight = 0) {
+  parts = parts.filter(part => part?.boneJoints?.length);
   const used = new Set();
   for (const part of parts) for (let i = 0; i < part.boneJoints.length; i++)
     if (part.boneWeights[i] > 0.001) used.add(part.boneJoints[i]);
   const joints = [...used].sort((a, b) => a - b);
-  if (!joints.length || joints.length > 8) throw new Error(`${game.jointNames[0]}: beard needs ${joints.length} bones (maximum 8)`);
+  if (!joints.length || joints.length > 8) throw new Error(`${game.jointNames[0]}: groom needs ${joints.length} bones (maximum 8)`);
   const palette = new Map(joints.map((joint, index) => [joint, index]));
-  let maxDroppedWeight = beard.maxDroppedWeight;
+
   for (const part of parts) {
     part.boneIndices = []; part.boundWeights = [];
-    for (let vertex = 0; vertex < part.pos.length / 3; vertex++) {
+    for (let vertex = 0; vertex < part.boneWeights.length / 4; vertex++) {
       let kept = 0;
       for (let k = 0; k < 4; k++) {
         const i = 4 * vertex + k, weight = part.boneWeights[i];
@@ -1135,12 +1158,12 @@ function BindBeardSkin(beard, game) {
         part.boundWeights.push(weight > 0.001 ? weight : 0);
         if (weight > 0.001) kept += weight;
       }
-      if (kept <= 0) throw new Error('Beard vertex has no skin weights');
+      if (kept <= 0) throw new Error('Groom vertex has no skin weights');
       maxDroppedWeight = Math.max(maxDroppedWeight, Math.abs(1 - kept));
       for (let k = 0; k < 4; k++) part.boundWeights[4 * vertex + k] /= kept;
     }
   }
-  if (maxDroppedWeight > 0.02) throw new Error(`Beard skin transfer dropped ${(maxDroppedWeight * 100).toFixed(1)}% weight`);
+  if (maxDroppedWeight > 0.02) throw new Error(`Groom skin transfer dropped ${(maxDroppedWeight * 100).toFixed(1)}% weight`);
   return { bones: joints.map(joint => game.jointNames[joint]), attach: joints.map(joint => game.attachBones[joint]), maxDroppedWeight };
 }
 
@@ -1343,10 +1366,39 @@ function TrimmedIcp(src, dst, init, { iterations = 40, keep = 0.6, affine = fals
   }
   return { T, err };
 }
+// These replacement heads have their own closed skin surface. Follow it
+// across UV seams from the registered nose; a nearby cap belongs to a
+// different component even where the two surfaces touch in projection.
+function FaceComponent(mesh, nose) {
+  const { pos, idx } = mesh, count = pos.length / 3;
+  const parents = Int32Array.from({ length: count }, (_, i) => i);
+  function Find(i) {
+    while (parents[i] !== i) { parents[i] = parents[parents[i]]; i = parents[i]; }
+    return i;
+  }
+  for (let t = 0; t < idx.length; t += 3) {
+    const root = Find(idx[t]);
+    parents[Find(idx[t + 1])] = root;
+    parents[Find(idx[t + 2])] = root;
+  }
+  const seams = new Map();
+  let seed = 0, closest = Infinity;
+  for (let i = 0; i < count; i++) {
+    const p = pos.subarray(i * 3, i * 3 + 3);
+    const key = Array.from(p, x => Math.round(x * 1e6)).join(',');
+    if (seams.has(key)) parents[Find(i)] = Find(seams.get(key));
+    else seams.set(key, i);
+    const distance = Len(Sub(p, nose));
+    if (distance < closest) { closest = distance; seed = i; }
+  }
+  const face = Find(seed);
+  return Uint8Array.from(parents, (_, i) => Find(i) === face ? 1 : 0);
+}
 async function GameHeadAssets(def) {
   const t0 = Date.now();
   const lab = HeadAssets(def.labHead);
   const fitHatSeam = def.hairRootFit === 'hatSeam';
+  const fitHeadSurface = def.hairRootFit === 'headSurface';
   const g = await ReadSkinnedGlb(path.join(PROJECT, def.model), fitHatSeam);
   const J = (name) => g.jointNames.findIndex((n) => n === name || n.endsWith(':' + name));
   const head = J('Head'), neck = J('Neck');
@@ -1453,7 +1505,9 @@ async function GameHeadAssets(def) {
       boneJoints: Uint16Array.from(joints2), boneWeights: Float32Array.from(weights2),
       ...(fitHatSeam ? {skinScore: Float32Array.from(color2)} : {}) };
   };
-  const skin = Split(true), cap = Split(false), hairMesh = fitHatSeam ? Split(true, hairV, true) : skin;
+  const faceVertices = fitHeadSurface ? FaceComponent(all, lab.frame.m.noseTip) : skinV;
+  const skin = Split(true), cap = Split(false, faceVertices);
+  const hairMesh = fitHeadSurface ? Split(true, faceVertices) : fitHatSeam ? Split(true, hairV, true) : skin;
   const sdf = new MeshSdf(all);                         // 碰撞：皮肤 + 帽子（帽子是实心的，发丝推到帽子外面）
   const capSdf = cap.idx.length ? new MeshSdf(cap) : null;
   const exclude = capSdf ? (p) => capSdf.Sample(p) < 0.003 || lab.sdf.Sample(p) < -0.004 : null;   // 帽子罩住的、被压进帽壳的头顶
@@ -1470,9 +1524,11 @@ async function GameHeadAssets(def) {
   const attachBones = g.jointNames.map((_, i) => M4.Mul(Array.from(g.ibm.slice(16 * i, 16 * i + 16)), base));
   const attach = attachBones[head];
   console.log(`  game head ${def.id}: ${dst.length} head verts, ICP ${(best.err * 1000).toFixed(2)} mm, scale ${Math.cbrt(Math.abs(S[0] * (S[5] * S[10] - S[9] * S[6]) - S[4] * (S[1] * S[10] - S[9] * S[2]) + S[8] * (S[1] * S[6] - S[5] * S[2]))).toFixed(3)}, skin ${skin.idx.length / 3} tri, hair scalp ${hairMesh.idx.length / 3} tri, cap ${cap.idx.length / 3} tri (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+  const capOccludes = capSdf ? p => capSdf.Sample(p) < .001 : null;
   const sampler = new SurfaceSampler(skin);
-  return { mesh: skin, hairMesh, sdf, sampler, hairSampler: fitHatSeam ? new SurfaceSampler(hairMesh) : sampler,
-    frame: lab.frame, exclude, hairExclude, scalpExclude, attach, attachBones,
+  return { mesh: skin, hairMesh, sdf, sampler, hairSampler: hairMesh === skin ? sampler : new SurfaceSampler(hairMesh),
+    frame: lab.frame, exclude, hairExclude: fitHeadSurface ? capOccludes : hairExclude,
+    scalpExclude: fitHeadSurface ? capOccludes : scalpExclude, attach, attachBones,
     jointNames: g.jointNames, icpErrorM: best.err, bone: 'Head' };
 }
 
@@ -1523,16 +1579,30 @@ async function BuildGroom(entry, tiles) {
       sb[2 * i] = Math.round(((s.w[0] + 0.5) / 2) * 65535); sb[2 * i + 1] = Math.round(((s.w[1] + 0.5) / 2) * 65535);
       ss[2 * i] = Math.round(s.seed * 255); ss[2 * i + 1] = Math.round(s.len * 255);
     });
+    const strandSkin = game ? {
+      boneJoints: h.strands.flatMap(s => s.skin.joints),
+      boneWeights: h.strands.flatMap(s => s.skin.weights),
+    } : null;
+    const scalpSkin = game ? BindGroomSkin(game, [strandSkin, h.scalp, h.cards, h.shell],
+      h.strands.reduce((worst, s) => Math.max(worst, s.skin.dropped), 0)) : null;
+    // A completely rigid scalp already follows the head. Leave its cheaper
+    // draw path and asset representation intact.
+    const weighted = scalpSkin && (scalpSkin.bones.length > 1 || scalpSkin.bones[0] !== game.bone);
+    if (weighted) {
+      sections.hairStrandBoneIndices = { array: Uint8Array.from(strandSkin.boneIndices) };
+      sections.hairStrandBoneWeights = QUnit16(strandSkin.boundWeights);
+    }
     Object.assign(sections, {
       hairGuides: guideData, hairStrandGuides: sg, hairStrandBary: sb, hairStrandSeed: ss, hairDensity: h.density,
-      ...MeshSections('hairCard', h.cards, { uv: true }),
-      ...MeshSections('hairShell', h.shell, { dataScale: [1, 0.05] }),
-      ...MeshSections('hairScalp', h.scalp, { uv: !!reference, dataScale: [1, 0.05, 1] }),
+      ...MeshSections('hairCard', h.cards, { uv: true, skinning: weighted }),
+      ...MeshSections('hairShell', h.shell, { dataScale: [1, 0.05], skinning: weighted }),
+      ...MeshSections('hairScalp', h.scalp, { uv: !!reference, dataScale: [1, 0.05, 1], skinning: weighted }),
       ...(braid ? MeshSections('hairBraid', braid, { dataScale: [1, 0.05], skinning: !!braidSkin }) : {}),
     });
     const measuredEar = frame.earMask || { marks: frame.m.ear, front: frame.earFront, back: frame.earBack };
     header.hair = {
       style: entry.hair, name: style.name, family: style.family, guides: G, points: K, strands: S,
+      ...(weighted ? { skinning: scalpSkin } : {}),
       ...(entry.hairRootFit ? { rootFit: entry.hairRootFit } : {}),
       ...(game ? { earCut: { centerX: frame.centerX, centerZ: frame.zc,
         front: measuredEar.front, back: measuredEar.back,
@@ -1543,7 +1613,7 @@ async function BuildGroom(entry, tiles) {
       shell: { kind: style.shell.kind, triangles: h.shell.idx.length / 3, opacity: style.shell.opacity, ...(h.shell.rootCapTriangles ? {rootCapTriangles: h.shell.rootCapTriangles} : {}) },
       scalp: { triangles: h.scalp.idx.length / 3, tint: style.scalpTint ?? { Short: 0.8, Medium: 0.6, Long: 0.55 }[style.family] ?? 0.6 },
       ...(braid ? { braid: { triangles: braid.idx.length / 3, length: style.braid.length, color: style.braid.color || style.color,
-        ...(braidSkin ? { skinning: braidSkin } : {}) } } : {}),
+        ...(braidSkin ? { skinning: braidSkin, anchors: braid.anchors } : {}) } } : {}),
       render: { width: style.width, clump: style.clump, frizz: style.frizz, curl: style.curl, color: style.color,
         roughness: style.roughness, specular: style.specular, scatter: style.scatter, length: Math.max(...Object.values(style.length)) },
     };
@@ -1558,7 +1628,7 @@ async function BuildGroom(entry, tiles) {
   if (entry.beard) {
     const style = DeepMerge(STYLES.beard[entry.beard], reference?.beard);
     const b = BuildBeard(entry.id, style, frame, mesh, sdf, sampler, tiles, exclude);
-    const skinning = game ? BindBeardSkin(b, game) : null;
+    const skinning = game ? BindGroomSkin(game, [b.cards, b.stubble], b.maxDroppedWeight) : null;
     if (b.cards.idx.length) Object.assign(sections, MeshSections('beardCard', b.cards, { uv: true, skinning: !!game }));
     if (b.stubble && b.stubble.idx.length) Object.assign(sections, MeshSections('beardStubble', b.stubble, { uv: !!style.referenceMask, dataScale: [1, 0.05], skinning: !!game }));
     header.beard = { style: entry.beard, name: style.name, cards: b.cardCount, triangles: b.cards.idx.length / 3,

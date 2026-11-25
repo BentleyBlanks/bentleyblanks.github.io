@@ -45,7 +45,7 @@ const entries = [...styles.grooms, ...(styles.gameGrooms || [])];
 for (const entry of entries) {
   Check(ids.has(entry.id), `${entry.id}：清单里有（造型表改了要重跑 _import/Script_HairGroomBuild.mjs）`);
   Check(!entry.hair || !!styles.hair[entry.hair], `${entry.id}：发型 ${entry.hair} 在造型表里`);
-  Check(!entry.hairRootFit || (entry.model && entry.hairRootFit === 'hatSeam'), `${entry.id}：帽缘头皮拟合只用于游戏挂件`);
+  Check(!entry.hairRootFit || (entry.model && ['hatSeam', 'headSurface'].includes(entry.hairRootFit)), `${entry.id}：头皮拟合只用于已登记的游戏挂件`);
   Check(!entry.beard || !!styles.beard[entry.beard], `${entry.id}：胡子 ${entry.beard} 在造型表里`);
   Check(!!heads[entry.head], `${entry.id}：头 ${entry.head} 有关键点`);
   if (entry.referenceLook || entry.model) {
@@ -143,6 +143,17 @@ for (const g of manifest.grooms) {
     const H = header.hair, K = H.points, G = H.guides, S = H.strands;
     Check((H.rootFit || null) === (entry.hairRootFit || null), `${g.id}：帽缘拟合配方与烘焙资产一致`);
     if (header.model) {
+      if (H.skinning) {
+        const {bones, attach} = H.skinning;
+        Check(bones.length <= 8 && attach.length === bones.length && attach.every(m => m.length === 16 && m.every(Number.isFinite)),
+          `${g.id}: scalp bone palette and inverse binds`);
+        for (const [part, count] of [['hairStrand', S], ...['hairCard', 'hairShell', 'hairScalp'].map(prefix => [prefix, sec(prefix + 'Pos').length / 3])]) {
+          const indices = sec(part + 'BoneIndices'), weights = sec(part + 'BoneWeights');
+          Check(indices?.length === 4 * count && weights?.length === indices.length && indices.every(i => i < bones.length)
+            && weights.every((_, i) => i % 4 || Math.abs(weights[i] + weights[i+1] + weights[i+2] + weights[i+3] - 65535) <= 2),
+            `${g.id}: ${part} has normalized weights for each root/vertex`);
+        }
+      }
       const ear = H.earCut, measured = heads[entry.head].ear;
       Check(!!ear && ear.yMin === measured.yMin && ear.yMax === measured.yMax
         && ear.halfWidth === measured.halfWidth && ear.front < ear.back
@@ -221,6 +232,8 @@ for (const g of manifest.grooms) {
       const skin = H.braid.skinning;
       Check(!!skin === !!header.model, `${g.id}：游戏长辫继承身体骨骼，实验室胸像保持静态`);
       if (skin) {
+        Check(H.braid.anchors?.length === skin.bones.length && H.braid.anchors.every((p, i, points) =>
+          p.length === 3 && p.every(Number.isFinite) && (i === 0 || p[1] < points[i - 1][1])), `${g.id}: braid simulation anchors from root to tip`);
         const indices = sec('hairBraidBoneIndices'), weights = sec('hairBraidBoneWeights');
         Check(JSON.stringify(skin.bones) === JSON.stringify(['Head', 'Neck', 'Spine2', 'Spine1'])
           && skin.attach.length === 4 && !!indices && !!weights && indices.length === pos.length / 3 * 4

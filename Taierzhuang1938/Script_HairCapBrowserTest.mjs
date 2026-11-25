@@ -77,6 +77,37 @@ try {
   assert.equal(lodLayers.strands.shell, false, 'close strands must not show the shell');
   assert.equal(lodLayers.shell.shell, true);
   assert.equal(lodLayers.none.shell, false);
+  // Both replacement heads differ from their original laboratory busts.
+  // The back of the live head must stay covered through the tie/cap seam.
+  for (const key of ['nier', 'liuWencai']) {
+    await page.locator('#who').selectOption(key, { force: true });
+    await page.waitForFunction(key => window.__preview.hair?.root.name === 'Hair_' + key, key);
+    await page.evaluate(async () => {
+      const T = await import('three'), p = window.__preview;
+      await p.SelectFile('Animation_Mixamo_UnarmedRunForward_V1.glb');
+      const scrub = document.querySelector('#scrub');
+      scrub.value = p.action.getClip().duration * .35; scrub.dispatchEvent(new Event('input'));
+      p.character.updateMatrixWorld(true);
+      document.querySelector('#follow').checked = false;
+      p.orbit.target.fromArray(p.hair.asset.header.portrait.center).applyMatrix4(p.hair.root.matrixWorld);
+      const forward = new T.Vector3(0,0,-1).transformDirection(p.hair.root.matrixWorld);
+      p.orbit.pan.set(0,0,0); p.orbit.yaw = Math.atan2(forward.x,forward.z) + 3.3;
+      p.orbit.dist = .45; p.orbit.pitch = .08;
+    });
+    // Resolve the coverage dither before measuring exposed skin, as for the cap views above.
+    const region = [270, 370, 156, 195];
+    for (const lod of ['none','strands','cards','shell']) {
+      await page.evaluate(lod => {
+        const p = window.__preview; p.hair.SetLod(lod); p.hair.Update(1, p.camera, p.renderer);
+        return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      }, lod);
+      const { data, info } = await sharp(await page.screenshot()).resize(640, 360).removeAlpha().raw().toBuffer({resolveWithObject:true});
+      const skinFraction = SkinFraction(data, info, region);
+      assert.ok(lod === 'none' ? skinFraction > .65 : skinFraction < .10,
+        `${key} ${lod}: rear scalp skin fraction ${skinFraction.toFixed(3)}`);
+      measurements.push({view: key + '_' + lod, region, skinFraction});
+    }
+  }
   assert.deepEqual(errors, []);
   assert.deepEqual(failedRequests, []);
   fs.writeFileSync(path.join(output, 'Data_HairCapReview.json'), `${JSON.stringify({ measurements, errors, failedRequests }, null, 2)}\n`);

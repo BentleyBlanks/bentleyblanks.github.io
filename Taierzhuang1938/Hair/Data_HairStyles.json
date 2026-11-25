@@ -1101,6 +1101,7 @@
   },
   {
    "id": "Game_LiuWencai",
+   "hairRootFit": "headSurface",
    "model": "Model/Character/Model_LiuWencai.glb",
    "head": "LiuWencai",
    "labHead": "LiuWencai",
@@ -1121,6 +1122,7 @@
   },
   {
    "id": "Game_Nier",
+   "hairRootFit": "headSurface",
    "model": "Model/Character/Model_Nier.glb",
    "head": "Nier",
    "labHead": "Nier",

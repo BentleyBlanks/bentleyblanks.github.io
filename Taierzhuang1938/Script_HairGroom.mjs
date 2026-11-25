@@ -10,6 +10,7 @@
 // 材质都不走预通道覆盖材质：网格挂 userData.ownPrepass = 自己那份预通道材质（Script_PostPrepass 的「自带预通道」路）。
 import * as THREE from 'three';
 import { MakeHairSharedUniforms, MakeStrandMaterials, MakeCardMaterials, MakeShellMaterials, MakeStubbleMaterial, MakeScalpTintMaterial } from './Script_HairMaterials.mjs';
+import { BraidDynamics } from './Script_HairBraidDynamics.mjs';
 import { MarkNoPrepass } from './Script_PostPrepass.mjs';
 import { HAIR_LOD, HAIR_ASSET_VERSION } from './Data_Tuning_Hair.mjs';
 
@@ -140,6 +141,10 @@ export async function LoadHairGroom(url) {
       aSeed: new THREE.InstancedBufferAttribute(seedF, 2),
       index: new THREE.BufferAttribute(new Uint16Array(index), 1),
     };
+    if (H.skinning) {
+      strandAttributes.aBoneIndices = new THREE.InstancedBufferAttribute(sec('hairStrandBoneIndices'), 4);
+      strandAttributes.aBoneWeights = new THREE.InstancedBufferAttribute(sec('hairStrandBoneWeights'), 4);
+    }
     const min = new THREE.Vector3().fromArray(H.bounds.min), max = new THREE.Vector3().fromArray(H.bounds.max);
     const sphere = new THREE.Sphere(); new THREE.Box3(min, max).getBoundingSphere(sphere);
     sphere.radius += H.render.length * 0.25 + 0.01;
@@ -214,8 +219,12 @@ export class HairGroom {
         uniforms: { uBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) },
           uPrevBeardBones: { value: Array.from({ length: 8 }, () => new THREE.Matrix4()) } } };
     };
+    this.scalpSkin = MakeSkin(asset.hair?.header.skinning, 'scalp');
     this.beardSkin = MakeSkin(asset.beard?.header.skinning, 'beard');
     this.braidSkin = MakeSkin(asset.hair?.header.braid?.skinning, 'braid');
+    const anchors = asset.hair?.header.braid?.anchors;
+    this.braidDynamics = this.braidSkin && anchors ? new BraidDynamics(anchors) : null;
+    this.skins = [this.scalpSkin, this.beardSkin, this.braidSkin].filter(Boolean);
     this.shared = MakeHairSharedUniforms();
     this.materials = []; this.meshes = {}; this.ownGeometries = [];
     this.current = null; this.previous = null; this.fade = 1;
@@ -229,17 +238,17 @@ export class HairGroom {
       sg.instanceCount = h.strands;
       sg.boundingSphere = h.sphere.clone();
       this.ownGeometries.push(sg);
-      const strand = MakeStrandMaterials(h, this.shared, lightRig, referenceAtlases.get(atlas));
+      const strand = MakeStrandMaterials(h, this.shared, lightRig, referenceAtlases.get(atlas), this.scalpSkin?.uniforms);
       this.strandUniforms = strand.own;
       this.meshes.strands = this.Mesh(sg, strand, 'Strands');
-      if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density, referenceAtlases.get(atlas)), 'Cards');
-      if (h.shellGeometry) this.meshes.shell = this.Mesh(h.shellGeometry, MakeShellMaterials(h, this.shared, lightRig), 'Shell');
+      if (h.cardGeometry) this.meshes.cards = this.Mesh(h.cardGeometry, MakeCardMaterials(h, atlas, this.shared, lightRig, h.density, referenceAtlases.get(atlas), this.scalpSkin?.uniforms), 'Cards');
+      if (h.shellGeometry) this.meshes.shell = this.Mesh(h.shellGeometry, MakeShellMaterials(h, this.shared, lightRig, this.scalpSkin?.uniforms), 'Shell');
       this.cardBaseAlpha = this.meshes.cards?.userData.hairUniforms.uAlphaScale.value;
       if (h.braidGeometry) {
         const braidLook = { ...h, render: { ...h.render, color: h.header.braid.color, roughness: .55, specular: .25, scatter: .25 } };
         this.meshes.braid = this.Mesh(h.braidGeometry, MakeShellMaterials(braidLook, this.shared, lightRig, this.braidSkin?.uniforms), 'Braid');
       }
-      if (h.scalpGeometry) this.meshes.scalp = this.Overlay(h.scalpGeometry, MakeScalpTintMaterial(h, referenceAtlases.get(atlas), lightRig), 'ScalpTint', 1);
+      if (h.scalpGeometry) this.meshes.scalp = this.Overlay(h.scalpGeometry, MakeScalpTintMaterial(h, referenceAtlases.get(atlas), lightRig, this.scalpSkin?.uniforms), 'ScalpTint', 1);
     }
     const b = asset.beard;
     if (b) {
@@ -327,7 +336,7 @@ export class HairGroom {
     const sh = this.shared;
     sh.uFrame.value = (sh.uFrame.value + 1) % 4096;
     this.root.updateWorldMatrix(true, false);
-    for (const skin of [this.beardSkin, this.braidSkin]) if (skin) {
+    for (const skin of this.skins) {
       const current = skin.uniforms.uBeardBones.value, previous = skin.uniforms.uPrevBeardBones.value;
       _m.copy(this.root.matrixWorld).invert();
       for (let i = 0; i < skin.bones.length; i++) {
@@ -335,6 +344,9 @@ export class HairGroom {
         skin.bones[i].updateWorldMatrix(true, false);
         current[i].copy(_m).multiply(skin.bones[i].matrixWorld).multiply(skin.attach[i]);
         if (!skin.ready) previous[i].copy(current[i]);
+      }
+      if (skin === this.braidSkin && this.braidDynamics?.Update(dt, this.root.matrixWorld, current)) {
+        for (let i = 0; i < skin.bones.length; i++) previous[i].copy(current[i]);
       }
       skin.ready = true;
     }

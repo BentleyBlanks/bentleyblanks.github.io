@@ -7,6 +7,75 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 
+// Browser-test probe. Match the close-fitting layers to their original body vertices in bind
+// space once, then measure separation against those same vertices on the animated body.
+async function MeasureGroomMotion() {
+  const T = await import('three');
+  const { character, hair, camera, renderer } = window.__preview;
+  character.updateMatrixWorld(true);
+  hair.Update(0, camera, renderer);
+  const body = character.getObjectByProperty('isSkinnedMesh', true);
+  const head = body.skeleton.bones.findIndex(b => b.name === 'Head');
+  const bodyToHair = hair.root.matrix.clone().invert().multiply(body.skeleton.boneInverses[head]).multiply(body.bindMatrix);
+  const delta = new T.Vector3(), rest = new T.Vector3(), sample = new T.Vector3(), actual = new T.Vector3();
+  const bodyPosition = body.geometry.attributes.position, bodyNormal = body.geometry.attributes.normal;
+  const cell = .002, grid = new Map();
+  const key = (x, y, z) => `${x}/${y}/${z}`;
+  for (let i = 0; i < bodyPosition.count; i++) {
+    rest.fromBufferAttribute(bodyPosition, i).applyMatrix4(bodyToHair);
+    const id = key(Math.floor(rest.x/cell), Math.floor(rest.y/cell), Math.floor(rest.z/cell));
+    if (!grid.has(id)) grid.set(id, []);
+    grid.get(id).push(i);
+  }
+  const origin = new T.Vector3(), normal = new T.Vector3(), candidateNormal = new T.Vector3();
+  const measurements = {};
+  for (const [part, skin] of [['scalp', hair.scalpSkin], ['stubble', hair.beardSkin]]) {
+    const mesh = hair.meshes[part];
+    if (!mesh) continue;
+    const { position, aBoneWeights, aBoneIndices } = mesh.geometry.attributes;
+    const distances = [], clearances = [];
+    let rigidMinMm = Infinity;
+    for (let i = 0; i < position.count; i++) {
+      sample.fromBufferAttribute(position, i);
+      normal.fromBufferAttribute(mesh.geometry.attributes.normal, i).normalize();
+      // Bake offsets the actual source vertex along its normal. Un-offset before
+      // matching so a close lip or overlapping UV seam cannot steal the match.
+      origin.copy(sample).addScaledVector(normal, part === 'scalp' ? -.00015 : -.00035);
+      const x = Math.floor(origin.x/cell), y = Math.floor(origin.y/cell), z = Math.floor(origin.z/cell);
+      let best = Infinity, nearest = -1;
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+        for (const id of grid.get(key(x+dx, y+dy, z+dz)) || []) {
+          rest.fromBufferAttribute(bodyPosition, id).applyMatrix4(bodyToHair);
+          candidateNormal.fromBufferAttribute(bodyNormal, id).transformDirection(bodyToHair);
+          const d = origin.distanceToSquared(rest) + normal.distanceToSquared(candidateNormal) * 1e-8;
+          if (d < best) { best = d; nearest = id; }
+        }
+      }
+      if (best > .001 ** 2) throw Error(`${part} vertex ${i} has no corresponding skin vertex (${Math.sqrt(best)} m)`);
+      if (skin) {
+        actual.set(0, 0, 0);
+        for (let k = 0; k < 4; k++) {
+          const matrix = skin.uniforms.uBeardBones.value[aBoneIndices.getComponent(i, k)];
+          actual.addScaledVector(delta.copy(sample).applyMatrix4(matrix), aBoneWeights.getComponent(i, k));
+        }
+      } else actual.copy(sample);
+      actual.applyMatrix4(mesh.matrixWorld);
+      rest.fromBufferAttribute(bodyPosition, nearest);
+      const world = body.applyBoneTransform(nearest, rest.clone()).applyMatrix4(body.matrixWorld);
+      delta.fromBufferAttribute(bodyNormal, nearest).multiplyScalar(.001).add(rest);
+      body.applyBoneTransform(nearest, delta).applyMatrix4(body.matrixWorld).sub(world).normalize();
+      rigidMinMm = Math.min(rigidMinMm, rest.copy(sample).applyMatrix4(mesh.matrixWorld).sub(world).dot(delta) * 1000);
+      actual.sub(world);
+      clearances.push(actual.dot(delta)*1000);
+      distances.push(actual.length()*1000);
+    }
+    distances.sort((a,b) => a-b); clearances.sort((a,b) => a-b);
+    measurements[part] = { vertices: position.count, rigidMinMm, maxMm: distances.at(-1), p95Mm: distances[Math.floor(distances.length*.95)],
+      minMm: clearances[0], p05Mm: clearances[Math.floor(clearances.length*.05)] };
+  }
+  return measurements;
+}
+
 const root = path.resolve(import.meta.dirname, "..");
 const server = process.env.HAIR_PREVIEW ? null : await ServeRoot(root, 0);
 const base = process.env.HAIR_PREVIEW || `http://127.0.0.1:${server.address().port}`;
@@ -78,6 +147,23 @@ try {
       if (poses[0].beardPos) assert.ok(Math.hypot(...poses[0].beardPos.map((v, i) => v - poses[1].beardPos[i])) > 0.002,
         `${key}: beard follows animated head`);
       observation.poses = poses;
+      observation.motion = [];
+      for (const file of ['Animation_Mixamo_NeutralIdle_V1.glb', 'Animation_Mixamo_Walking_V21.glb', 'Animation_Mixamo_UnarmedRunForward_V1.glb']) {
+        await page.evaluate(file => window.__preview.SelectFile(file), file);
+        for (const fraction of [.15, .5, .85]) {
+          await page.evaluate(fraction => {
+            const p = window.__preview, scrub = document.querySelector('#scrub');
+            scrub.value = fraction * p.action.getClip().duration;
+            scrub.dispatchEvent(new Event('input'));
+          }, fraction);
+          const layers = await page.evaluate(MeasureGroomMotion);
+          for (const [part, metrics] of Object.entries(layers)) {
+            assert.ok(metrics.minMm > .045 && metrics.maxMm < .65,
+              `${key} ${file} ${fraction} ${part} crossed or detached from the skin: ${JSON.stringify(metrics)}`);
+          }
+          observation.motion.push({file, fraction, layers});
+        }
+      }
     }
     if (key !== "xbot" && observations.filter(o => o.key === key).length === 1) {
       await page.evaluate(() => {

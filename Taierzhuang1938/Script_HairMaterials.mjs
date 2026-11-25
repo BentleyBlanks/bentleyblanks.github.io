@@ -219,8 +219,20 @@ const PREPASS_VELOCITY = /* glsl */`
 
 // ---------------------------------------------------------------------------------------------------------------
 // 发丝
-const STRAND_VERTEX = (prepass) => /* glsl */`
+// Both passes use the scalp triangle's bone weights. Previous-frame bones are
+// needed even when the character's root transform has not moved.
+const SkinDeclarations = prepass => `
+attribute vec4 aBoneIndices, aBoneWeights;
+uniform mat4 uBeardBones[8];
+${prepass ? 'uniform mat4 uPrevBeardBones[8];' : ''}
+`;
+const SkinMatrix = palette => `(aBoneWeights.x * ${palette}[int(aBoneIndices.x)]
+  + aBoneWeights.y * ${palette}[int(aBoneIndices.y)]
+  + aBoneWeights.z * ${palette}[int(aBoneIndices.z)]
+  + aBoneWeights.w * ${palette}[int(aBoneIndices.w)])`;
+const STRAND_VERTEX = (prepass, skinned) => /* glsl */`
 precision highp float;
+${skinned ? SkinDeclarations(prepass) : ''}
 uniform highp sampler2D uGuides;
 uniform float uK;
 uniform vec2 uWidth;
@@ -297,7 +309,11 @@ void main() {
   float o2;
   float ds = 1.0 / (uK * 2.0 + 2.0);
   vec3 Pa = HairPoint(max(s - ds, 0.0), o2), Pb = HairPoint(min(s + ds, 1.0), o2);
-  vec3 T = Pb - Pa;
+  vec3 restP = P;
+  vec3 restT = Pb - Pa;
+  ${skinned ? `mat4 skin = ${SkinMatrix('uBeardBones')};
+  P = (skin * vec4(restP, 1.0)).xyz;
+  vec3 T = mat3(skin) * restT;` : 'vec3 T = restT;'}
   T = length(T) > 1e-8 ? normalize(T) : vec3(0.0, 1.0, 0.0);
   vec3 toCam = normalize(uCameraLocal - P);
   vec3 side = cross(T, toCam);
@@ -309,17 +325,20 @@ void main() {
   vCoverage = clamp(width / drawn, 0.0, 1.0) * (1.0 - smoothstep(0.82, 1.0, s) * 0.7);
   vec3 hairLocal = P + side * aVert.y * drawn * 0.5 / uModelScale;
   ${prepass ? `
-  vec3 prevSide = cross(T, normalize(uPrevCameraLocal - P));
+  ${skinned ? `mat4 prevSkin = ${SkinMatrix('uPrevBeardBones')};
+  vec3 prevP = (prevSkin * vec4(restP, 1.0)).xyz;
+  vec3 prevT = mat3(prevSkin) * restT;` : 'vec3 prevP = P; vec3 prevT = T;'}
+  vec3 prevSide = cross(prevT, normalize(uPrevCameraLocal - prevP));
   prevSide = length(prevSide) > 1e-6 ? normalize(prevSide) : vec3(1.0, 0.0, 0.0);
   float prevScale = max(uPrevModelScale, 1e-6);
   float prevWidth = mix(uWidth.x, uWidth.y, s) * uWidthScale * prevScale;
-  float prevDist = max(length(uPrevCameraLocal - P) * prevScale, 1e-3);
+  float prevDist = max(length(uPrevCameraLocal - prevP) * prevScale, 1e-3);
   float prevDrawn = max(prevWidth, uPrevPixelScale * prevDist * uMinPixels);
-  vec3 hairLocalPrev = P + prevSide * aVert.y * prevDrawn * 0.5 / prevScale;
+  vec3 hairLocalPrev = prevP + prevSide * aVert.y * prevDrawn * 0.5 / prevScale;
   ` : ''}
   vec4 mv = modelViewMatrix * vec4(hairLocal, 1.0);
   vViewPos = mv.xyz;
-  vLocalPos = P;
+  vLocalPos = restP;
   vWorldPos = (modelMatrix * vec4(hairLocal, 1.0)).xyz;
   vTangent = normalize(mat3(modelViewMatrix) * T);
   vT = s;
@@ -454,8 +473,7 @@ const MESH_VERTEX = (prepass, skinBeard = false) => /* glsl */`
 precision highp float;
 attribute vec3 aTangent;
 attribute vec3 aData;
-${skinBeard ? 'attribute vec4 aBoneIndices; attribute vec4 aBoneWeights; uniform mat4 uBeardBones[8];' : ''}
-${skinBeard && prepass ? 'uniform mat4 uPrevBeardBones[8];' : ''}
+${skinBeard ? SkinDeclarations(prepass) : ''}
 out vec3 vTangent;
 out vec3 vNormalV;
 out vec3 vViewPos;
@@ -849,7 +867,7 @@ function ReferenceColourUniforms(reference, atlas, melanin) {
   };
 }
 
-export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = null) {
+export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = null, skinBones = null) {
   const r = hair.render;
   const reference = !!hair.referenceScalp?.projection;
   const own = {
@@ -860,9 +878,9 @@ export function MakeStrandMaterials(hair, shared, lightRig, referenceAtlas = nul
     ...EarCutUniforms(hair),
   };
   if (reference) Object.assign(own, ReferenceColourUniforms(hair.referenceScalp, referenceAtlas, r.color.melanin));
-  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density) };
-  const main = LitMaterial(STRAND_VERTEX(false), STRAND_FRAGMENT(reference), uniforms, { lightRig });
-  const prepass = PrepassMaterial(STRAND_VERTEX(true), STRAND_PREPASS_FRAGMENT, { ...shared, ...own });
+  const uniforms = { ...shared, ...own, ...ColorUniforms(r.color), ...DensityUniforms(hair.density), ...skinBones };
+  const main = LitMaterial(STRAND_VERTEX(false, !!skinBones), STRAND_FRAGMENT(reference), uniforms, { lightRig });
+  const prepass = PrepassMaterial(STRAND_VERTEX(true, !!skinBones), STRAND_PREPASS_FRAGMENT, { ...shared, ...own, ...skinBones });
   return { main, prepass, own };
 }
 export function MakeCardMaterials(part, atlas, shared, lightRig, density, referenceAtlas = null, skinBeard = null) {
@@ -918,9 +936,9 @@ export function MakeStubbleMaterial(beard, shared, referenceAtlas = null, lightR
   return { main: m, own };
 }
 
-export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = null) {
+export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = null, skinBones = null) {
   const own = { uMelanin: { value: hair.render.color.melanin }, uRedness: { value: hair.render.color.redness },
-    uStrength: { value: hair.scalpTint }, uFade: { value: 1 }, ...EarCutUniforms(hair) };
+    ...skinBones, uStrength: { value: hair.scalpTint }, uFade: { value: 1 }, ...EarCutUniforms(hair) };
   if (hair.referenceScalp) {
     if (!referenceAtlas) throw new Error('Missing character reference scalp atlas');
     own.uReferenceMask = {value: referenceAtlas};
@@ -928,8 +946,8 @@ export function MakeScalpTintMaterial(hair, referenceAtlas = null, lightRig = nu
     Object.assign(own, ReferenceFrontUniforms([hair.referenceScalp.projection.centerX, hair.referenceScalp.centerZ]));
   }
   const m = hair.referenceScalp
-    ? LitMaterial(MESH_VERTEX(false), SCALP_FRAGMENT(true), own, {lightRig, transparent: true, side: THREE.FrontSide})
-    : new THREE.ShaderMaterial({glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false), fragmentShader: SCALP_FRAGMENT(false), uniforms: own, transparent: true});
+    ? LitMaterial(MESH_VERTEX(false, !!skinBones), SCALP_FRAGMENT(true), own, {lightRig, transparent: true, side: THREE.FrontSide})
+    : new THREE.ShaderMaterial({glslVersion: THREE.GLSL3, vertexShader: MESH_VERTEX(false, !!skinBones), fragmentShader: SCALP_FRAGMENT(false), uniforms: own, transparent: true});
   m.depthWrite = false;
   m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -1;
   m.allowOverride = false;

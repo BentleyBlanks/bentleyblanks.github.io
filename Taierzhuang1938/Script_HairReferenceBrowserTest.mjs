@@ -10,7 +10,7 @@ import {HAIR_RANGE_ROWS} from './Data_HairRange.mjs';
 const root = path.resolve(import.meta.dirname, '..'), here = import.meta.dirname;
 const output = path.join(here, 'tmp/HairLab/ReferenceReview'); fs.mkdirSync(output, {recursive:true});
 const references = JSON.parse(fs.readFileSync(path.join(here, 'Hair/Data_HairReferences.json'))).looks;
-const referenceRoot = path.join(process.env.USERPROFILE, 'OneDrive/Sync/饮河/FPS/角色/Tripo');
+const referenceRoot = process.env.HAIR_REFERENCE_ROOT || path.join(process.env.USERPROFILE, 'OneDrive/Sync/饮河/FPS/角色/Tripo');
 const stations = HAIR_RANGE_ROWS.flatMap(row=>row.items.map(item=>({...item,row:row.id})));
 const subjects = Object.fromEntries(stations.map((station,index)=>[station.groom.replace(/_Cast$/,''),index])
   .filter(([key,index])=>stations[index].groom.endsWith('_Cast') && !stations[index].lod));
