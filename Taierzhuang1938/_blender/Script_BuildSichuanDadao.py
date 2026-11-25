@@ -1,212 +1,155 @@
-"""Exterior game mesh traced from the upper sabre in Jianchuan's group photo.
+"""Build the exterior game prop from the three-view contour fit.
 
-The side outline uses image samples. Depth and wear are game-art estimates.
-Reference and texture provenance: _import/Reference/SichuanDadao/.
+The approved sheet supplies shape and color in three orthographic projections.
+The frame places that exterior on the existing game rig.
 """
 
+import json
 import math
+from pathlib import Path
 
 import bmesh
 
 from TzmCore import Node
 
 
-# Pixel samples from the published 359 × 270 photo. The first/last horizontal
-# coordinates map to the existing 0.90 m in-game span. +Y is the cutting side.
-BLADE_OUTLINE = (
-    (26, 89.2, 91.7), (28, 87.7, 92.9), (32, 84.3, 94.2),
-    (40, 76.9, 97.1), (47, 70.8, 98.8), (51, 68.4, 99.5),
-    (55, 69.3, 100.0), (62, 71.0, 100.8), (74, 72.8, 101.5),
-    (88, 74.1, 102.1), (101, 74.9, 102.3), (120, 75.8, 101.8),
-    (140, 76.5, 100.5), (160, 76.7, 99.3), (180, 76.4, 97.1),
-    (195, 76.3, 96.1), (205, 76.2, 95.1), (216, 75.7, 94.5),
-    (222.5, 79.0, 89.0),
-)
-GRIP_OUTLINE = (
-    (221, 84.5, 6.7), (228, 84.0, 7.5), (239, 83.0, 6.6),
-    (250, 82.8, 6.6), (260, 82.6, 8.0), (274, 81.7, 6.5),
-    (289, 81.4, 6.35), (300, 81.3, 6.85), (306, 81.75, 5.95),
-)
-GUARD_OUTLINE = (
-    (210.8, 69.8), (212.4, 67.9), (215.2, 68.4), (218.7, 70.9),
-    (221.1, 73.4), (223.7, 77.0), (224.8, 83.0), (224.5, 91.8),
-    (222.9, 98.5), (221.4, 100.5), (218.4, 101.0), (216.2, 99.5),
-    (216.0, 96.4), (217.1, 91.3), (216.7, 82.8), (215.5, 74.4),
-    (213.6, 72.5), (211.1, 72.1),
-)
+FIT = json.loads(Path(__file__).with_name("Data_SichuanDadaoThreeViewFit.json").read_text(encoding="utf-8"))
+FRAME = FIT["frame"]
+ATLAS = FIT["atlas"]
 
 
-def FromPhoto(photoX, photoY, depth):
-    axisY = 82.25 - 0.052 * (photoX - 260)
-    return (depth, (photoY - axisY) * 0.003, (photoX - 26) * 0.003 - 0.630)
+def FromPhoto(u, v, depth):
+    u -= FRAME["axisU"]
+    v -= FRAME["axisV"]
+    scale = FRAME["metersPerPixel"]
+    y = u * FRAME["sin"] + v * FRAME["cos"]
+    z = u * FRAME["cos"] - v * FRAME["sin"]
+    return ((depth - FRAME["axisDepth"]) * scale,
+            y * scale, FRAME["zMin"] + (z - FRAME["zPixelMin"]) * scale)
 
 
-def AtlasUv(u, v, strip):
-    # Four padded strips in Texture_Dadao. Coordinates in the bake start at
-    # the top of the image, whereas the game UV starts at the bottom.
-    return ((16 + 992 * u) / 1024, 1 - (strip * 256 + 20 + 216 * v) / 1024)
+def ToPhoto(position):
+    x, y, z = position
+    scale = FRAME["metersPerPixel"]
+    y = y / scale
+    z = (z - FRAME["zMin"]) / scale + FRAME["zPixelMin"]
+    u = FRAME["axisU"] + z * FRAME["cos"] + y * FRAME["sin"]
+    v = FRAME["axisV"] + y * FRAME["cos"] - z * FRAME["sin"]
+    return u, v, FRAME["axisDepth"] + x / scale
 
 
-def AddFace(mesh, uvLayer, corners, uvs, smooth=True):
-    face = mesh.faces.new(corners)
-    face.smooth = smooth
-    uvByVertex = dict(zip(corners, uvs))
-    for loop in face.loops:
-        loop[uvLayer].uv = uvByVertex[loop.vert]
+def ProjectUv(position, strip):
+    u, v, depth = ToPhoto(position)
+    along = (u - ATLAS["left"]) / (ATLAS["right"] - ATLAS["left"])
+    if strip < 2:
+        across = (v - ATLAS["top"]) / (ATLAS["bottom"] - ATLAS["top"])
+    else:
+        across = (depth - ATLAS["sideTop"]) / (ATLAS["sideBottom"] - ATLAS["sideTop"])
+    return ((16 + 992 * along) / 1024, 1 - (strip * 256 + 20 + 216 * across) / 1024)
 
 
-def OrientMesh(mesh):
+def CompletePart(mesh):
     bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
     mesh.normal_update()
+    uvLayer = mesh.loops.layers.uv.new()
+    for face in mesh.faces:
+        normal = face.normal
+        if abs(normal.x) >= .48:
+            strip = 0 if normal.x > 0 else 1
+        else:
+            across = normal.y * FRAME["cos"] - normal.z * FRAME["sin"]
+            strip = 2 if across < 0 else 3
+        for loop in face.loops:
+            loop[uvLayer].uv = ProjectUv(loop.vert.co, strip)
+    return mesh
+
+
+def LoftFaces(mesh, rows, caps=True, flatBands=()):
+    for before, after in zip(rows, rows[1:]):
+        for index in range(len(before)):
+            nextIndex = (index + 1) % len(before)
+            face = mesh.faces.new((before[index], after[index], after[nextIndex], before[nextIndex]))
+            face.smooth = index not in flatBands
+    if caps:
+        mesh.faces.new(rows[0]).smooth = False
+        mesh.faces.new(rows[-1]).smooth = False
     return mesh
 
 
 def BuildBlade():
     mesh = bmesh.new()
-    uvLayer = mesh.loops.layers.uv.new()
-    bands = ((0, .0022), (.045, .0031), (.15, .0035), (.59, .00335),
-             (.80, .0030), (.87, .00245), (.96, .00135), (1, .00085))
-    rowsBySide = []
-    start, end = BLADE_OUTLINE[0][0], BLADE_OUTLINE[-1][0]
-
-    for side, sign in enumerate((1, -1)):
-        rows = []
-        for photoX, spine, edge in BLADE_OUTLINE:
-            depthScale = min(1, .34 + (photoX - start) / 48)
-            row = [
-                mesh.verts.new(FromPhoto(photoX, spine + (edge - spine) * across,
-                                         sign * depth * depthScale))
-                for across, depth in bands
-            ]
-            rows.append(row)
-        for index, (near, far) in enumerate(zip(rows, rows[1:])):
-            u0 = (BLADE_OUTLINE[index][0] - start) / (end - start)
-            u1 = (BLADE_OUTLINE[index + 1][0] - start) / (end - start)
-            for col in range(len(bands) - 1):
-                v0, v1 = bands[col][0], bands[col + 1][0]
-                AddFace(mesh, uvLayer, (near[col], far[col], far[col + 1], near[col + 1]),
-                        [AtlasUv(u, v, side) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
-        rowsBySide.append(rows)
-
-    front, back = rowsBySide
-    for col, v in ((0, 0.0), (-1, 1.0)):
-        for index in range(len(front) - 1):
-            u0 = (BLADE_OUTLINE[index][0] - start) / (end - start)
-            u1 = (BLADE_OUTLINE[index + 1][0] - start) / (end - start)
-            rim = v + (0.008 if v == 0 else -0.008)
-            AddFace(mesh, uvLayer, (front[index][col], front[index + 1][col],
-                                   back[index + 1][col], back[index][col]),
-                    [AtlasUv(u, across, 0) for u, across in ((u0, v), (u1, v), (u1, rim), (u0, rim))],
-                    smooth=False)
-    for row, u in ((0, 0.0), (-1, 1.0)):
-        cap = u + (.008 if u == 0 else -.008)
-        for col in range(len(bands) - 1):
-            v0, v1 = bands[col][0], bands[col + 1][0]
-            AddFace(mesh, uvLayer, (front[row][col], front[row][col + 1],
-                                   back[row][col + 1], back[row][col]),
-                    [AtlasUv(s, v, 0) for s, v in ((u, v0), (u, v1), (cap, v1), (cap, v0))],
-                    smooth=False)
-    return OrientMesh(mesh)
+    # Soft visual bevels keep the photographed rim readable at shallow angles.
+    cheek = ((0, .58), (.026, .92), (.10, 1), (.48, .96),
+             (.79, .92), (.89, .70), (.97, .40), (1, .30))
+    profile = cheek + tuple((across, -depth) for across, depth in reversed(cheek))
+    rows = []
+    for u, top, bottom, near, far in FIT["blade"]:
+        center, radius = (near + far) / 2, (far - near) / 2
+        rows.append([mesh.verts.new(FromPhoto(u, top + (bottom - top) * across,
+                                             center + radius * depth))
+                     for across, depth in profile])
+    return CompletePart(LoftFaces(mesh, rows, flatBands=(len(cheek) - 1, len(profile) - 1)))
 
 
-def BuildGripTube(outline, strip, sections, wrapped):
+def BuildGrip():
     mesh = bmesh.new()
-    uvLayer = mesh.loops.layers.uv.new()
-    segments = 24
-    start, end = outline[0][0], outline[-1][0]
-    photoRows = []
-    for near, far in zip(outline, outline[1:]):
-        steps = max(1, math.ceil((far[0] - near[0]) / sections))
-        photoRows.extend(tuple(a + (b - a) * step / steps for a, b in zip(near, far))
-                         for step in range(steps))
-    photoRows.append(outline[-1])
-    rings = []
-    for photoX, center, radius in photoRows:
-        ring = []
-        for index in range(segments):
-            angle = math.tau * index / segments
-            scale = 1.0
-            if wrapped:
-                lap = (photoX - start) / 6.4 - angle / math.tau + .05 * math.sin(2.2 * angle)
-                scale += .055 * (.5 + .5 * math.cos(lap * math.tau)) ** 5
-                scale += .018 * math.sin(3 * angle + photoX / 11)
-            depth = math.cos(angle) * scale * (.0053 + .0008 * radius)
-            photoY = center + math.sin(angle) * radius * scale
-            ring.append(mesh.verts.new(FromPhoto(photoX, photoY, depth)))
-        rings.append(ring)
-
-    for index, (near, far) in enumerate(zip(rings, rings[1:])):
-        u0 = (photoRows[index][0] - start) / (end - start)
-        u1 = (photoRows[index + 1][0] - start) / (end - start)
-        for col in range(segments):
-            nxt = (col + 1) % segments
-            v0, v1 = col / segments, (col + 1) / segments
-            AddFace(mesh, uvLayer, (near[col], far[col], far[nxt], near[nxt]),
-                    [AtlasUv(u, v, strip) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
-    for ring in (rings[0], rings[-1]):
-        AddFace(mesh, uvLayer, ring,
-                [AtlasUv(.5 + .03 * math.cos(math.tau * i / segments),
-                         .5 + .03 * math.sin(math.tau * i / segments), strip)
-                 for i in range(segments)], smooth=False)
-    return OrientMesh(mesh)
+    circle = [(math.sin(i * math.tau / 24), math.cos(i * math.tau / 24)) for i in range(24)]
+    rows = []
+    for u, top, bottom, near, far in FIT["grip"]:
+        centerV, radiusV = (top + bottom) / 2, (bottom - top) / 2
+        centerX, radiusX = (near + far) / 2, (far - near) / 2
+        rows.append([mesh.verts.new(FromPhoto(u, centerV + radiusV * v, centerX + radiusX * x))
+                     for v, x in circle])
+    return CompletePart(LoftFaces(mesh, rows))
 
 
 def BuildGuard():
     mesh = bmesh.new()
-    uvLayer = mesh.loops.layers.uv.new()
-    rings = []
-    for depth, inset in ((-.011, .82), (-.008, 1), (.008, 1), (.011, .82)):
-        rings.append([mesh.verts.new(FromPhoto(218 + (x - 218) * inset,
-                                              84 + (y - 84) * inset, depth))
-                      for x, y in GUARD_OUTLINE])
-    for index, (near, far) in enumerate(zip(rings, rings[1:])):
-        for col in range(len(GUARD_OUTLINE)):
-            nxt = (col + 1) % len(GUARD_OUTLINE)
-            u0, u1 = col / len(GUARD_OUTLINE), (col + 1) / len(GUARD_OUTLINE)
-            v0, v1 = .2 + index * .1, .3 + index * .1
-            AddFace(mesh, uvLayer, (near[col], far[col], far[nxt], near[nxt]),
-                    [AtlasUv(u, v, 3) for u, v in ((u0, v0), (u0, v1), (u1, v1), (u1, v0))])
-    for ring in (rings[0], rings[-1]):
-        AddFace(mesh, uvLayer, ring,
-                [AtlasUv((x - 210) / 16, (y - 67) / 35, 3) for x, y in GUARD_OUTLINE], smooth=False)
-    return OrientMesh(mesh)
+    centerU, centerV = 1504, 320
+    rows = []
+    for depth, inset in ((0, .96), (.17, 1), (.83, 1), (1, .96)):
+        rows.append([mesh.verts.new((depth, centerV + (v - centerV) * inset,
+                                     centerU + (u - centerU) * inset))
+                     for u, v in FIT["guard"]])
+    LoftFaces(mesh, rows)
+    bmesh.ops.triangulate(mesh, faces=list(mesh.faces))
+    depthControls = FIT["guardDepth"]
+    for u, _, _ in depthControls[1:-1]:
+        bmesh.ops.bisect_plane(mesh, geom=[*mesh.verts, *mesh.edges, *mesh.faces],
+                              dist=1e-5, plane_co=(0, 0, u), plane_no=(0, 0, 1))
+    for vert in mesh.verts:
+        thickness, v, u = vert.co
+        # A thickness transition belongs at the photographed longitudinal station.
+        for (start, near0, far0), (end, near1, far1) in zip(depthControls, depthControls[1:]):
+            if u <= end:
+                along = min(1, max(0, (u - start) / (end - start)))
+                near = near0 + (near1 - near0) * along
+                far = far0 + (far1 - far0) * along
+                # Hide the cap under the cheek while the guard and blade overlap.
+                shoulder = min(1, max(0, (u - 1470) / 12))
+                thickness = .5 + (thickness - .5) * (.76 + .24 * shoulder)
+                vert.co = FromPhoto(u, v, near + (far - near) * thickness)
+                break
+    return CompletePart(mesh)
 
 
-def BuildPommelRing():
+def BuildRing():
     mesh = bmesh.new()
-    uvLayer = mesh.loops.layers.uv.new()
-    around, tube = 52, 12
-    rings = []
-    for index in range(around):
-        angle = math.tau * index / around
-        ring = []
-        for col in range(tube):
-            cross = math.tau * col / tube
-            rim = 1.47 + .09 * math.sin(3 * angle)
-            x = 314.85 + (9.68 + rim * math.cos(cross)) * math.cos(angle)
-            y = 83.55 + (10.35 + rim * math.cos(cross)) * math.sin(angle)
-            ring.append(mesh.verts.new(FromPhoto(x, y, .0032 * math.sin(cross))))
-        rings.append(ring)
-    for index, near in enumerate(rings):
-        far = rings[(index + 1) % around]
-        u0, u1 = index / around, (index + 1) / around
-        for col in range(tube):
-            nxt = (col + 1) % tube
-            v0, v1 = col / tube, (col + 1) / tube
-            AddFace(mesh, uvLayer, (near[col], far[col], far[nxt], near[nxt]),
-                    [AtlasUv(u, v, 3) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
-    return OrientMesh(mesh)
+    section = [(math.sin(i * math.tau / 12), .5 + .5 * math.cos(i * math.tau / 12))
+               for i in range(12)]
+    rows = []
+    for outerU, outerV, innerU, innerV, near, far in FIT["ring"]:
+        center, radius = (near + far) / 2, (far - near) / 2
+        rows.append([mesh.verts.new(FromPhoto(innerU + (outerU - innerU) * outside,
+                                             innerV + (outerV - innerV) * outside,
+                                             center + radius * depth))
+                     for depth, outside in section])
+    return CompletePart(LoftFaces(mesh, rows + rows[:1], caps=False))
 
 
 def BuildParts():
-    return [
-        ("Blade", BuildBlade()),
-        ("Guard", BuildGuard()),
-        ("CottonWrap", BuildGripTube(GRIP_OUTLINE, 2, 1.45, wrapped=True)),
-        ("PommelCollar", BuildGripTube(((302.5, 82, 5.0), (305.2, 82.4, 6.2),
-                                      (308.4, 82.8, 4.2)), 3, 1.6, wrapped=False)),
-        ("PommelRing", BuildPommelRing()),
-    ]
+    return [("Blade", BuildBlade()), ("Guard", BuildGuard()),
+            ("CottonWrap", BuildGrip()), ("PommelRing", BuildRing())]
 
 
 def BuildDadao():
@@ -215,8 +158,8 @@ def BuildDadao():
     for _, mesh in BuildParts():
         body.Add("dadao", mesh, tile="sourceUv")
     body.Child("muzzle", t=(0, -0.012074, -0.626))
-    body.Child("gripR", t=(0, 0, 0.030))
-    body.Child("gripL", t=(0, 0, 0.155))
+    body.Child("gripR", t=(0, 0, .030))
+    body.Child("gripL", t=(0, 0, .155))
     return root
 
 

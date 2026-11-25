@@ -11,10 +11,11 @@
 
 - 川军随身带大刀的记载见记者对建川博物馆藏品的报道。馆方出川影像能看到行军人员和着装，刀的完整轮廓只够用实物照片校准。[中新网](https://www.chinanews.com/cul/2014/09-03/6558063.shtml) · [四川建川博物馆](https://www.jc-museum.cn/news/1149.html)
 - 网上另有蓝底红绸单刀，图注写「抗战川军所用的大刀」，该页缺收藏机构、原图来源与单件记录。图中的卷曲护手与主样本不同。[抗日战争纪念网转载](https://m.krzzjn.com/show-1182-47353.html)
-- 滕县第122师单件的可核归属、背面和厚度资料仍待查。游戏沿用挂点和整体尺度，单面照片无法提供的深度、材质底色与磨耗由本作补足。
+- 滕县第122师单件的可核归属、背面和厚度资料仍待查。游戏以实物供图为基础生成三视图，作为外观对标；未拍视角的轮廓、底色与磨耗属于复原。
 
 ## 成品与重建
 
-- 游戏加载 `Model/Model_Dadao.tzm.json`。`Script_BuildSichuanDadao.py` 保留侧面取样与四条 UV 图集区域，走 `BuildAll.py -- --only Dadao` 构建。三角上限为 10,000。
-- 钢面和棉布源图由 OpenAI Image API 的 `gpt-image-2` 生成，原图 1536 × 1024。提示词见 [材质提示](Prompt_SichuanDadaoSurfaces.txt)。运行 `python Taierzhuang1938/_import/Script_BakeDadaoPbr.py <Texture_DadaoSource.png>` 烘焙 1K Base、OpenGL Normal 和 ORM，再运行 `python Taierzhuang1938/_import/Script_BakePbrTexture.py --audit --name Dadao` 记录成品校验值。
-- Blender 工程及原图存于素材库的 `Blender/Taierzhuang1938/SichuanDadao`。三个运行时贴图随工程打包。
+- 游戏加载 `Model/Model_Dadao.tzm.json`。`Script_TraceDadaoThreeViews.py <Reference_SichuanDadaoThreeViews.png>` 提取正背剪影和窄视图，并写入 `Data_SichuanDadaoThreeViewFit.json`。`Script_BuildSichuanDadao.py` 读取这些控制点，在 Blender 中对齐原有挂点。使用 `BuildAll.py -- --only Dadao` 构建，三角上限为 10,000。
+- 正面、背面和窄面直接投影原图上的锈斑和布纹，并用同一中性灯光的三视图渲染校准底色。缺少直接参考的表面用 OpenAI Image API 的 `gpt-image-2.6-sunburst` 补齐，设置为最高档 `max`，源图 3840 × 2160。见 [材质提示词](Prompt_SichuanDadaoUnseenSurfaces.txt)。
+- 运行 `python Taierzhuang1938/_import/Script_BakeDadaoPbr.py <Reference_SichuanDadaoThreeViews.png> <Texture_DadaoUnseenSurfaces.png>` 烘焙 2K 基色、1K OpenGL 法线与 1K ORM，再运行 `python Taierzhuang1938/_import/Script_BakePbrTexture.py --audit --name Dadao` 记录成品校验值。
+- `Scene_SichuanDadaoThreeViewFit.blend`、对标图和源贴图保存在素材库的 `Blender/Taierzhuang1938/SichuanDadao`。Blender 工程保留独立部件和三个相机，随工程打包运行时贴图。

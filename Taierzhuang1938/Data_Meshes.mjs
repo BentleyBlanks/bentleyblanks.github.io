@@ -183,12 +183,12 @@ export const MESHES = {
   },
   Dadao: {
     file: "Model_Dadao.tzm.json", category: "weapon",
-    version: "sichuan-dadao-20261126",
-    triangles: 5248, meshBlocks: 1, nodes: 5, joints: 0,
+    version: "sichuan-dadao-three-views-20261126",
+    triangles: 9635, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.02408, 0.12391, 0.900], lengthM: 0.900, bladeM: 0.576,
+    span: [0.03242, 0.12726, 0.90018], lengthM: 0.900, bladeM: 0.576,
     draws: { high: 1, medium: 1, low: 1 },
-    note: "建川博物馆供图上方一柄的侧面轮廓。刀身两侧、缠布与铁件共用一张 UV 图集。"
+    note: "以建川博物馆供图为依据生成三视图，再按同一比例拟合刀身、护手、布柄和尾环。"
       + "资料与游戏复原见 _import/Reference/SichuanDadao/。",
   },
 

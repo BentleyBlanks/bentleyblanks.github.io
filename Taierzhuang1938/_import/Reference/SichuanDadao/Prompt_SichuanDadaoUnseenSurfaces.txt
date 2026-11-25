@@ -1,0 +1,6 @@
+Use case: historical-scene
+Asset: one flat source swatch sheet for a 3D museum prop. Image 1 is the approved iron color and patina reference. Image 2 is the approved cotton color and fiber reference.
+Create a completely filled two-panel texture sheet, vertical split at exactly half the width, no dividing line. Render both halves flat and unlit under the same soft neutral illumination.
+Left half: extremely detailed dark brown-grey aged iron surface, matching the color and restrained oxidation of image 1. Tiny dull grey and brown pores, minute worn areas and quiet uneven patina across the entire panel. Natural matte patina with modest dull-metal variation and very little orange. Fill the field edge to edge. This texture supplies the small surfaces not directly pictured in the three-view reference.
+Right half: densely woven old grey-tan cotton matched to image 2, muted neutral khaki brown with finely resolved warp and weft, tiny dust traces, occasional soft fibers and restrained discoloration throughout. A continuous flat weave with no large folds or seams.
+No shapes, silhouettes, objects, edge highlights, shadows, gradients, exaggerated rust, grids, borders, labels or type.
