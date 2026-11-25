@@ -13,6 +13,7 @@ import { MeshUrl, WeaponMeshId } from "../Script_Meshes.mjs";
 import { Mulberry32 } from "../Script_Noise.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
+import { WeaponMaterialPreview } from "./Script_WeaponMaterialPreview.mjs";
 
 const GLB = {
   HanYang: { url: HANYANG_173R.url, Load: LoadHanYang173R, Configure: ConfigureHanYang173R, Instantiate: InstantiateHanYang173R },
@@ -206,6 +207,20 @@ function MountPosition(instance, name) {
   return node ? node.getWorldPosition(new THREE.Vector3()) : null;
 }
 
+function SelectionGeometry({ object, start, count }) {
+  const { index } = object.geometry;
+  const position = object.geometry.getAttribute("position");
+  const vertices = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const vertex = index ? index.getX(start + i) : start + i;
+    const offset = i * 3;
+    vertices[offset] = position.getX(vertex);
+    vertices[offset + 1] = position.getY(vertex);
+    vertices[offset + 2] = position.getZ(vertex);
+  }
+  return new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(vertices, 3));
+}
+
 export class WeaponInspectionScene {
   constructor(canvas, onDraw) {
     this.canvas = canvas;
@@ -227,10 +242,22 @@ export class WeaponInspectionScene {
     this.span = 1;
     this.zoom = 1;
     this.gridVisible = true;
+    this.wireframe = false;
+    this.meshMaterials = [];
+    this.wireMaterial = new THREE.MeshBasicMaterial({ color: 0xccc4af, wireframe: true, toneMapped: false });
+    this.selectionMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffc75e, opacity: .56, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2, toneMapped: false,
+    });
+    this.occludedMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffc75e, opacity: .3, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      depthFunc: THREE.GreaterDepth, wireframe: true, toneMapped: false,
+    });
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
     this.keyLight = CreateLighting(this.renderer, this.scene);
+    this.materialPreview = new WeaponMaterialPreview(this.scene.environment);
     this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
     this.resizeObserver.observe(canvas);
@@ -350,8 +377,11 @@ export class WeaponInspectionScene {
   }
 
   Show(model) {
+    this.SelectPart(null);
+    this.materialPreview.Set(null, null);
     this.Release(this.model);
     this.model = model;
+    this.meshMaterials = [];
     if (this.grid) {
       this.grid.removeFromParent();
       this.grid.dispose();
@@ -362,6 +392,10 @@ export class WeaponInspectionScene {
       model.group.traverse((object) => {
         if (!object.isMesh) return;
         object.castShadow = object.receiveShadow = true;
+        this.meshMaterials.push({
+          object, shaded: object.material,
+          wire: Array.isArray(object.material) ? object.material.map((material) => material && this.wireMaterial) : this.wireMaterial,
+        });
         for (const material of [object.material].flat()) {
           if (!material?.isMeshStandardMaterial || this.inspectionMaterials.has(material)) continue;
           AttachInspectionChannels(material, this.channel);
@@ -404,6 +438,38 @@ export class WeaponInspectionScene {
     this.RequestDraw();
   }
 
+  SetWireframe(on) {
+    this.wireframe = on;
+    this.selectionMaterial.wireframe = on;
+    this.renderer.shadowMap.enabled = !on;
+    this.RequestDraw();
+  }
+
+  SelectPart(part) {
+    if (this.selection) {
+      this.selection.group.removeFromParent();
+      this.selection.geometry.dispose();
+      this.selection = null;
+    }
+    if (part?.count) {
+      const geometry = SelectionGeometry(part);
+      const group = new THREE.Group();
+      const fill = new THREE.Mesh(geometry, this.selectionMaterial);
+      const occluded = new THREE.Mesh(geometry, this.occludedMaterial);
+      fill.renderOrder = 3;
+      occluded.renderOrder = 4;
+      group.add(fill, occluded);
+      part.object.add(group);
+      this.selection = { group, geometry };
+    }
+    this.RequestDraw();
+  }
+
+  PreviewMaterial(material, canvas) {
+    this.materialPreview.Set(material, canvas);
+    this.RequestDraw();
+  }
+
   Direction() {
     const cos = Math.cos(this.pitch);
     return new THREE.Vector3(Math.sin(this.yaw) * cos, Math.sin(this.pitch), Math.cos(this.yaw) * cos);
@@ -437,6 +503,11 @@ export class WeaponInspectionScene {
 
   Draw() {
     if (!this.width || !this.height) return;
+    if (this.materialPreview.pending) {
+      const channel = this.channel.value;
+      this.channel.value = CHANNELS.beauty;
+      try { this.materialPreview.Draw(this.renderer); } finally { this.channel.value = channel; }
+    }
     const { camera } = this;
     const halfHeight = this.span / this.zoom / 2;
     const halfWidth = halfHeight * this.width / this.height;
@@ -449,7 +520,14 @@ export class WeaponInspectionScene {
     camera.position.copy(this.center).addScaledVector(this.Direction(), 15);
     camera.lookAt(this.center);
     camera.updateProjectionMatrix();
-    this.renderer.render(this.scene, camera);
+    if (this.wireframe) {
+      for (const { object, wire } of this.meshMaterials) object.material = wire;
+      try { this.renderer.render(this.scene, camera); } finally {
+        for (const { object, shaded } of this.meshMaterials) object.material = shaded;
+      }
+    } else {
+      this.renderer.render(this.scene, camera);
+    }
     this.onDraw?.();
   }
 }

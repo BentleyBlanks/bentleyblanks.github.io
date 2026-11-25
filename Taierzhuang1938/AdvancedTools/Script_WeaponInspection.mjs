@@ -38,11 +38,12 @@ const inspector = ById("modelInspector");
 const status = ById("stageStatus");
 const retry = ById("retryLoad");
 const gridButton = ById("gridToggle");
+const wireframeButton = ById("wireframeToggle");
 const mountButton = ById("mountToggle");
 const bladeButton = ById("bayonetToggle");
 const scale = ById("viewScale");
 const channelButtons = [...document.querySelectorAll("[data-channel]")];
-const viewButtons = [...channelButtons, gridButton, mountButton, bladeButton];
+const viewButtons = [...channelButtons, gridButton, wireframeButton, mountButton, bladeButton];
 const dimensionIds = ["sizeX", "sizeY", "sizeZ"];
 const mountLabels = [
   { key: "muzzle", label: ById("muzzleLabel") },
@@ -147,7 +148,7 @@ async function Select(id, variant = 0) {
     Text("modelFile", model.file);
     Text("modelTriangles", number.format(model.triangles));
     model.size.toArray().forEach((meters, i) => Text(dimensionIds[i], number.format(Math.round(meters * 1000))));
-    ShowWeaponModelInspector(inspector, model);
+    ShowWeaponModelInspector(inspector, model, stage);
     SetStatus("ready");
     bladeButton.hidden = !model.blade;
     mountButton.hidden = !model.muzzle && !model.grip;
@@ -202,6 +203,10 @@ function BindViewport() {
     if (stage.grid) stage.grid.visible = stage.gridVisible;
     SetPressed(gridButton, stage.gridVisible);
     stage.RequestDraw();
+  });
+  wireframeButton.addEventListener("click", () => {
+    stage.SetWireframe(!stage.wireframe);
+    SetPressed(wireframeButton, stage.wireframe);
   });
   mountButton.addEventListener("click", () => {
     showMounts = !showMounts;

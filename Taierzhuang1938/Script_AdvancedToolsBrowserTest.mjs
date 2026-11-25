@@ -441,14 +441,47 @@ try {
       const inspector = document.querySelector("#modelInspector");
       const count = window.WeaponInspection.scene.model.body.children[0].children.filter((child) => child.isMesh).length;
       return inspector.querySelector('[aria-label="网格"]').options.length === count
-        && inspector.querySelectorAll(".texture-list img").length >= 3
-        && !!inspector.querySelector(".texture-info small").textContent.match(/\d+ × \d+ · (sRGB|线性) · UV\d/);
+        && inspector.querySelectorAll(".material-properties img").length >= 3
+        && !!inspector.querySelector(".texture-metadata").textContent.match(/\d+ × \d+ · (sRGB|线性) · UV\d/);
     }));
+    const MaterialPixels = () => page.locator(".material-preview canvas").evaluate((canvas) => {
+      const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixels = 0, hash = 0;
+      for (let i = 3; i < data.length; i += 4) {
+        if (!data[i]) continue;
+        pixels++;
+        hash = (Math.imul(hash, 31) + data[i - 3] * 3 + data[i - 2] * 5 + data[i - 1] * 7) | 0;
+      }
+      return { pixels, hash };
+    });
+    const originalModel = await ReadPixels();
+    const originalMaterial = await MaterialPixels();
     await meshPicker.selectOption({ index: 1 });
     const meshSlot = page.locator(".mesh-slot").first();
     const expectedMaterial = await meshSlot.locator("span").textContent();
     await meshSlot.click();
     Check("子网格材质槽链接到对应材质", await materialPicker.locator("option:checked").textContent() === expectedMaterial);
+    const selectedPart = await page.evaluate(() => {
+      const stage = window.WeaponInspection.scene;
+      stage.Draw();
+      const { group, geometry } = stage.selection;
+      const mesh = stage.model.body.children[0].children.filter((object) => object.isMesh)[1];
+      return group.parent === mesh && geometry.attributes.position.count === (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count);
+    });
+    const highlighted = await ReadPixels();
+    const selectedMaterial = await MaterialPixels();
+    Check("子网格点选只高亮对应几何，材质球随选择更新",
+      selectedPart && highlighted.hash !== originalModel.hash && await meshSlot.getAttribute("aria-pressed") === "true"
+      && originalMaterial.pixels > 4000 && selectedMaterial.pixels > 4000 && selectedMaterial.hash !== originalMaterial.hash);
+    const wireframe = page.locator("#wireframeToggle");
+    await wireframe.click();
+    Check("线框显示模型拓扑，并保留子网格高亮", await wireframe.getAttribute("aria-pressed") === "true"
+      && (await ReadPixels()).hash !== highlighted.hash
+      && await page.evaluate(() => window.WeaponInspection.scene.selectionMaterial.wireframe));
+    await wireframe.click();
+    Check("关闭线框恢复选中的完整材质画面", (await ReadPixels()).hash === highlighted.hash);
+    await meshSlot.click();
+    Check("再次点选清除高亮", await meshSlot.getAttribute("aria-pressed") === "false" && (await ReadPixels()).hash === originalModel.hash);
 
     const split = page.getByRole("button", { name: "双视口" });
     const single = page.getByRole("button", { name: "单视口" });

@@ -8,11 +8,11 @@
   <link rel="icon" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261125Comparison">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261126MaterialPreview">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
-  <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs?v=20261125Comparison"></script>
+  <script type="module" src="./AdvancedTools/Script_WeaponInspection.mjs?v=20261126MaterialPreview"></script>
 </head>
 <body class="uiToolSurface edThemedSurface">
   <header class="tool-header">
@@ -86,6 +86,7 @@
       <footer class="bench-footer">
         <div class="overlays" role="group" aria-label="预览叠层">
           <button type="button" class="edBtn on" id="gridToggle" aria-pressed="true">网格</button>
+          <button type="button" class="edBtn" id="wireframeToggle" aria-pressed="false">线框</button>
           <button type="button" class="edBtn" id="mountToggle" aria-pressed="false">挂点</button>
           <button type="button" class="edBtn" id="bayonetToggle" aria-pressed="false" hidden>刺刀预览</button>
         </div>
