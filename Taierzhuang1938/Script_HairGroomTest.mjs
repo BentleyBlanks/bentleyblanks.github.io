@@ -4,6 +4,7 @@
 //   3. 发片 / 头发壳 / 胡茬的索引不越界，消光体素尺寸与文件头一致；
 //   4. 头部胸像 GLB 与关键点存在、发片图集存在；测试场摆的每一套都在清单里。
 import fs from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -92,7 +93,9 @@ for (const station of stations) {
 }
 
 function Open(file) {
-  const buf = fs.readFileSync(file);
+  const stored = fs.readFileSync(file);
+  const compressed = stored[0] === 0x1f && stored[1] === 0x8b;
+  const buf = compressed ? gunzipSync(stored) : stored;
   const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
   Check(buf.toString('ascii', 0, 4) === 'TXHR', `${path.basename(file)}：文件头 TXHR`);
   const jsonLength = buf.readUInt32LE(8);
@@ -100,7 +103,8 @@ function Open(file) {
   const base = 12 + jsonLength;
   Check(base % 4 === 0, `${path.basename(file)}：数据段 4 字节对齐`);
   const sec = (name) => { const m = header.sections[name]; return m ? new ARRAY_TYPES[m.type](ab, base + m.offset, m.count) : null; };
-  return { header, sec, bytes: buf.length };
+  Check(!header.model || compressed, `${header.id}: game groom uses lossless gzip storage`);
+  return { header, sec, bytes: stored.length };
 }
 function CheckIndex(name, index, vertexCount) {
   let max = 0; for (const v of index) if (v > max) max = v;

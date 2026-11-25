@@ -99,7 +99,12 @@ function MeshGeometry(sec, prefix, withUv = true) {
 export async function LoadHairGroom(url) {
   const response = await fetch(HairAssetUrl(url));
   if (!response.ok) throw new Error(`HairGroom: ${url} ${response.status}`);
-  const buffer = await response.arrayBuffer();
+  let buffer = await response.arrayBuffer();
+  const prefix = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+  if (prefix[0] === 0x1f && prefix[1] === 0x8b) {
+    const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'));
+    buffer = await new Response(stream).arrayBuffer();
+  }
   const view = new DataView(buffer);
   if (buffer.byteLength < 12) throw new Error(`HairGroom: truncated ${url}`);
   const magic = String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3));

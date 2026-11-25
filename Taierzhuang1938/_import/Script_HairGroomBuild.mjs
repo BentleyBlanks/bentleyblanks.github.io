@@ -1645,7 +1645,8 @@ async function BuildGroom(entry, tiles) {
       ...(style.referenceLuminance ? {luminanceAtlasSha256:REFERENCE_MASKS.luminanceAtlasSha256} : {}),
     };
   }
-  const buf = Pack(header, sections);
+  const payload = Pack(header, sections);
+  const buf = game ? zlib.gzipSync(payload, { level: 9 }) : payload;
   const file = path.join(HAIR, 'Grooms', `Groom_${entry.id}.bin`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   WriteAsset(file, buf);

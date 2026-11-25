@@ -29,6 +29,8 @@ node Taierzhuang1938/_import/Script_HairGroomBuild.mjs --atlas
 
 只修改某个人的造型参数时，仅重建本次涉及的套装；覆盖或亮度图集的像素／布局改变时，同步重烘所有引用该图集的套装，以更新 UV 与校验和。构建脚本输出 `Hair/Grooms/Groom_<Id>.bin`、`Hair/Data_HairGrooms.json`，共用发片图集在 `Hair/Textures/Texture_HairCardAtlas.png`。修改资产后更新 `Data_Tuning_Hair.HAIR_ASSET_VERSION`；模块本身由发布系统盖内容戳。
 
+游戏套装对完整 TXHR 字节流使用 gzip 无损压缩；清单的 `bytes` 记录实际文件大小。加载器识别压缩头并兼容原始 TXHR。
+
 二进制 `TXHR` v1：12 字节前缀（magic、版本、JSON 字节数），随后为对齐后的 JSON 头及命名 typed-array 段。头中记录导向、插值、发片、壳、胡茬、头皮、密度体素和量化范围；运行时检查版本和段边界。
 
 ### 2026-11-07 新增人物参考
