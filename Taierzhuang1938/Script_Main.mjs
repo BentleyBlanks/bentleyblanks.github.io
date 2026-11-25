@@ -47,9 +47,9 @@ import { SetWaterSkyUniforms, SetWaterSsr, UpdateWaterSurfaces } from "./Script_
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
-// 测试场：登记表（网址开关与通用待遇）+ 插件（场地、建什么、每帧排在哪儿），见 docs/Data_SandboxRanges.md。
+// 测试场：登记表（网址开关与通用待遇）+ 按需懒加载插件（场地、建什么、每帧排在哪儿），见 docs/Data_SandboxRanges.md。
 import { SandboxRangeFromParams } from "./Data_SandboxRanges.mjs";
-import { SANDBOX_PLUGINS, SandboxPluginFor, SandboxForPhase, SandboxWorldClasses, CreateEncounterPlayPluginInstance } from "./Script_SandboxRanges.mjs";
+import { LoadSandboxPlugin, SandboxForPhase, SandboxWorldClasses, CreateEncounterPlayPluginInstance } from "./Script_SandboxRanges.mjs";
 import { CreateEncounterPlayPhase } from "./Script_EncounterPlayScene.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID } from "./Data_FirstLevelCampaign.mjs";
@@ -256,7 +256,8 @@ window.__bootMainAlive = true;
 window.__bootGuardDismiss?.();
 
 const params = new URLSearchParams(location.search);
-const SANDBOX_PLUGIN = SandboxPluginFor(SandboxRangeFromParams(params));
+const SANDBOX_ENTRY = SandboxRangeFromParams(params);
+const SANDBOX_PLUGIN = SANDBOX_ENTRY ? await LoadSandboxPlugin(SANDBOX_ENTRY) : null;
 const GRAPHICS_PROFILE = SANDBOX_PLUGIN?.startup?.graphicsProfile ?? LoadGraphicsProfile(location.search);
 // 画质档同时决定几何 / 资产预算与呈现（2026-10-31 起没有「白盒」档，白盒编辑器走同一套）。
 const QUALITY = GRAPHICS_PROFILE;
@@ -2833,10 +2834,8 @@ async function Boot() {
       // 它不在 PHASES 里，PHASE_TABLE 在 ?range=1 下是整表替换的（见文件头那段
       // 注释与 docs/Data_TestRange.md）—— 当场换表要把已经建好的世界、兵员池、
       // 携行与七关口径一起翻一遍，重载一次比那条路诚实得多。
-      // 玩家可见的测试场景集中保留核心玩法入口。界河仍可通过
-      // ?jiehe=1 直达，供自动化与内部验收使用，不再混入选章。
-      // P0/P1/P2 白盒不在这一组：它已是正式章节组里的「第一关」（CAMPAIGN_ENTRIES[0]）。
-      sandboxes: SANDBOX_PLUGINS.map((plugin) => plugin.phase),
+      // 测试场景入口已移至独立工具页（AdvancedTools/TestScenes.html），游戏菜单的选关页只保留正式战役章节。
+      sandboxes: [],
       sandboxMode: SANDBOX_RANGE?.id ?? (FIRST_LEVEL_P012_WHITEBOX ? "firstLevelP012Whitebox" : JIEHE ? "jiehe" : false),
       PlaySandbox: (key) => GoToSandbox(key),
       // 机位表按**建好的那一片**取，不按「第几章」取：`?phase=overview` 与
@@ -2982,7 +2981,10 @@ const WORLD_CLASSES = {
   // 白盒关卡编辑器的每一关都是同一个白盒场地类，布局各自不同（phase.whitebox.layout）。
   ...Object.fromEntries(BLOCKOUT_PHASES.map((phase) => [phase.id, FirstLevelWhiteboxField])),
 };
-function WorldClassFor(phase) { return WORLD_CLASSES[phase.id] || TengxianField; }
+function WorldClassFor(phase) {
+  if (SANDBOX_PLUGIN?.phase?.id === phase.id && SANDBOX_PLUGIN.World) return SANDBOX_PLUGIN.World;
+  return WORLD_CLASSES[phase.id] || TengxianField;
+}
 
 /**
  * 进／出玩法测试靶场：改 `?range=1` 再重载。
@@ -3143,8 +3145,8 @@ function RegisterSandboxDebug() {
 
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
-  // 白盒关卡编辑器：文件场景在这里读进来（布局、边界、出生点都可能随之更新）。
-  await phase.blockout?.Prepare?.();
+  // 白盒关卡编辑器 / 独立测试场景：文件场景在这里读进来（布局、边界、出生点都可能随之更新）。
+  await (phase.blockout?.Prepare?.() ?? phase.sceneAsset?.Prepare?.());
   // 场景的环境（区域 + 预设）跟着场景走：EnterLevel 套完 phase.sky 之后由它接管天光
   await SyncPhaseEnvironment(phase);
   // 拆旧场地释放的材质先记着，EnterLevel 预热完再真释放（Script_DeferredMaterialDispose 抬头）。

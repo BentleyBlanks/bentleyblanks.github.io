@@ -3,7 +3,7 @@
 //
 // 纯模块：零 three、零 DOM，Node 与浏览器共用。
 
-import { SceneDir, SceneFileName, DecodeSceneHeights, EncodeSceneHeights } from "./Script_SceneDoc.mjs";
+import { SceneDir, SceneFileName, DecodeSceneHeights, EncodeSceneHeights, FlatSceneHeights, IsFlatTerrain } from "./Script_SceneDoc.mjs";
 import { DecodeTrenchDatum, EncodeTrenchDatum } from "./Script_SceneTrenches.mjs";
 
 const PointZ = (point) => (Array.isArray(point) ? point[1] : point?.z);
@@ -142,11 +142,16 @@ async function FetchSingleScene(sceneUrl, fetchFn, bustCache, sourceDoc = null) 
     try { doc = await res.json(); } catch { throw new Error("场景文件不是 JSON"); }
   }
   const baseHref = new URL(sceneUrl, globalThis.location?.href || "http://localhost/Taierzhuang1938/index.html").href;
-  const heightUrl = new URL(doc.terrain.file, baseHref).href;
-  const hRes = await fetchFn(`${heightUrl}${suffix}`, { cache: "no-store" });
-  if (!hRes.ok) throw new Error(`高度图读不到（HTTP ${hRes.status}）：${doc.terrain.file}`);
-  const heightBuffer = await hRes.arrayBuffer();
-  const heights = DecodeSceneHeights(heightBuffer, doc.terrain);
+  let heightBuffer = null, heights;
+  if (IsFlatTerrain(doc.terrain)) {
+    heights = FlatSceneHeights(doc.terrain);
+  } else {
+    const heightUrl = new URL(doc.terrain.file, baseHref).href;
+    const hRes = await fetchFn(`${heightUrl}${suffix}`, { cache: "no-store" });
+    if (!hRes.ok) throw new Error(`高度图读不到（HTTP ${hRes.status}）：${doc.terrain.file}`);
+    heightBuffer = await hRes.arrayBuffer();
+    heights = DecodeSceneHeights(heightBuffer, doc.terrain);
+  }
   let datumBuffer = null, datum = [];
   if (doc.trenches?.datum?.file) {
     const datumUrl = new URL(doc.trenches.datum.file, baseHref).href;

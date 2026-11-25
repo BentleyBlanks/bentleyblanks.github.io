@@ -47,9 +47,19 @@
 
 靶场与白刃实验场的运行时各在 `Script_RangeTargets` / `Script_MeleeLabRuntime`（2026-11-01 从 `Script_Main` 搬来）：木桩兵注册表、遭遇进度、面板与取证口都在那里，经 `host.ctx` 读写主文件的状态；状态跟页面走，换关重建不清，与搬家前一致。`Script_Main` 里已经没有任何测试场的名字。
 
-**加一个测试场**：登记表加一行 → 插件里写 `phase` / `World` / `Create` → 文本表加 `bootLabel` 的键 → `SandboxRangesTest` 的钩子表补一项。不改 `Script_Main`。
+**加一个测试场**：登记表加一行（含 `phaseId` 与 `sceneId`）→ 建独立场景文件 `Scenes/Test<Name>/Scene_Test<Name>.json` 并在 `Data_SceneAssets.SCENE_LIST` 登记 → 新建独立插件 `Script_SandboxPlugin_<Name>.mjs` 并在 `Script_SandboxRanges` 登记动态 `import()` 与在 `index.html` import map 登记 → 文本表加 `bootLabel` 的键 → `SandboxRangesTest` 的钩子表补一项。不改 `Script_Main`。
 
-发布包（esbuild 整包，不开代码分割）照旧把测试场代码打在游戏包里；按需加载要改打包设置，是另一件事。
+2026-11-25 起，全部 10 个功能测试场均已拆分为 9 份独立场景文件（`Scenes/Test*/Scene_Test*.json`，其中 `impacts` 与 `reactions` 共用 `TestShellImpact`）与独立按需插件 `Script_SandboxPlugin_<Name>.mjs`；`Script_BuildBrowserBundle` 采用两阶段共享模块表分包，将各测试场拆为独立 `Script_BundleChunk_*.mjs`，正式游戏与主菜单零下载任何测试场代码与场景文件。测试场景入口已从游戏主菜单「任务选择」移除，统一由本地独立页面 `AdvancedTools/TestScenes.html` 进入（配套桌面快捷方式 `Script_TestScenesLaunch.mjs --shortcut` 生成「测试场景」）。
+
+### 2.1 测试场景实机封面规范与自动更新
+
+- **存放与命名**：所有功能测试场的实机封面统一存放在 `Taierzhuang1938/AdvancedTools/Covers/Texture_TestSceneCover_<PascalId>.webp`（例如 `Texture_TestSceneCover_Explosions.webp`），规格固定为 `1280×720` WebP（位于 `AdvancedTools/` 下，不进入线上 GitHub Pages 发布包，不占玩家下载体积）。
+- **自动采集与更新**：任何时候修改了测试场景布局（`Scenes/Test*/`）、场地渲染或新增了功能测试场，直接运行自动化工具进游戏静音实机重拍并覆盖对应 WebP：
+  - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs --changed`：按 Git 改动自动识别受影响的测试场（及缺失封面的新增测试场）增量重拍；
+  - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs --only=explosions,gore`：只重拍指定测试场；
+  - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs`：全量重拍全部功能测试场；
+  - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs --check`：纯 Node 校验全部功能测试场封面文件齐备、为合法 WebP 且体积合理（已接入 `Script_AdvancedToolsTest.mjs` 自动门禁）。
+- **新增测试场**：在 `Script_CaptureTestSceneCovers.mjs` 的 `WATCH_PATTERNS` 与 `SHOT_PRESETS` 中补一条取景配置，跑一次 `--only=<id>` 生成封面即可。
 
 ## 3. 玩法时钟 `Script_GameClock.mjs`
 

@@ -253,6 +253,10 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 - **沟尾**：z 561 起 22 m 渐浅（原来 574 起 8 m），半宽 3 → 2，水线在 z≈573 收成舌头；尾水块分三截收窄（`HechaTailWater` / `_2` / `_3`，底一律 −2.7 与上游同水面 −1.7），尾上补 5 丛苇子（`Reed_HechaTail_*`）。z 583 起是官道旁的平地，z 556±1 接缝与 0610 解析地面逐点相同（1218 测试 0.001 m 门限）。
 - 中线 z 214…561 一格不动，`L0610_RIVER` 的折线与半宽数据没改（头尾是场景里的补充，不在 `Data_*` 里）。`Script_EditorBlockoutFirstLevel0610SceneTest`（沟头一路渐浅、水块）与 `1218SceneTest`（沟尾一路渐浅、三截水块）钉住。
 
+- **变体场景北段继承（`doc.inherit`，2026-11-22）**与**独立测试场景（2026-11-25）**：
+  - 平地测试场可使用 `terrain: { "kind": "flat", "y": 0, "minX", "minZ", "cellM", "cols", "rows" }`，无需生成 `.height.bin`；`look` 支持 `groundColor`、`groundLibraryMaterial`、`groundMarginM`、`groundGrid`、`groundTint`、`deformableTerrain`；`Whitebox/Box` 的 `params` 支持可选 `color` / `libraryMaterial` / `roughness` / `metalness` / `sector` / `surface`。
+  - 9 份测试场景（`TestRange` / `TestMelee` / `TestMovement` / `TestWeapon` / `TestExplosion` / `TestGore` / `TestShellImpact` / `TestCloth` / `TestHair`）均已登记在 `Data_SceneAssets.SCENE_LIST`，可直接用 `SceneEditor.html` 打开编辑或从 `AdvancedTools/TestScenes.html` 一键进入。
+
 ### 变体场景北段继承（`doc.inherit`，2026-11-22）
 
 当多个关卡变体共用前半程场地、只在某道分界线往南分叉时，`tengxian-scene/1` 支持可选头字段 `inherit: { scene: "<基线场景ID>", maxZ: <分界Z> }`（须满足 `inherit.maxZ === terrain.minZ`）：

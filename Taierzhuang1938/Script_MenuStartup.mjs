@@ -13,7 +13,6 @@ import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsPr
 import {QUALITY_PRESETS} from './Data_Tuning_Graphics.mjs';
 import { CreateGameGraphics } from './Script_Tuning_GameGraphics.mjs';
 import {CAMPAIGN_ENTRIES} from './Data_MenuCampaign.mjs';
-import {MENU_SANDBOX_ENTRIES} from './Data_MenuSandboxes.mjs';
 import {FIRST_LEVEL_CAMPAIGN_STAGES} from './Data_FirstLevelCampaign.mjs';
 import {DebugOptions} from './Script_DebugOptions.mjs';
 import {SandboxUrl} from './Data_StartupRouting.mjs';
@@ -107,7 +106,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 }
 await preview.Load();
 menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdrop: true,
-  campaign: CAMPAIGN_ENTRIES, sandboxes: MENU_SANDBOX_ENTRIES,
+  campaign: CAMPAIGN_ENTRIES, sandboxes: [],
   CommandRoomPreview: () => preview.State(), PreviewCommandRoom, PrepareBackdrop: () => preview.Load(),
   SliceIndex: () => null, Unlock: () => audio.Unlock(), Settings: OpenSettings, CloseSettings: () => settings.Close(), OpenTool,
   DevToolsAvailable: DEV_TOOLS_ENABLED, DebugTools: DebugToolStates, ToggleDebugTool: DebugToolStates,

@@ -26,6 +26,11 @@ import { LocalControlCenterUrl } from "./Data_StartupRouting.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl } from "./AdvancedTools/Data_AdvancedTools.mjs";
 import { ControlCenterCards, CONTROL_CENTER_TITLE } from "./AdvancedTools/Script_ControlCenter.mjs";
 import { REPO_ROOT, SHORTCUT_NAME, CONTROL_CENTER_PATH, ControlCenterUrl, PREVIEW_SCRIPT, ServesThisRepo } from "./AdvancedTools/Script_ControlCenterLaunch.mjs";
+import { TestSceneCards, TEST_SCENES_TITLE } from "./AdvancedTools/Script_TestScenes.mjs";
+import { CheckTestSceneCovers, CoverUrlFor } from "./AdvancedTools/Script_CaptureTestSceneCovers.mjs";
+import {
+  SHORTCUT_NAME as TEST_SCENES_SHORTCUT_NAME, TEST_SCENES_PATH, TestScenesUrl,
+} from "./AdvancedTools/Script_TestScenesLaunch.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const toolsDir = path.join(projectDir, "AdvancedTools");
@@ -60,7 +65,7 @@ Check("只在控制中心的独立工具不进游戏清单与拆分边界", STAN
 
 // --- 2. 搬家 ---------------------------------------------------------------------
 const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "Tool_MotionWorkbench.html",
-  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html", "Tool_PropLibrary.html", "Tool_AssetStandards.html"];
+  "TextureManager.html", "Tool_WeaponInspection.html", "Tool_FirstPersonInspection.html", "Tool_Studio.html", "ControlCenter.html", "TestScenes.html", "Tool_PropLibrary.html", "Tool_AssetStandards.html"];
 Check("页面都在 AdvancedTools/", pages.every((page) => fs.existsSync(path.join(toolsDir, page))));
 Check("旧位置不留跳转壳", pages.slice(0, 6).every((page) => !fs.existsSync(path.join(projectDir, page))));
 Check("摄影棚编辑器与独立窗口入口都在 AdvancedTools/", ["Actor", "Facial", "FirstPerson", "FirstPersonEntry", "Vfx", "Audio",
@@ -156,9 +161,11 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   Check("标题是 AdvancedTool ControlCenter", CONTROL_CENTER_TITLE === "AdvancedTool ControlCenter");
   const standaloneIds = STANDALONE_TOOLS.map((tool) => tool.id);
   const gameMenuCards = cards.filter((card) => !standaloneIds.includes(card.id));
-  Check("卡片 19 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 19 && new Set(cards.map((card) => card.group)).size === 6
+  Check("卡片 20 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 20 && new Set(cards.map((card) => card.group)).size === 6
     && JSON.stringify(gameMenuCards.map((card) => card.id)) === JSON.stringify(menuIds));
   Check("游戏工具文案取 TOOL_INFO 的 label / hint", gameMenuCards.every((card) => card.label === TOOL_INFO[card.id].label && card.hint === TOOL_INFO[card.id].hint));
+  Check("测试场景启动器是控制中心关卡组的独立窗口卡片", cards.some((card) => card.id === "testScenes" && card.group === "level"
+    && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/TestScenes.html")));
   Check("模型制作工作台是控制中心的独立资产工具", cards.some((card) => card.id === "modelWorkbench" && card.group === "assets"
     && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_ModelWorkbench.html")));
   const assets = cards.filter((card) => card.group === "assets").map((card) => card.id);
@@ -188,6 +195,37 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   }
   Check("blockout / timeline 用入口类的 Url()", /editor=blockout/.test(game("blockout").href)
     && /editor=blockout/.test(game("timeline").href));
+}
+
+// --- 4b. 测试场景启动页与启动器 -------------------------------------------------------
+{
+  const tsPage = "http://127.0.0.1:9/Taierzhuang1938/AdvancedTools/TestScenes.html";
+  const tsCards = TestSceneCards(tsPage);
+  const functional = tsCards.filter((card) => card.group === "functional");
+  Check("测试场景页标题正确", TEST_SCENES_TITLE === "测试场景");
+  Check("测试场景页只保留 10 个独立功能测试场且均有进入、场景编辑器链接与实机封面", tsCards.length === 10 && functional.length === 10
+    && functional.every((card) => card.sceneId && card.runHref.includes(`?${card.id}=1`)
+      && card.editHref.includes(`/AdvancedTools/SceneEditor.html?scene=${card.sceneId}`)
+      && card.cover === CoverUrlFor(card.id)),
+    functional.map((c) => `${c.id}->${c.sceneId}`).join(","));
+  const coversCheck = CheckTestSceneCovers();
+  Check("10 个功能测试场实机 WebP 封面均齐备且合法（Script_CaptureTestSceneCovers --check）",
+    coversCheck.ok && coversCheck.items.length === 10,
+    coversCheck.ok ? `${coversCheck.items.length} 张` : JSON.stringify(coversCheck));
+  const tsLauncher = path.join(toolsDir, "Script_TestScenesLaunch.mjs");
+  const tsPlan = execFileSync(process.execPath, [tsLauncher, "--dry-run", "8193"], { encoding: "utf8", cwd: os.tmpdir() });
+  Check("测试场景入口 --dry-run 打印计划", /\[dry-run\]/.test(tsPlan) && tsPlan.includes(TestScenesUrl(8193))
+    && TEST_SCENES_PATH === "/Taierzhuang1938/AdvancedTools/TestScenes.html");
+  const tsDir = fs.mkdtempSync(path.join(os.tmpdir(), "TestScenesShortcut-"));
+  try {
+    execFileSync(process.execPath, [tsLauncher, `--shortcut-dir=${tsDir}`], { encoding: "utf8", cwd: os.tmpdir() });
+    const tsFiles = fs.readdirSync(tsDir);
+    if (process.platform === "win32") {
+      Check("测试场景入口 --shortcut-dir 建中文 .lnk", tsFiles.includes(`${TEST_SCENES_SHORTCUT_NAME}.lnk`), tsFiles.join(","));
+    } else {
+      Check("测试场景入口 --shortcut-dir 建启动文件", tsFiles.length === 1);
+    }
+  } finally { fs.rmSync(tsDir, { recursive: true, force: true }); }
 }
 
 // --- 5. 启动器 ----------------------------------------------------------------------

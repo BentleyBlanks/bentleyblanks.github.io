@@ -445,7 +445,7 @@ Section("运行时贴图 URL");
 const runtimeFiles = fs.readdirSync(project)
   // The ignored local bundle duplicates already-audited source, including URLs
   // whose version is appended dynamically. It is not an additional authored source.
-  .filter((f) => f !== "Script_BrowserBundle.mjs")
+  .filter((f) => f !== "Script_BrowserBundle.mjs" && !f.startsWith("Script_BundleChunk_"))
   .filter((f) => (/^(Script_|Data_).*\.mjs$/.test(f) && !/Test\.mjs$/.test(f)) || /^Style_.*\.css$/.test(f) || f === "index.html");
 const URL_RE = /Texture\/[A-Za-z0-9_\/]+\.(?:webp|png|jpe?g|hdr)(\?v=[^"'`)\s]+)?/g;
 const seenUnstamped = new Set();

@@ -14,7 +14,10 @@ if (process.argv.includes("--bundle")) {
   const { BuildBrowserBundle } = await import("./Script_BuildBrowserBundle.mjs");
   const bundle = await BuildBrowserBundle();
   await page.route("**/Taierzhuang1938/?*", route => route.fulfill({contentType:"text/html",body:bundle.html}));
-  for (const file of bundle.files) await page.route("**/"+file.name+"?*", route => route.fulfill({contentType:"text/javascript",body:file.code}));
+  for (const file of bundle.files) {
+    await page.route("**/"+file.name, route => route.fulfill({contentType:"text/javascript",body:file.code}));
+    await page.route("**/"+file.name+"?*", route => route.fulfill({contentType:"text/javascript",body:file.code}));
+  }
 }
 const errors = [], requests = [], snapshots = [];
 page.on("pageerror", error => errors.push(String(error)));

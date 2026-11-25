@@ -1,131 +1,73 @@
-// Refactored explosion range whitebox: uncluttered deformable firing field with
-// flush distance range lines, optional target sandbag cover wall, and a single
-// off-lane vehicle pad whose tank is spawned on demand from the left panel.
+// Explosion range whitebox: static deformable ground, boundaries, range ticks and vehicle pad
+// come from Scenes/TestExplosion/Scene_TestExplosion.json; dynamic cover wall and on-demand
+// vehicles attach to scene markers.
 import * as THREE from "three";
-import { RangeField } from "./Script_RangeField.mjs";
-import { BuildSink } from "./Script_World.mjs";
-import { MakeBox, MakePlane, PlaceGeometry } from "./Script_Geo.mjs";
+import { TestSceneField, CreateSignAtlas, AddAtlasSignToSink } from "./Script_TestSceneField.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
-import {
-  EXPLOSION_SPAWN, EXPLOSION_VEHICLES, EXPLOSION_VEHICLE_PAD, EXPLOSION_RANGE_MARKERS,
-} from "./Data_ExplosionRange.mjs";
+import { EXPLOSION_SPAWN, EXPLOSION_VEHICLES, EXPLOSION_VEHICLE_PAD } from "./Data_ExplosionRange.mjs";
 
-export class ExplosionRangeField extends RangeField {
+export class ExplosionRangeField extends TestSceneField {
   constructor(scene, library, options = {}) {
-    super(scene, library, options);
-    this.materials = new Map();
+    super(scene, library, {
+      defaultSector: "ExplosionRange",
+      defaultColliderTag: "testFixture",
+      defaultRoughness: 0.96,
+      ...options,
+    });
     this.models = new Map();
-    this.textures = [];
     this.activeVehicleId = null;
     this.coverWallGroup = null;
     this.coverCollider = null;
     this.vehicleCollider = null;
     this.cameraFar = 360;
     this.worldLimits = { ...this.bounds, groundLimit: 4000 };
-    for (const [name, color] of Object.entries({
-      Soil: 0x9ca5a9,
-      Pad: 0xc2c8c9,
-      Line: 0xd9d4c4,
-      Boundary: 0x293439,
-      Sandbag: 0x9b8e72,
-      Timber: 0x624d38,
-      Armor: 0x555c4a,
-      Track: 0x3b3d3c,
-    })) {
-      const material = library.Get("Ground").clone();
-      material.map = null;
-      material.normalMap = null;
-      material.roughnessMap = null;
-      material.metalnessMap = null;
-      material.aoMap = null;
-      material.color.setHex(color);
-      material.roughness = 0.96;
-      material.metalness = 0;
-      this.materials.set(name, material);
-    }
   }
 
-  BuildGround() {
-    const sink = new BuildSink(), b = this.bounds;
-    sink.SetSector("ExplosionGround");
-    sink.Add("Soil", PlaceGeometry(MakePlane(b.maxX - b.minX + 120, b.maxZ - b.minZ + 120),
-      { x: (b.minX + b.maxX) / 2, y: 0, z: (b.minZ + b.maxZ) / 2 }));
-    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) })) {
-      mesh.name = "ExplosionRangeGround";
-      mesh.userData.deformableTerrain = true;
-      this.meshes.push(mesh);
+  _CloneFlatMaterial(name, colorHex) {
+    let mat = this.ownedMaterials.get(name);
+    if (!mat) {
+      mat = this.library.Get("Ground").clone();
+      mat.map = null; mat.normalMap = null; mat.roughnessMap = null; mat.metalnessMap = null; mat.aoMap = null;
+      mat.color.setHex(colorHex);
+      mat.roughness = 0.96;
+      mat.metalness = 0;
+      this.ownedMaterials.set(name, mat);
     }
-    this.stats.groundChunks = 1;
-    this.stats.groundTris = 2;
+    return mat;
   }
 
-  Label(sink, id, text, x, y, z, width = 2.2, color = "#e8e3d2") {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 140;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#1a2326";
-    ctx.fillRect(0, 0, 512, 140);
-    ctx.strokeStyle = "#b89f63";
-    ctx.lineWidth = 6;
-    ctx.strokeRect(4, 4, 504, 132);
-    ctx.fillStyle = color;
-    ctx.font = "bold 62px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, 256, 72, 470);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    this.textures.push(texture);
-    this.materials.set(id, new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }));
-    sink.Add(id, PlaceGeometry(new THREE.PlaneGeometry(width, width * 140 / 512), { x, y, z }));
-  }
-
-  BuildStructures() {
-    const sink = new BuildSink();
-    sink.SetSector("ExplosionStations");
-    const Box = (id, material, x, y, z, w, h, d, solid = true, tag = "testFixture") => {
-      sink.Add(material, PlaceGeometry(MakeBox(w, h, d, 1, id), { x, y, z }));
-      if (solid) sink.Solid(x, y, z, w / 2, h / 2, d / 2, tag);
-    };
-
-    // 清晰简洁的投掷距离标尺线（贴地窄条 + 场地左右外侧低矮米数牌，不遮挡中央视场与落坑地面）
-    const cx = EXPLOSION_SPAWN.x, sz = EXPLOSION_SPAWN.z;
-    for (const dist of EXPLOSION_RANGE_MARKERS) {
-      const z = sz - dist;
-      // 左右两侧短标线（中段留给真实弹坑形变，避免横跨炮坑悬空）
-      Box(`RangeTickL${dist}`, "Line", cx - 12.5, 0.015, z, 3.6, 0.03, 0.14, false);
-      Box(`RangeTickR${dist}`, "Line", cx + 12.5, 0.015, z, 3.6, 0.03, 0.14, false);
-      Box(`RangePostL${dist}`, "Boundary", cx - 15.2, 0.28, z, 0.14, 0.56, 0.14, false);
-      this.Label(sink, `RangeDist${dist}`, `${dist} m`, cx - 15.2, 0.62, z + 0.08, 1.9);
+  BuildExtraStructures(sink, materialMap) {
+    const signMarkers = this.Markers((m) => !!m.meta?.signId);
+    if (signMarkers.length) {
+      const signs = signMarkers.map((m) => ({ id: m.meta.signId, text: m.meta.text || m.name, sub: "" }));
+      const atlas = CreateSignAtlas(signs, {
+        cols: 3, tileW: 512, tileH: 140,
+        background: "#1a2326", textColor: "#e8e3d2", borderColor: "#b89f63",
+        titleFont: "bold 62px sans-serif", titleY: 72, insetPx: 2, anisotropy: 4,
+      });
+      this.ownedTextures.push(atlas.texture);
+      const signMat = new THREE.MeshBasicMaterial({
+        name: "ExplosionRangeSigns",
+        map: atlas.texture,
+        toneMapped: false,
+      });
+      this.ownedMaterials.set("ExplosionRangeSigns", signMat);
+      materialMap.set("ExplosionRangeSigns", signMat);
+      sink.SetSector("ExplosionSigns");
+      for (const m of signMarkers) {
+        const w = m.meta.w || 1.9;
+        AddAtlasSignToSink(sink, "ExplosionRangeSigns", atlas, m.meta.signId,
+          m.x, m.y ?? 0.62, m.z, w, w * 140 / 512, 0, m.ry || 0);
+      }
     }
-
-    // 侧方按需战车停放坪（远离主投弹中心线，默认空坪，面板选中某型战车后才放上对应实模）
-    const pad = EXPLOSION_VEHICLE_PAD;
-    Box("VehicleSidePad", "Pad", pad.x, 0.03, pad.z, 6.2, 0.06, 7.6, true, "testPad");
-
-    // 场地四周低矮围墙（保留边界墙体碰撞，供穿墙截断验证）
-    const b = this.bounds;
-    for (const x of [b.minX + 0.5, b.maxX - 0.5]) Box("SideBoundary", "Boundary", x, 1.4, (b.minZ + b.maxZ) / 2, 1, 2.8, b.maxZ - b.minZ);
-    for (const z of [b.minZ + 0.5, b.maxZ - 0.5]) Box("EndBoundary", "Boundary", (b.minX + b.maxX) / 2, 1.4, z, b.maxX - b.minX, 2.8, 1);
-
-    for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) })) {
-      if (mesh.material.isMeshBasicMaterial) mesh.castShadow = false;
-      this.meshes.push(mesh);
-    }
-    this.colliders = sink.colliders;
-    this.covers = [];
-    this.stats.structures = sink.colliders.length;
-
-    // 可按需开关的目标掩体沙袋墙（用于测试温雷空爆越过掩体杀伤掩体后日军）
     this._BuildCoverWall();
   }
 
   _BuildCoverWall() {
     const group = new THREE.Group();
     group.name = "ExplosionTargetCoverWall";
-    const bagMat = this.materials.get("Sandbag");
-    const timberMat = this.materials.get("Timber");
+    const bagMat = this._CloneFlatMaterial("ExplosionSandbag", 0x9b8e72);
+    const timberMat = this._CloneFlatMaterial("ExplosionTimber", 0x624d38);
     const geos = [];
     const Add = (geo, mat, x, y, z) => {
       geos.push(geo);
@@ -135,7 +77,6 @@ export class ExplosionRangeField extends RangeField {
       m.receiveShadow = true;
       group.add(m);
     };
-    // 8 米宽、1.05 米高错缝沙袋低墙 + 两侧木桩支撑
     for (let row = 0; row < 3; row += 1) {
       const count = row % 2 === 0 ? 8 : 7;
       for (let i = 0; i < count; i += 1) {
@@ -153,12 +94,14 @@ export class ExplosionRangeField extends RangeField {
   }
 
   /** 按需显示或隐藏靶区低掩体（与物理碰撞盒同步，隐藏时场地彻底还原为空旷平地）。 */
-  SetCoverWall(visible, zPos = EXPLOSION_SPAWN.z - 20.2) {
+  SetCoverWall(visible, zPos = null) {
     if (!this.coverWallGroup) return false;
+    const anchor = this.Marker("DefaultCoverWall");
+    const targetZ = zPos ?? anchor?.z ?? (EXPLOSION_SPAWN.z - 20.2);
+    const x = anchor?.x ?? EXPLOSION_SPAWN.x;
+    const y = typeof this.BaseGroundHeight === "function" ? this.BaseGroundHeight(x, targetZ) : this.GroundHeight(x, targetZ);
     this.coverWallGroup.visible = !!visible;
-    const x = EXPLOSION_SPAWN.x;
-    const y = this.BaseGroundHeight(x, zPos);
-    this.coverWallGroup.position.set(x, y, zPos);
+    this.coverWallGroup.position.set(x, y, targetZ);
     if (this.coverCollider) {
       const idx = this.colliders.indexOf(this.coverCollider);
       if (idx >= 0) this.colliders.splice(idx, 1);
@@ -166,7 +109,7 @@ export class ExplosionRangeField extends RangeField {
     }
     if (visible) {
       this.coverCollider = {
-        minX: x - 4.0, maxX: x + 4.0, minY: y, maxY: y + 1.05, minZ: zPos - 0.36, maxZ: zPos + 0.36,
+        minX: x - 4.0, maxX: x + 4.0, minY: y, maxY: y + 1.05, minZ: targetZ - 0.36, maxZ: targetZ + 0.36,
         tag: "sandbag",
       };
       this.colliders.push(this.coverCollider);
@@ -176,14 +119,19 @@ export class ExplosionRangeField extends RangeField {
 
   /** 预载三款日军战车资产但默认全部隐藏，不在进场时一股脑塞满场地。 */
   async LoadVehicles() {
+    const padAnchor = this.Marker("VehiclePadAnchor");
+    const padX = padAnchor?.x ?? EXPLOSION_VEHICLE_PAD.x;
+    const padZ = padAnchor?.z ?? EXPLOSION_VEHICLE_PAD.z;
+    const armorMat = this._CloneFlatMaterial("ExplosionArmor", 0x555c4a);
+    const trackMat = this._CloneFlatMaterial("ExplosionTrack", 0x3b3d3c);
     for (const spec of EXPLOSION_VEHICLES) {
       const doc = await LoadDocument(`./Model/Model_${spec.id}.tzm.json`);
       if (!doc) throw new Error(`Missing vehicle ${spec.id}`);
       const model = InstantiateModel(doc, {
-        materials: { armor: this.materials.get("Armor"), steel: this.library.Get("Steel"), track: this.materials.get("Track") },
+        materials: { armor: armorMat, steel: this.library.Get("Steel"), track: trackMat },
       });
       model.root.name = `ExplosionVehicle_${spec.id}`;
-      model.root.position.set(spec.x, spec.y + 0.06, spec.z);
+      model.root.position.set(padX, (spec.y || 0) + 0.06, padZ);
       model.root.visible = false;
       this.scene.add(model.root);
       this.models.set(spec.id, model);
@@ -192,13 +140,16 @@ export class ExplosionRangeField extends RangeField {
 
   /** 切换侧方坪上唯一出场的战车（id=null 表示清空不放战车）。 */
   SetActiveVehicle(id) {
+    const padAnchor = this.Marker("VehiclePadAnchor");
+    const padX = padAnchor?.x ?? EXPLOSION_VEHICLE_PAD.x;
+    const padZ = padAnchor?.z ?? EXPLOSION_VEHICLE_PAD.z;
     const next = id && this.models.has(id) ? id : null;
     this.activeVehicleId = next;
     for (const [key, model] of this.models) {
       model.root.visible = key === next;
       if (key === next) {
         const spec = EXPLOSION_VEHICLES.find((s) => s.id === key);
-        if (spec) model.root.position.set(spec.x, spec.y + 0.06, spec.z);
+        if (spec) model.root.position.set(padX, (spec.y || 0) + 0.06, padZ);
       }
     }
     if (this.vehicleCollider) {
@@ -207,10 +158,9 @@ export class ExplosionRangeField extends RangeField {
       this.vehicleCollider = null;
     }
     if (next) {
-      const pad = EXPLOSION_VEHICLE_PAD;
       const hw = next === "Type97ChiHa" ? 1.25 : 1.08;
       this.vehicleCollider = {
-        minX: pad.x - hw, maxX: pad.x + hw, minY: 0, maxY: 2.2, minZ: pad.z - 2.3, maxZ: pad.z + 2.3,
+        minX: padX - hw, maxX: padX + hw, minY: 0, maxY: 2.2, minZ: padZ - 2.3, maxZ: padZ + 2.3,
         tag: "testVehicle",
       };
       this.colliders.push(this.vehicleCollider);
@@ -230,9 +180,7 @@ export class ExplosionRangeField extends RangeField {
       this.coverWallGroup = null;
     }
     super.Dispose();
-    for (const material of this.materials.values()) material.dispose();
-    for (const texture of this.textures) texture.dispose();
-    this.materials.clear();
-    this.textures.length = 0;
   }
 }
+
+export default ExplosionRangeField;

@@ -188,7 +188,8 @@ Check("发布构建比完整包小", deploy.gameInputs.length < full.gameInputs.
   Check("发布清单与范围白名单都不放行 AdvancedTools/", PUBLISH_EXCLUDE.some((entry) => entry.path === "Taierzhuang1938/AdvancedTools/")
     && !IsPublishedSource("Taierzhuang1938/AdvancedTools/ControlCenter.html") && IsPublishedSource("Taierzhuang1938/index.html"));
 }
-const saved = Buffer.byteLength(full.code) - Buffer.byteLength(stripped.code);
+const GameBytes = (bundle) => Buffer.byteLength(bundle.code) + (bundle.chunkFiles || []).reduce((sum, file) => sum + Buffer.byteLength(file.code), 0);
+const saved = GameBytes(full) - GameBytes(stripped);
 Check("剔除让游戏包明显变小", saved > 200 * 1024, `${(saved / 1024).toFixed(0)} KB（${full.gameInputs.length} → ${stripped.gameInputs.length} 个模块）`);
 
 // --- 3. 实机：剔除后的包照常开机、设置可用 --------------------------------------
@@ -204,6 +205,7 @@ if (process.argv.includes("--browser")) {
       page.on("pageerror", (error) => errors.push(String(error)));
       await page.route("**/Taierzhuang1938/?*", (route) => route.fulfill({ contentType: "text/html", body: stripped.html }));
       for (const file of stripped.files) {
+        await page.route(`**/${file.name}`, (route) => route.fulfill({ contentType: "text/javascript", body: file.code }));
         await page.route(`**/${file.name}?*`, (route) => route.fulfill({ contentType: "text/javascript", body: file.code }));
       }
       await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?${fixture.query}&quality=low&scale=small`,
@@ -245,6 +247,7 @@ if (process.argv.includes("--browser")) {
       page.on("pageerror", (error) => errors.push(String(error)));
       await page.route("**/Taierzhuang1938/?*", (route) => route.fulfill({ contentType: "text/html", body: deploy.html }));
       for (const file of deploy.files) {
+        await page.route(`**/${file.name}`, (route) => route.fulfill({ contentType: "text/javascript", body: file.code }));
         await page.route(`**/${file.name}?*`, (route) => route.fulfill({ contentType: "text/javascript", body: file.code }));
       }
       await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?${fixture.query}&quality=low&scale=small`,

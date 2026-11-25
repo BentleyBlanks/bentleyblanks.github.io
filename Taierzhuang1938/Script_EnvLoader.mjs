@@ -16,7 +16,8 @@ export function SceneIdOfUrl(url) {
  * → { kind: "scene" | "level", id } 或 null（这一关没有区域文件可言）
  */
 export function EnvTargetForPhase(phase) {
-  const sceneId = SceneIdOfUrl(phase?.blockout?.SceneUrl?.());
+  const sceneUrl = phase?.blockout?.SceneUrl?.() || (phase?.sceneAsset?.hasEnvironment ? phase.sceneAsset.SceneUrl?.() : null);
+  const sceneId = SceneIdOfUrl(sceneUrl);
   if (sceneId) return { kind: "scene", id: sceneId };
   const levelId = phase?.id ? ENV_LEVELS[phase.id] : null;
   return levelId ? { kind: "level", id: levelId } : null;

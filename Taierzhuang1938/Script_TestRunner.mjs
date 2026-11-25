@@ -1301,7 +1301,7 @@ const changedDomainRules = [
   // 行为图数据与试验场是编辑器和 AI 共用的：改了跑 ai 域（AiBrainGraphTest / AiEditorTest / AiCombatBrowserTest）。
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   { domain: "ai", pattern: /SoldierComponents|Script_SoldierFields|Script_SoldierView|SoldierArchetypes|SoldierForeignWrites/i },
-  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLab/ },
+  { domain: "sandboxRanges", pattern: /SandboxRanges|Script_SandboxPlugin|Script_TestSceneField|Script_SceneAssetLoader|Script_GameClock|Data_StartupRouting|Script_RangeTargets|Script_MeleeLab/ },
   { domain: "dataRules", pattern: /Data_DataSources|Script_Data(Sources|Json|Refs)Test/ },
   // 数据模块的配套函数（2026-11-02 从 Data_X 搬到 Script_X）：领域跟着原来的数据模块走。
   { domain: "render", pattern: /Script_(CharacterSelection|Tengxian|Tuning_Gtao).mjs$/ },

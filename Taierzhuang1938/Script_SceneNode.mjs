@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DecodeSceneHeights, SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
+import { DecodeSceneHeights, FlatSceneHeights, IsFlatTerrain, SceneDir, SceneFileName } from "./Script_SceneDoc.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
 import { BLOCKOUT_LEVELS, BlockoutSliceDoc } from "./Script_EditorBlockoutLevels.mjs";
 
@@ -20,7 +20,9 @@ export function SceneFilePath(sceneId) {
 export function ReadSceneSync(sceneId) {
   const file = SceneFilePath(sceneId);
   const doc = JSON.parse(fs.readFileSync(file, "utf8"));
-  const pre = DecodeSceneHeights(fs.readFileSync(path.join(path.dirname(file), doc.terrain.file)), doc.terrain);
+  const pre = IsFlatTerrain(doc.terrain)
+    ? FlatSceneHeights(doc.terrain)
+    : DecodeSceneHeights(fs.readFileSync(path.join(path.dirname(file), doc.terrain.file)), doc.terrain);
   const datumFile = doc.trenches?.datum?.file;
   const datum = datumFile ? fs.readFileSync(path.join(path.dirname(file), datumFile)) : null;
   const { heights, plan } = PrepareSceneTerrain(doc, pre, datum);

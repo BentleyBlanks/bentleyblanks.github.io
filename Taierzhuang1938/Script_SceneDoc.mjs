@@ -136,8 +136,12 @@ export function ValidateScene(doc) {
   const t = doc.terrain;
   if (!IsObject(t)) errors.push("terrain 要是对象");
   else {
-    if (!NonEmpty(t.file) || /[\\/]/.test(t.file)) errors.push("terrain.file 要是同目录下的文件名");
-    if (t.encoding !== SCENE_HEIGHT_ENCODING) errors.push(`terrain.encoding 要是 ${JSON.stringify(SCENE_HEIGHT_ENCODING)}`);
+    if (t.kind === "flat") {
+      if (t.y !== undefined && !Finite(t.y)) errors.push("terrain.y 要是有限数字");
+    } else {
+      if (!NonEmpty(t.file) || /[\\/]/.test(t.file)) errors.push("terrain.file 要是同目录下的文件名");
+      if (t.encoding !== SCENE_HEIGHT_ENCODING) errors.push(`terrain.encoding 要是 ${JSON.stringify(SCENE_HEIGHT_ENCODING)}`);
+    }
     if (!Finite(t.minX) || !Finite(t.minZ) || !(Finite(t.cellM) && t.cellM > 0)) errors.push("terrain 要带有限的 minX / minZ 与正的 cellM");
     if (!Number.isInteger(t.cols) || !Number.isInteger(t.rows) || t.cols < 1 || t.rows < 1) errors.push("terrain.cols / rows 要是正整数");
   }
@@ -211,6 +215,20 @@ export function FormatSceneJson(scene) {
 // ---------------------------------------------------------------------------
 // 高度图
 
+/** 地形是不是解析平地（无需外部 .height.bin 高度图）。 */
+export function IsFlatTerrain(terrain) {
+  return terrain?.kind === "flat";
+}
+
+/** 按 terrain 尺寸生成平地格点高度数组（全为 terrain.y ?? 0）。 */
+export function FlatSceneHeights(terrain) {
+  const count = (terrain.cols + 1) * (terrain.rows + 1);
+  const heights = new Float32Array(count);
+  const y = Finite(terrain?.y) ? terrain.y : 0;
+  if (y !== 0) heights.fill(y);
+  return heights;
+}
+
 /** 字节（Uint8Array / ArrayBuffer）→ 每个格点的高度（米），heights[iz*(cols+1)+ix]。 */
 export function DecodeSceneHeights(bytes, terrain) {
   const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
@@ -280,6 +298,12 @@ export function SceneObjectToBlock(obj) {
     // 道具铺几件（params.tile = [nx, ny, nz]，同现行第一关替换表的 tile：一只长盒子里排几个模型）
     ...(asset?.kind === "prop" && Array.isArray(obj.params?.tile) ? { propTile: [...obj.params.tile] } : {}),
     ...(asset?.kind === "tree" ? { sceneTree: true } : {}),
+    ...(typeof obj.params?.color === "string" ? { color: obj.params.color } : {}),
+    ...(typeof obj.params?.libraryMaterial === "string" ? { libraryMaterial: obj.params.libraryMaterial } : {}),
+    ...(Finite(obj.params?.roughness) ? { roughness: obj.params.roughness } : {}),
+    ...(Finite(obj.params?.metalness) ? { metalness: obj.params.metalness } : {}),
+    ...(typeof obj.params?.sector === "string" ? { sector: obj.params.sector } : {}),
+    ...(typeof obj.params?.surface === "string" ? { surface: obj.params.surface } : {}),
     ...(obj.pos[1] !== null ? { y: obj.pos[1] + h / 2 } : {}),
     ...(obj.visual === false ? { visual: false } : {}),
     ...(obj.tag ? { tag: obj.tag } : {}),
@@ -356,6 +380,12 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     ...(look.groundPaintCellM !== undefined ? { groundPaintCellM: look.groundPaintCellM } : {}),
     ...(look.terrainLayers ? { terrainLayers: look.terrainLayers } : {}),
     ...(look.proceduralDressing === false ? { proceduralDressing: false } : {}),
+    ...(typeof look.groundColor === "string" ? { groundColor: look.groundColor } : {}),
+    ...(typeof look.groundLibraryMaterial === "string" ? { groundLibraryMaterial: look.groundLibraryMaterial } : {}),
+    ...(Finite(look.groundMarginM) ? { groundMarginM: look.groundMarginM } : {}),
+    ...(IsObject(look.groundGrid) ? { groundGrid: { ...look.groundGrid } } : {}),
+    ...(Array.isArray(look.groundTint) ? { groundTint: [...look.groundTint] } : {}),
+    ...(look.deformableTerrain === true ? { deformableTerrain: true } : {}),
     ...(scene.smokeColumns ? { smokeColumns: scene.smokeColumns.filter(s => Inside(area, s.x, s.z)) } : {}),
     ...(scene.fogVolumes ? { fogVolumes: scene.fogVolumes.filter(({ position: [x, , z], size: [rx, , rz] }) =>
       x + rx >= area.minX && x - rx <= area.maxX && z + rz >= area.minZ && z - rz <= area.maxZ) } : {}),

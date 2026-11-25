@@ -988,12 +988,12 @@ async function CheckMissionList() {
     const rows = [...document.querySelectorAll('.mnLevel')].filter(el => el.getClientRects().length);
     const art = document.querySelector('.mnMissionArt').getBoundingClientRect();
     const copy = document.querySelector('.mnMissionCopy').getBoundingClientRect();
-    return {visible:rows.length,trainingHidden:document.querySelector('.mnSandboxTrack').closest('section').hidden,
+    return {visible:rows.length,trainingRemoved:!document.querySelector('.mnSandboxTrack'),
       heroWidth:art.width,viewport:innerWidth,copyOverArt:copy.top>art.top+art.height*.45&&copy.top<art.bottom,
-      toggle:document.querySelector('.mnTrainingToggle').textContent};
+      toggleHidden:!!document.querySelector('.mnTrainingToggle')?.hidden};
   });
-  Check('03构图：只显示六章，任务大图与下缘简报叠放，标题旁可切测试场景',presentation.visible===6&&presentation.trainingHidden
-    &&presentation.heroWidth>presentation.viewport*.55&&presentation.copyOverArt&&presentation.toggle==='测试场景',JSON.stringify(presentation));
+  Check('03构图：只显示六章，任务大图与下缘简报叠放，测试场景入口已从游戏菜单移除',presentation.visible===6&&presentation.trainingRemoved
+    &&presentation.heroWidth>presentation.viewport*.55&&presentation.copyOverArt&&presentation.toggleHidden,JSON.stringify(presentation));
   const images=[];
   for(let index=0;index<6;index++){
     await page.locator('.mnMissionTrack .mnLevel').nth(index).hover();
@@ -1061,22 +1061,12 @@ async function CheckMissionList() {
     await page.locator('.mnMissionTrack .mnLevel').nth(5).hover();
     await page.keyboard.press('Enter');
     await page.keyboard.press('ArrowDown');
-    Check('正式章节的方向键不跳进隐藏的测试场景',await page.evaluate(()=>window.Taierzhuang.menu.selected===5));
-    await page.locator('.mnTrainingToggle').click();
-    await page.keyboard.press('ArrowUp');
-    Check('训练入口显示八项测试，方向键停在当前分组',await page.evaluate(()=>window.Taierzhuang.menu.selected===6
-      &&document.querySelector('.mnPanelTitle').textContent==='训练与测试'
-      &&[...document.querySelectorAll('.mnLevel')].filter(el=>el.getClientRects().length).length===8));
-    await page.locator('.mnSandboxLevel').nth(1).click();
-    await page.locator('.mnMissionStart').click();
-    await page.keyboard.press('Enter');
-    await page.keyboard.press('Escape');
-    Check('训练页 Esc 返回此前章节，保持正式菜单与暂停的返回层级',await page.evaluate(()=>window.Taierzhuang.menu.mode==='levels'
-      &&window.Taierzhuang.menu.selected===5&&document.querySelector('.mnTrainingToggle').textContent==='测试场景'));
+    Check('正式章节的方向键停在末章，不越界且无隐藏测试场景',await page.evaluate(()=>window.Taierzhuang.menu.selected===5
+      &&document.querySelectorAll('.mnSandboxLevel').length===0&&!!document.querySelector('.mnTrainingToggle')?.hidden));
     await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(0));
     await page.locator('.mnMissionStart').focus();
     await page.keyboard.press('Enter');
-    Check("鼠标、Enter、测试入口与开始按钮各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,7,7,7,0'),
+    Check("鼠标、Enter 与开始按钮各只触发一次正确任务",await page.evaluate(()=>window.missionPlayed.join(',')==='3,4,5,0'),
       await page.evaluate(()=>window.missionPlayed.join(',')));
     await page.evaluate(()=>window.Taierzhuang.menu.SelectLevel(1));
     Check('未完成章节的开始按钮不可进入任务',await page.locator('.mnMissionStart').isDisabled());
@@ -1099,10 +1089,6 @@ async function CheckMissionList() {
         return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=foot.top+1;
       }));
       await page.screenshot({path:path.join(outDir,"Scene_MissionList"+name+".png")});
-      await page.locator('.mnCampaignBack').focus();
-      await page.locator('.mnTrainingToggle').click();
-      await page.locator('.mnSandboxLevel').last().focus();
-      Check(name+"最后一个测试入口能滚动到并选中",await page.evaluate(()=>window.Taierzhuang.menu.selected===window.Taierzhuang.menu.entries.length-1));
       const reopened=await page.evaluate(()=>{
         const menu=window.Taierzhuang.menu;menu.Show('title');menu.Show('levels');
         const row=document.querySelector('.mnLevel.on').getBoundingClientRect();
@@ -1655,51 +1641,18 @@ async function CheckMissionList() {
   await Boot();
   const brief = await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuShow("levels");
-    const menu = window.Taierzhuang.menu;
-    const rangeIndex = menu.entries.findIndex((entry) => entry.id === "Range"
-      || entry.sandboxKey === "range");
-    menu.SelectLevel(rangeIndex);
     return {
-      selected: window.Taierzhuang.Debug.Menu().selected,
-      title: document.querySelector("#menu .mnBriefTitle")?.textContent || "",
-      mark: document.querySelector("#menu .mnSandboxLevel.on .mnLvMark")?.textContent || "",
-      no: document.querySelector("#menu .mnSandboxLevel.on .mnLvNo")?.textContent || "",
-      sandboxes: [...document.querySelectorAll("#menu .mnSandboxLevel")].map((entry) => ({
-        no: entry.querySelector(".mnLvNo")?.textContent || "",
-        name: entry.querySelector(".mnLvName")?.textContent || "",
-        mark: entry.querySelector(".mnLvMark")?.textContent || "",
-      })),
-      map: !!document.querySelector("#menu .mnMap"),
-      objective: document.querySelector("#menu .mnMissionObjective")?.textContent || "",
-      go: !!document.querySelector("#menu .mnGo"),
+      sandboxes: document.querySelectorAll("#menu .mnSandboxLevel").length,
+      toggleHidden: !!document.querySelector("#menu .mnTrainingToggle")?.hidden,
+      chapters: document.querySelectorAll("#menu .mnChapterLevel").length,
     };
   });
-  Check("靶场条目排在六条章节之后，标「沙盒」",
-    brief.selected === 8 && brief.mark === "沙盒" && brief.no === "靶",   // 枪械专项后保留原玩法靶场
-    `selected=${brief.selected} mark=${brief.mark} no=${brief.no}`);
-  Check("选章列出操作、枪械、玩法、爆炸、白刃、断肢、炮击扬尘、人物战场反应八项测试入口（第一关已归入正式章节）",
-    brief.sandboxes.length === 9
-      && brief.sandboxes.map((entry) => entry.no).join(",") === "跃,枪,靶,爆,刃,肢,尘,震,布"
-      && brief.sandboxes.every((entry) => entry.mark === "沙盒")
-      && brief.sandboxes[0].name.includes("操作交互测试场")
-      && brief.sandboxes[1].name.includes("枪械白盒靶场")
-      && brief.sandboxes[2].name.includes("玩法测试靶场")
-      && brief.sandboxes[3].name.includes("爆炸测试场")
-      && brief.sandboxes[4].name.includes("白刃战 · 大刀与刺刀")
-      && brief.sandboxes[5].name.includes("断肢测试场")
-      && brief.sandboxes[6].name.includes("炮击扬尘测试场")
-      && brief.sandboxes[7].name.includes("人物战场反应测试场")
-      && brief.sandboxes[8].name.includes("布料模拟测试场")
-      && !brief.sandboxes.some((entry) => /第一关|P0\/P1\/P2/.test(entry.name))
-      && brief.sandboxes.every((entry) => !entry.name.includes("界河")),
-    JSON.stringify(brief.sandboxes));
-  Check("靶场预览只留一句目标、没有二次确认按钮，且**不画**滕县全图",
-    brief.title === "玩法测试靶场" && brief.objective.length > 0 && !brief.go && !brief.map,
-    `${brief.title} / ${brief.objective} / go=${brief.go} / map=${brief.map}`);
-  await page.screenshot({ path: path.join(outDir, "Menu_Levels_Range.png") });
+  Check("测试场景已从游戏菜单选关移除（仅保留六章正式战役，统一走独立测试场景页）",
+    brief.sandboxes === 0 && brief.toggleHidden && brief.chapters === 6,
+    JSON.stringify(brief));
 
-  // 单击已选中的靶场卡片直接整页重载，等新页面把 Debug.Range 挂出来
-  await page.click("#menu .mnSandboxLevel.on");
+  // 通过独立测试入口直达靶场（?range=1），等页面把 Debug.Range 挂出来
+  await page.goto(Url("&range=1"), { timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.Debug?.Range !== undefined,
     null, { timeout: 240000 });
   const entered = await page.evaluate(() => ({
@@ -1711,7 +1664,7 @@ async function CheckMissionList() {
     rootOff: document.getElementById("menu").classList.contains("off"),
     bootStart: !document.getElementById("bootStart").disabled,
   }));
-  Check("从选章进得去靶场（?range=1，场上是靶场那一关）",
+  Check("直达独立靶场（?range=1，场上是靶场那一关）",
     entered.range === "1" && entered.level === "Range" && entered.stations === 3,
     `range=${entered.range} level=${entered.level} stations=${entered.stations}`);
   Check("靶场里菜单只建不开（开机不许一屏标题盖在场地上）",
@@ -1756,19 +1709,14 @@ async function CheckMissionList() {
     back.range === null && back.open && back.mode === "title" && back.level !== "Range",
     `range=${back.range} mode=${back.mode} level=${back.level}`);
 
-  await page.evaluate(() => {
-    window.Taierzhuang.Debug.MenuShow("levels");
-    const menu = window.Taierzhuang.menu;
-    menu.SelectLevel(menu.entries.findIndex(entry => entry.sandboxKey === "explosions"));
-  });
-  await page.click("#menu .mnSandboxLevel.on");
+  await page.goto(Url("&explosions=1"), { timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && window.Taierzhuang.Debug.Level().id === "ExplosionRange",
     null, { timeout: 240000 });
   const explosionEntered = await page.evaluate(() => ({
     query: new URL(location.href).searchParams.get("explosions"), open: window.Taierzhuang.Debug.Menu().open,
     scene: window.Taierzhuang.Debug.Explosions.State(),
   }));
-  Check("爆炸场菜单卡进入独立场地，默认没有飞机盘旋",
+  Check("爆炸场独立入口进入独立场地，默认没有飞机盘旋",
     explosionEntered.query === "1" && !explosionEntered.open && explosionEntered.scene.visibleAircraft.length === 0,
     JSON.stringify(explosionEntered));
   await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));

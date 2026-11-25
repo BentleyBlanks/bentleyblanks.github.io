@@ -33,7 +33,10 @@ try {
     page.on('request', request => requests.push(request.url())); page.on('pageerror', error => errors.push(String(error)));
     if (deployed) {
       await page.route('**/Taierzhuang1938/?*', route => route.fulfill({contentType: 'text/html', body: bundle.html}));
-      for (const file of bundle.files) await page.route('**/' + file.name + '?*', route => route.fulfill({contentType: 'text/javascript', body: file.code}));
+      for (const file of bundle.files) {
+        await page.route('**/' + file.name, route => route.fulfill({contentType: 'text/javascript', body: file.code}));
+        await page.route('**/' + file.name + '?*', route => route.fulfill({contentType: 'text/javascript', body: file.code}));
+      }
     }
     const started = performance.now();
     await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/`, {waitUntil: 'commit'});
@@ -140,31 +143,13 @@ async function CheckMenuResponse(page, deployed) {
   assert.equal(response.actions, 1); assert.equal(response.snapshots, 1);
   assert.ok(response.copyShift < 1, 'outgoing text retains its layout during the crossfade');
   await page.waitForFunction(() => !document.querySelector('.mnBriefLeaving'));
-  await page.getByRole('button', {name: '测试场景', exact: true}).click();
-  assert.equal(await page.locator('.mnSandboxLevel:visible').count(), visibleSandboxKeys.length);
-  const hairEntry = page.getByRole('button', {name: /头发胡子测试场/});
-  await hairEntry.scrollIntoViewIfNeeded();
-  await hairEntry.hover();
-  await page.waitForFunction(() => Tengxian.menu.entries[Tengxian.menu.selected]?.sandboxKey === 'hair' && !document.querySelector('.mnBriefLeaving'));
-  assert.ok(await hairEntry.isVisible(), 'hair lab is discoverable in the visible test-scene menu');
-  await page.screenshot({path: path.join(out, `Scene_TestScenes_${deployed ? 'Bundle' : 'Source'}.png`)});
-  const routes = await page.evaluate(() => {
-    const m = Tengxian.menu, play = m.host.PlaySandbox, keys = [];
-    m.host.PlaySandbox = key => keys.push(key);
-    try { for (let i = m.campaign.length; i < m.entries.length; i++) m.levelEls[i].click(); }
-    finally { m.host.PlaySandbox = play; }
-    return keys;
-  });
-  assert.deepEqual(routes, visibleSandboxKeys, 'every selectable test scene has a working visible menu route');
-  await page.keyboard.press('Escape');
+  // 测试场景已从游戏主菜单移除，统一由独立工具页 AdvancedTools/TestScenes.html 进入。
+  assert.equal(await page.locator('.mnTrainingToggle:visible').count(), 0, 'test-scene toggle is removed from the campaign level select menu');
+  assert.equal(await page.locator('.mnSandboxLevel').count(), 0, 'no test-scene entries remain inside the game menu');
   assert.equal(await page.locator('.mnChapterLevel:visible').count(), 6);
   for (const viewport of [{width:390,height:844}, {width:844,height:390}]) {
     await page.setViewportSize(viewport);
-    const layout = await page.locator('.mnTrainingToggle').evaluate(el => {
-      const r=el.getBoundingClientRect();
-      return {fits:r.x>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight, height:r.height};
-    });
-    assert.ok(layout.fits && layout.height>=44, 'test scenes remain visible on phone and short screens');
+    assert.equal(await page.locator('.mnChapterLevel:visible').count(), 6, 'campaign chapters stay visible on phone and short screens');
   }
   await page.setViewportSize({width:1280,height:720});
   await page.emulateMedia({reducedMotion:'reduce'});
@@ -177,13 +162,5 @@ async function CheckMenuResponse(page, deployed) {
     const m=Tengxian.menu; m.Navigate('levels'); m.Navigate('title');
     return m.mode==='title' && !m.pendingMode && !m.pageAnimation;
   }), 'a quick return cancels pending navigation');
-  await page.click('[data-act="levels"]');
-  await page.waitForFunction(() => Tengxian.menu.mode === 'levels' && !Tengxian.menu.pageAnimation && !Tengxian.menu.pendingMode);
-  await page.getByRole('button', {name: '测试场景', exact: true}).click();
-  await page.route('**/*hair=1*', route => route.fulfill({contentType: 'text/html', body: '<title>Hair lab navigation</title>'}));
-  await page.getByRole('button', {name: /头发胡子测试场/}).click();
-  await page.waitForURL(url => url.searchParams.get('hair') === '1');
-  await page.goBack({waitUntil: 'commit'});
-  await page.waitForFunction(() => window.Tengxian?.state.ready && window.Tengxian.menu.open, null, {timeout: 90000});
   await page.evaluate(() => Tengxian.menu.Show('title'));
 }

@@ -1,13 +1,6 @@
-// 炮击扬尘测试场的世界（?impacts=1）：一片第一关同款的分层土壤地形 + 样条壕沟网络，外加布景。
-//
-// 继承 FirstLevelWhiteboxField —— 它已经包了这一切：连续可变形的土壤高度场（弹坑、Rapier 贴地、角色贴地共用同一份）、
-// RefineCells 沟壁细分、MissionPlain 分层地形 PBR（底土 / 草茬 / 沟边翻土）、壕沟表面土块 / 根毯 / 石头
-//（BuildTrenchEarth / BuildTrenchSurface）。这里只给它一份自己的布局（Data_ShellImpactRangeTerrain）并补布景：
-//   · 枯树（Model_BreakableDeadTree，炮击能打断）走 BreakableTrees.Load 的自带种树表；
-//   · 汽油桶、九二式重机枪：静态几何走 BuildSink 合批，碰撞盒照常登记；
-//   · 碉堡 / 弹药箱 / 补给箱 / 炮弹堆 / 沙袋：Script_ExternalProps 的 placementsOnly（Script_Main 在建关时接）；
-//   · 战车炮的发射阵地：两辆现有战车模型（动态模型，同爆炸测试场 LoadVehicles）。
-// 布景坐标一律在 Data_ShellImpactRange，这里不写数。
+// 炮击扬尘 / 人物反应测试场共用世界（?impacts=1 / ?reactions=1）：
+// 地形、四段样条壕沟、枯树、外部布景、汽油桶、重机枪与战车阵地锚点均从
+// Scenes/TestShellImpact/Scene_TestShellImpact.json 读取（缺失时退回 BuildShellImpactLayout）。
 import * as THREE from "three";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
@@ -25,7 +18,8 @@ const DRUM_COLORS = Object.freeze([0x5b6247, 0x7b4b33, 0x464a49]);
 
 export class ShellImpactRangeField extends FirstLevelWhiteboxField {
   constructor(scene, library, options = {}) {
-    super(scene, library, { ...options, whiteboxLayout: BuildShellImpactLayout() });
+    const layout = options.whiteboxLayout || BuildShellImpactLayout();
+    super(scene, library, { ...options, whiteboxLayout: layout });
     this.cameraFar = SHELL_IMPACT_CAMERA_FAR;
     this.worldLimits = { ...this.bounds, groundLimit: SHELL_IMPACT_WORLD.groundLimit };
     this.sceneryMaterials = new Map();
@@ -35,16 +29,48 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     this.sceneryStats = { drums: 0, mg: 0, trees: 0 };
   }
 
+  _TreeSpecs() {
+    if (Array.isArray(this.layout?.sceneTrees) && this.layout.sceneTrees.length) {
+      return this.layout.sceneTrees;
+    }
+    return SHELL_IMPACT_TREES.map((tree) => ({
+      id: tree.id, x: tree.x, z: tree.z, ry: tree.ry, scale: tree.scale, region: "ImpactRange",
+    }));
+  }
+
+  _DrumSpecs() {
+    const markers = (this.layout?.landmarks || []).filter((m) => m.meta?.kind === "drum");
+    if (markers.length) {
+      return markers.map((m) => ({ id: m.id, x: m.x, z: m.z, yaw: m.ry || 0, tilt: m.meta?.tilt ?? 0 }));
+    }
+    return SHELL_IMPACT_DRUMS;
+  }
+
+  _MgSpec() {
+    const marker = (this.layout?.landmarks || []).find((m) => m.meta?.kind === "mg");
+    if (marker) {
+      return { weaponId: marker.meta.weaponId || SHELL_IMPACT_MG.weaponId, x: marker.x, z: marker.z, yaw: marker.ry || 0 };
+    }
+    return SHELL_IMPACT_MG;
+  }
+
+  _TankSpecs() {
+    const markers = (this.layout?.landmarks || []).filter((m) => m.meta?.kind === "tank" && m.meta?.tankId);
+    if (markers.length) {
+      return Object.fromEntries(markers.map((m) => [m.meta.tankId, { x: m.x, z: m.z, yaw: m.ry || 0 }]));
+    }
+    return SHELL_IMPACT_TANKS;
+  }
+
   async PrepareAssets() {
     await super.PrepareAssets();
-    // 枯树：自带种树表（第一关的 MakeTreePlacements 只认第一关的坐标）。
-    this.breakableTrees = await BreakableTrees.Load(this, SHELL_IMPACT_TREES.map((tree) => ({
-      id: tree.id, x: tree.x, z: tree.z, ry: tree.ry, scale: tree.scale, region: "ImpactRange",
-    })));
+    this.breakableTrees = await BreakableTrees.Load(this, this._TreeSpecs());
     this.sceneryStats.trees = this.breakableTrees.trees.length;
-    const urls = Object.keys(SHELL_IMPACT_TANKS).map((id) => [id, `./Model/Model_${id}.tzm.json`]);
+    const mgSpec = this._MgSpec();
+    const tanksMap = this._TankSpecs();
+    const urls = Object.keys(tanksMap).map((id) => [id, `./Model/Model_${id}.tzm.json`]);
     const [mg, ...tanks] = await Promise.all([
-      LoadDocument(`./Model/Model_${SHELL_IMPACT_MG.weaponId}.tzm.json`),
+      LoadDocument(`./Model/Model_${mgSpec.weaponId}.tzm.json`),
       ...urls.map(([, url]) => LoadDocument(url)),
     ]);
     this.mgDoc = mg;
@@ -53,7 +79,6 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
 
   *BuildSteps() {
     for (const step of super.BuildSteps()) {
-      // 最后一步之前补布景：碰撞盒要赶在 BuildCollisionGrid 之前进表（super 在 progress 1 那一步已建过一次，这里重建）。
       if (step.progress >= 1) { this.BuildScenery(); this.BuildCollisionGrid(); }
       yield step;
     }
@@ -68,14 +93,10 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     return material;
   }
 
-  /**
-   * 地面铺完之后：沟沿抛土裙面（trenchEarth 里吃地面材质的那几片）的顶点色在基类里固定写 1，
-   * 而地面本身按 SHELL_IMPACT_GROUND_TINT 偏了黄褐 —— 两边不一致就是一圈灰带。这里把同一个偏色补到这些裙面上
-   *（地面顶点色按 sRGB 写进去，所以这里也按 sRGB 转线性再乘）。
-   */
   BuildWhiteBoxes() {
     super.BuildWhiteBoxes();
-    const tint = new THREE.Color().setRGB(SHELL_IMPACT_GROUND_TINT[0], SHELL_IMPACT_GROUND_TINT[1], SHELL_IMPACT_GROUND_TINT[2], THREE.SRGBColorSpace);
+    const tintTuple = this.layout?.groundTint || SHELL_IMPACT_GROUND_TINT;
+    const tint = new THREE.Color().setRGB(tintTuple[0], tintTuple[1], tintTuple[2], THREE.SRGBColorSpace);
     for (const mesh of this.meshes) {
       if (!mesh.userData.trenchEarth || !mesh.userData.groundSurface) continue;
       const color = mesh.geometry.attributes.color;
@@ -97,12 +118,11 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
       scale = new THREE.Vector3(1, 1, 1), euler = new THREE.Euler();
     const body = new THREE.CylinderGeometry(DRUM.radiusM, DRUM.radiusM, DRUM.heightM, 14, 1);
     const rib = new THREE.TorusGeometry(DRUM.ribRadiusM, DRUM.ribTubeM, 5, 14);
-    for (const [index, drum] of SHELL_IMPACT_DRUMS.entries()) {
+    for (const [index, drum] of this._DrumSpecs().entries()) {
       const ground = this.StaticGroundHeight(drum.x, drum.z);
-      // tilt 1：倒在地上的桶（圆柱横着，轴向按 yaw）。
       const lying = drum.tilt === 1;
       const y = ground + (lying ? DRUM.radiusM : DRUM.heightM / 2);
-      euler.set(lying ? 0 : 0, drum.yaw, lying ? Math.PI / 2 : 0, "YXZ");
+      euler.set(0, drum.yaw, lying ? Math.PI / 2 : 0, "YXZ");
       quaternion.setFromEuler(euler);
       position.set(drum.x, y, drum.z);
       matrix.compose(position, quaternion, scale);
@@ -129,13 +149,11 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
 
   /** 九二式重机枪（三脚架）：模型是 tzm，网格烘进 BuildSink（枪口朝 -Z；yaw 0 = 朝北）。 */
   BakeMachineGun(sink, keys) {
-    const spec = SHELL_IMPACT_MG;
+    const spec = this._MgSpec();
     if (!this.mgDoc) return;
-    // 不用金属度高的 Steel：场里没有环境反射时它是一团黑。深橄榄灰的哑光漆，远看也读得出轮廓。
     const steel = this.Material("ImpactMgSteel", { color: 0x565b4c, roughness: 0.55, metalness: 0.2 });
     keys.set("ImpactMgSteel", steel);
     const built = InstantiateModel(this.mgDoc, { materials: { steel }, batch: true });
-    // 模型原点在握把，三脚架脚底在 y = −0.246，枪身中心在 x ≈ −0.2、z ≈ −0.32：把脚底中心放到摆位点。
     const bounds = built.bounds;
     const cx = (bounds.min.x + bounds.max.x) / 2, cz = (bounds.min.z + bounds.max.z) / 2;
     const ground = this.StaticGroundHeight(spec.x, spec.z);
@@ -157,9 +175,8 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     const armor89 = this.library.Get("Type89Armor", { side: THREE.DoubleSide });
     const track = this.library.Get("Type89Track", { side: THREE.DoubleSide });
     const steel = this.Material("ImpactTankSteel", { color: 0x40443c, roughness: 0.6, metalness: 0.3 });
-    // 八九式有自己的装甲贴图；九五式 / 九七式的 UV 是另一套，套八九式的图会花成格子，用哑光军绿。
     const armorFlat = this.Material("ImpactTankArmor", { color: 0x5b6350, roughness: 0.78, metalness: 0.15, side: THREE.DoubleSide });
-    for (const [id, spec] of Object.entries(SHELL_IMPACT_TANKS)) {
+    for (const [id, spec] of Object.entries(this._TankSpecs())) {
       const doc = this.tankDocs.get(id);
       if (!doc) throw new Error(`Missing vehicle model ${id}`);
       const built = InstantiateModel(doc, { materials: {
@@ -167,7 +184,6 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
         type89Armor: armor89, type89Barrel: armor89, type89Track: track,
       } });
       built.root.name = `ShellImpactTank_${id}`;
-      // 车头（炮口）局部 -Z；yaw = π/2 → 朝西（-X）。四点取地高，车体贴坡。
       const c = Math.cos(spec.yaw), s = Math.sin(spec.yaw);
       const Ground = (dx, dz) => this.GroundHeight(spec.x + dx * c + dz * s, spec.z - dx * s + dz * c);
       const y = (Ground(0, -1.8) + Ground(0, 1.8) + Ground(-1, 0) + Ground(1, 0)) / 4;

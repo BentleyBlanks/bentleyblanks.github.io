@@ -1,0 +1,19 @@
+{
+  "schema": "tengxian-scene/1",
+  "id": "TestMelee",
+  "title": "测试场景 · 白刃战实验场",
+  "source": {"notes":"从 Script_RangeField 白刃分支拆分的独立场景文件（?melee=1）"},
+  "bounds": {"minX":1387,"maxX":1413,"minZ":1442,"maxZ":1480},
+  "spawn": {"x":1400,"z":1476,"yawDeg":0},
+  "terrain": {"kind":"flat","y":0,"minX":1387,"minZ":1442,"cellM":2,"cols":13,"rows":19},
+  "look": {"groundLibraryMaterial":"Ground","groundMarginM":40,"groundColor":"#8b8676"},
+  "markers": [
+    {"id":"MeleeArena","name":"白刃实验场","kind":"area","x":1400,"z":1460,"radiusM":18}
+  ],
+  "objects": [
+    {"id":"MeleeBoundaryW","asset":"Whitebox/Box","material":"Whitebox/Structure","pos":[1387,0,1461],"size":[0.5,1.2,38],"tag":"wall","group":"测试场/围栏","params":{"libraryMaterial":"Stone","sector":"Range"},"meta":{"tileM":1}},
+    {"id":"MeleeBoundaryE","asset":"Whitebox/Box","material":"Whitebox/Structure","pos":[1413,0,1461],"size":[0.5,1.2,38],"tag":"wall","group":"测试场/围栏","params":{"libraryMaterial":"Stone","sector":"Range"},"meta":{"tileM":1}},
+    {"id":"MeleeBoundaryN","asset":"Whitebox/Box","material":"Whitebox/Structure","pos":[1400,0,1442],"size":[26,1.2,0.5],"tag":"wall","group":"测试场/围栏","params":{"libraryMaterial":"Stone","sector":"Range"},"meta":{"tileM":1}},
+    {"id":"MeleeBoundaryS","asset":"Whitebox/Box","material":"Whitebox/Structure","pos":[1400,0,1480],"size":[26,1.2,0.5],"tag":"wall","group":"测试场/围栏","params":{"libraryMaterial":"Stone","sector":"Range"},"meta":{"tileM":1}}
+  ]
+}

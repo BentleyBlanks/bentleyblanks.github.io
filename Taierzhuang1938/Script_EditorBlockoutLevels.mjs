@@ -308,6 +308,12 @@ function GroundedBlock(block, groundAt) {
     ...(block.propConformGround ? { propConformGround: true } : {}),
     ...(block.sceneTree ? { sceneTree: true } : {}),
     ...(block.semantic === "water" && block.waterRibbon ? { waterRibbon: block.waterRibbon } : {}),
+    ...(typeof block.color === "string" ? { color: block.color } : {}),
+    ...(typeof block.libraryMaterial === "string" ? { libraryMaterial: block.libraryMaterial } : {}),
+    ...(Number.isFinite(block.roughness) ? { roughness: block.roughness } : {}),
+    ...(Number.isFinite(block.metalness) ? { metalness: block.metalness } : {}),
+    ...(typeof block.sector === "string" ? { sector: block.sector } : {}),
+    ...(typeof block.surface === "string" ? { surface: block.surface } : {}),
   };
 }
 
@@ -826,6 +832,12 @@ export function LayoutFromSceneDoc(doc) {
     sceneProps: formal ? blocks.filter((block) => block.propModel)
       .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,
     ...(doc.proceduralDressing === false ? { proceduralDressing: false } : {}),
+    ...(doc.groundColor ? { groundColor: doc.groundColor } : {}),
+    ...(doc.groundLibraryMaterial ? { groundLibraryMaterial: doc.groundLibraryMaterial } : {}),
+    ...(Number.isFinite(doc.groundMarginM) ? { groundMarginM: doc.groundMarginM } : {}),
+    ...(doc.groundGrid ? { groundGrid: { ...doc.groundGrid } } : {}),
+    ...(Array.isArray(doc.groundTint) ? { groundTint: [...doc.groundTint] } : {}),
+    ...(doc.deformableTerrain === true ? { deformableTerrain: true } : {}),
     heightTint: tint,
     groundPaint,
     colorSemantics: Array.isArray(doc.colorSemantics) ? [...doc.colorSemantics] : [],

@@ -9,7 +9,7 @@
 
 import * as THREE from "three";
 import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo } from "../Data_SceneAssets.mjs";
-import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FormatSceneJson, IsSceneCamera, SceneStyle } from "../Script_SceneDoc.mjs";
+import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FlatSceneHeights, IsFlatTerrain, FormatSceneJson, IsSceneCamera, SceneStyle } from "../Script_SceneDoc.mjs";
 import { SceneEditModel, SplitGroup } from "./Script_SceneEditModel.mjs";
 import {
   HeightGridSampler, BlockoutTintColor, BuildGroundPaint, BackdropGroundSampler, BuildSceneGroundSurface, SceneTrenchDressing,
@@ -188,11 +188,15 @@ class SceneEditorApp {
     const { doc, revision, stamp, url } = await this.FetchScene();
     const terrainKey = JSON.stringify([doc.terrain, doc.trenches?.datum || null]);
     if (!this.pre || terrainKey !== this.terrainKey) {
-      const heightUrl = new URL(doc.terrain.file, url);
-      const response = await fetch(`${heightUrl.href}?t=${Date.now()}`, { cache: "no-store" });
-      if (!response.ok) throw new Error(`高度图读不到（HTTP ${response.status}）`);
-      // 高度图存的是沟没挖之前的地面；壕沟按 trenches 现挖进 this.heights（docs/Data_Scene.md §9）
-      this.pre = DecodeSceneHeights(await response.arrayBuffer(), doc.terrain);
+      if (IsFlatTerrain(doc.terrain)) {
+        this.pre = FlatSceneHeights(doc.terrain);
+      } else {
+        const heightUrl = new URL(doc.terrain.file, url);
+        const response = await fetch(`${heightUrl.href}?t=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`高度图读不到（HTTP ${response.status}）`);
+        // 高度图存的是沟没挖之前的地面；壕沟按 trenches 现挖进 this.heights（docs/Data_Scene.md §9）
+        this.pre = DecodeSceneHeights(await response.arrayBuffer(), doc.terrain);
+      }
       this.datum = [];
       if (doc.trenches?.datum?.file) {
         const datumResponse = await fetch(`${new URL(doc.trenches.datum.file, url).href}?t=${Date.now()}`, { cache: "no-store" });
@@ -566,6 +570,7 @@ class SceneEditorApp {
     const positions = new Float32Array((nx + 1) * (nz + 1) * 3);
     const colors = new Float32Array(positions.length);
     const tint = doc.look?.heightTint || { lo: this.sampler.minY, hi: Math.max(this.sampler.minY + 0.5, this.sampler.maxY) };
+    const flatColor = typeof doc.look?.groundColor === "string" ? new THREE.Color().setHex(HexInt(doc.look.groundColor), THREE.SRGBColorSpace) : null;
     const paint = BuildGroundPaint(doc.paint, doc.bounds);
     const rgb = [0, 0, 0], color = new THREE.Color();
     let k = 0;
@@ -574,10 +579,14 @@ class SceneEditorApp {
         const gx = ix * step, gz = iz * step;
         const x = t.minX + gx * t.cellM, z = t.minZ + gz * t.cellM, y = h[gz * (t.cols + 1) + gx];
         positions[k] = x; positions[k + 1] = y; positions[k + 2] = z;
-        BlockoutTintColor(y, tint, rgb);
-        if (paint) paint.Blend(x, z, rgb);
-        color.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
-        colors[k] = color.r; colors[k + 1] = color.g; colors[k + 2] = color.b;
+        if (flatColor && !paint) {
+          colors[k] = flatColor.r; colors[k + 1] = flatColor.g; colors[k + 2] = flatColor.b;
+        } else {
+          BlockoutTintColor(y, tint, rgb);
+          if (paint) paint.Blend(x, z, rgb);
+          color.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
+          colors[k] = color.r; colors[k + 1] = color.g; colors[k + 2] = color.b;
+        }
         k += 3;
       }
     }
@@ -718,6 +727,7 @@ class SceneEditorApp {
     const kind = SCENE_ASSETS[obj.asset]?.kind;
     if (kind === "tree") return "tree";
     if (kind === "prop") return `prop:${obj.asset}`;
+    if (typeof obj.params?.color === "string") return `color:${obj.params.color.toLowerCase()}`;
     return `box:${obj.material}`;
   }
 
@@ -725,6 +735,11 @@ class SceneEditorApp {
     if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.22, depthWrite: false });
     if (key.startsWith("bd:")) return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
     if (key === "tree") return new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 });
+    if (key.startsWith("color:")) {
+      const material = new THREE.MeshStandardMaterial({ color: HexInt(key.slice(6)), roughness: 0.9 });
+      ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
+      return material;
+    }
     // 道具：按弹着表面的语义色画、提亮一档（只是预览，真样子是模型）
     if (key.startsWith("prop:")) {
       const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_ASSETS[key.slice(5)]?.semantic), roughness: 0.8 });

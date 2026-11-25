@@ -9,6 +9,8 @@ import {ServeRoot} from './Script_DevServer.mjs';
 
 const result = await BuildBrowserBundle();
 assert.ok(result.inputs > 150, 'bundle contains the complete first-party graph');
+assert.equal(result.chunkFiles.length, 11, '11 on-demand sandbox plugin chunks (10 test ranges + scenery preview): ' + result.chunkFiles.length);
+assert.ok(!result.entryInputs.some(inp => /^Script_SandboxPlugin_(?!EncounterPlay)/.test(inp)), 'main bundle excludes on-demand sandbox plugins');
 assert.ok(result.externalImports.every(entry => entry.path === 'three' || entry.path.startsWith('./vendor/')), 'no first-party import waterfall remains');
 assert.ok(!result.html.includes('Object.values(map.imports)'), 'production never preloads the source graph');
 assert.ok(result.files.find(file => file.name === 'Script_EntryBrowserBundle.mjs').code.includes('Script_BrowserBundle.mjs?v=' + result.version));
@@ -20,7 +22,12 @@ const outputDir = path.join(os.tmpdir(), 'WhiteboxBootFix');
 await fs.mkdir(outputDir, {recursive:true});
 try {
   const fixtureName = process.argv.find(value => value.startsWith('--fixture='))?.slice('--fixture='.length);
-  const fixtures = [{name:'Whitebox',query:'whitebox=p012'}, {name:'MainMenu',query:''}, {name:'MissingCharacters',query:'whitebox=p012'}]
+  const fixtures = [
+    {name:'Whitebox',query:'whitebox=p012'},
+    {name:'MainMenu',query:''},
+    {name:'MissingCharacters',query:'whitebox=p012'},
+    {name:'SandboxRange',query:'explosions=1'},
+  ]
     .filter(fixture => !fixtureName || fixture.name === fixtureName);
   assert.ok(fixtures.length, 'unknown bundle fixture');
   for (const fixture of fixtures) {
@@ -46,8 +53,10 @@ try {
     let releaseBundle;
     const bundleGate = fixture.name === 'Whitebox' ? new Promise(resolve => {releaseBundle=resolve;}) : Promise.resolve();
     await page.route('**/Script_BrowserBundle.mjs?*', async route => { await bundleGate; await route.fulfill({contentType:'text/javascript',body:result.code}); });
-    for (const file of result.files.filter(file => file.name !== result.bundleName))
+    for (const file of result.files.filter(file => file.name !== result.bundleName)) {
+      await page.route('**/' + file.name, route => route.fulfill({contentType:'text/javascript',body:file.code}));
       await page.route('**/' + file.name + '?*', route => route.fulfill({contentType:'text/javascript',body:file.code}));
+    }
     const started = Date.now();
     await page.goto('http://127.0.0.1:' + server.address().port + '/Taierzhuang1938/?' + fixture.query + '&quality=low&scale=small', {waitUntil:'commit',timeout:60000});
     if (releaseBundle) {
@@ -112,6 +121,13 @@ try {
       assert.ok(combat.finite && combat.alive >= 4, 'squad and opening enemy remain live with finite transforms');
       assert.equal(combat.luo?.model, 'luo', 'surviving character GLB keeps its formal cast appearance');
       assert.ok(combat.he?.alive && combat.enemy?.alive, 'failed character GLB actors fall back and stay alive');
+    } else if (fixture.name === 'SandboxRange') {
+      const info = await page.evaluate(() => ({
+        level: window.Tengxian.Debug.Level().id,
+        state: window.Tengxian.Debug.Explosions.State(),
+      }));
+      assert.equal(info.level, 'ExplosionRange', 'explosions sandbox range loads ExplosionRange level from its split chunk');
+      assert.equal(info.state?.activeLoadout, 'timed', 'explosions sandbox range initializes timed loadout');
     } else {
       await page.waitForFunction(()=>window.Tengxian?.Debug?.Menu?.().open,null,{timeout:60000});
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
@@ -128,6 +144,13 @@ try {
     }
     assert.deepEqual(errors, []);
     assert.ok(![...modules].some(url => url.endsWith('/Script_Main.mjs')), 'source entry is not also loaded');
+    const loadedSandboxChunks = [...modules].filter(url => /Script_BundleChunk_Script_SandboxPlugin_/.test(url));
+    if (fixture.name === 'SandboxRange') {
+      assert.equal(loadedSandboxChunks.length, 1, 'sandbox range downloads only its own chunk: ' + loadedSandboxChunks.join(', '));
+      assert.ok(/Script_BundleChunk_Script_SandboxPlugin_Explosions-/.test(loadedSandboxChunks[0]), 'loaded chunk matches explosions range');
+    } else {
+      assert.equal(loadedSandboxChunks.length, 0, 'campaign/menu never downloads on-demand sandbox test chunks: ' + loadedSandboxChunks.join(', '));
+    }
     assert.ok(modules.size <= 20, 'startup remains below 20 distinct script requests: ' + modules.size);
     await page.screenshot({path:path.join(outputDir,fixture.name+'.png')});
     console.log('PASS',fixture.name,JSON.stringify({seconds:(Date.now()-started)/1000,scriptRequests:modules.size,version:result.version,outputDir}));

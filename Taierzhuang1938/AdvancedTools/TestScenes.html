@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>测试场景 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" data-interface-theme href="../Style_Interface.css">
+  <link rel="stylesheet" href="../Style_Menu.css">
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #060706;
+    }
+    /* 1:1 沿用主菜单「选择关卡 / 测试场景」整套冷灰 / 旧金 / 羽化大图封面语言 */
+    #menu.tsLauncher {
+      pointer-events: auto;
+      background: #070807;
+    }
+    #menu.tsLauncher .mnPanel::before {
+      display: block;
+      opacity: 0.42;
+      filter: grayscale(1) blur(7px) brightness(0.32);
+    }
+    #menu.tsLauncher .mnPanelHead {
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 13vh;
+      padding: 4vh 0 2vh;
+    }
+    .tsHeadTools {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 0 0 auto;
+    }
+    .tsHeadMeta {
+      font-size: var(--menu-font-small);
+      letter-spacing: 0.1em;
+      color: var(--ui-muted);
+      white-space: nowrap;
+    }
+    .tsSearch {
+      width: 240px;
+      box-sizing: border-box;
+      padding: 8px 12px;
+      border: 1px solid #c1bdab55;
+      border-radius: 0;
+      background: #101311b8;
+      color: var(--ui-bright);
+      font: inherit;
+      font-size: var(--menu-font-small);
+      letter-spacing: 0.04em;
+    }
+    .tsSearch::placeholder { color: #8b9188; }
+    .tsSearch:focus { outline: 1px solid var(--ui-gold); border-color: var(--ui-gold); }
+    /* 列表区域严格沿用 #menu.levelsOn .mnLevel / .mnSandboxLevel 原生字号与冷灰→旧金选中态，略收行距让 10 项在一屏完整可见 */
+    #menu.tsLauncher .mnLevelList {
+      padding: 1vh 6px 1vh 0;
+    }
+    #menu.tsLauncher .mnLevel {
+      min-height: clamp(44px, 5.6vh, 54px);
+      margin-bottom: 0.55vh;
+    }
+    #menu.tsLauncher .mnBrief {
+      padding: 0 2vw 2vh;
+    }
+    #menu.tsLauncher .mnMissionArt {
+      inset: 0 -1vw 4% 0;
+    }
+    #menu.tsLauncher .mnMissionArt img {
+      filter: saturate(0.86) brightness(0.82) contrast(1.04);
+    }
+    #menu.tsLauncher .mnMissionArt::after {
+      box-shadow: none;
+      background: linear-gradient(0deg, #060706eb 0%, #06070699 36%, #06070624 66%, transparent 100%);
+    }
+    .tsSceneFile {
+      margin-top: 8px;
+      font-family: var(--ui-mono);
+      font-size: var(--menu-font-small);
+      letter-spacing: 0.03em;
+      color: #b7b5a6;
+    }
+    .tsBriefDesc {
+      margin-top: 12px;
+      max-width: 42em;
+      font-size: var(--menu-font-body);
+      line-height: 1.75;
+      color: #d6d9d1;
+    }
+    /* 主/次操作按钮：同高度、同冷灰旧金直角风格，主次分明且基线严格对齐 */
+    #menu.tsLauncher .mnMissionActions {
+      justify-content: flex-start;
+      gap: 16px;
+      margin-top: 2.8vh;
+    }
+    .tsActionPrimary,
+    .tsActionSecondary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 26px;
+      box-sizing: border-box;
+      border-radius: 0;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: var(--ui-font);
+      font-size: clamp(15px, 1.12vw, 18px);
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-shadow: 0 2px 4px #0008;
+      transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    }
+    .tsActionPrimary {
+      color: var(--ui-gold);
+      border: 1px solid #edca8352;
+      border-left: 4px solid #edca83;
+      background: linear-gradient(90deg, #dfbd682b 0%, #c8b68814 70%, #b8a9820a 100%);
+    }
+    .tsActionPrimary:hover,
+    .tsActionPrimary:focus-visible {
+      color: #ffe6a8;
+      border-color: #edca83a6;
+      border-left-color: #ffe09a;
+      background: linear-gradient(90deg, #dfbd6842 0%, #c8b68822 72%, #b8a98212 100%);
+      outline: none;
+    }
+    .tsActionSecondary {
+      color: #d6d9d1;
+      border: 1px solid #c1bdab52;
+      border-left: 2px solid #c1bdab88;
+      background: linear-gradient(90deg, #1b1e1acc 0%, #131613b3 100%);
+      letter-spacing: 0.1em;
+    }
+    .tsActionSecondary:hover,
+    .tsActionSecondary:focus-visible {
+      color: var(--ui-gold);
+      border-color: #edca8380;
+      border-left-color: #edca83;
+      background: linear-gradient(90deg, #d8d4c31e 0%, #181b17cc 100%);
+      outline: none;
+    }
+    a.mnCampaignBack {
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    .tsFootLinks {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .tsEmptyList {
+      padding: 28px 16px;
+      color: var(--ui-muted);
+      font-size: var(--menu-font-meta);
+      letter-spacing: 0.06em;
+    }
+    @media (max-width: 760px) {
+      .tsHeadTools { width: 100%; justify-content: space-between; }
+      .tsSearch { width: 180px; }
+      .tsHeadMeta { display: none; }
+    }
+  </style>
+  <!-- 同 ControlCenter.html：同步读 ../index.html 的 import map 并解析成绝对地址，模块版本与游戏一致。 -->
+  <script>
+    (function () {
+      var map = '{"imports":{}}';
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "../index.html", false);
+        xhr.send();
+        var found = /<script type="importmap">([\s\S]*?)<\/script>/.exec(xhr.responseText);
+        if (found) {
+          var imports = JSON.parse(found[1]).imports, resolved = {};
+          Object.keys(imports).forEach(function (key) {
+            resolved[key.charAt(0) === "." ? new URL(key, xhr.responseURL).href : key] = new URL(imports[key], xhr.responseURL).href;
+          });
+          map = JSON.stringify({ imports: resolved });
+        }
+      } catch (error) { console.error("[TestScenes] 读不到 index.html 的 import map", error); }
+      var script = document.createElement("script");
+      script.type = "importmap";
+      script.textContent = map;
+      document.currentScript.after(script);
+    })();
+  </script>
+  <script type="module" src="./Script_TestScenes.mjs"></script>
+</head>
+<body data-test-scenes>
+</body>
+</html>
