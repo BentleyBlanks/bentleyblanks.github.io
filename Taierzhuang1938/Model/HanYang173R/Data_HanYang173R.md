@@ -5,7 +5,7 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **79,009 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
+- Game geometry: **79,909 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
 - R3 uses a unique atlas for each of the three wood pieces and keeps the grain lengthwise on the sides and samples the caps in the same object-space coordinates. Base colour, roughness/metalness and tangent-space normals are baked from a continuous object-space finish into the final UVs. The steel is darker in protected regions; age and wear vary across its surface rather than following the mesh triangles.
 - The exterior revisions shape the wood shoulder and nose, the two band profiles and the rounded rear outline. The surface-distance record compares digital meshes. The historical photographs supply visual references.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
@@ -175,6 +175,14 @@ The front forearm has local support sections that seat its lower shoulder under 
 The exposed action, handle stem and tail use lower-contrast satin steel with fine pitting. The stock's side glyph is removed from pigment, roughness and normals. Blender bevels and new UV/tangent frames give the sight and raised receiver edges a narrow glint. The material study combines the visible steel from the museum specimen and the sight in Lu's upper-surface photograph. The photographed wear and the game lighting give different highlights. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
 
 The asset test casts rays across both band joints, including oblique directions around the front band. Matched camera captures from the actual inspection bench and its Albedo, Roughness and Reflection views are in the archive's `Review` folder.
+
+### R28 steel finish and exterior edges
+
+The steel uses separate pigment, roughness, metallic and tangent-normal fields. Scan samples and small pits give the dark grey-brown oxide its texture. Local abrasion follows the flanks, rolled returns and the exposed handle shoulder. The sharpness of those highlights changes with the viewing angle. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119)
+
+The rear band takes its cross sections from the approved band mesh. Its raised rib is part of the surface and its four UV islands keep a similar texel density along and around the band. Blender bevels and their face masks place edge wear on the receiver, rear sight and visible handle root. The amount of rounding was judged from the shadows and edge highlights in the photographs. [Steven Lu, length comparison](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
+
+The actual weapon inspection bench comparison and its Albedo, Roughness and Reflection captures are in the archive's `Review` folder.
 
 ### Rebuild and inspect
 

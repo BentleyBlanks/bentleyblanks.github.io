@@ -208,12 +208,12 @@
       "name": "汉阳造173R（当前手持与世界模型）",
       "pack": "HanYang173R/Model_HanYang173R.glb",
       "sourceTriangles": 295470,
-      "actualTriangles": 79009,
+      "actualTriangles": 79909,
       "targetTriangles": 80000,
       "policy": "target",
       "sourceTexture": "用户提供的Dots 173R几何；Poly Haven的CC0黑胡桃木、旧木表面及钢板独立颜色、粗糙度、法线与钢板金属遮罩；归档逐图校验",
       "runtimeTexture": "44部件、132张基础PBR图及2张独立1K线性油膜遮罩；三件木头各用独立UV，主木托4096、另两件2048。按路径规则发布BC7，Base sRGB、线性ORM及OpenGL法线",
-      "note": "R27重做两道箍口的木钢接合、后箍下缘、枪机外露钢件的缎面反射及照门与机匣微倒角，并去掉枪托侧面的字样。枪械检查台验收底色、粗糙度与反射。"
+      "note": "R28 按馆藏近照重做深灰褐钢面的氧化、细蚀点和擦亮边缘。后箍凸棱、机匣、照门和拉柄根部用实际曲面表现。检查台对照底色、粗糙度、法线与反射。"
     },
     {
       "id": "Type89MediumTank",

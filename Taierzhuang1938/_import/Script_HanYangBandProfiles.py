@@ -78,7 +78,7 @@ def FollowFrontBandOutline(streams, bandBounds):
     return ShapeFrontBandFace(shaped, bandBounds)
 
 
-def InsertTimberSections(streams, indices, sections):
+def InsertAxialSections(streams, indices, sections):
     """Split crossing triangles without moving UVs or other vertex fields."""
     values = {key: list(array) for key, array in streams.items()}
     faces = indices.reshape(-1, 3).tolist()
@@ -118,7 +118,7 @@ def SmoothWeight(t):
     return t*t*(3.-2.*t), 6.*t*(1.-t)
 
 
-def SetTimberFrames(streams, jacobian):
+def TransformSurfaceFrames(streams, jacobian):
     normals = np.linalg.solve(jacobian.transpose(0,2,1), streams['NORMAL'][:, :, None])[:, :, 0]
     normals /= np.linalg.norm(normals, axis=1)[:, None]
     streams['NORMAL'] = normals.astype('<f4')
@@ -136,7 +136,7 @@ def SeatFrontBandTimber(streams, indices, bounds):
     low, high = bounds
     streams = FollowFrontBandOutline(streams, bounds)
     cutPlanes = (low[2]+.004, low[2]+.010, high[2]+.001, high[2]+.015)
-    streams, indices = InsertTimberSections(streams, indices, cutPlanes)
+    streams, indices = InsertAxialSections(streams, indices, cutPlanes)
     points = streams['POSITION'].astype(np.float64)
     x, y, z = points.T.copy()
     entry, entrySlope = SmoothWeight((z-low[2])/.012)
@@ -158,7 +158,7 @@ def SeatFrontBandTimber(streams, indices, bounds):
     jacobian[:, 1, 2] = height*dz
     points[:, 0], points[:, 1] = x*scale, .027+height*scale
     streams['POSITION'] = points.astype('<f4')
-    SetTimberFrames(streams, jacobian)
+    TransformSurfaceFrames(streams, jacobian)
     return streams, indices
 
 
@@ -189,7 +189,7 @@ def SeatRearBandTimber(name, streams):
         if semantic in streams:
             seated[semantic] = streams[semantic].copy()
     frames = {key: array[mask] for key, array in seated.items() if key in ('NORMAL', 'TANGENT')}
-    SetTimberFrames(frames, jacobian[mask])
+    TransformSurfaceFrames(frames, jacobian[mask])
     for key, array in frames.items():
         seated[key][mask] = array
     return seated
@@ -281,3 +281,94 @@ def ShapeBandProfile(name, streams):
         tangent[:, :3] = direction / np.linalg.norm(direction, axis=1)[:, None]
         shaped['TANGENT'] = tangent
     return ShapeFrontBandFace(shaped, bounds) if front else shaped
+
+
+def SampleBandSection(triangles, depth, center, rays):
+    """Find the two surfaces of the band along rays in an axial section."""
+    following = np.roll(triangles, -1, axis=1)
+    depths = triangles[:, :, 2]
+    crosses = (depths > depth) != (following[:, :, 2] > depth)
+    active = crosses.sum(axis=1) == 2
+    start = triangles[active][crosses[active]]
+    end = following[active][crosses[active]]
+    fraction = (depth - start[:, 2]) / (end[:, 2] - start[:, 2])
+    points = start[:, :2] + fraction[:, None] * (end - start)[:, :2]
+    segments = points.reshape(-1, 2, 2) - center
+    corner = segments[:, 0]
+    edge = segments[:, 1] - corner
+    perpendicular = np.column_stack((rays[:, 1], -rays[:, 0]))
+    denominator = edge @ perpendicular.T
+    alongEdge = np.divide(-(corner @ perpendicular.T), denominator,
+                          out=np.full_like(denominator, np.nan), where=abs(denominator) > 1e-11)
+    hits = corner[:, None, :] + alongEdge[:, :, None] * edge[:, None, :]
+    radii = np.einsum('sri,ri->sr', hits, rays)
+    valid = (alongEdge >= -1e-7) & (alongEdge <= 1.+1e-7) & (radii > 0.)
+    inner = np.min(np.where(valid, radii, np.inf), axis=0)
+    outer = np.max(np.where(valid, radii, -np.inf), axis=0)
+    assert np.isfinite(inner).all() and np.all(outer >= inner), depth
+    return inner, outer
+
+
+def FormRearBandRib(streams, indices):
+    """Loft the existing band contour and add the raised exterior rib."""
+    positions = streams['POSITION'].astype(np.float64)
+    low, high = positions.min(axis=0), positions.max(axis=0)
+    indexType = indices.dtype
+    triangles = positions[indices.reshape(-1, 3)]
+    angle = np.arange(64) * (2.*np.pi/64)
+    rays = np.column_stack((np.cos(angle), np.sin(angle)))
+    center = (low[:2] + high[:2]) / 2.
+    outside = (.004, .064, .25, .38, .51, .63, .75, .936, .996)
+    inside = (.996, .83, .17, .004)
+    grid = []
+    for surface, fractions in ((1, outside), (0, inside)):
+        for fraction in fractions:
+            depth = low[2] + fraction * (high[2] - low[2])
+            sampled = SampleBandSection(triangles, depth, center, rays)[surface]
+            xy = center + sampled[:, None] * rays
+            if surface:
+                level = (xy[:, 1] - low[1]) / (high[1] - low[1])
+                rise, _ = SmoothWeight((level - .10)/.22)
+                fall, _ = SmoothWeight((.88 - level)/.27)
+                crest = max(1. - ((fraction - .51)/.235)**2, 0.)**2
+                xy[:, 0] *= 1. + .043 * crest * rise * fall
+            grid.append(np.column_stack((xy, np.full(len(rays), depth))))
+    grid = np.asarray(grid)
+
+    # Give the broad faces and the returns a continuous normal along the loft.
+    tangent = np.roll(grid, -1, axis=1) - np.roll(grid, 1, axis=1)
+    acrossProfile = np.roll(grid, -1, axis=0) - np.roll(grid, 1, axis=0)
+    normal = np.cross(tangent, acrossProfile)
+    normal /= np.linalg.norm(normal, axis=2)[:, :, None]
+    tangent /= np.linalg.norm(tangent, axis=2)[:, :, None]
+    # Four near-square islands keep the density similar across and around the band.
+    row = np.arange(len(grid) + 1) % len(grid)
+    sectorCount = 4
+    sectorWidth = len(rays) // sectorCount
+    patchWidth = sectorWidth + 1
+    positions, normals, tangents, coordinates, indices = [], [], [], [], []
+    for sector in range(sectorCount):
+        col = (sector*sectorWidth + np.arange(patchWidth)) % len(rays)
+        patch = grid[row[:, None], col[None, :]]
+        curved = np.linalg.norm(np.diff(patch, axis=1), axis=2).mean(axis=0)
+        profile = np.linalg.norm(np.diff(patch, axis=0), axis=2).mean(axis=1)
+        u, v = np.r_[0., np.cumsum(curved)], np.r_[0., np.cumsum(profile)]
+        scale = .45 / max(u[-1], v[-1])
+        u = .25 + .5*(sector % 2) + scale*(u - .5*u[-1])
+        v = .25 + .5*(sector // 2) + scale*(v - .5*v[-1])
+        coordinate = np.stack(np.meshgrid(u, v), axis=-1)
+        corner = sector*patch.shape[0]*patchWidth + np.arange(len(grid))[:, None]*patchWidth + np.arange(sectorWidth)[None, :]
+        faces = np.stack((corner, corner+1, corner+patchWidth,
+                          corner+1, corner+patchWidth+1, corner+patchWidth), axis=-1)
+        positions.append(patch.reshape(-1, 3))
+        normals.append(normal[row[:, None], col[None, :]].reshape(-1, 3))
+        tangents.append(tangent[row[:, None], col[None, :]].reshape(-1, 3))
+        coordinates.append(coordinate.reshape(-1, 2))
+        indices.append(faces.reshape(-1, 1))
+    result = {'POSITION': np.concatenate(positions).astype('<f4'), 'NORMAL': np.concatenate(normals).astype('<f4')}
+    if 'TEXCOORD_0' in streams:
+        result['TEXCOORD_0'] = np.concatenate(coordinates).astype('<f4')
+    if 'TANGENT' in streams:
+        frames = np.concatenate(tangents)
+        result['TANGENT'] = np.column_stack((frames, np.ones(len(frames)))).astype('<f4')
+    return result, np.concatenate(indices).astype(indexType)
