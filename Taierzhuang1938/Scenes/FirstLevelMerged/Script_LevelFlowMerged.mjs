@@ -63,9 +63,21 @@ const CART_MAIN_STREET = [
   [172, 600], [174, 638], [172, 680], [146, 687], [121, 693], [122.3, 719],
 ];
 
-// 妮儿从救护所顺西胡同悄悄折回关帝庙南檐下的纯街巷路线（0 穿墙、抢在西翼搜兵到前缩入庙南墙后）
-const NIER_SLIP_BACK = [
-  [121, 719], [121, 693], [84, 688], [84, 636], [84, 608], [84, 561], [85.5, 538], [80.3, 529.6],
+// 妮儿方案B路线（0 穿墙）：08c 随驴车行至中街口 [140,560] 后半路拐回自家灶屋拿干粮，
+// 撞见东翼侧包日军沿中街压来，急从院门撤向西巷口 [84,561]，09a 末段顺西巷摸到关帝庙南门外与出庙顺子恰好碰头
+const NIER_CART_SPLIT_RATIO = 83.15 / 293.57;
+const NIER_HOME_IN = [
+  [140, 560], [131.6, 560], [131.6, 562.8], [131.6, 565.0], [127.5, 565.0], [127.5, 566.2], [127.5, 568.2],
+];
+const NIER_FLEE_WEST = [
+  [127.5, 568.2], [127.5, 566.2], [127.5, 565.0], [131.6, 565.0], [131.6, 562.8], [131.6, 560],
+  [118, 558], [104, 559], [84, 561],
+];
+const NIER_WEST_LANE_UP = [
+  [84, 561], [85.5, 538],
+];
+const NIER_TEMPLE_EAVES_CREEP = [
+  [85.5, 538], [80.3, 529.6],
 ];
 
 // 空袭单向冲进田嫂避难洞路线（沿东墙根转入南院门，0 穿墙）
@@ -260,25 +272,64 @@ export function MergedActors(beat, time, player, progress, timeline) {
   actors.push(Actor("geng", "老耿", "civilian", "person", gengP,
     (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "walk"));
 
-  // 妮儿：08b 牵黑子过板桥 → 08c 随车去救护所 → 08d-09a 顺西巷抢在西翼搜兵到前缩进关帝庙南墙后 → 09b-09d 钻洞开便门 → 10a-10c 返救护所进洞
+  // 妮儿（方案B）：08b 牵黑子过板桥 → 08c 随驴车至中街口后半路拐进老耿家灶屋拿干粮，撞见东翼日军压街后急撤西巷口
+  // → 08d–09a 躲在西巷并顺西巷摸到关帝庙南檐下，09b+2s 恰好与出庙顺子碰头（零提前干等、零瞬移）→ 09c 钻洞开便门 → 10a–10c 去救护所进洞
+  const nierSplitTime = At("08c") + (cartEnd - At("08c")) * NIER_CART_SPLIT_RATIO;
+  const nierKitchenArrive = At("08c") + 20;
+  const nierFleeStart = At("08c") + 29;
+  const nierWestArrive = At("08c") + 50;
+  const nierCreepStart = At("09a") + 23;
+  const nierBendArrive = At("09a") + 33.5;
+  const nierMeetTime = At("09b") + 2.0;
+  const nierFollowHandover = At("09b") + 4.37;
   let nierP;
+  let nierPoseOverride = null;
+  let nierStatus;
   if (beat.id === "08a") nierP = PlayerAt(Math.min(time + 2.0, At("08a", 1)), timeline);
   else if (beat.id === "08b") {
     const t = Clamp((progress - 0.35) / 0.65, 0, 1);
     nierP = SampleRoute([[99, 468], [99, 471], [99, 476], [104, 486]], Clamp(t + 0.08, 0, 1));
-  } else if (time < cartEnd) {
-    const t = Clamp((time - At("08c")) / (cartEnd - At("08c")), 0, 1);
-    nierP = SampleRoute(CART_MAIN_STREET, Clamp(t + 0.02, 0, 1));
-  } else if (time < At("09b")) {
-    const slipEnd = At("09a") + 20;
-    const slipT = Clamp((time - At("08d")) / Math.max(1, slipEnd - At("08d")), 0, 1);
-    nierP = SampleRoute(NIER_SLIP_BACK, slipT);
+  } else if (time < nierSplitTime) {
+    const t = Clamp((time - At("08c")) / Math.max(0.1, cartEnd - At("08c")), 0, NIER_CART_SPLIT_RATIO);
+    nierP = SampleRoute(CART_MAIN_STREET, t);
+  } else if (time < nierKitchenArrive) {
+    nierP = SampleRoute(NIER_HOME_IN, Clamp((time - nierSplitTime) / (nierKitchenArrive - nierSplitTime), 0, 1));
+    nierStatus = "半路拐回中街自家灶屋拿干粮";
+  } else if (time < nierFleeStart) {
+    nierP = [127.5, 568.2];
+    nierPoseOverride = "kneel";
+    nierStatus = "在灶屋收拾干粮包袱";
+  } else if (time < nierWestArrive) {
+    nierP = SampleRoute(NIER_FLEE_WEST, Clamp((time - nierFleeStart) / (nierWestArrive - nierFleeStart), 0, 1));
+    nierStatus = "见东翼鬼子冲进中街，急撤往西巷躲避";
+  } else if (time < nierCreepStart) {
+    nierP = [84, 561];
+    nierPoseOverride = "crouch";
+    nierStatus = "被封街机枪堵在西巷口，贴墙躲避";
+  } else if (time < nierBendArrive) {
+    nierP = SampleRoute(NIER_WEST_LANE_UP, Clamp((time - nierCreepStart) / (nierBendArrive - nierCreepStart), 0, 1));
+    nierPoseOverride = "crouch";
+    nierStatus = "沿西巷摸向熟悉的关帝庙，寻隙回家";
+  } else if (time < nierMeetTime) {
+    nierP = SampleRoute(NIER_TEMPLE_EAVES_CREEP, Clamp((time - nierBendArrive) / (nierMeetTime - nierBendArrive), 0, 1));
+    nierPoseOverride = "crouch";
+    nierStatus = "贴关帝庙南檐摸近，寻隙回中街";
+  } else if (time < nierFollowHandover) {
+    nierP = [80.3, 529.6];
+    nierPoseOverride = "crouch";
+    nierStatus = "庙南檐下撞见出庙的顺子，被一把捂住嘴";
+  } else if (beat.id === "09b") {
+    nierP = Follow(1.4);
+    nierStatus = progress > 0.68
+      ? "听不见喊话，误以为顺子拦着不让回家，狠咬手背"
+      : "拐回家拿干粮撞见东翼鬼子，被堵在西巷";
   } else if (beat.id === "09c") {
     nierP = progress < 0.85
-      ? SampleRoute([[118, 558], [119.1, 562.8], [122.5, 564.8], [124.2, 564.8]], Clamp(progress / 0.8, 0, 1))
+      ? SampleRoute([[115.6, 558.17], [118, 558], [119.1, 562.8], [122.5, 564.8], [124.2, 564.8]], Clamp(progress / 0.8, 0, 1))
       : SampleRoute([[124.2, 564.8], [125.6, 564.8]], Clamp((progress - 0.85) / 0.15, 0, 1));
   } else if (time < At("10a")) {
     nierP = Follow(1.4);
+    if (beat.id === "09d" && progress >= 0.5) nierStatus = "灶屋清敌后抢回干粮包袱";
   } else if (beat.id === "10a") {
     nierP = Follow(2.2);
   } else if (beat.id === "10b") {
@@ -291,9 +342,9 @@ export function MergedActors(beat, time, player, progress, timeline) {
     nierP = time >= At("13a", 1) && beat.id !== "13e" ? [-91, 886] : Follow(4.5);
   }
   actors.push(Actor("nier", "妮儿", "civilian", "child", nierP,
-    ["09b", "09c"].includes(beat.id) ? "crouch"
-      : (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "walk",
-    { status: beat.id === "09b" && progress > 0.68 ? "误解顺子见死不救，狠咬手背" : undefined }));
+    nierPoseOverride || (["09b", "09c"].includes(beat.id) ? "crouch"
+      : (beat.stage === "11" && beat.id !== "11c") || (time >= At("13a", 1) && beat.id !== "13e") ? "kneel" : "walk"),
+    { status: nierStatus }));
 
   // 救护所与田嫂、二丫
   if (time >= cartEnd) {
