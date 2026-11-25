@@ -339,12 +339,14 @@ def BakeRegion(name, sample, size, index, reference):
         axial = reference["knurl"]["axialCycles"] * vv
         left, right = np.mod(angular + axial, 1), np.mod(angular - axial, 1)
         diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
-        shoulders = np.minimum(diamonds / .82, 1)
-        grooves = np.clip(1 - diamonds / .30, 0, 1)
-        tonalDelta += 9 * (shoulders - .45) - 10 * grooves
-        heightField += 1.12 * shoulders
-        oxidation += .135 * grooves
-        roughnessDelta += .075 * grooves - .048 * shoulders
+        shoulders = np.clip((diamonds - .04) / .63, 0, 1)
+        grooves = np.clip(1 - diamonds / .37, 0, 1) ** .83
+        chip = UnitVariation(luminance, .42, 2.15)
+        chippedCrests = shoulders * np.clip(.60 + .21 * chip - .13 * medium, .12, 1)
+        tonalDelta += 6.8 * chip + 3.3 * (shoulders - .45) - 5.5 * grooves
+        heightField += 1.54 * shoulders + .12 * chip * shoulders
+        oxidation += .127 * grooves
+        roughnessDelta += .075 * grooves - .047 * shoulders
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -393,6 +395,19 @@ def BakeRegion(name, sample, size, index, reference):
         # polished response there while keeping the photographed color field.
         rough += .11 * near * (1 - .64 * oxideCoverage)
         metal -= .48 * near * np.maximum(metal - .55, 0)
+    if name == "Knurl":
+        # The dark bottoms retain oxide while worn metal catches light on
+        # the irregular diamond shoulders.
+        dark = .83 * grooves
+        recessColor = SrgbToLinear(np.array([35, 32, 27], dtype=np.float32) / 255)
+        linear += (recessColor - linear) * dark[..., None]
+        rough += (.73 - rough) * dark
+        metal += (.30 - metal) * dark
+        exposed = .65 * chippedCrests
+        crestColor = SrgbToLinear(np.array([171, 164, 150], dtype=np.float32) / 255)
+        linear += (crestColor - linear) * exposed[..., None]
+        rough += (.34 - rough) * exposed
+        metal += (.94 - metal) * exposed
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
         weight = ReferenceField(closeup, xx, sampledV, channel) * influence / 100
@@ -422,6 +437,8 @@ def BakeRegion(name, sample, size, index, reference):
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
+    if name == "Knurl":
+        ao *= 1 - .31 * grooves
     if name == "Wheel":
         ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
@@ -438,7 +455,7 @@ def BakeRegion(name, sample, size, index, reference):
         SeamBlend(surface.swapaxes(0, 1), pixels=10)
     rough, metal, ao = np.moveaxis(surface, -1, 0)
     relief = .00018 if name in ("RearEye", "Wheel") else .00012
-    smoothing = .55 if name == "Barrel" else .72
+    smoothing = {"Barrel": .55, "Knurl": .50}.get(name, .72)
     normal = NormalFromHeight(GaussianPeriodic(heightField, smoothing), relief, .12, 1.0, "gl") * .5 + .5
     orm = np.stack([ao, np.clip(rough, .17, .92), metal], axis=-1)
     return tuple(np.rint(255 * np.clip(arr, 0, 1)).astype(np.uint8) for arr in (base, normal, orm))
@@ -467,7 +484,7 @@ def Bake():
     for atlas, pixels in zip(maps, SampleBarrelStripe(maps, (width, height))):
         atlas[y:y + height, x:x + width] = pixels
 
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 86.5, 87)):
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84.5, 87)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)
