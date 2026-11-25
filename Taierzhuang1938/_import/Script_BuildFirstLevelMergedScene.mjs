@@ -237,10 +237,147 @@ function BuildMergedScene() {
     }
   };
 
-  // 村内与周边取土水坑 / 避弹凹窝
-  CarveEllipticalPit(146, 643, 8.8, 6.8, 1.18, 0.50);   // 村心南坑塘（打破+80m僵直网格，还原鲁南水坑）
-  CarveEllipticalPit(46, 704, 8.2, 6.4, 1.12, 0.48);    // 村西南取土苇坑
-  CarveEllipticalPit(-118, 906, 10.5, 7.6, 1.08, 0.48); // 桥南西侧取土苇洼（5F）
+  // 村内与周边有机不规则取土水坑（5 处坑塘：不规则肾形/梨形/双瓣洼地，完全替代生硬矩形水盒）
+  const ORGANIC_PONDS = [
+    {
+      id: "Pond_N_Water", paintKey: "PondN", group: "08–13合并/水",
+      cx: 180.6, cz: 490.2, rx: 7.4, rz: 4.4, angleDeg: -11, bend: 0.13,
+      harmonics: [[1, 0.08, 0.5], [2, 0.12, -0.4], [3, 0.08, 1.2], [4, 0.04, -1.5]],
+      depth: 1.12, bottomY: -0.92, surfY: -0.20, clearOldPit: true,
+    },
+    {
+      id: "Pond_W_Water", paintKey: "PondW", group: "08–13合并/水",
+      cx: 60.8, cz: 548.2, rx: 6.2, rz: 4.6, angleDeg: 17, bend: -0.11,
+      harmonics: [[1, 0.09, -0.8], [2, 0.11, 0.7], [3, 0.07, -1.6], [4, 0.04, 0.9]],
+      depth: 1.10, bottomY: -0.92, surfY: -0.20, clearOldPit: true,
+    },
+    {
+      id: "Pond_Mid_Water", paintKey: "PondMid", group: "08–13合并/地标/村内坑塘",
+      cx: 146.2, cz: 643.2, rx: 7.1, rz: 4.8, angleDeg: -16, bend: 0.14,
+      harmonics: [[1, 0.07, 1.4], [2, 0.13, 0.35], [3, 0.09, -0.9], [4, 0.04, 2.1]],
+      depth: 1.18, bottomY: -0.94, surfY: -0.26, clearOldPit: false,
+    },
+    {
+      id: "Pond_SW_Water", paintKey: "PondSW", group: "08–13合并/地标/村内坑塘",
+      cx: 46.6, cz: 704.0, rx: 6.5, rz: 4.5, angleDeg: 21, bend: -0.12,
+      harmonics: [[1, 0.10, 2.3], [2, 0.10, -0.9], [3, 0.08, 0.7], [4, 0.04, -0.6]],
+      depth: 1.12, bottomY: -0.92, surfY: -0.26, clearOldPit: false,
+    },
+    {
+      id: "Pond_SWBridge_Water", paintKey: "PondSWBridge", group: "08–13合并/桥圈/五区_南岸三营桥头阵地",
+      cx: -118.0, cz: 906.0, rx: 8.1, rz: 5.3, angleDeg: -14, bend: 0.13,
+      harmonics: [[1, 0.08, -1.2], [2, 0.13, 0.55], [3, 0.08, 1.9], [4, 0.04, -1.1]],
+      depth: 1.08, bottomY: -0.92, surfY: -0.26, clearOldPit: false,
+    },
+  ];
+  const PondRadiusFactor = (spec, theta) => {
+    let f = 1;
+    for (const [k, amp, phase] of spec.harmonics) f += amp * Math.cos(k * theta + phase);
+    return Math.max(0.58, f);
+  };
+  const PondContourPoint = (spec, theta, scale = 1) => {
+    const f = PondRadiusFactor(spec, theta) * scale;
+    const u = Math.cos(theta) * f;
+    const v = Math.sin(theta) * f + (spec.bend || 0) * (u * u - 0.35);
+    const lx = u * spec.rx, lz = v * spec.rz;
+    const rad = (spec.angleDeg || 0) * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    return [Fix(spec.cx + lx * cos + lz * sin), Fix(spec.cz - lx * sin + lz * cos)];
+  };
+  const SamplePondPolygon = (spec, scale = 1, steps = 48) => {
+    const pts = [];
+    for (let i = 0; i < steps; i++) {
+      const [x, z] = PondContourPoint(spec, (i / steps) * Math.PI * 2, scale);
+      pts.push({ x, z });
+    }
+    return pts;
+  };
+  const BuildPondWaterRibbon = (spec, steps = 28) => {
+    const poly = SamplePondPolygon(spec, 1.0, 96);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const p of poly) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.z < minZ) minZ = p.z;
+      if (p.z > maxZ) maxZ = p.z;
+    }
+    const pad = Math.min(0.28, (maxX - minX) * 0.03);
+    const rows = [];
+    for (let i = 0; i <= steps; i++) {
+      const x = Fix(minX + pad + ((maxX - minX - pad * 2) * i) / steps);
+      const zs = [];
+      for (let e = 0; e < poly.length; e++) {
+        const a = poly[e], b = poly[(e + 1) % poly.length];
+        if ((a.x <= x && b.x > x) || (b.x <= x && a.x > x)) {
+          const t = (x - a.x) / (b.x - a.x);
+          zs.push(a.z + (b.z - a.z) * t);
+        }
+      }
+      if (zs.length < 2) continue;
+      const nz = Fix(Math.min(...zs)), sz = Fix(Math.max(...zs));
+      if (sz - nz < 0.12) continue;
+      if (!rows.length || x > rows[rows.length - 1][0]) rows.push([x, nz, sz]);
+    }
+    return {
+      rows,
+      centerX: Fix((minX + maxX) * 0.5),
+      centerZ: Fix((minZ + maxZ) * 0.5),
+      spanX: Fix(maxX - minX),
+      spanZ: Fix(maxZ - minZ),
+    };
+  };
+  const CarveOrganicPond = (spec) => {
+    const reach = Math.max(spec.rx, spec.rz) * 1.95;
+    const ix0 = Math.max(0, Math.floor((spec.cx - reach - minX) / cellM));
+    const ix1 = Math.min(cols, Math.ceil((spec.cx + reach - minX) / cellM));
+    const iz0 = Math.max(SafeMinIz, Math.floor((spec.cz - reach - INHERIT_MAX_Z) / cellM));
+    const iz1 = Math.min(outRows, Math.ceil((spec.cz + reach - INHERIT_MAX_Z) / cellM));
+    const rad = (spec.angleDeg || 0) * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    if (spec.clearOldPit) {
+      // 平滑回填旧矩形坑底（保留周边正常自然坡度），再用有机轮廓重新开挖
+      let rimSum = 0, rimCnt = 0;
+      for (let a = 0; a < 24; a++) {
+        const [bx, bz] = PondContourPoint(spec, (a / 24) * Math.PI * 2, 1.55);
+        rimSum += HeightAtOwn(bx, bz);
+        rimCnt++;
+      }
+      const bankH = rimCnt ? rimSum / rimCnt : 0.18;
+      for (let iz = iz0; iz <= iz1; iz++) {
+        const wz = INHERIT_MAX_Z + iz * cellM;
+        for (let ix = ix0; ix <= ix1; ix++) {
+          const wx = minX + ix * cellM;
+          const r = Math.hypot((wx - spec.cx) / (spec.rx * 1.55), (wz - spec.cz) / (spec.rz * 1.55));
+          if (r >= 1) continue;
+          const h = ownHeights[iz * width + ix];
+          if (h < bankH) {
+            const blend = r <= 0.72 ? 1 : 0.5 * (1 + Math.cos(Math.PI * (r - 0.72) / 0.28));
+            ownHeights[iz * width + ix] = h + (bankH - h) * blend;
+          }
+        }
+      }
+    }
+    const flatRatio = 0.52, bankOuter = 1.44;
+    for (let iz = iz0; iz <= iz1; iz++) {
+      const wz = INHERIT_MAX_Z + iz * cellM;
+      for (let ix = ix0; ix <= ix1; ix++) {
+        const wx = minX + ix * cellM;
+        const dx = wx - spec.cx, dz = wz - spec.cz;
+        const lx = dx * cos - dz * sin;
+        const lz = dx * sin + dz * cos;
+        const u = lx / spec.rx;
+        const v = lz / spec.rz - (spec.bend || 0) * (u * u - 0.35);
+        const dist = Math.hypot(u, v);
+        const rNorm = dist / PondRadiusFactor(spec, Math.atan2(v, u));
+        if (rNorm >= bankOuter) continue;
+        const k = rNorm <= flatRatio
+          ? 1
+          : 0.5 * (1 + Math.cos(Math.PI * (rNorm - flatRatio) / (bankOuter - flatRatio)));
+        ownHeights[iz * width + ix] -= spec.depth * k;
+      }
+    }
+  };
+  for (const pond of ORGANIC_PONDS) CarveOrganicPond(pond);
   CarveEllipticalPit(-93.2, 884.8, 4.0, 3.6, 0.30, 0.55); // 堤后伤员与百姓避弹浅凹窝（5C）
 
   // 先期炮击与日机轰炸弹坑（凹坑 + 翻起焦土唇边，体现进入北沙河前已遭轰炸）
@@ -330,6 +467,7 @@ function BuildMergedScene() {
   const SKIP_BASE_IDS = new Set([
     "TeleWire_06",
     "Encounter_BeishaheBridgeRushScreen",
+    "Pond_N_Water", "Pond_W_Water",
     "RailCharge_1", "RailCharge_2",
     "RailFuse_Bridge", "RailFuse_Bank",
     "FallenGirder_S1W", "FallenGirder_S1E", "FallenGirder_S2W", "FallenGirder_S2E",
@@ -370,6 +508,156 @@ function BuildMergedScene() {
       shifted.hideOn = "BridgeBlown";
     }
     ownObjects.push(shifted);
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6B) 打破旧基线连排民居的僵直平行兵营感（有机错落退线、不同宅基地进深宽窄、自然倾角与夹道留缝）：
+  //     - 100% 锁定可进/剧情/搜兵遮挡院落（NA1 / MA3 / MA4 / Aid / Tian / Mat / Church / YBombed）
+  //     - 当院落从共墙连排拆离时自动补齐缺失的西院墙 WallL，并在院落局部坐标系内缩放宅基地宽/深、
+  //       微调偏角与错缝退线，同步变换门窗 opening、room、标语 Slogan_*、马灯、枕木垛与标注 LmSlogan_*
+  // ---------------------------------------------------------------------------
+  const COMPOUND_LAYOUT_TWEAKS = {
+    // 村北西排（NA1 锁定以 100% 保护 09a 西翼搜兵出生与门洞路径；NA2/NA3 有机错位且严守 09a 官道净空）
+    NA2: { dx: 0.3, dz: -1.0, dYaw: 5.5, sx: 0.86, sz: 0.88 },
+    NA3: { dx: -0.3, dz: 0.6, dYaw: 4.2, sx: 0.84, sz: 0.88 },
+    // 村北中排（图三：打破 NB1–NB4 54m 笔直排房与平行正房，形成错落退线与真实夹道）
+    NB1: { dx: -1.2, dz: 0.7, dYaw: -5.8, sx: 0.88, sz: 0.92 },
+    NB2: { dx: -0.3, dz: -1.5, dYaw: 4.6, sx: 0.86, sz: 0.84 },
+    NB3: { dx: 0.6, dz: 1.0, dYaw: -4.8, sx: 0.88, sz: 0.90 },
+    NB4: { dx: 1.6, dz: -1.3, dYaw: 5.2, sx: 0.86, sz: 0.84 },
+    // 村北东排
+    NC1: { dx: -0.5, dz: 0.6, dYaw: 6.2, sx: 0.90, sz: 0.90 },
+    NC2: { dx: 1.2, dz: -1.3, dYaw: 11.2, sx: 0.88, sz: 0.86 },
+    // 村东中北排（DB1–DB4 四连排）
+    DB1: { dx: -1.0, dz: 1.0, dYaw: -4.8, sx: 0.88, sz: 0.92 },
+    DB2: { dx: -0.1, dz: -1.2, dYaw: 5.6, sx: 0.86, sz: 0.84 },
+    DB3: { dx: 0.8, dz: 1.2, dYaw: -4.2, sx: 0.88, sz: 0.90 },
+    DB4: { dx: 1.8, dz: -0.9, dYaw: 5.2, sx: 0.86, sz: 0.84 },
+    // 主街东侧斜排（DA1–DA2 打破 -57° 死板双拼，更贴近鲁南坐北朝南错落街缘）
+    DA1: { dx: 0.9, dz: -0.8, dYaw: 15.0, sx: 0.86, sz: 0.86 },
+    DA2: { dx: 2.2, dz: 1.2, dYaw: 29.0, sx: 0.86, sz: 0.86 },
+    // 村东中街北排（DC1–DC4，严格北退让开中街东段侧包通道）
+    DC1: { dx: -0.7, dz: -1.4, dYaw: 5.0, sx: 0.88, sz: 0.86 },
+    DC2: { dx: 0.1, dz: -0.4, dYaw: -4.0, sx: 0.86, sz: 0.90 },
+    DC3: { dx: 0.9, dz: -1.7, dYaw: 6.4, sx: 0.88, sz: 0.84 },
+    DC4: { dx: 1.8, dz: -0.8, dYaw: 3.6, sx: 0.86, sz: 0.88 },
+    // 中街南排（图二：MA3/MA4 锁定保护老耿家夹壁便门与室内清房；MA1/MA2 彻底破除死板四连排）
+    MA1: { dx: -1.6, dz: 1.5, dYaw: -5.6, sx: 0.88, sz: 0.88 },
+    MA2: { dx: -1.2, dz: -0.5, dYaw: 4.8, sx: 0.84, sz: 0.86 },
+    // 村西竖排（WB1–WB2 打破 -92.7° 双拼）
+    WB1: { dx: -1.6, dz: -1.2, dYaw: 7.2, sx: 0.90, sz: 0.90 },
+    WB2: { dx: -0.4, dz: 1.5, dYaw: -6.5, sx: 0.90, sz: 0.88 },
+    // 中街东段南侧（MB1/MB2/MC1/SB1，严格南让开中街通道且彼此留缝）
+    MB1: { dx: -0.8, dz: 1.2, dYaw: 5.8, sx: 0.88, sz: 0.86 },
+    MB2: { dx: 0.9, dz: 1.6, dYaw: -5.2, sx: 0.88, sz: 0.82 },
+    MC1: { dx: 0.5, dz: 1.8, dYaw: 7.5, sx: 0.92, sz: 0.88 },
+    SB1: { dx: 0.4, dz: 2.2, dYaw: -5.8, sx: 0.90, sz: 0.88 },
+    // 村心南排（SA1–SA3 三连排）
+    SA1: { dx: -1.4, dz: 1.0, dYaw: 5.2, sx: 0.88, sz: 0.90 },
+    SA2: { dx: -0.1, dz: -1.1, dYaw: -4.8, sx: 0.86, sz: 0.84 },
+    SA3: { dx: 1.2, dz: 1.2, dYaw: 4.4, sx: 0.88, sz: 0.90 },
+    // 东南官道斜排（图四：打破 GW1–GW3 / GE1–GE2 五座 -48.8° 机械平行队列，恢复鲁南锯齿退界与偏南朝向）
+    GW1: { dx: -2.0, dz: 0.3, dYaw: 14.5, sx: 0.84, sz: 0.86 },
+    GW2: { dx: -3.2, dz: 2.0, dYaw: 28.0, sx: 0.82, sz: 0.84 },
+    GW3: { dx: -0.8, dz: 3.4, dYaw: 10.5, sx: 0.84, sz: 0.86 },
+    GE1: { dx: 1.6, dz: -1.4, dYaw: 19.5, sx: 0.84, sz: 0.86 },
+    GE2: { dx: 3.2, dz: 0.8, dYaw: 33.0, sx: 0.84, sz: 0.84 },
+    // 村南中东双院（SR1–SR2 打破 15.1° 平行双拼）
+    SR1: { dx: -1.1, dz: 1.2, dYaw: -8.5, sx: 0.90, sz: 0.90 },
+    SR2: { dx: 0.8, dz: -0.6, dYaw: 5.8, sx: 0.88, sz: 0.88 },
+    // 李子行空村（LzN1–3 / LzS1–2 打破 0° 兵营队列）
+    LzN1: { dx: -1.2, dz: -1.5, dYaw: 5.2, sx: 0.92, sz: 0.90 },
+    LzN2: { dx: 0.3, dz: 0.7, dYaw: -4.6, sx: 0.90, sz: 0.86 },
+    LzN3: { dx: 1.6, dz: -1.3, dYaw: 5.8, sx: 0.92, sz: 0.90 },
+    LzS1: { dx: -1.0, dz: 1.1, dYaw: -4.8, sx: 0.92, sz: 0.88 },
+    LzS2: { dx: 1.4, dz: -0.7, dYaw: 4.2, sx: 0.90, sz: 0.90 },
+  };
+  const EnsureOwnWallL = (prefix) => {
+    if (ownObjects.some((o) => o.id === `${prefix}_WallL` || o.id.startsWith(`${prefix}_WallL_`))) return;
+    const wallB = ownObjects.find((o) => o.id === `${prefix}_WallB`);
+    const wallR = ownObjects.find((o) => o.id === `${prefix}_WallR`)
+      || ownObjects.find((o) => o.id === `${prefix}_WallR_South`);
+    if (!wallB || !wallR) return;
+    const yaw = wallB.yawDeg || 0;
+    const rad = (yaw * Math.PI) / 180;
+    const widthM = wallB.size[0];
+    // 对 MA3（WallR 已拆为 North/South）取完整深度 15.5m 与 WallF/WallB 中点 Z
+    let rx = wallR.pos[0], rz = wallR.pos[2], depthM = wallR.size[2];
+    if (wallR.id.endsWith("_South")) {
+      const wallF = ownObjects.find((o) => o.id === `${prefix}_WallF_1`);
+      if (wallF) {
+        rz = Fix((wallB.pos[2] + wallF.pos[2]) * 0.5);
+        depthM = 15.5;
+      }
+    }
+    ownObjects.push({
+      id: `${prefix}_WallL`,
+      asset: "Whitebox/Box",
+      material: wallB.material || "Whitebox/Plaster",
+      pos: [Fix(rx - Math.cos(rad) * widthM), null, Fix(rz + Math.sin(rad) * widthM)],
+      size: [wallR.size[0], wallB.size[1], depthM],
+      ...(yaw ? { yawDeg: yaw } : {}),
+      group: wallB.group,
+    });
+  };
+  // MA2 从 MA3 拆离后，为 MA3 补上独立西院墙，确保院落封闭
+  EnsureOwnWallL("MA3");
+  const sloganMarkerTransforms = new Map();
+  for (const [prefix, tweak] of Object.entries(COMPOUND_LAYOUT_TWEAKS)) {
+    EnsureOwnWallL(prefix);
+    const members = ownObjects.filter((o) =>
+      o.id.startsWith(`${prefix}_`)
+      || o.id === `Slogan_${prefix}`
+      || o.id === `VillageLightPost_${prefix}`
+      || o.id === `VillageLight_${prefix}`
+      || o.id === `SleeperPile_${prefix}`,
+    );
+    const walls = members.filter((o) => o.id.startsWith(`${prefix}_Wall`));
+    if (!walls.length) continue;
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const w of walls) {
+      if (w.pos[0] < minX) minX = w.pos[0];
+      if (w.pos[0] > maxX) maxX = w.pos[0];
+      if (w.pos[2] < minZ) minZ = w.pos[2];
+      if (w.pos[2] > maxZ) maxZ = w.pos[2];
+    }
+    const pivX = (minX + maxX) * 0.5, pivZ = (minZ + maxZ) * 0.5;
+    const baseYaw = walls[0].yawDeg || 0;
+    const rad0 = (baseYaw * Math.PI) / 180;
+    const cos0 = Math.cos(rad0), sin0 = Math.sin(rad0);
+    const newYaw = baseYaw + (tweak.dYaw || 0);
+    const rad1 = (newYaw * Math.PI) / 180;
+    const cos1 = Math.cos(rad1), sin1 = Math.sin(rad1);
+    const sx = tweak.sx ?? 1, sz = tweak.sz ?? 1;
+    const XformPt = (px, pz) => {
+      const dx0 = px - pivX, dz0 = pz - pivZ;
+      const lx = (dx0 * cos0 - dz0 * sin0) * sx;
+      const lz = (dx0 * sin0 + dz0 * cos0) * sz;
+      return [
+        Fix(pivX + (tweak.dx || 0) + lx * cos1 + lz * sin1),
+        Fix(pivZ + (tweak.dz || 0) - lx * sin1 + lz * cos1),
+      ];
+    };
+    sloganMarkerTransforms.set(`LmSlogan_${prefix}`, XformPt);
+    for (const obj of members) {
+      const [nx, nz] = XformPt(obj.pos[0], obj.pos[2]);
+      obj.pos[0] = nx;
+      obj.pos[2] = nz;
+      if (tweak.dYaw) obj.yawDeg = Fix((obj.yawDeg || 0) + tweak.dYaw);
+      if (Array.isArray(obj.size) && (sx !== 1 || sz !== 1)) {
+        // 仅按宅基地局部宽/深缩放墙段与屋身跨度，保留墙厚/窗框/灯柱真实尺度
+        if (obj.size[0] > 0.65) obj.size[0] = Fix(obj.size[0] * sx);
+        if (obj.size[2] > 0.65) obj.size[2] = Fix(obj.size[2] * sz);
+      }
+      if (Array.isArray(obj.meta?.openings)) {
+        obj.meta.openings = obj.meta.openings.map((op) => (
+          Array.isArray(op.p) ? { ...op, p: XformPt(op.p[0], op.p[1]) } : op
+        ));
+      }
+      if (Array.isArray(obj.meta?.room?.center)) {
+        obj.meta.room.center = XformPt(obj.meta.room.center[0], obj.meta.room.center[1]);
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -942,19 +1230,55 @@ function BuildMergedScene() {
   AddLunanCompound("S2_Edge_NE", "T1", 205.5, 488.5, 9.2, 8.6, { gateSide: "S", yawDeg: -4.5 });
   AddLunanCompound("S2_Edge_SE", "T1", 211.0, 686.5, 9.6, 9.4, { gateSide: "W", yawDeg: 5.0 });
 
-  // 村心南坑塘 & 村西南取土苇坑水面、岸边歪柳、干苇与坑边避难土洞
+  // 村内与桥南 5 处有机不规则坑塘水面（统一采用 waterRibbon 有机轮廓，彻底消除方正水盒！）+ 岸边歪柳、干苇与坑边避难土洞
   const pondG = "08–13合并/地标/村内坑塘";
+  const pondPaint = [];
+  for (const pond of ORGANIC_PONDS) {
+    const { rows, centerX, centerZ, spanX, spanZ } = BuildPondWaterRibbon(pond, 28);
+    ownObjects.push({
+      id: pond.id,
+      asset: "Whitebox/Box",
+      material: "Whitebox/Water",
+      pos: [centerX, pond.bottomY, centerZ],
+      size: [spanX, Fix(pond.surfY - pond.bottomY), spanZ],
+      solid: false,
+      group: pond.group,
+      meta: { waterRibbon: rows },
+    });
+    pondPaint.push(
+      { id: `PondBank_${pond.paintKey}`, poly: SamplePondPolygon(pond, 1.32, 40), feather: 1.5, color: "#92886c", strength: 0.70 },
+      { id: `PondDamp_${pond.paintKey}`, poly: SamplePondPolygon(pond, 1.09, 44), feather: 0.65, color: "#6d7866", strength: 0.78 },
+      { id: `PondWater_${pond.paintKey}`, poly: SamplePondPolygon(pond, 1.0, 48), feather: 0.35, color: "#78a4b2", strength: 0.94 },
+    );
+  }
+  const PondRimPt = (pondId, deg, scale = 1.08) => PondContourPoint(
+    ORGANIC_PONDS.find((p) => p.id === pondId), (deg * Math.PI) / 180, scale,
+  );
+  const [pnW1x, pnW1z] = PondRimPt("Pond_N_Water", 212, 1.18);
+  const [pnR1x, pnR1z] = PondRimPt("Pond_N_Water", 26, 1.02);
+  const [pnR2x, pnR2z] = PondRimPt("Pond_N_Water", 148, 1.03);
+  const [pwW1x, pwW1z] = PondRimPt("Pond_W_Water", 235, 1.20);
+  const [pwR1x, pwR1z] = PondRimPt("Pond_W_Water", 48, 1.02);
+  const [pmW1x, pmW1z] = PondRimPt("Pond_Mid_Water", 208, 1.22);
+  const [pmW2x, pmW2z] = PondRimPt("Pond_Mid_Water", 22, 1.22);
+  const [pmR1x, pmR1z] = PondRimPt("Pond_Mid_Water", -18, 1.00);
+  const [pmR2x, pmR2z] = PondRimPt("Pond_Mid_Water", 146, 1.02);
+  const [psW1x, psW1z] = PondRimPt("Pond_SW_Water", -35, 1.22);
+  const [psR1x, psR1z] = PondRimPt("Pond_SW_Water", 145, 1.02);
   ownObjects.push(
-    { id: "Pond_Mid_Water", asset: "Whitebox/Box", material: "Whitebox/Water", pos: [146, -0.78, 643], size: [12.5, 0.52, 9.2], solid: false, group: pondG },
-    { id: "Pond_Mid_Willow1", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [137.2, null, 639.2], size: [0.46, 6.4, 0.46], group: pondG },
-    { id: "Pond_Mid_Willow2", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [154.6, null, 646.8], size: [0.44, 5.8, 0.44], group: pondG },
+    { id: "Pond_N_Willow", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [pnW1x, null, pnW1z], size: [0.44, 6.1, 0.44], group: pondG },
+    { id: "Pond_N_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [pnR1x, null, pnR1z], size: [2.2, 0.88, 1.2], yawDeg: -14, solid: false, group: pondG },
+    { id: "Pond_N_Reeds2", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [pnR2x, null, pnR2z], size: [2.0, 0.82, 1.1], yawDeg: 22, solid: false, group: pondG },
+    { id: "Pond_W_Willow", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [pwW1x, null, pwW1z], size: [0.44, 5.9, 0.44], group: pondG },
+    { id: "Pond_W_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [pwR1x, null, pwR1z], size: [2.1, 0.86, 1.2], yawDeg: 18, solid: false, group: pondG },
+    { id: "Pond_Mid_Willow1", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [pmW1x, null, pmW1z], size: [0.46, 6.4, 0.46], group: pondG },
+    { id: "Pond_Mid_Willow2", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [pmW2x, null, pmW2z], size: [0.44, 5.8, 0.44], group: pondG },
     { id: "Pond_Mid_Dugout", asset: "Whitebox/Box", material: "Whitebox/EarthDark", pos: [144.5, null, 635.2], size: [3.4, 0.85, 2.2], yawDeg: -6, group: pondG },
     { id: "Pond_Mid_DugoutMat", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [144.5, 0.86, 635.2], size: [3.1, 0.10, 2.0], yawDeg: -6, solid: false, group: pondG },
-    { id: "Pond_Mid_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [152.2, null, 641.2], size: [2.2, 0.95, 1.4], solid: false, group: pondG },
-    { id: "Pond_Mid_Reeds2", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [140.4, null, 647.5], size: [2.4, 0.88, 1.2], solid: false, group: pondG },
-    { id: "Pond_SW_Water", asset: "Whitebox/Box", material: "Whitebox/Water", pos: [46, -0.76, 704], size: [11.6, 0.50, 8.6], solid: false, group: pondG },
-    { id: "Pond_SW_Willow", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [52.2, null, 699.2], size: [0.46, 6.6, 0.46], group: pondG },
-    { id: "Pond_SW_Reeds", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [40.2, null, 707.6], size: [2.6, 0.92, 1.5], solid: false, group: pondG },
+    { id: "Pond_Mid_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [pmR1x, null, pmR1z], size: [2.2, 0.95, 1.4], yawDeg: -16, solid: false, group: pondG },
+    { id: "Pond_Mid_Reeds2", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [pmR2x, null, pmR2z], size: [2.4, 0.88, 1.2], yawDeg: 12, solid: false, group: pondG },
+    { id: "Pond_SW_Willow", asset: "Whitebox/Box", material: "Whitebox/Foliage", pos: [psW1x, null, psW1z], size: [0.46, 6.6, 0.46], group: pondG },
+    { id: "Pond_SW_Reeds", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [psR1x, null, psR1z], size: [2.6, 0.92, 1.5], yawDeg: 24, solid: false, group: pondG },
     // 村内公井与官道拆轨枕木柴垛（人间烟火细节）
     { id: "Village_Well_SouthMid_Curb", asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [128.5, null, 643.5], size: [1.3, 0.48, 1.3], group: "08–13合并/地标/村心公井" },
     { id: "Village_Well_SouthMid_P1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [127.9, null, 643.5], size: [0.14, 1.35, 0.14], group: "08–13合并/地标/村心公井" },
@@ -1553,10 +1877,9 @@ function BuildMergedScene() {
     { id: "SouthRally_Stretcher1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [-58.4, null, 893.2], size: [2.1, 0.14, 0.85], yawDeg: 18, solid: false, group: z5G },
     { id: "SouthRally_Stretcher2", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [-73.2, null, 891.8], size: [2.1, 0.14, 0.85], yawDeg: -24, solid: false, group: z5G },
     { id: "SouthRally_Barrow1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [-74.0, null, 894.0], size: [1.75, 0.66, 0.92], yawDeg: 32, group: z5G },
-    // 5F 南岸西侧防洪柳林与取土苇洼（[-118, 906]）
-    { id: "Pond_SWBridge_Water", asset: "Whitebox/Box", material: "Whitebox/Water", pos: [-118, -0.74, 906], size: [14.5, 0.48, 10.2], solid: false, group: z5G },
-    { id: "Pond_SWBridge_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [-111.5, null, 903.0], size: [3.2, 0.98, 1.8], solid: false, group: z5G },
-    { id: "Pond_SWBridge_Reeds2", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [-124.5, null, 909.5], size: [3.6, 0.92, 1.6], solid: false, group: z5G },
+    // 5F 南岸西侧防洪柳林与取土苇洼（[-118, 906]，水面由 ORGANIC_PONDS 统一生成 waterRibbon）
+    { id: "Pond_SWBridge_Reeds1", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [-111.5, null, 903.0], size: [3.2, 0.98, 1.8], yawDeg: -14, solid: false, group: z5G },
+    { id: "Pond_SWBridge_Reeds2", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [-124.5, null, 909.5], size: [3.6, 0.92, 1.6], yawDeg: 18, solid: false, group: z5G },
   );
   for (const [idx, x, z, h] of [
     [1, -104, 882, 6.8], [2, -112, 884, 7.2], [3, -122, 886, 6.5], [4, -133, 887, 7.4],
@@ -1860,11 +2183,11 @@ function BuildMergedScene() {
     { id: "NorthNiche_GrenadeW", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [70.2, null, 487.0], size: [0.48, 0.28, 0.34], yawDeg: -14, group: defG },
     { id: "NorthNiche_AmmoE", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [145.5, null, 480.8], size: [0.62, 0.34, 0.42], yawDeg: -6, group: defG },
     { id: "NorthNiche_GrenadeE", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [149.2, null, 481.2], size: [0.48, 0.28, 0.34], yawDeg: 16, group: defG },
-    // 村北前沿二线墙后木制射击台（北排院墙构成第二道射界阶梯）
-    { id: "NorthWallStep_1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [81.0, null, 498.5], size: [3.4, 0.85, 0.85], group: defG },
-    { id: "NorthWallStep_2", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [125.0, null, 502.8], size: [3.4, 0.85, 0.85], group: defG },
-    { id: "NorthWallStep_3", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [152.0, null, 501.8], size: [3.4, 0.85, 0.85], group: defG },
-    { id: "NorthWallStep_4", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [189.0, null, 501.5], size: [3.4, 0.85, 0.85], group: defG },
+    // 村北前沿二线墙后木制射击台（随北排院墙有机退线与倾角同步贴合）
+    { id: "NorthWallStep_1", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [81.5, null, 497.2], size: [3.4, 0.85, 0.85], yawDeg: 2.0, group: defG },
+    { id: "NorthWallStep_2", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [123.7, null, 503.6], size: [3.4, 0.85, 0.85], yawDeg: -4.1, group: defG },
+    { id: "NorthWallStep_3", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [152.7, null, 502.9], size: [3.4, 0.85, 0.85], yawDeg: -3.3, group: defG },
+    { id: "NorthWallStep_4", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [188.5, null, 502.2], size: [3.4, 0.85, 0.85], yawDeg: -2.6, group: defG },
     // 村内纵深二线街口枕木沙袋半街垒（贴街肩摆设，留足驴车与全员通行净宽，0 穿墙！）
     { id: "InnerBarricade_NorthMain", asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [108.5, null, 510.2], size: [2.4, 0.96, 0.72], yawDeg: -18, group: defG },
     { id: "InnerBarricade_NorthMainLog", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [108.5, Fix(HeightAtOwn(108.5, 510.2) + 0.92), 510.2], size: [2.3, 0.16, 0.34], yawDeg: -18, solid: false, group: defG },
@@ -2142,6 +2465,7 @@ function BuildMergedScene() {
     // 村缘土场过渡带（原东西战壕内绿菜园已随外围壕沟清场撤除，仅保留西侧土场与村内院落小菜园）
     { id: "VillageFringe_W2", poly: [{ x: 42, z: 580 }, { x: 56, z: 582 }, { x: 54, z: 604 }, { x: 40, z: 598 }], feather: 2.2, color: "#cfc2a2", strength: 0.62 },
     ...bombScorchPaint,
+    ...pondPaint,
     {
       id: "ThreshingFloor",
       poly: [
@@ -2307,7 +2631,14 @@ function BuildMergedScene() {
         if (m.id === "LmSouthStreetCorner") return { ...m, x: 172, z: 680 };
         if (m.id === "LmExitPath") return { ...m, x: 121, z: 744 };
         const forceSouth = m.id === "LmWell_3" ? true : null;
-        return { ...m, z: MapZ(m.z, forceSouth) };
+        const shifted = { ...m, z: MapZ(m.z, forceSouth) };
+        const sloganXform = sloganMarkerTransforms.get(m.id);
+        if (sloganXform) {
+          const [nx, nz] = sloganXform(shifted.x, shifted.z);
+          shifted.x = nx;
+          shifted.z = nz;
+        }
+        return shifted;
       }),
     { id: "LmMergedSouthMidStreet", name: "南中街（民居密巷）", x: 142.0, z: 636.0, kind: "place" },
     { id: "LmMergedMidPond", name: "村心南坑塘", x: 146.0, z: 643.0, kind: "place" },

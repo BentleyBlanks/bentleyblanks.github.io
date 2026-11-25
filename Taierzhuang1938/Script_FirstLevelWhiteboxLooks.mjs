@@ -420,5 +420,6 @@ export function BuildRibbonWater(block, scene) {
   geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
-  return CreateWaterSurface({geometry,scene,preset:"muddyRiver",flow:[-1,.2],name:block.id});
+  const flow = /^Pond_/.test(block.id || "") ? [-0.04, 0.02] : [-1, 0.2];
+  return CreateWaterSurface({geometry,scene,preset:"muddyRiver",flow,name:block.id});
 }

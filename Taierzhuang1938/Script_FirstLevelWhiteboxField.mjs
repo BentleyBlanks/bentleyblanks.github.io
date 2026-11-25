@@ -406,8 +406,9 @@ export class FirstLevelWhiteboxField {
     for (const block of this.layout.blocks) {
       if(block.dynamic || block.treeModel)continue;
       if(block.waterRibbon) {
-        this.waterMesh=BuildRibbonWater(block,this.scene);
-        this.meshes.push(this.waterMesh);
+        const mesh = BuildRibbonWater(block, this.scene);
+        if (!this.waterMesh || block.id === "SandRiverSurface") this.waterMesh = mesh;
+        this.meshes.push(mesh);
         continue;
       }
       const targetSink = this.layout.terrain === "P012Heightfield" && IsP012TrainBlock(block.id) ? (this.layout.fortifications && block.id.startsWith(`StationCar${this.layout.derailCar}`) ? derailSink : trainSink) : sink;
