@@ -789,13 +789,29 @@ function UpgradeMergedEastFlank(document, defaults) {
   }
 }
 
+function UpgradeMergedBoards(document, defaults) {
+  const next = defaults.groups.find(group => group.id === "MergedBoards");
+  const group = document.groups.find(group => group.id === next?.id);
+  if (!group || !next) return;
+  if (group.endBeat === "08d" && group.lifetime === 54) {
+    group.endBeat = next.endBeat;
+    group.lifetime = next.lifetime;
+    if (group.lastFall === 62) group.lastFall = next.lastFall;
+    const trigger = document.triggers.find(t => t.id === group.triggerId);
+    if (trigger?.id === next.triggerId && trigger.endBeat === "08d") {
+      trigger.endBeat = defaults.triggers.find(t => t.id === next.triggerId).endBeat;
+    }
+  }
+}
+
 export function UpgradeEncounterDocument(input,defaults) {
   if(defaults.id!=="FirstLevelEncounter") {
     const cloned=structuredClone(input);
-    const mergedLegacyRevisions = ["2026-11-22-beishahe-merged-1", "2026-11-25-west-search-cover-1"];
-    if (input.id === "L1_BeishaheMerged" && input.id === defaults.id
-      && mergedLegacyRevisions.includes(input.revision) && input.revision !== defaults.revision) {
-      UpgradeMergedEastFlank(cloned, defaults);
+    const eastFlankRevisions = ["2026-11-22-beishahe-merged-1", "2026-11-25-west-search-cover-1"];
+    const boardsLegacyRevisions = [...eastFlankRevisions, "2026-11-26-east-flank-plan-a-1"];
+    if (input.id === "L1_BeishaheMerged" && input.id === defaults.id && input.revision !== defaults.revision) {
+      if (eastFlankRevisions.includes(input.revision)) UpgradeMergedEastFlank(cloned, defaults);
+      if (boardsLegacyRevisions.includes(input.revision)) UpgradeMergedBoards(cloned, defaults);
     }
     cloned.id=defaults.id;
     cloned.revision=defaults.revision;

@@ -194,7 +194,7 @@ export const MERGED_WAVES = [
     trigger: { mode: "time", delay: 0 }, repeat: "沟北坟头土坎遮挡后绕掩体两两交替跃进至两道掩体土坎后，缩头探头压制沟南战壕",
   },
   {
-    id: "MergedBoards", beat: "08c", until: "08d", label: "跃进架桥工兵组",
+    id: "MergedBoards", beat: "08c", until: "08c", label: "跃进架桥工兵组",
     source: [96, 410], areaSize: [5, 3.5],
     route: [[96, 410], [102.5, 410], [102.5, 432.5], [108.5, 432.9], [103.5, 434.5], [106.2, 455.5], [100.2, 457.0], [100.2, 466]],
     spawnOffsets: [[1.2, 0], [-1.2, -0.4], [1.0, -1.6], [-1.0, -1.8]],
@@ -204,7 +204,7 @@ export const MERGED_WAVES = [
       { delay: 0.3, route: [[102.5, 410], [103.0, 432.5], [107.2, 432.9], [104.2, 434.2], [105.0, 455.5], [99.8, 457.2], [99.8, 466.2]] },
       { delay: 0.8, route: [[90.5, 410], [90.8, 432.5], [95.0, 432.9], [97.4, 434.2], [94.4, 455.5], [99.0, 457.2], [99.0, 466.2]] },
     ],
-    count: 4, interval: 0.9, maxAlive: 4, lifetime: 54, speed: 2.7, behavior: "bounds", lastFall: 62,
+    count: 4, interval: 0.9, maxAlive: 4, lifetime: 48, speed: 2.7, behavior: "bounds", lastFall: 52,
     coverWaitSeconds: 2.0,
     fireCycle: { seconds: 4.8, active: 2.3, offset: 0.2 },
     trigger: { mode: "time", delay: 3 }, repeat: "依托官道两侧土堆掩体绕端两两交替跃进，每到掩体蹲伏射击后再推进至沟沿架桥",

@@ -391,6 +391,37 @@ const customizedDraft = ReloadMerged();
 assert.deepEqual(customizedDraft.groups.find(group => group.id === oldSearch.id), oldSearch);
 assert.deepEqual(customizedDraft.triggers.find(trigger => trigger.id === oldSearchTrigger.id), oldSearchTrigger);
 
+const prevBoardsDraft = structuredClone(merged.defaultDocument);
+prevBoardsDraft.revision = "2026-11-26-east-flank-plan-a-1";
+const prevBoards = prevBoardsDraft.groups.find(group => group.id === "MergedBoards");
+prevBoards.endBeat = "08d";
+prevBoards.lifetime = 54;
+prevBoards.lastFall = 62;
+const prevBoardsTrigger = prevBoardsDraft.triggers.find(trigger => trigger.id === prevBoards.triggerId);
+prevBoardsTrigger.endBeat = "08d";
+fakeStore.set(merged.spec.storageKey, JSON.stringify(prevBoardsDraft));
+const upgradedBoardsDraft = new EncounterDocument(merged.defaultDocument, merged.timeline, mockStorage, {
+  storageKey: merged.spec.storageKey, legacyStorageKey: null,
+}).value;
+assert.equal(upgradedBoardsDraft.revision, merged.defaultDocument.revision);
+assert.equal(upgradedBoardsDraft.groups.find(group => group.id === "MergedBoards").endBeat, "08c");
+assert.equal(upgradedBoardsDraft.groups.find(group => group.id === "MergedBoards").lifetime, 48);
+assert.equal(upgradedBoardsDraft.triggers.find(trigger => trigger.id === prevBoards.triggerId).endBeat, "08c");
+
+// 08d 撤桥起手与撤桥转 09a 瞬间不得在沟口脸上残留或补刷 MergedBoards / MergedRifles
+const plan08d = new EncounterPlayPlan(merged.defaultDocument, merged.BeatById("08d").start, merged);
+assert.equal(
+  plan08d.initial.filter((a) => a.groupId === "MergedBoards").length,
+  0,
+  "08d 以清完垫沟兵为前提，起手不应在沟口近距刷出存活的 MergedBoards",
+);
+const alive08d = new Set(plan08d.initial.map((a) => a.id));
+plan08d.Interact();
+plan08d.Step(0.016, merged.BeatById("08d").p.at(-1), alive08d);
+assert.equal(plan08d.beat.id, "09a", "08d 撤桥交互后立即转入 09a");
+const transitionSpawns = plan08d.Spawns(alive08d).filter((a) => ["MergedBoards", "MergedRifles"].includes(a.groupId));
+assert.equal(transitionSpawns.length, 0, "08d 撤桥转入 09a 瞬间不得补刷已结束的沟口敌军");
+
 // 6. 单村合并版 08–13 单向动线、完整敌军渗入路径与全链路 Play 过关验证
 const f08d = merged.evaluate(merged.BeatById("08d").start + 28);
 assert.ok(f08d.dialogue.some((d) => d.actorId === "liu" && d.text.includes("关帝庙")), "08d 顺视线转向关帝庙绕后");
@@ -635,6 +666,21 @@ const f09cMelee = merged.evaluate(b09c.start + 6.5);
 assert.equal(f09cMelee.actors.find(a => a.id === "player")?.pose, "melee", "09c 顺子以大刀近战无声解决邻院落单搜屋兵");
 const f09cAfterMelee = merged.evaluate(b09c.start + 8.0);
 assert.equal(f09cAfterMelee.actors.find(a => a.id === "MergedYardStraggler_0")?.pose, "dead", "邻院落单搜屋兵在 09c 被无声放倒");
+
+// 08c 垫沟兵全部 4 个生成点从沟南战壕各观察位均须完全被土坎掩体遮挡，防止 VisibleSpawn 误卡或转头后突刷。
+const boardsGroup = CompileEncounters(merged.defaultDocument, merged.timeline).groups.find(group => group.id === "MergedBoards");
+const boardsScreens = solidObjects.filter(({ pos: [x, , z] }) => x >= 88 && x <= 112 && z >= 408 && z <= 476);
+for (let index = 0; index < boardsGroup.count; index++) {
+  const spawn = GroupPath(boardsGroup, index)[0];
+  for (const player of [[104, 478], [112, 478], [99, 475.5], [101, 476]]) {
+    const origin = Eyes(player, 1.7);
+    for (const [dx, height] of [[0, 0.4], [0, 1.1], [0, 1.7], [-0.35, 1.4], [0.35, 1.4]]) {
+      const target = Eyes([spawn[0] + dx, spawn[1]], height);
+      assert.ok(boardsScreens.some(wall => RayHitsOrientedBox(origin, target, wall, groundAt)),
+        `08C 垫沟兵 ${index + 1} 的生成点 ${spawn} 从战壕位置 ${player} 可见`);
+    }
+  }
+}
 
 // 8. 全员 0 穿墙、潜行/平民零照面穿帮、合理近距交火线回归审计（按 1s 步进扫完整个 08a–13e）
 const solidWalls = solidObjects.filter((o) => o.size[1] >= 0.45 && o.meta?.obstacle !== "barbedWire");

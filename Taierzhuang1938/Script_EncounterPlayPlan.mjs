@@ -196,7 +196,7 @@ export class EncounterPlayPlan {
   Spawns(aliveIds) {
     const result = [];
     for (const group of this.compiled.groups) {
-      if (!group.enabled || !this.triggers.has(group.triggerId) || (this.time > group.end && ![...(this.gate.clear || []), ...(this.gate.kills?.groups || [])].includes(group.id))) continue;
+      if (!group.enabled || !this.triggers.has(group.triggerId) || (this.time >= group.end && ![...(this.gate.clear || []), ...(this.gate.kills?.groups || [])].includes(group.id))) continue;
       const state = this.groups.get(group.id), live = [...aliveIds].filter((id) => id.startsWith(group.id + "_")).length;
       if (state.count >= group.count || live >= group.maxAlive || group.reinforceAfterClear && state.count >= group.maxAlive && live > 0) continue;
       if (this.elapsed - state.lastSpawn < group.interval) continue;
