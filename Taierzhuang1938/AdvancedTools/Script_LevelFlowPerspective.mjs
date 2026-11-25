@@ -856,5 +856,5 @@ export class FlowPerspectiveView extends FlowMapView {
   }
   Diagnostics() {
     this.InspectOcclusion();
-    return {backend:this.raster.accelerated?"webgl2":"software",renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
+    return {backend:this.raster.accelerated?"webgl2":"software",terrainLayered:!!(this.raster.accelerated&&this.raster.gpu?.layerTextures&&this.raster.terrainSurface?.splat),renderScale:this.raster.coordinateScale,drawMs:this.drawMs,terrain:this.mapData.terrain.source,terrainTriangles:this.terrainTriangles,triangles:this.raster.triangles,far:this.far,eye:[...this.eye],aim:[...this.aim],actors:[...this.occlusion].map(([id,stats])=>({id,...stats,labelOpacity:this.ActorLabelOpacity(this.frame.actors.find(actor=>actor.id===id))}))};}
 }

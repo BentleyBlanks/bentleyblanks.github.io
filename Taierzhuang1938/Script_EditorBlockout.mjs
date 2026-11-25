@@ -712,7 +712,7 @@ export class EditorBlockout {
       BlockoutTintColor(tint.lo + (tint.hi - tint.lo) * i / 255, tint, rgb);
       srgb[i * 3] = rgb[0]; srgb[i * 3 + 1] = rgb[1]; srgb[i * 3 + 2] = rgb[2];
     }
-    for (const mesh of formal ? [] : field.meshes || []) {
+    for (const mesh of formal || field.terrainLayers ? [] : field.meshes || []) {
       if (mesh.name !== BLOCKOUT_EDITOR.groundName || !mesh.geometry) continue;
       const position = mesh.geometry.getAttribute("position");
       let colors = mesh.geometry.getAttribute("color");

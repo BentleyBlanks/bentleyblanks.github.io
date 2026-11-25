@@ -855,6 +855,26 @@ assert.ok(relief.colorAt(3.5,1)[0]>relief.colorAt(2.5,1)[0]+30,
 const reliefSurface=relief.surfaceMaps();
 assert.equal(relief.surfaceMaps(),reliefSurface,'all panes reuse the baked terrain surface');
 assert.equal(reliefSurface.backdrop,null,'scenes without backdrop paint retain the plain-ground fallback');
+assert.ok(reliefSurface.splat&&reliefSurface.macroTint,'baked terrain surface includes 4-layer splat and macroTint maps');
+assert.equal(reliefSurface.splat.width,reliefSurface.scene.width,'splat texture shares scene grid width');
+assert.equal(reliefSurface.splat.height,reliefSurface.scene.height,'splat texture shares scene grid height');
+assert.equal(reliefSurface.macroTint.width,reliefSurface.scene.width,'macroTint texture shares scene grid width');
+{
+  const SplatAt=(x,z)=>{
+    const t=reliefSurface.splat, o=((z-t.minZ)/t.texelM*t.width+(x-t.minX)/t.texelM)*4;
+    return [...t.data.slice(o,o+4)];
+  };
+  const TintAt=(x,z)=>{
+    const t=reliefSurface.macroTint, o=((z-t.minZ)/t.texelM*t.width+(x-t.minX)/t.texelM)*4;
+    return [...t.data.slice(o,o+3)];
+  };
+  const plowedSplat=SplatAt(2,2), wheatSplat=SplatAt(8,2), fallowSplat=SplatAt(14,2);
+  assert.ok(wheatSplat[2]>plowedSplat[2]+100,'wheat strip writes high stubble weight compared to plowed soil');
+  assert.ok(plowedSplat[1]>wheatSplat[1]+50,'plowed strip writes spoil earth weight compared to wheat');
+  assert.ok(wheatSplat[2]>fallowSplat[2]+60,'wheat strip writes higher stubble weight than fallow');
+  const plowedTint=TintAt(2,2), wheatTint=TintAt(8,2);
+  assert.ok(wheatTint[1]>wheatTint[0]&&plowedTint[0]>plowedTint[2],'macroTint preserves spring green wheat vs warm brown plowed strips');
+}
 for(const [x,z] of [[0.5,0.5],[2,2],[8,2],[14,2]]) {
   const texture=reliefSurface.scene;
   const offset=((z-texture.minZ)/texture.texelM*texture.width+(x-texture.minX)/texture.texelM)*4;

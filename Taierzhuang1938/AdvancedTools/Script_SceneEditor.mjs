@@ -603,7 +603,7 @@ class SceneEditorApp {
     this.world.add(this.terrain);
     this.terrainStep = step;
     this.terrainLook = "tint";
-    if (this.style === "formal") this.terrainReady = this.DressFormalTerrain(this.terrain);
+    if (this.style === "formal" || doc.look?.terrainLayers) this.terrainReady = this.DressFormalTerrain(this.terrain);
 
     const bd = doc.backdrop;
     this.backdropAt = bd ? BackdropGroundSampler(bd, this.sampler, bd.siteBounds || doc.bounds) : null;
@@ -643,7 +643,7 @@ class SceneEditorApp {
         this.terrainPack = pack;
       }
       if (token !== this.terrainToken || mesh !== this.terrain) return false;
-      const surface = BuildSceneGroundSurface(this.model.doc, this.sampler);
+      const surface = BuildSceneGroundSurface({ ...this.model.doc, scene: this.sceneId, trenchPlan: this.trenchPlan }, this.sampler);
       const position = mesh.geometry.getAttribute("position"), n = position.count;
       const colors = new Float32Array(n * 3), layers = new Float32Array(n * 4), c = [1, 1, 1], w = [0, 0, 1, 1];
       const color = new THREE.Color();

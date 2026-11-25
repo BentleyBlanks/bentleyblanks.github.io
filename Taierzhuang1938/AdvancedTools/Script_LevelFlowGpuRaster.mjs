@@ -1,11 +1,136 @@
 import { EncounterGpuOverlay } from "./Script_LevelFlowGpuOverlay.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
+import { TERRAIN_SETS } from "../Data_Tuning_Terrain.mjs";
+import { TerrainLayerUrls } from "../Script_Tuning_Terrain.mjs";
 
 // One offscreen context for all panes. Each pane retains its native linear
 // depth for GPU overlays and on-demand surface picking.
 const Dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 let shared;
 let unavailable=false;
+
+// Shared CPU-packed 4-layer MissionPlain terrain textures (albedo+height 512²,
+// normal+rough+AO 256²) for WebGL2 multi-layer height-blended terrain splatting.
+const EDITOR_TERRAIN_SET = "MissionPlain";
+const EDITOR_ALBEDO_SIZE = 512;
+const EDITOR_SURFACE_SIZE = 256;
+const SRGB_TO_LINEAR = (() => {
+  const table = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const c = i / 255;
+    table[i] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }
+  return table;
+})();
+
+let layerPackPromise = null;
+let loadedLayerPack = null;
+const layerReadyListeners = new Set();
+
+async function FetchLayerBitmap(url, assetBase) {
+  const response = await fetch(new URL(url, assetBase));
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url}`);
+  const blob = await response.blob();
+  return createImageBitmap(blob, { premultiplyAlpha: "none", colorSpaceConversion: "none" });
+}
+
+function ResizeBitmapRgba(bitmap, size) {
+  const canvas = typeof OffscreenCanvas !== "undefined"
+    ? new OffscreenCanvas(size, size)
+    : Object.assign(document.createElement("canvas"), { width: size, height: size });
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, 0, 0, size, size);
+  return ctx.getImageData(0, 0, size, size).data;
+}
+
+export function PreloadEncounterTerrainLayers(onReady = null) {
+  if (onReady) {
+    if (loadedLayerPack) onReady(loadedLayerPack);
+    else layerReadyListeners.add(onReady);
+  }
+  if (loadedLayerPack) return Promise.resolve(loadedLayerPack);
+  if (layerPackPromise) return layerPackPromise;
+  if (typeof fetch !== "function" || typeof createImageBitmap !== "function") return Promise.resolve(null);
+  const set = TERRAIN_SETS[EDITOR_TERRAIN_SET];
+  if (!set) return Promise.resolve(null);
+  const assetBase = new URL("../", import.meta.url);
+  const urls = TerrainLayerUrls(EDITOR_TERRAIN_SET);
+  layerPackPromise = Promise.all(urls.map((u) => Promise.all([
+    FetchLayerBitmap(u.base, assetBase),
+    FetchLayerBitmap(u.normal, assetBase),
+    FetchLayerBitmap(u.orh, assetBase),
+  ]))).then((bitmaps) => {
+    const layers = urls.length;
+    const aSize = EDITOR_ALBEDO_SIZE, sSize = EDITOR_SURFACE_SIZE;
+    const albedoData = new Uint8Array(aSize * aSize * 4 * layers);
+    const surfaceData = new Uint8Array(sSize * sSize * 4 * layers);
+    const albedoMean = new Float32Array(4 * layers);
+    const surfaceMean = new Float32Array(4 * layers);
+    for (let layer = 0; layer < layers; layer++) {
+      const [baseBmp, normBmp, orhBmp] = bitmaps[layer];
+      const base = ResizeBitmapRgba(baseBmp, aSize);
+      const height = ResizeBitmapRgba(orhBmp, aSize);
+      const norm = ResizeBitmapRgba(normBmp, sSize);
+      const orh = ResizeBitmapRgba(orhBmp, sSize);
+      baseBmp.close?.(); normBmp.close?.(); orhBmp.close?.();
+      const aOff = aSize * aSize * 4 * layer;
+      let r = 0, g = 0, b = 0, h = 0;
+      for (let i = 0, n = aSize * aSize; i < n; i++) {
+        const src = i * 4, dst = aOff + src;
+        albedoData[dst] = base[src];
+        albedoData[dst + 1] = base[src + 1];
+        albedoData[dst + 2] = base[src + 2];
+        albedoData[dst + 3] = height[src + 2];
+        r += SRGB_TO_LINEAR[base[src]];
+        g += SRGB_TO_LINEAR[base[src + 1]];
+        b += SRGB_TO_LINEAR[base[src + 2]];
+        h += height[src + 2];
+      }
+      const aCount = aSize * aSize;
+      albedoMean.set([r / aCount, g / aCount, b / aCount, h / aCount / 255], layer * 4);
+      const sOff = sSize * sSize * 4 * layer;
+      let nx = 0, ny = 0, rough = 0, ao = 0;
+      for (let i = 0, n = sSize * sSize; i < n; i++) {
+        const src = i * 4, dst = sOff + src;
+        surfaceData[dst] = norm[src];
+        surfaceData[dst + 1] = norm[src + 1];
+        surfaceData[dst + 2] = orh[src + 1];
+        surfaceData[dst + 3] = orh[src];
+        nx += norm[src]; ny += norm[src + 1]; rough += orh[src + 1]; ao += orh[src];
+      }
+      const sCount = sSize * sSize * 255;
+      surfaceMean.set([nx / sCount, ny / sCount, rough / sCount, ao / sCount], layer * 4);
+    }
+    loadedLayerPack = {
+      setName: EDITOR_TERRAIN_SET,
+      layers,
+      albedoSize: aSize,
+      surfaceSize: sSize,
+      albedoData,
+      surfaceData,
+      albedoMean,
+      surfaceMean,
+      tileNear: set.layers.map((l) => 1 / l.tileM),
+      tileFar: set.layers.map((l) => 1 / l.farTileM),
+      normalScale: set.layers.map((l) => l.normalScale),
+      heightOffset: set.layers.map((l) => l.heightOffset),
+      tints: set.layers.map((l) => l.tint || [1, 1, 1]),
+      albedoScale: set.albedoScale ?? 0.87,
+    };
+    for (const listener of layerReadyListeners) {
+      try { listener(loadedLayerPack); } catch {}
+    }
+    layerReadyListeners.clear();
+    return loadedLayerPack;
+  }).catch((error) => {
+    console.warn("[EncounterTerrain] 4-layer textures unavailable, keeping single color map:", error?.message || error);
+    layerPackPromise = null;
+    return null;
+  });
+  return layerPackPromise;
+}
 
 export function EncounterGpuRaster() {
   if(unavailable) return null;
@@ -87,19 +212,219 @@ class GpuRaster {
       uniform vec2 lightBalance;
       uniform vec4 shadowSettings;
       uniform bool terrainSurface;
-      uniform sampler2D groundColor,distantColor;
+      uniform bool terrainLayered;
+      uniform sampler2D groundColor,distantColor,splatMap,macroTintMap;
+      uniform highp sampler2DArray layerAlbedo,layerSurface;
       uniform vec4 groundBounds,distantBounds;
+      uniform vec4 layerTileNear,layerTileFar,layerNormalScale,layerHeightOffset;
+      uniform vec4 layerAlbedoMean0,layerAlbedoMean1,layerAlbedoMean2,layerAlbedoMean3;
+      uniform vec4 layerSurfaceMean0,layerSurfaceMean1,layerSurfaceMean2,layerSurfaceMean3;
+      uniform vec3 layerTint0,layerTint1,layerTint2,layerTint3;
+      uniform float layerAlbedoScale;
       layout(location=0) out vec4 pixel;
       layout(location=1) out float distancePixel;
       layout(location=2) out vec4 normalPixel;
+
+      float TerrainHash(vec2 p) {
+        vec3 q=fract(vec3(p.xyx)*0.1031);
+        q+=dot(q,q.yzx+33.33);
+        return fract((q.x+q.y)*q.z);
+      }
+      float TerrainNoise(vec2 p) {
+        vec2 i=floor(p),f=fract(p);
+        f=f*f*(3.0-2.0*f);
+        return mix(mix(TerrainHash(i),TerrainHash(i+vec2(1.0,0.0)),f.x),
+                   mix(TerrainHash(i+vec2(0.0,1.0)),TerrainHash(i+vec2(1.0,1.0)),f.x),f.y);
+      }
+      vec4 TerrainVpMix(vec4 a,vec4 b,float t,vec4 mean) {
+        float s=inversesqrt(max((1.0-t)*(1.0-t)+t*t,0.5));
+        return mean+((a-mean)*(1.0-t)+(b-mean)*t)*s;
+      }
+      vec2 TerrainGradXZ(vec2 dS,vec2 dPx,vec2 dPy) {
+        float det=dPx.x*dPy.y-dPx.y*dPy.x;
+        if(abs(det)<1e-12) return vec2(0.0);
+        return vec2(dS.x*dPy.y-dS.y*dPx.y,dPx.x*dS.y-dPy.x*dS.x)/det;
+      }
+      void SampleTerrainLayer(float layer,vec2 meters,vec2 dxM,vec2 dyM,float invTile,float variant,
+                              vec4 aMean,vec4 sMean,out vec4 alb,out vec4 surf) {
+        vec2 uv=meters*invTile,dx=dxM*invTile,dy=dyM*invTile;
+        vec3 at=vec3(uv,layer);
+        float band=floor(variant),f=fract(variant);
+        float t=smoothstep(0.3,0.7,f);
+        float salt=layer*17.0;
+        vec2 offA=sin(vec2(3.0,7.0)*(band+salt));
+        vec2 offB=sin(vec2(3.0,7.0)*(band+1.0+salt));
+        if(t<0.002) {
+          alb=textureGrad(layerAlbedo,at+vec3(offA,0.0),dx,dy);
+          surf=textureGrad(layerSurface,at+vec3(offA,0.0),dx,dy);
+        } else if(t>0.998) {
+          alb=textureGrad(layerAlbedo,at+vec3(offB,0.0),dx,dy);
+          surf=textureGrad(layerSurface,at+vec3(offB,0.0),dx,dy);
+        } else {
+          alb=TerrainVpMix(textureGrad(layerAlbedo,at+vec3(offA,0.0),dx,dy),
+            textureGrad(layerAlbedo,at+vec3(offB,0.0),dx,dy),t,aMean);
+          surf=TerrainVpMix(textureGrad(layerSurface,at+vec3(offA,0.0),dx,dy),
+            textureGrad(layerSurface,at+vec3(offB,0.0),dx,dy),t,sMean);
+        }
+      }
+      void SampleLayerNearFar(float layer,vec2 txz,vec2 dxM,vec2 dyM,float invNear,float invFar,float farT,float variant,
+                              vec4 aMean,vec4 sMean,out vec4 alb,out vec4 surf) {
+        alb=aMean;surf=sMean;
+        if(farT<0.999) SampleTerrainLayer(layer,txz,dxM,dyM,invNear,variant,aMean,sMean,alb,surf);
+        if(farT>0.001) {
+          vec3 farAt=vec3(txz*invFar,layer);
+          vec4 farA=textureGrad(layerAlbedo,farAt,dxM*invFar,dyM*invFar);
+          vec4 farS=textureGrad(layerSurface,farAt,dxM*invFar,dyM*invFar);
+          alb=farT>=0.999?farA:TerrainVpMix(alb,farA,farT,aMean);
+          surf=farT>=0.999?farS:TerrainVpMix(surf,farS,farT,sMean);
+        }
+      }
       void main() {
+        vec3 twDx=dFdx(worldPosition),twDy=dFdy(worldPosition);
+        bool smoothTerrain=dot(worldNormal,worldNormal)>0.01;
+        vec3 geomN=smoothTerrain?normalize(worldNormal):vec3(0.0,1.0,0.0);
+        vec3 litNormal=geomN;
+        float terrainAo=1.0;
+
+        vec3 layeredLinear=vec3(0.0);
+        bool useLayered=terrainSurface&&terrainLayered&&smoothTerrain;
+        if(useLayered) {
+          vec2 txz=worldPosition.xz;
+          float tDist=max(distanceToCamera,0.0);
+          vec2 groundSize=vec2(textureSize(splatMap,0));
+          vec2 groundUv=(txz-groundBounds.xy)/groundBounds.zw;
+          bool inGround=all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)));
+          vec2 clampedUv=(clamp(groundUv,0.0,1.0)*(groundSize-1.0)+0.5)/groundSize;
+          vec4 splat=texture(splatMap,clampedUv);
+          vec4 macroTex=texture(macroTintMap,clampedUv);
+          vec2 rutD=vec2(dFdx(splat.a),dFdy(splat.a));
+
+          float farT=smoothstep(12.0,48.0,tDist);
+          float variant=TerrainNoise(txz*(1.0/5.3))*8.0;
+
+          if(inGround) {
+            float wTrack=splat.r;
+            float wSpoil=splat.g*(1.0-wTrack);
+            float wRest=max(0.0,1.0-wTrack-wSpoil);
+            float stubbleNoise=TerrainNoise(txz*0.042)*0.62+TerrainNoise(txz*0.115+11.3)*0.23+TerrainNoise(txz*0.26+5.1)*0.15;
+            float stubble=clamp(splat.b*mix(0.76,1.12,smoothstep(0.28,0.72,stubbleNoise)),0.0,1.0);
+            vec4 tW=vec4(wRest*(1.0-stubble),wTrack,wRest*stubble,wSpoil);
+
+            vec4 tAlb0=layerAlbedoMean0,tSurf0=layerSurfaceMean0;
+            vec4 tAlb1=layerAlbedoMean1,tSurf1=layerSurfaceMean1;
+            vec4 tAlb2=layerAlbedoMean2,tSurf2=layerSurfaceMean2;
+            vec4 tAlb3=layerAlbedoMean3,tSurf3=layerSurfaceMean3;
+            vec4 tH=vec4(0.0);
+            if(tW.x>=0.004) {SampleLayerNearFar(0.0,txz,twDx.xz,twDy.xz,layerTileNear.x,layerTileFar.x,farT,variant,layerAlbedoMean0,layerSurfaceMean0,tAlb0,tSurf0);tH.x=clamp(tAlb0.a,0.0,1.0)+layerHeightOffset.x;}
+            if(tW.y>=0.004) {SampleLayerNearFar(1.0,txz,twDx.xz,twDy.xz,layerTileNear.y,layerTileFar.y,farT,variant,layerAlbedoMean1,layerSurfaceMean1,tAlb1,tSurf1);tH.y=clamp(tAlb1.a,0.0,1.0)+layerHeightOffset.y;}
+            if(tW.z>=0.004) {SampleLayerNearFar(2.0,txz,twDx.xz,twDy.xz,layerTileNear.z,layerTileFar.z,farT,variant,layerAlbedoMean2,layerSurfaceMean2,tAlb2,tSurf2);tH.z=clamp(tAlb2.a,0.0,1.0)+layerHeightOffset.z;}
+            if(tW.w>=0.004) {SampleLayerNearFar(3.0,txz,twDx.xz,twDy.xz,layerTileNear.w,layerTileFar.w,farT,variant,layerAlbedoMean3,layerSurfaceMean3,tAlb3,tSurf3);tH.w=clamp(tAlb3.a,0.0,1.0)+layerHeightOffset.w;}
+
+            vec4 tMask=step(vec4(0.004),tW);
+            vec4 tHw=(tH+tW)*tMask;
+            float tTop=max(max(tHw.x,tHw.y),max(tHw.z,tHw.w))-0.20;
+            vec4 tB=max(tHw-tTop,0.0)*tMask;
+            tB/=max(dot(tB,vec4(1.0)),1e-4);
+
+            vec3 tAlbedo=tAlb0.rgb*tB.x+tAlb1.rgb*tB.y+tAlb2.rgb*tB.z+tAlb3.rgb*tB.w;
+            vec4 tSurface=tSurf0*tB.x+tSurf1*tB.y+tSurf2*tB.z+tSurf3*tB.w;
+            vec2 tNxy=(tSurf0.rg*2.0-1.0)*(layerNormalScale.x*tB.x)
+              +(tSurf1.rg*2.0-1.0)*(layerNormalScale.y*tB.y)
+              +(tSurf2.rg*2.0-1.0)*(layerNormalScale.z*tB.z)
+              +(tSurf3.rg*2.0-1.0)*(layerNormalScale.w*tB.w);
+            vec3 tPerturb=vec3(tNxy.x,0.0,tNxy.y);
+
+            vec3 tAbsN=abs(geomN);
+            float sideT=(1.0-smoothstep(0.50,0.78,tAbsN.y))*(1.0-smoothstep(55.0,95.0,tDist));
+            if(sideT>0.004) {
+              bool alongX=tAbsN.x>tAbsN.z;
+              vec2 sm=alongX?vec2(worldPosition.z,-worldPosition.y):vec2(worldPosition.x,-worldPosition.y);
+              vec2 sdx=alongX?vec2(twDx.z,-twDx.y):vec2(twDx.x,-twDx.y);
+              vec2 sdy=alongX?vec2(twDy.z,-twDy.y):vec2(twDy.x,-twDy.y);
+              vec3 sAlb=vec3(0.0);vec4 sSurf=vec4(0.0);vec2 sNxy=vec2(0.0);vec4 sa,ss;
+              if(tB.x>0.0) {SampleTerrainLayer(0.0,sm,sdx,sdy,layerTileNear.x,variant,layerAlbedoMean0,layerSurfaceMean0,sa,ss);sAlb+=sa.rgb*tB.x;sSurf+=ss*tB.x;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.x*tB.x);}
+              if(tB.y>0.0) {SampleTerrainLayer(1.0,sm,sdx,sdy,layerTileNear.y,variant,layerAlbedoMean1,layerSurfaceMean1,sa,ss);sAlb+=sa.rgb*tB.y;sSurf+=ss*tB.y;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.y*tB.y);}
+              if(tB.z>0.0) {SampleTerrainLayer(2.0,sm,sdx,sdy,layerTileNear.z,variant,layerAlbedoMean2,layerSurfaceMean2,sa,ss);sAlb+=sa.rgb*tB.z;sSurf+=ss*tB.z;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.z*tB.z);}
+              if(tB.w>0.0) {SampleTerrainLayer(3.0,sm,sdx,sdy,layerTileNear.w,variant,layerAlbedoMean3,layerSurfaceMean3,sa,ss);sAlb+=sa.rgb*tB.w;sSurf+=ss*tB.w;sNxy+=(ss.rg*2.0-1.0)*(layerNormalScale.w*tB.w);}
+              tAlbedo=mix(tAlbedo,sAlb,sideT);
+              tSurface=mix(tSurface,sSurf,sideT);
+              vec3 sidePerturb=alongX?vec3(0.0,-sNxy.y,sNxy.x):vec3(sNxy.x,-sNxy.y,0.0);
+              tPerturb=mix(tPerturb,sidePerturb,sideT);
+            }
+
+            float rutRaw=clamp((splat.a*255.0/254.0)*2.0-1.0,-1.0,1.0);
+            float rutS=rutRaw*4.0;
+            float rutSw=rutS+(TerrainNoise(txz*0.105+3.3)-0.5)*0.20;
+            float rutU=(abs(rutSw)-0.72)/0.26;
+            float rutPixelM=(abs(rutD.x)+abs(rutD.y))*8.0;
+            float rutRoad=tB.y*step(abs(rutRaw),0.92);
+            float rutBandFade=rutRoad*(1.0-smoothstep(110.0,240.0,tDist))*(1.0-smoothstep(0.24,0.62,rutPixelM));
+            float rutGrooveFade=rutRoad*(1.0-smoothstep(60.0,145.0,tDist))*(1.0-smoothstep(0.12,0.32,rutPixelM));
+            float gRut=0.0;float rutSlope=0.0;
+            float rutBandU=rutU/2.4;
+            if(abs(rutBandU)<1.0&&rutBandFade>0.001) {
+              float along=mix(0.62,1.0,TerrainNoise(txz*0.21+9.1));
+              float qb=1.0-rutBandU*rutBandU;
+              gRut=qb*qb*0.42*rutBandFade*along;
+              if(abs(rutU)<1.0&&rutGrooveFade>0.001) {
+                float q=1.0-rutU*rutU;
+                gRut=max(gRut,q*q*rutGrooveFade*along);
+                rutSlope=-4.0*rutU*q*0.075/0.26*sign(rutSw)*rutGrooveFade*along;
+              }
+            }
+            if(rutSlope!=0.0) {
+              vec2 rutGrad=TerrainGradXZ(rutD*8.0,twDx.xz,twDy.xz);
+              rutGrad/=max(length(rutGrad),1e-4);
+              tPerturb+=vec3(rutGrad.x,0.0,rutGrad.y)*rutSlope;
+            }
+
+            vec3 tMeanAlb=layerAlbedoMean0.rgb*tB.x+layerAlbedoMean1.rgb*tB.y+layerAlbedoMean2.rgb*tB.z+layerAlbedoMean3.rgb*tB.w;
+            float tContrast=mix(1.0,0.45,smoothstep(25.0,120.0,tDist));
+            tAlbedo=tMeanAlb+(tAlbedo-tMeanAlb)*tContrast;
+
+            vec3 tTint=layerTint0*tB.x+layerTint1*tB.y+layerTint2*tB.z+layerTint3*tB.w;
+            tAlbedo*=tTint;
+
+            float m0=TerrainNoise(txz*(1.0/7.3)+3.7)-0.5;
+            float m1=TerrainNoise(txz*(1.0/31.0)+17.31)-0.5;
+            float m2=TerrainNoise(txz*(1.0/117.0)+41.7)-0.5;
+            vec3 tMacro=(1.0+2.0*(m0*0.05+m1*0.075+m2*0.06))*(1.0+vec3(0.9,0.25,-0.8)*m2*0.10);
+            tAlbedo*=tMacro*(1.0-0.22*gRut);
+
+            vec3 macroRgb=macroTex.rgb*(255.0/128.0);
+            vec3 macroLin=pow(max(macroRgb,vec3(0.05)),vec3(2.2));
+            layeredLinear=max(tAlbedo*macroLin*layerAlbedoScale,vec3(0.0));
+
+            float nFade=mix(1.0,0.28,smoothstep(10.0,140.0,tDist));
+            tPerturb*=nFade;
+            tPerturb-=geomN*dot(geomN,tPerturb);
+            litNormal=normalize(geomN+tPerturb);
+            float tAo=clamp(tSurface.a,0.0,1.0);
+            float aoKeep=mix(1.0,0.55,farT);
+            terrainAo=mix(1.0,tAo,0.72*aoKeep);
+          } else {
+            vec3 bg=vec3(198.0,207.0,169.0)/255.0;
+            vec2 distantUv=(txz-distantBounds.xy)/distantBounds.zw;
+            if(all(greaterThanEqual(distantUv,vec2(0.0)))&&all(lessThanEqual(distantUv,vec2(1.0)))) {
+              vec4 paint=texture(distantColor,distantUv);
+              bg=mix(bg,paint.rgb,paint.a);
+            }
+            vec3 farAt=vec3(txz*layerTileFar.x,0.0);
+            vec3 farTex=textureGrad(layerAlbedo,farAt,twDx.xz*layerTileFar.x,twDy.xz*layerTileFar.x).rgb;
+            vec3 detail=clamp(farTex/max(layerAlbedoMean0.rgb,vec3(0.05)),0.72,1.32);
+            float m1=TerrainNoise(txz*(1.0/31.0)+17.31)-0.5;
+            float m2=TerrainNoise(txz*(1.0/117.0)+41.7)-0.5;
+            float macro=1.0+2.0*(m1*0.06+m2*0.05);
+            layeredLinear=pow(max(bg,vec3(0.001)),vec3(2.2))*mix(vec3(1.0),detail,0.55)*macro*0.60;
+          }
+        }
+
         float visibility=1.0;
         normalPixel=vec4(0.0);
         if(lit) {
-          vec3 normal=normalize(cross(dFdx(worldPosition),dFdy(worldPosition)));
+          vec3 normal=normalize(cross(twDx,twDy));
           if(dot(normal,eye-worldPosition)<0.0) normal=-normal;
-          bool smoothTerrain=dot(worldNormal,worldNormal)>0.01;
-          vec3 shadingNormal=smoothTerrain?normalize(worldNormal):normal;
+          vec3 shadingNormal=smoothTerrain?geomN:normal;
           normalPixel=vec4(dot(shadingNormal,right),dot(shadingNormal,up),dot(shadingNormal,forward),smoothTerrain?1.0:0.0);
           // Offset smooth receivers away from their own tessellated surface.
           float normalBias=smoothTerrain?shadowSettings.z*shadowSettings.y*2.0:0.0;
@@ -121,12 +446,17 @@ class GpuRaster {
               vec2 offset=vec2(x,y)*texel;
               lit+=texture(shadowMap,vec3(shadow.xy+offset,clamp(shadow.z+dot(depthGradient,offset)-bias,0.0,1.0)));
             }
-            float direct=lightBalance.y*max(dot(shadingNormal,sun),0.0);
+            vec3 shadowDirectNormal=useLayered?litNormal:shadingNormal;
+            float direct=lightBalance.y*max(dot(shadowDirectNormal,sun),0.0);
             visibility-=shadowSettings.w*(1.0-lit/9.0)*direct/(lightBalance.x+direct);
           }
         }
         vec3 surface=rgb;
-        if(terrainSurface&&dot(worldNormal,worldNormal)>0.01) {
+        if(useLayered) {
+          float diffuse=max(0.0,dot(litNormal,sun));
+          vec3 litLinear=layeredLinear*(lightBalance.x*terrainAo+lightBalance.y*diffuse)*1.75;
+          surface=pow(clamp(litLinear,0.0,1.0),vec3(1.0/2.2));
+        } else if(terrainSurface&&smoothTerrain) {
           surface=vec3(198.0,207.0,169.0)/255.0;
           vec2 distantUv=(worldPosition.xz-distantBounds.xy)/distantBounds.zw;
           if(all(greaterThanEqual(distantUv,vec2(0.0)))&&all(lessThanEqual(distantUv,vec2(1.0)))) {
@@ -138,7 +468,7 @@ class GpuRaster {
           if(all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)))) {
             surface=texture(groundColor,(groundUv*(groundSize-1.0)+0.5)/groundSize).rgb;
           }
-          float diffuse=max(0.0,dot(normalize(worldNormal),sun));
+          float diffuse=max(0.0,dot(geomN,sun));
           surface*=lightBalance.x+lightBalance.y*diffuse;
         }
         pixel=vec4(surface*visibility,1.0);
@@ -165,8 +495,23 @@ class GpuRaster {
       return program;
     };
     this.lightingUniforms=Object.fromEntries(['lit','shadowMap','shadowCenter','shadowRight','shadowUp','sun','shadowSettings','lightBalance'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
-    this.surfaceUniforms=Object.fromEntries(['terrainSurface','groundColor','distantColor','groundBounds','distantBounds'].map(name=>[name,gl.getUniformLocation(this.program,name)]));
+    this.surfaceUniforms=Object.fromEntries([
+      'terrainSurface','terrainLayered','groundColor','distantColor','splatMap','macroTintMap',
+      'layerAlbedo','layerSurface','groundBounds','distantBounds',
+      'layerTileNear','layerTileFar','layerNormalScale','layerHeightOffset',
+      'layerAlbedoMean0','layerAlbedoMean1','layerAlbedoMean2','layerAlbedoMean3',
+      'layerSurfaceMean0','layerSurfaceMean1','layerSurfaceMean2','layerSurfaceMean3',
+      'layerTint0','layerTint1','layerTint2','layerTint3','layerAlbedoScale',
+    ].map(name=>[name,gl.getUniformLocation(this.program,name)]));
     this.surfaceTextures=new Map();
+    this.layerTextures=null;
+    // 1x1 dummy textures so WebGL2 sampler validation always sees valid bindings on TEXTURE3..6
+    this.blank2d=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.blank2d);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([128,128,128,255]));
+    this.blankArray=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D_ARRAY,this.blankArray);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D_ARRAY,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texImage3D(gl.TEXTURE_2D_ARRAY,0,gl.RGBA8,1,1,4,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(16).fill(128));
     this.residentOwners=new Map();
     this.overlay=new EncounterGpuOverlay(gl,Program);
     this.shadowProgram=Program(`#version 300 es
@@ -308,34 +653,83 @@ class GpuRaster {
     if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE) throw new Error('Incomplete shadow framebuffer');
   }
 
+  EnsureLayerTextures() {
+    if (this.layerTextures) return this.layerTextures;
+    if (!loadedLayerPack) { PreloadEncounterTerrainLayers(); return null; }
+    const gl = this.gl, pack = loadedLayerPack;
+    this.validateResources = true;
+    const anisotropy = gl.getExtension('EXT_texture_filter_anisotropic');
+    const maxAniso = anisotropy ? Math.min(FLOW_RENDERING.terrainSurface.anisotropy, gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)) : 0;
+    const MakeArrayTex = (data, size, srgb) => {
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, tex);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.texImage3D(gl.TEXTURE_2D_ARRAY, 0, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, size, size, pack.layers, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
+      if (anisotropy && maxAniso > 1) gl.texParameterf(gl.TEXTURE_2D_ARRAY, anisotropy.TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
+      return tex;
+    };
+    gl.activeTexture(gl.TEXTURE5);
+    const albedo = MakeArrayTex(pack.albedoData, pack.albedoSize, true);
+    gl.activeTexture(gl.TEXTURE6);
+    const surface = MakeArrayTex(pack.surfaceData, pack.surfaceSize, false);
+    gl.activeTexture(gl.TEXTURE0);
+    this.layerTextures = { albedo, surface, pack };
+    return this.layerTextures;
+  }
+
   BindTerrainSurface(surface) {
     const gl=this.gl,uniforms=this.surfaceUniforms;
     gl.uniform1i(uniforms.terrainSurface,surface?1:0);
     gl.uniform1i(uniforms.groundColor,1);gl.uniform1i(uniforms.distantColor,2);
-    if(!surface) return;
+    gl.uniform1i(uniforms.splatMap,3);gl.uniform1i(uniforms.macroTintMap,4);
+    gl.uniform1i(uniforms.layerAlbedo,5);gl.uniform1i(uniforms.layerSurface,6);
+    const layerGpu=surface?.splat?this.EnsureLayerTextures():null;
+    const layered=!!(surface?.splat&&layerGpu);
+    gl.uniform1i(uniforms.terrainLayered,layered?1:0);
+    // Keep TEXTURE3..6 bound to valid textures even when layered shading is inactive
+    gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,this.blank2d);
+    gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,this.blank2d);
+    gl.activeTexture(gl.TEXTURE5);gl.bindTexture(gl.TEXTURE_2D_ARRAY,layerGpu?layerGpu.albedo:this.blankArray);
+    gl.activeTexture(gl.TEXTURE6);gl.bindTexture(gl.TEXTURE_2D_ARRAY,layerGpu?layerGpu.surface:this.blankArray);
+    if(!surface) {gl.activeTexture(gl.TEXTURE0);return;}
     if(!this.surfaceTextures.has(surface)) {
       this.validateResources=true;
       gl.activeTexture(gl.TEXTURE1);
-      // The shared context serves every pane. Reuse the same pair of maps,
+      // The shared context serves every pane. Reuse the same set of maps,
       // and release replaced scene maps when the editor changes terrain.
       while(this.surfaceTextures.size>=2) {
         const [oldSource,textures]=this.surfaceTextures.entries().next().value;
-        for(const texture of textures) gl.deleteTexture(texture);
+        for(const texture of textures) if(texture) gl.deleteTexture(texture);
         this.surfaceTextures.delete(oldSource);
       }
       const anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');
-      const textures=[surface.scene,surface.backdrop].map(map=>{
+      const UploadMap=(map,mipmaps)=>{
+        if(!map) return null;
         const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
-        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,mipmaps?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,map?.width||1,map?.height||1,0,gl.RGBA,gl.UNSIGNED_BYTE,map?.data||new Uint8Array(4));
-        gl.generateMipmap(gl.TEXTURE_2D);
-        if(anisotropy) gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,
-          Math.min(FLOW_RENDERING.terrainSurface.anisotropy,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,map.width||1,map.height||1,0,gl.RGBA,gl.UNSIGNED_BYTE,map.data||new Uint8Array(4));
+        if(mipmaps) {
+          gl.generateMipmap(gl.TEXTURE_2D);
+          if(anisotropy) gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,
+            Math.min(FLOW_RENDERING.terrainSurface.anisotropy,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+        }
         return texture;
-      });
+      };
+      const textures=[
+        UploadMap(surface.scene||{width:1,height:1,data:new Uint8Array(4)},true),
+        UploadMap(surface.backdrop||{width:1,height:1,data:new Uint8Array(4)},true),
+        // Splat map keeps linear filtering without mipmap bleeding across signed rut coordinates
+        UploadMap(surface.splat,false),
+        UploadMap(surface.macroTint,true),
+      ];
       this.surfaceTextures.set(surface,textures);
     }
     const textures=this.surfaceTextures.get(surface);
@@ -344,6 +738,21 @@ class GpuRaster {
       gl.uniform1i(index?uniforms.distantColor:uniforms.groundColor,1+index);
       const extent=map?[map.minX,map.minZ,(map.width-(index?0:1))*map.texelM,(map.height-(index?0:1))*map.texelM]:[0,0,1,1];
       gl.uniform4fv(index?uniforms.distantBounds:uniforms.groundBounds,extent);
+    }
+    if(layered) {
+      gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,textures[2]||this.blank2d);
+      gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,textures[3]||this.blank2d);
+      const pack=layerGpu.pack;
+      gl.uniform4fv(uniforms.layerTileNear,pack.tileNear);
+      gl.uniform4fv(uniforms.layerTileFar,pack.tileFar);
+      gl.uniform4fv(uniforms.layerNormalScale,pack.normalScale);
+      gl.uniform4fv(uniforms.layerHeightOffset,pack.heightOffset);
+      for(let i=0;i<4;i++) {
+        gl.uniform4fv(uniforms[`layerAlbedoMean${i}`],pack.albedoMean.subarray(i*4,i*4+4));
+        gl.uniform4fv(uniforms[`layerSurfaceMean${i}`],pack.surfaceMean.subarray(i*4,i*4+4));
+        gl.uniform3fv(uniforms[`layerTint${i}`],pack.tints[i]);
+      }
+      gl.uniform1f(uniforms.layerAlbedoScale,pack.albedoScale);
     }
     gl.activeTexture(gl.TEXTURE0);
   }
@@ -732,8 +1141,20 @@ class GpuRaster {
     const surface=raster.terrainSurface,terrain=surface?this.surfaceTextures.get(surface):null;
     const slot=terrain?.indexOf(texture);
     if(slot>=0) {
-      const map=slot?surface.backdrop:surface.scene;
-      return {name:slot?"远景地表":"场景地表",format:"RGBA8",width:map?.width||1,height:map?.height||1,flipY:false};
+      const entries=[
+        ["场景地表",surface.scene],
+        ["远景地表",surface.backdrop],
+        ["地表权重图",surface.splat],
+        ["地表宏观色",surface.macroTint],
+      ];
+      const [label,map]=entries[slot]||["场景地表",surface.scene];
+      return {name:label,format:"RGBA8",width:map?.width||1,height:map?.height||1,flipY:false};
+    }
+    if(this.layerTextures) {
+      if(texture===this.layerTextures.albedo)
+        return {name:"地形图层反照率",format:"SRGB8_ALPHA8[4]",width:this.layerTextures.pack.albedoSize,height:this.layerTextures.pack.albedoSize,flipY:false};
+      if(texture===this.layerTextures.surface)
+        return {name:"地形图层法线",format:"RGBA8[4]",width:this.layerTextures.pack.surfaceSize,height:this.layerTextures.pack.surfaceSize,flipY:false};
     }
     return null;
   }

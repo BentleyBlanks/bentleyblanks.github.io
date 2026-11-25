@@ -7,7 +7,7 @@
   "bounds": {"minX":-160,"maxX":320,"minZ":355,"maxZ":990},
   "spawn": {"x":98.5,"z":356,"yawDeg":180},
   "terrain": {"file":"Scene_FirstLevelMerged.height.bin","encoding":"int16-cm-le","minX":-160,"minZ":355,"cellM":0.5,"cols":960,"rows":1270},
-  "look": {"heightTint":{"lo":-2.68,"hi":3.85,"low":"#59513f","mid":"#8a7e65","high":"#a19172","slope":"#5e4e3c","slopeRange":[0.25,0.85]},"colorSemantics":["foliage","roof","structure","canvas","danger","metal","timber"],"semanticColors":{"roof":"#4d473c","structure":"#d9d3c4","canvas":"#ebe4d0","danger":"#b8452e","metal":"#3c4245","timber":"#6e5c45"}},
+  "look": {"terrainLayers":"MissionPlain","heightTint":{"lo":-2.68,"hi":3.85,"low":"#59513f","mid":"#8a7e65","high":"#a19172","slope":"#5e4e3c","slopeRange":[0.25,0.85]},"colorSemantics":["foliage","roof","structure","canvas","danger","metal","timber"],"semanticColors":{"roof":"#4d473c","structure":"#d9d3c4","canvas":"#ebe4d0","danger":"#b8452e","metal":"#3c4245","timber":"#6e5c45"}},
   "backdrop": {
     "far": 7000,
     "ground": {"color":"#7a7150","y":-2.74,"radiusM":6000,"blendM":160},

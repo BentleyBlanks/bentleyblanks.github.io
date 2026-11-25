@@ -84,8 +84,9 @@ import {
   L0105_CELL_M, L0105_HEIGHTS, L0105_GULLY, L0105_GULLY_TREES, L0105_SUNKEN_LANE, L0105_PLACES, L0105_TRENCHES,
   PointAlong, PointBeside, LineLength,
 } from "./Data_EditorBlockoutFirstLevel0105Space.mjs";
+import { L0610_FIELD_ZONES, L0610_FIELDS } from "./Script_EncounterFarmland.mjs";
 
-export { PointAlong, PointBeside, LineLength };
+export { PointAlong, PointBeside, LineLength, L0610_FIELD_ZONES, L0610_FIELDS };
 
 export const L0610_LEVEL_KEY = "FirstLevel0610";
 export const L0610_TITLE = "第一关 06–10 · 耿家庄（新剧本白盒）";
@@ -263,56 +264,10 @@ export const L0610_FOOTPATHS = F([
 ]);
 
 /**
- * 田（卜凯：小麦区一块地约 2,350 m²，一户的地东一块西一块；长条是创作）：六片区域（多边形），每片铺成拼块——
- * 一块 50–110 m 宽、70–140 m 长、各有各的方向（区域方向 ±14°，四分之一的转 90°）、约五分之一整块不分条；其余分成 10–32 m 宽的条，
- * 每条是返青麦地（wheat）/ 翻过的地（plowed，等春播）/ 撂荒地（fallow）之一。田埂 ridgeH 烘进高度场（条与条之间、块的四边）。
- * 拼块按行列铺在区域的外接框上、只留中心在区域里的；块转过以后角上互相搭一点，取先到的那块（场景生成器 FieldAt）。
+ * 田（卜凯：小麦区一块地约 2,350 m²，一户的地东一块西一块；长条是创作）：L0610_FIELD_ZONES 与 L0610_FIELDS 统一定义在 Script_EncounterFarmland.mjs 并从本模块原样转出。
+ * 田埂 ridgeH 烘进高度场（条与条之间、块的四边）。
  */
-export const L0610_FIELD_ZONES = F([
-  F({ id: "W", name: "河西", angle: 6, poly: F([[-18, 205], [12, 205], [16, 240], [10, 290], [8, 340], [12, 372], [-18, 372]]) }),
-  F({ id: "WW", name: "河西南", angle: -4, poly: F([[-18, 380], [10, 380], [14, 430], [18, 480], [22, 520], [24, 548], [-18, 548]]) }),
-  F({ id: "M", name: "河汊子和凹路之间", angle: -5, poly: F([[44, 206], [80, 206], [84, 220], [86, 245], [85, 262], [89, 282], [94, 302], [92, 324], [95, 346], [97, 362], [95, 372], [44, 372], [40, 352], [46, 332], [50, 304], [48, 284], [40, 266], [36, 246], [40, 224]]) }),
-  F({ id: "E1", name: "凹路东边", angle: 3, poly: F([[108, 206], [205, 206], [205, 296], [196, 330], [180, 358], [165, 366], [108, 366], [104, 345], [101, 322], [103, 302], [97, 282]]) }),
-  F({ id: "E2", name: "驿道两边", angle: -8, poly: F([[205, 206], [318, 206], [318, 300], [290, 340], [262, 380], [238, 376], [228, 366], [214, 352], [205, 296]]) }),
-  F({ id: "SE", name: "庄子东南", angle: 5, poly: F([[241, 384], [318, 384], [318, 560], [128, 560], [128, 556], [238, 552], [246, 470], [250, 440], [258, 410]]) }),
-]);
 export const L0610_FIELD_RIDGE = F({ h: 0.25, halfW: 0.35 });
-const FIELD_KINDS = ["wheat", "wheat", "wheat", "plowed", "fallow"];
-function BuildFields() {
-  const pieces = [];
-  for (const zone of L0610_FIELD_ZONES) {
-    const xs = zone.poly.map((p) => p[0]), zs = zone.poly.map((p) => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minZ = Math.min(...zs), maxZ = Math.max(...zs);
-    let row = 0;
-    for (let bz = minZ - 25; bz < maxZ + 10; row++) {
-      const bd = 70 + Hash01(zone.angle, row, 1) * 70;
-      let col = 0;
-      for (let bx = minX - 25; bx < maxX + 10; col++) {
-        const bw = 50 + Hash01(zone.angle, row, col, 2) * 60;
-        const cx = bx + bw / 2, cz = bz + bd / 2;
-        // 中心或四个四分点有一个在区域里就留（铺到边；生成器只在区域多边形里烘田埂）
-        const keep = [[0, 0], [-bw / 4, -bd / 4], [bw / 4, -bd / 4], [-bw / 4, bd / 4], [bw / 4, bd / 4]].some(([ox, oz]) => PointInPoly(cx + ox, cz + oz, zone.poly));
-        if (keep) {
-          const turn = Hash01(zone.angle, row, col, 3) < 0.25 ? 90 : 0;
-          const angleDeg = zone.angle + (Hash01(zone.angle, row, col, 4) - 0.5) * 28 + turn;
-          const whole = Hash01(zone.angle, row, col, 17) < 0.2;   // 17 块里 3 块整块（约五分之一）
-          const strips = [];
-          let u = -bw / 2;
-          while (u < bw / 2 - 0.01) {
-            const w = whole ? bw : Math.min(10 + Hash01(zone.angle, row, col, strips.length, 6) * 22, bw / 2 - u);
-            strips.push(F({ from: Math.round(u * 100) / 100, to: Math.round((u + w) * 100) / 100, kind: FIELD_KINDS[Math.floor(Hash01(zone.angle, row, col, strips.length, 7) * FIELD_KINDS.length)] }));
-            u += w;
-          }
-          pieces.push(F({ id: `${zone.id}_${row}_${col}`, zone: zone.id, x: Math.round(cx * 10) / 10, z: Math.round(cz * 10) / 10, w: Math.round(bw * 10) / 10, d: Math.round(bd * 10) / 10, angleDeg: Math.round(angleDeg * 10) / 10, whole, strips: F(strips) }));
-        }
-        bx += bw;
-      }
-      bz += bd;
-    }
-  }
-  return F(pieces);
-}
-export const L0610_FIELDS = BuildFields();
 
 /** 林（家族坟地：几座坟头 + 松柏）与义林（埋外乡人：杂树、小坟、没字的木牌）。坟头烘进高度场（r、h），树是 foliage 块。坐标是林的中心，ry 弧度。 */
 export const L0610_GROVES = F([

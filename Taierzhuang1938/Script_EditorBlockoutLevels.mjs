@@ -16,6 +16,10 @@ import { BLOCKOUT_LEVEL_KEYS, ValidateBlockoutScene } from "./Script_EditorBlock
 import { BlockoutDocFromScene, ValidateScene } from "./Script_SceneDoc.mjs";
 import { FetchResolvedScene } from "./Script_SceneInherit.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "./Data_SceneGroundLayers.mjs";
+import { TERRAIN_RUTS } from "./Data_Tuning_Terrain.mjs";
+import {
+  EncounterFarmlandForScene, CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor,
+} from "./Script_EncounterFarmland.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
 import { SCENE_ASSETS } from "./Data_SceneAssets.mjs";
@@ -439,6 +443,11 @@ export function HydrateGroundPaint(raster) {
  */
 export function BuildSceneGroundSurface(doc, sampler) {
   const S = SCENE_GROUND_SURFACE;
+  const sceneId = doc.scene || doc.id || "";
+  const isEncounter = sceneId === "FirstLevelEncounter" || sceneId === "FirstLevelMerged";
+  const farmlandData = isEncounter ? EncounterFarmlandForScene(sceneId, doc.bounds?.maxZ ?? 1440) : null;
+  const farmland = farmlandData ? CompileFarmlandFieldGrid(farmlandData.fields, farmlandData.fieldZones) : null;
+
   const Weights = (id) => {
     const hit = SCENE_GROUND_CLASSES.find((c) => c.match.test(String(id || "")));
     return hit ? [hit.track || 0, hit.spoil || 0, hit.soil || 0] : null;
@@ -448,43 +457,133 @@ export function BuildSceneGroundSurface(doc, sampler) {
     const rgb = Weights(item.id);
     if (rgb && (item.poly || item.line)) items.push({ ...item, rgb });
   }
-  for (const line of doc.ways?.roads || []) {
-    if (line.length >= 2) items.push({ line, halfW: S.road.halfW, feather: S.road.feather, rgb: [S.road.track, 0, 0] });
+  const hasRibbons = Array.isArray(doc.ways?.roadRibbons) && doc.ways.roadRibbons.length > 0;
+  if (!isEncounter && !hasRibbons) {
+    for (const line of doc.ways?.roads || []) {
+      if (line.length >= 2) items.push({ line, halfW: S.road.halfW, feather: S.road.feather, rgb: [S.road.track, 0, 0] });
+    }
   }
   for (const line of doc.ways?.trenches || []) {
     if (line.length >= 2) items.push({ line, halfW: S.trench.halfW, feather: S.trench.feather, rgb: [0, 1, 0] });
   }
   const cellM = Number.isFinite(doc.groundPaintCellM) ? Math.max(0.25, Math.min(S.cellM, doc.groundPaintCellM)) : S.cellM;
   const raster = items.length ? BuildGroundPaint(items, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
-  const tintItems = (doc.paint || []).flatMap(item => {
-    const rgb = typeof item.tint === "string" && /^#[0-9a-f]{6}$/i.test(item.tint) ? HexRgb(item.tint) : item.tint;
-    return (item.poly || item.line) && Array.isArray(rgb) && rgb.length === 3 && rgb.every(value => Number.isFinite(value) && value >= 0 && value <= 2)
-      ? [{ ...item, rgb }] : [];
+
+  // 遭遇场景与带样条路网的场景：统一走 BuildRoadSplatRaster，获得分级路宽 + 片元级解析车辙横向坐标。
+  let roadSplat = null;
+  if (isEncounter || hasRibbons) {
+    const roadEntries = [];
+    for (const [idx, line] of (doc.ways?.roads || []).entries()) {
+      if (Array.isArray(line) && line.length >= 2) {
+        roadEntries.push({
+          id: `WayRoad_${idx}`, kind: "guandao", width: 4.0,
+          points: line.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z])),
+        });
+      }
+    }
+    const footpaths = [];
+    for (const r of doc.ways?.roadRibbons || []) {
+      if (!Array.isArray(r.points) || r.points.length < 2) continue;
+      const pts = r.points.map((p) => (Array.isArray(p) ? [p[0], p[1]] : [p.x, p.z]));
+      if (r.kind === "footpath") footpaths.push(pts);
+      else roadEntries.push({ id: r.id, kind: r.kind || "villageStreet", width: r.width || 3.2, widthJitter: r.widthJitter, points: pts });
+    }
+    if (roadEntries.length || footpaths.length) {
+      roadSplat = BuildRoadSplatRaster(roadEntries, footpaths, [], doc.bounds, {
+        cellM: isEncounter ? 0.5 : cellM, maxCells: 4000000, encodeRangeM: TERRAIN_RUTS.encodeRangeM,
+      });
+    }
+  }
+
+  const tintItems = (doc.paint || []).flatMap((item) => {
+    if (!item.poly && !item.line) return [];
+    const explicit = typeof item.tint === "string" && /^#[0-9a-f]{6}$/i.test(item.tint) ? HexRgb(item.tint) : item.tint;
+    const rgb = Array.isArray(explicit) && explicit.length === 3 && explicit.every((value) => Number.isFinite(value) && value >= 0 && value <= 2)
+      ? explicit : (isEncounter ? PaintMacroTintFor(item) : null);
+    return rgb ? [{ ...item, rgb }] : [];
   });
   const tint = tintItems.length ? BuildGroundPaint(tintItems, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
-  const w = [0, 0, 0], step = S.slope.stepM, span = S.slope.to - S.slope.from;
+  const w = [0, 0, 0], rs = [0, 1], step = S.slope.stepM, span = S.slope.to - S.slope.from;
   // 场景壕沟：翻土层跟着样条的实际沟沿走，沿弃土垄再铺一层（同现行第一关 SampleMissionTerrain 那一段）
   const plan = doc.trenchPlan || null;
   return (x, z, color = [1, 1, 1], layers = [0, 0, 1, 1]) => {
-    w[0] = 0; w[1] = 0; w[2] = 0;
-    raster?.Blend(x, z, w);
-    let track = w[0], spoil = w[1];
-    const soil = w[2];
+    let track = 0, spoil = 0, stubble = 1;
+    color[0] = 1; color[1] = 1; color[2] = 1;
+
+    if (farmland) {
+      const strip = SampleFarmlandStrip(farmland, x, z);
+      if (strip) {
+        const p = strip.preset;
+        track = p.track; spoil = p.spoil; stubble = p.stubble;
+        color[0] = p.tint[0]; color[1] = p.tint[1]; color[2] = p.tint[2];
+      } else {
+        stubble = 0.58;
+      }
+    }
+
+    if (raster) {
+      w[0] = 0; w[1] = 0; w[2] = 0;
+      const a = raster.Blend(x, z, w);
+      if (a > 1e-4) {
+        if (farmland) {
+          const invA = 1 / a;
+          const pTrack = w[0] * invA, pSpoil = w[1] * invA, pSoil = w[2] * invA;
+          track = track * (1 - a) + w[0];
+          spoil = spoil * (1 - a) + w[1];
+          const authoredStubble = Math.max(0, 1 - pTrack - pSpoil - pSoil);
+          stubble = stubble * (1 - a) + authoredStubble * a;
+        } else {
+          track = w[0]; spoil = w[1];
+          stubble = Math.max(0, Math.min(1, 1 - track - spoil - w[2]));
+        }
+      }
+    }
+    tint?.Blend(x, z, color);
+
+    let rutCoord = 1;
+    if (roadSplat) {
+      roadSplat.Sample(x, z, rs);
+      const roadTrack = rs[0];
+      rutCoord = rs[1];
+      if (roadTrack > 1e-3) {
+        if (roadTrack > track) track = roadTrack;
+        stubble *= 1 - roadTrack * 0.92;
+        if (isEncounter) {
+          const protect = Math.min(1, roadTrack * 1.15);
+          color[0] += (1 - color[0]) * protect;
+          color[1] += (1 - color[1]) * protect;
+          color[2] += (1 - color[2]) * protect;
+        }
+      }
+    }
+
+    let earthExpose = 0;
     const corridor = plan?.Corridor(x, z);
     if (corridor) {
       const t = 1 - Math.max(0, Math.min(1, (corridor.d - corridor.halfFloor - corridor.bank * 0.5) / (corridor.bank * 0.5 + corridor.bermWidth)));
       const tt = t * t * (3 - 2 * t);
       if (tt > spoil) spoil = tt;
+      if (tt > earthExpose) earthExpose = tt;
     }
     const gx = (sampler(x + step, z) - sampler(x - step, z)) / (2 * step);
     const gz = (sampler(x, z + step) - sampler(x, z - step)) / (2 * step);
     const u = Math.max(0, Math.min(1, (Math.hypot(gx, gz) - S.slope.from) / span));
     const steep = u * u * (3 - 2 * u);
     if (steep > spoil) spoil = steep;
+    if (steep > earthExpose) earthExpose = steep;
     track *= 1 - steep;
-    color[0] = 1; color[1] = 1; color[2] = 1;
-    tint?.Blend(x, z, color);
-    layers[0] = track; layers[1] = spoil; layers[2] = Math.max(0, Math.min(1, 1 - track - spoil - soil)); layers[3] = 1;
+
+    if (isEncounter && earthExpose > 0.1) {
+      const protect = Math.max(0, Math.min(1, (earthExpose - 0.1) * 1.25));
+      color[0] += (1 - color[0]) * protect;
+      color[1] += (1 - color[1]) * protect;
+      color[2] += (1 - color[2]) * protect;
+    }
+
+    layers[0] = Math.max(0, Math.min(1, track));
+    layers[1] = Math.max(0, Math.min(1, spoil));
+    layers[2] = Math.max(0, Math.min(1, farmland ? stubble : Math.min(stubble, 1 - track - spoil)));
+    layers[3] = rutCoord;
     return color;
   };
 }
@@ -677,8 +776,11 @@ export function LayoutFromSceneDoc(doc) {
     const grounded = GroundedBlock(block, sampler);
     return Number.isFinite(block.y) ? { ...grounded, y: block.y } : grounded;
   };
-  // 正式场景（docs/Data_Scene.md §8，2026-11-01）：道具换外部模型，地面是分层地表；体块不是正式资产，照白盒画灰面 + 米格线（编辑器 DressWorld）
+  // 正式场景（docs/Data_Scene.md §8，2026-11-01）：道具换外部模型，地面是分层地表；体块仍是白盒灰面 + 米格线。
+  // 白盒场景若在 look.terrainLayers 显式登记了图层集（如 FirstLevelEncounter / FirstLevelMerged），
+  // 地面同样走分层地表贴图混合，体块保持白盒不换道具模型。
   const formal = doc.style === "formal";
+  const layeredGround = formal || !!doc.terrainLayers;
   // 细高的 foliage 块（DeadTree_xx，脚印 ≤ BLOCKOUT_TREE_MAX_FOOT_M）与场景里的 Tree/* 是树：只留碰撞，编辑器种枯树模型（2026-10-20，同 BlockoutBlock）
   const blocks = doc.blocks.map(block => {
     const grounded = Placed(block);
@@ -709,11 +811,11 @@ export function LayoutFromSceneDoc(doc) {
     terrain: "P012Heightfield",
     terrainSpec: null,
     terrainSampler: sampler,
-    // 正式场景：分层地表读不到时退回平铺土，顶点色不再乘色带
-    SampleGroundColor: formal ? () => neutral : groundPaint
+    // 分层地表：读不到贴图时退回平铺土，顶点色不再乘高度色带
+    SampleGroundColor: layeredGround ? () => neutral : groundPaint
       ? (x, z) => { const rgb = BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)); groundPaint.Blend(x, z, rgb); return rgb; }
       : (x, z) => BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)),
-    SampleGroundSurface: formal ? BuildSceneGroundSurface(doc, sampler) : null,
+    SampleGroundSurface: layeredGround ? BuildSceneGroundSurface(doc, sampler) : null,
     // 正式场景的道具（Prop/*）：盒子只留碰撞，FirstLevelWhiteboxField 换外部模型
     sceneProps: formal ? blocks.filter((block) => block.propModel)
       .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,
@@ -728,7 +830,7 @@ export function LayoutFromSceneDoc(doc) {
     backdropGroundAt: backdrop ? BackdropGroundSampler(backdrop, sampler, doc.bounds) : null,
     cameraFar: backdrop ? Math.max(BLOCKOUT_CAMERA_FAR, backdrop.far) : BLOCKOUT_CAMERA_FAR,
     bounds: { ...doc.bounds },
-    ground: formal ? { ...ground, pbr: MISSION_LAYOUT.ground.pbr, pbrOptions: { ...MISSION_LAYOUT.ground.pbrOptions },
+    ground: layeredGround ? { ...ground, pbr: MISSION_LAYOUT.ground.pbr, pbrOptions: { ...MISSION_LAYOUT.ground.pbrOptions },
       terrainLayers: doc.terrainLayers || MISSION_LAYOUT.ground.terrainLayers } : ground,
     // 可选 semanticColors（2026-10-20）：场景文件改的几种块色盖在第一关那张表上
     semanticColors: { ...MISSION_LAYOUT.semanticColors,

@@ -189,6 +189,11 @@ Timeline 小窗右上角的箭头可收起或展开时间轴，默认展开，�
 
 ## 维护与验证
 
+- 2026-11-25 遭遇设计编辑器与遭遇白盒场景地形贴图混合统一（方案 A）：
+  - 提取纯 JS 模块 `Script_EncounterFarmland.mjs` 统一管理鲁南条田分区与条带（含 `L0610_FIELD_ZONES` / `L0610_FIELDS` 与 `MergedFieldZones` / `MergedPaperFields`）、道路 Splat 权重与连续带符号车辙横向坐标（`BuildRoadSplatRaster`）及低频宏观调色（`PaintMacroTintFor`）。
+  - `Script_LevelFlowTerrain.mjs` 在保留 `surfaceMaps.scene` 供软件回退与既有测试兼容的基础上，新增 0.5 m/texel 的 `splat`（R 车道 `CartTrack`、G 翻土/陡坡 `SpoilEarth`、B 草茬 `DryStubble`、A 连续带符号车辙坐标）与 `macroTint` 烘焙，移除 0.5 m 硬烘焙细条纹、道路糊泥与 3 m `SoilMixAt` 喷枪雾；`Script_LevelFlowGpuRaster.mjs` 在 WebGL2 片段着色器中复用外部 `TERRAIN_SETS.MissionPlain` 四层无缝贴图，完成远近双尺度防重复平铺、Height Lerp 高度混合、陡坡双平面侧投影、解析双道车辙与宏观条田分色（模型保持白盒）。
+  - `Scene_FirstLevelEncounter.json` 与 `Scene_FirstLevelMerged.json` 同步在 `look` 中启用 `"terrainLayers": "MissionPlain"`；`Script_EditorBlockoutLevels.mjs` 将分层地表与 `style === "formal"` 解耦，使 Encounter Play、正式战役白盒（`?whitebox=p012`）与 `SceneEditor.html` 均呈现「白盒体块 + 共享四层地表混合 + 条田宏观分色」。
+
 - 2026-11-15 立体视口增加与太阳方向一致的面光照、建筑及屋顶投影、深度重建 AO。投影包含镜头外的遮挡物，沿用剧情事件显隐；颜色处理后仍用原始深度进行点选和人物遮挡。参数在 `Data_Tuning_LevelFlow`，WebGL 不可用时沿用软件深度光栅与面光照。沿当前 01–10 玩家路线附近的 35 栋实心占位房改成空心墙体、屋顶和地坪，增加 35 处朝院内的房门及 99 处窗洞；临巷后窗窗台 1.2 米，室内朝院的窗台 1 米，开口贯穿重合的院墙。同样的房屋和开口逐件同步进正式场景。具体门窗位置、尺寸与窥视关系属于关卡空间设计。
 
 - 2026-11-13 按 01D / 32.423 秒反馈修正开场进场顺序：日军不再和撤退队同在 01C 出生。按十二人各自出发时刻、路线长度与 1.8 米/秒行军速度，取队尾到支沟拐弯 X23.5、Z67.2 的最晚时刻（默认约 44.21 秒），此后九名日军才按 0.4 秒间隔从原来三条远处路线接近，仍用 3 米/秒，不能瞬移到洞口。01D 由 10 秒延至 30 秒，02A 从 60 秒开始；02B 给折返回援多留 20 秒，02C 及以后顺延共 40 秒，全程变为 1910 秒。前述历史截图秒数保留为原始反馈定位，新验收按拍号与拍内偏移取样。原截图 32.423 秒无日军；队尾过弯前不生成，回溯后结果相同。这里调整的是 Encounter Designer 创作性预演，不改变游戏正式任务触发。

@@ -9,16 +9,18 @@
 /** 涂色 id → 层（先命中先用；没命中 = 草茬）。数是这一层的权重，加起来不超过 1。 */
 export const SCENE_GROUND_CLASSES = Object.freeze([
   Object.freeze({ match: /^(Road_|RoadNorthEnd|PostRoadNorthEnd|NorthRoad|FieldPath|FieldLane_|RailNorth|RailSouth)/, track: 1 }),
+  // 村缘菜园与绿篱带：排在 Village 之前，保持草茬地被而不是压实土路
+  Object.freeze({ match: /^(VillageFringe_W1|VillageFringe_W3|VillageFringe_E|Village_InnerGardenW|Garden_|Wheat_|RootedVerge)/ }),
   // 01–05 那一大片农田的底色（17 万平方米、白盒里是 0.6 的沙土色罩子）：草茬里夹着一成多裸土，不是路
   Object.freeze({ match: /^FarmPaths/, soil: 0.35 }),
-  // 村里的院场、门口空地：踩实了一大半、剩下是底土
-  Object.freeze({ match: /^(Village|NorthGateYard)/, track: 0.6, soil: 0.4 }),
-  // 旧壕、散兵坑、挖出来的土、沟里的沙、陡坎、坟头、河床
-  Object.freeze({ match: /^(SapSpoil|OldTrench_|OldFoxhole_|DitchSoil|DitchSand|AtDitch|ScarpFace|Grave_|FieldGrave_|WoodLiu_Grave|WoodZhao_Grave|SandBed|Stream)/, spoil: 1 }),
+  // 田埂：半硬土半底土
+  Object.freeze({ match: /^Bund_/, track: 0.4, soil: 0.5 }),
+  // 村里的院场、打麦场、门口空地：踩实了一大半、剩下是底土
+  Object.freeze({ match: /^(Village|NorthGateYard|ThreshingFloor|GateYard|RailSecYard_Base|BridgeSouthHamlet_Base|Lizihang)/, track: 0.6, soil: 0.4 }),
+  // 旧壕、散兵坑、炸点焦土、农田干沟、挖出来的土、沟里的沙、陡坎、坟头、河床
+  Object.freeze({ match: /^(SapSpoil|OldTrench_|OldFoxhole_|BombScorch_|FieldDitch_|DitchSoil|DitchSand|AtDitch|ScarpFace|Grave_|FieldGrave_|WoodLiu_Grave|WoodZhao_Grave|SandBed|SandBar_|Stream)/, spoil: 1 }),
   // 阵地前清过的地：底土，不长草茬
   Object.freeze({ match: /^Cleared/, soil: 1 }),
-  // Paint patches of rooted soil back into otherwise bare verges.
-  Object.freeze({ match: /^RootedVerge/ }),
 ]);
 
 export const SCENE_GROUND_SURFACE = Object.freeze({

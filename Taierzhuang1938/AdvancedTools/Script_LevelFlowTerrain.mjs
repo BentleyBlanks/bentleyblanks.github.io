@@ -5,6 +5,11 @@ import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs"
 import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
 import { BuildGroundPaint, HydrateGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
 import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
+import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "../Data_SceneGroundLayers.mjs";
+import { TERRAIN_RUTS } from "../Data_Tuning_Terrain.mjs";
+import {
+  CompileFarmlandFieldGrid, SampleFarmlandStrip, BuildRoadSplatRaster, PaintMacroTintFor,
+} from "../Script_EncounterFarmland.mjs";
 
 const ROAD_TIER_ORDER = { footpath: 0, villageAlley: 1, villageStreet: 2, guandao: 3 };
 const SmoothStep = (edge0, edge1, x) => {
@@ -690,6 +695,10 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   };
   // Bake color independently of relief tessellation. Pixel centers correspond
   // to world grid samples, so adjacent LOD cells use exactly the same paint.
+  // In addition to the legacy software-fallback color map (`scene`), bake a
+  // physically grounded Splat control map (`splat`: track / spoil / stubble /
+  // signed road rut coord) and a low-frequency `macroTint` map for WebGL2
+  // multi-layer texture splatting (reusing MissionPlain).
   let surfaceMaps=prepared?.surfaceMaps;
   const SurfaceMaps = () => {
     if (surfaceMaps) return surfaceMaps;
@@ -701,15 +710,162 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         * (Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1) > settings.maxPixels) texelM *= 2;
     const width = Math.ceil((bounds.maxX - bounds.minX) / texelM) + 1;
     const height = Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1;
-    const data = new Uint8Array(width * height * 4);
-    for (let row = 0; row < height; row++) for (let column = 0; column < width; column++) {
-      const x = bounds.minX + column * texelM, z = bounds.minZ + row * texelM;
-      const color = SurfaceColorAt(x, z), soilMix = SoilMixAt(x, z);
-      const offset = (row * width + column) * 4;
-      for (let axis = 0; axis < 3; axis++) data[offset + axis] = Math.round(color[axis] + ([184, 164, 128][axis] - color[axis]) * soilMix);
-      data[offset + 3] = 255;
+    const total = width * height;
+    const data = new Uint8Array(total * 4);
+    const splatData = new Uint8Array(total * 4);
+    const macroTintData = new Uint8Array(total * 4);
+
+    // 1) Shared farmland spatial index (O(1) per pixel)
+    const farmlandGrid = CompileFarmlandFieldGrid(map.fields || [], map.fieldZones || []);
+
+    // 2) Authored scene.paint -> splat layer classes + macro tint rasters
+    const S = SCENE_GROUND_SURFACE;
+    const ClassWeights = (id) => {
+      const hit = SCENE_GROUND_CLASSES.find((c) => c.match.test(String(id || "")));
+      return hit ? [hit.track || 0, hit.spoil || 0, hit.soil || 0] : null;
+    };
+    const splatPaintItems = [];
+    const tintPaintItems = [];
+    for (const item of scene.paint || []) {
+      if (!item.poly && !item.line) continue;
+      const w = ClassWeights(item.id);
+      if (w) splatPaintItems.push({ ...item, rgb: w });
+      const tintRgb = PaintMacroTintFor(item);
+      if (tintRgb) tintPaintItems.push({ ...item, rgb: tintRgb });
     }
-    surfaceMaps = {scene:{minX:bounds.minX, minZ:bounds.minZ, texelM, width, height, data}, backdrop:backdropPaint};
+    // Non-road trenches (gullies, AT ditches, firing trenches): tight spoil floor & bank,
+    // no 3-metre airbrush mud fog over adjacent roads or farmland.
+    for (const trench of map.trenches || []) {
+      if (trench.id === "SunkenLane" || !Array.isArray(trench.points) || trench.points.length < 2) continue;
+      splatPaintItems.push({
+        line: trench.points.map(([px, pz]) => ({ x: px, z: pz })),
+        halfW: Math.max(0.8, (trench.width || 3.2) * 0.45),
+        feather: 1.0,
+        rgb: [0, 1, 0],
+      });
+    }
+    const splatPaint = splatPaintItems.length ? BuildGroundPaint(splatPaintItems, bounds, paintSettings) : null;
+    const tintPaint = tintPaintItems.length ? BuildGroundPaint(tintPaintItems, bounds, paintSettings) : null;
+
+    // 3) Spline road splat + analytical signed lateral rut distance
+    const splatRoads = [
+      ...(map.roads || []),
+      ...(lane && lane.points?.length >= 2 ? [{ id: "SunkenLane", kind: "villageStreet", points: lane.points, width: 4.2 }] : []),
+    ];
+    const roadSplat = BuildRoadSplatRaster(splatRoads, map.footpaths, map.floors, bounds, {
+      ...paintSettings, encodeRangeM: TERRAIN_RUTS.encodeRangeM,
+    });
+
+    // 4) Local height buffer for fast, allocation-free central-difference slope calculation
+    const hGrid = new Float32Array(total);
+    for (let row = 0; row < height; row++) {
+      const z = bounds.minZ + row * texelM;
+      const rowOff = row * width;
+      for (let column = 0; column < width; column++) {
+        hGrid[rowOff + column] = HeightAt(bounds.minX + column * texelM, z);
+      }
+    }
+
+    const inv2Step = 1 / (2 * texelM);
+    const slopeFrom = S.slope.from, slopeSpan = Math.max(1e-3, S.slope.to - S.slope.from);
+    const pw = [0, 0, 0], rs = [0, 1], tint = [1, 1, 1];
+    for (let row = 0; row < height; row++) {
+      const z = bounds.minZ + row * texelM;
+      const rowOff = row * width;
+      const rPrev = Math.max(0, row - 1) * width, rNext = Math.min(height - 1, row + 1) * width;
+      for (let column = 0; column < width; column++) {
+        const x = bounds.minX + column * texelM;
+        const idx = rowOff + column;
+        const offset = idx * 4;
+
+        // Legacy software-fallback / test color map
+        const color = SurfaceColorAt(x, z), soilMix = SoilMixAt(x, z);
+        for (let axis = 0; axis < 3; axis++) data[offset + axis] = Math.round(color[axis] + ([184, 164, 128][axis] - color[axis]) * soilMix);
+        data[offset + 3] = 255;
+
+        // Physically grounded splat weights & low-frequency macro tint
+        let track = 0, spoil = 0, stubble = 0.55;
+        tint[0] = 1; tint[1] = 1; tint[2] = 1;
+
+        const strip = SampleFarmlandStrip(farmlandGrid, x, z);
+        if (strip) {
+          const p = strip.preset;
+          track = p.track; spoil = p.spoil; stubble = p.stubble;
+          tint[0] = p.tint[0]; tint[1] = p.tint[1]; tint[2] = p.tint[2];
+        }
+
+        if (splatPaint) {
+          pw[0] = 0; pw[1] = 0; pw[2] = 0;
+          const a = splatPaint.Blend(x, z, pw);
+          if (a > 1e-4) {
+            const invA = 1 / a;
+            const pTrack = pw[0] * invA, pSpoil = pw[1] * invA, pSoil = pw[2] * invA;
+            track = track * (1 - a) + pw[0];
+            spoil = spoil * (1 - a) + pw[1];
+            const authoredStubble = Math.max(0, 1 - pTrack - pSpoil - pSoil);
+            stubble = stubble * (1 - a) + authoredStubble * a;
+          }
+        }
+        tintPaint?.Blend(x, z, tint);
+
+        let rutCoord = 1;
+        if (roadSplat) {
+          roadSplat.Sample(x, z, rs);
+          const roadTrack = rs[0];
+          rutCoord = rs[1];
+          if (roadTrack > 1e-3) {
+            if (roadTrack > track) track = roadTrack;
+            stubble *= 1 - roadTrack * 0.92;
+            const protect = Clamp(roadTrack * 1.15, 0, 1);
+            tint[0] += (1 - tint[0]) * protect;
+            tint[1] += (1 - tint[1]) * protect;
+            tint[2] += (1 - tint[2]) * protect;
+          }
+        }
+
+        let earthExpose = 0;
+        const corridor = plan?.Corridor(x, z);
+        if (corridor) {
+          const tc = 1 - Clamp((corridor.d - corridor.halfFloor - corridor.bank * 0.5) / Math.max(0.25, corridor.bank * 0.5 + corridor.bermWidth), 0, 1);
+          const tt = tc * tc * (3 - 2 * tc);
+          if (tt > spoil) spoil = tt;
+          if (tt > earthExpose) earthExpose = tt;
+        }
+
+        const cPrev = Math.max(0, column - 1), cNext = Math.min(width - 1, column + 1);
+        const gx = (hGrid[rowOff + cNext] - hGrid[rowOff + cPrev]) * inv2Step;
+        const gz = (hGrid[rNext + column] - hGrid[rPrev + column]) * inv2Step;
+        const uSlope = Clamp((Math.hypot(gx, gz) - slopeFrom) / slopeSpan, 0, 1);
+        const steep = uSlope * uSlope * (3 - 2 * uSlope);
+        if (steep > spoil) spoil = steep;
+        if (steep > earthExpose) earthExpose = steep;
+        track *= 1 - steep;
+
+        // Exposed trench banks and steep earth cuts return to natural loess color instead of green wheat tint
+        if (earthExpose > 0.1) {
+          const protect = Clamp((earthExpose - 0.1) * 1.25, 0, 1);
+          tint[0] += (1 - tint[0]) * protect;
+          tint[1] += (1 - tint[1]) * protect;
+          tint[2] += (1 - tint[2]) * protect;
+        }
+
+        splatData[offset] = Math.round(Clamp(track, 0, 1) * 255);
+        splatData[offset + 1] = Math.round(Clamp(spoil, 0, 1) * 255);
+        splatData[offset + 2] = Math.round(Clamp(stubble, 0, 1) * 255);
+        splatData[offset + 3] = Math.round(Clamp(rutCoord * 0.5 + 0.5, 0, 1) * 254);
+
+        macroTintData[offset] = Clamp(Math.round(tint[0] * 128), 0, 255);
+        macroTintData[offset + 1] = Clamp(Math.round(tint[1] * 128), 0, 255);
+        macroTintData[offset + 2] = Clamp(Math.round(tint[2] * 128), 0, 255);
+        macroTintData[offset + 3] = 255;
+      }
+    }
+    surfaceMaps = {
+      scene: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data },
+      backdrop: backdropPaint,
+      splat: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: splatData },
+      macroTint: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: macroTintData },
+    };
     return surfaceMaps;
   };
   // One colour cache per light setting, so viewports with different skies (day and dusk) keep their own colours.

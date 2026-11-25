@@ -449,8 +449,9 @@ export class FirstLevelWhiteboxField {
       const railway = BuildRailwayFromSpec(sink, this.layout.railway, { groundAt: (x, z) => this.TerrainHeight(x, z) });
       this.stats.railway = { bedChunks: railway.bed.chunks, ties: railway.track.ties, railSegs: railway.track.railSegs };
     }
-    // 村内道路与田间小路样条条带（Script_RoadSpline.BuildRoadRibbon）：按等级贴地铺设，不登记碰撞以免阻挡脚步或弹坑。
-    if (this.layout.ways?.roadRibbons?.length) {
+    // 村内道路与田间小路样条条带（Script_RoadSpline.BuildRoadRibbon）：仅在未启用分层地表贴图混合时铺平色条带，
+    // 启用 terrainLayers 时道路直接由 Splat 权重（CartTrack）+ 解析车辙在地面着色器里渲染，避免平色片遮挡地表贴图。
+    if (this.layout.ways?.roadRibbons?.length && !this.terrainLayers) {
       const roadPalette = {
         roadGuandao: 0xbeb08e,
         roadVillage: 0xb5a687,

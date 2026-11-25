@@ -17,6 +17,7 @@ import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs";
 import { LevelFlowDebug } from "./Script_LevelFlowDebug.mjs";
 import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
+import { PreloadEncounterTerrainLayers } from "./Script_LevelFlowGpuRaster.mjs";
 
 const Element = (id) => document.getElementById(id);
 let canvas, workspace, navigation, annotationEditor, chat, gamePlay, timeline, previewDebug;
@@ -766,7 +767,15 @@ function Tick(timestamp) {
 async function Start() {
   PopulateVariantPicker();
   PopulateTimeline();
-  mapData = await EnsureVariantMap(activeVariant, frame.player);
+  const [loadedMap] = await Promise.all([
+    EnsureVariantMap(activeVariant, frame.player),
+    PreloadEncounterTerrainLayers(() => {
+      if (!workspace) return;
+      for (const entry of workspace.entries) { entry.map.baseKey = ""; entry.map.staticKey = ""; }
+      RequestRender();
+    }),
+  ]);
+  mapData = loadedMap;
   workspace = new EncounterViewports(Element("viewportGrid"), mapData, {
     activate: (entry) => { map = entry.map; canvas = entry.canvas; canvas.dataset.mode = mode; canvas.dataset.navigationTool = navigationTool; },
     change: () => Render(), bounds: StageBounds, bind: BindMap, storage,
