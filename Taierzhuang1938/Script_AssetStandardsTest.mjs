@@ -45,7 +45,7 @@ for (const [id, target] of Object.entries(SPECIAL_TRIANGLE_TARGETS)) {
   const pythonPair = new RegExp(`"${id}"\\s*:\\s*${target}`).test(pythonRules);
   const actual = MESHES[id]?.triangles;
   Check(pythonPair && actual <= target && actual >= target * 0.97,
-    `${id} 指定翻倍目标 ${target.toLocaleString("en-US")}`,
+    `${id} 指定面数目标 ${target.toLocaleString("en-US")}`,
     `实际 ${actual?.toLocaleString("en-US")}`);
 }
 
@@ -69,8 +69,8 @@ for (const [id, record] of Object.entries(SOURCE_ASSET_STANDARDS)) {
     }
   }
 }
-// 2026-09-05 删掉五件不合 1938 年 3 月时代的卢沟桥资源包武器后，再移除 C96，清单为 19 项。
-Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 15 && missing.length === 0,
+// 八九式重掷弹筒现在有单独的外观来源和面数上限。
+Check(Object.keys(SOURCE_ASSET_STANDARDS).length === 16 && missing.length === 0,
   "现有源模型均进入资产规范清单", missing.join("、"));
 Check(!WEAPONS.Mauser96 && Object.values(LOADOUTS).every((loadout) =>
   [loadout.primary, loadout.secondary, loadout.melee].every((id) => !id || WEAPONS[id]))

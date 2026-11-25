@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
-"""日方的三件重装备：八九式重掷弹筒 / 八九式中战车 / 九四式轻装甲车。
-
-这三条在 Data_Weapons.mjs 里有完整数据、在 Data_Levels.mjs 里有出场位置，
-可一直没有几何 —— 枪械编辑器那一栏写着「车辆与掷弹筒没有模型，只看数据」。
+"""日方载具：八九式中战车 / 九四式轻装甲车。
 
 --- 坐标系 -----------------------------------------------------------------
-
-掷弹筒走**武器规范系**（与 BuildWeapons 一致）：右手握点 = 原点、筒口沿 -Z。
-它是单兵携行的东西，走这条路人物才能直接拿着它。
 
 车辆走**载具规范系**：
   · 原点在**地面、车体中心**（不是车底盘中心）—— 放置的人写一个 (x, z) 就落地，
@@ -31,8 +25,6 @@
     塔后另有一挺机枪（不是装饰，是它被从背后爬上去的原因）。
   · 九四式轻装甲车：3.10 / 1.60 / 1.60 m，只有一挺机枪，车尾有牵引钩 ——
     它本来是拉弹药拖车的，被拉到前线当装甲车用，牵引钩必须在。
-  · 八九式重掷弹筒：全长 413 mm，**没有两脚架**，底部弧形驻钣抵地，约 45° 手持发射。
-    别给它加脚架 —— 那是把它认成迫击炮。
 """
 
 import math
@@ -43,84 +35,9 @@ PI = math.pi
 
 # 贴图格距。车体钢板用 armor（0.75 m 一格）：一面 4.3 m 的车体侧板吃到六格，
 # SteelHelmet 那张图的锈斑与粗糙度变化正好落在「几十厘米一处」的尺度上。
-# 套枪的 gunSteel（0.030）会把锈斑缩成砂纸，套建筑的 steel（0.35）又太密。
 T_ARMOR = "armor"        # 材质名兼格距名（两边同名，见 TzmCore.TILE_METERS["armor"]）
 T_STEEL = "steel"        # 同上
 T_TRACK = "track"        # 履带与负重轮：**不是 armor**（没喷漆）也不是发蓝裸钢
-T_GUN_STEEL = "gunSteel"  # **只是格距**：掷弹筒是单兵器材，格距走枪那一套
-T_GUN_WOOD = "gunWood"    # 同上。材质名仍然是 steel / wood
-
-SEG = 10
-
-
-def LoftZ(rings, segments=SEG, **kwargs):
-    """沿 -Z 放样：ring["y"] 写的是目标 z（从尾往口排，z 递减）。
-    与 BuildWeapons.LoftZ 同一套约定 —— 先沿 +Y 放样再绕 X 转 -90°。"""
-    flipped = [dict(r, y=-r["y"]) for r in rings]
-    bm = Loft(flipped, segments, **kwargs)
-    Transform(bm, rx=-PI * 0.5)
-    return bm
-
-
-# ---------------------------------------------------------------------------
-# 八九式重掷弹筒（全长 413 mm）
-# ---------------------------------------------------------------------------
-
-def BuildType89Launcher():
-    """筒身 + 螺杆 + 弧形驻钣 + 侧面击发机构。**没有两脚架。**
-
-    全长 413 mm 分配：驻钣尾端 z=+0.185，筒口 z=-0.228。握点（原点）落在螺杆上，
-    人物的右手就抓在那儿 —— 这是「手持发射」这件事在几何上的落点。
-    """
-    root = Node("root")
-    body = root.Child("body")
-
-    # 筒身：φ50 的滑膛短筒，口部略收（真物是口部有一圈加厚）
-    body.Add("steel", LoftZ([
-        Ring(-0.014, rx=0.0250, rz=0.0250, power=2.2),
-        Ring(-0.030, rx=0.0255, rz=0.0255, power=2.2),
-        Ring(-0.205, rx=0.0250, rz=0.0250, power=2.2),
-        Ring(-0.216, rx=0.0268, rz=0.0268, power=2.2),   # 口部加厚圈
-        Ring(-0.228, rx=0.0262, rz=0.0262, power=2.2),
-    ], SEG), tile=T_GUN_STEEL)
-
-    # 螺杆：调射程用的粗牙螺杆，筒底插进去 14 mm（零件之间只准插进去，不准挨着）
-    body.Add("steel", LoftZ([
-        Ring(0.150, rx=0.0165, rz=0.0165, power=2.2),
-        Ring(0.030, rx=0.0155, rz=0.0155, power=2.2),
-        Ring(-0.010, rx=0.0210, rz=0.0210, power=2.2),   # 锥座
-        Ring(-0.040, rx=0.0180, rz=0.0180, power=2.2),   # **插进筒里 26 mm**：
-    ], 8), tile=T_GUN_STEEL)                             # 刚好挨着会两张皮打架，一转一闪
-
-    # 驻钣：抵地的那块弧形铁鞋。用一段 Lathe 的浅碗，凹面朝后下方。
-    plate = Lathe([(0.0, 0.0), (0.030, 0.006), (0.048, 0.030), (0.049, 0.050)], 10, smooth=False)
-    Transform(plate, rx=PI * 0.5)          # 碗口朝 +Z（贴地那一面）
-    Transform(plate, z=0.135)          # 压住螺杆尾端 15 mm
-    body.Add("steel", plate, tile=T_GUN_STEEL)
-    # 驻钣与螺杆之间的球窝接头
-    body.Add("steel", LoftZ([Ring(0.158, rx=0.0215, rz=0.0215, power=2.4),
-                                 Ring(0.118, rx=0.0215, rz=0.0215, power=2.4)], 8),
-             tile=T_GUN_STEEL)
-
-    # 击发机构：筒身右侧一块小方壳 + 扳机杆（这是「它能手持击发」的可读零件）
-    housing = Box(0.026, 0.040, 0.062, bevel=0.004, segments=1)
-    Transform(housing, x=0.030, y=-0.006, z=-0.046)
-    body.Add("steel", housing, tile=T_GUN_STEEL)
-    lever = Box(0.010, 0.030, 0.014)
-    Transform(lever, x=0.030, y=-0.030, z=-0.030, rx=0.25)
-    body.Add("steel", lever, tile=T_GUN_STEEL)
-
-    # 握把：螺杆上缠的一段皮/木，左手扶这里。给它一点直径差，剪影上才看得出是「握处」
-    grip = LoftZ([Ring(0.096, rx=0.0215, rz=0.0215, power=2.6),
-                  Ring(0.040, rx=0.0225, rz=0.0225, power=2.6)], 8)
-    body.Add("wood", grip, tile=T_GUN_WOOD)
-
-    body.Child("muzzle", t=(0.0, 0.0, -0.230))
-    body.Child("gripR", t=(0.0, 0.0, 0.0))
-    body.Child("gripL", t=(0.0, 0.0, -0.070))
-    body.Child("sight", t=(0.026, 0.026, -0.060))
-    body.Child("magazine", t=(0.0, 0.0, 0.150))
-    return root
 
 
 # ---------------------------------------------------------------------------
@@ -372,6 +289,5 @@ def BuildType94Tankette():
 
 
 VEHICLE_BUILDERS = {
-    "Type89Launcher": BuildType89Launcher,
     "Type89Tank": BuildType89Tank,
 }

@@ -29,6 +29,7 @@ import ImportLugouqiaoWeapons        # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
 from Script_Zb26Rebuild import BuildZb26 as BuildHistoricalZb26  # noqa: E402
+from Script_Type89LauncherExterior import BuildType89Launcher  # noqa: E402
 from AssetBudgets import WEAPON_TRIANGLE_LIMIT, VEHICLE_TRIANGLE_LIMIT  # noqa: E402
 
 # 三角预算。超了不是警告是**失败** —— 换模最容易翻车的就是这里，
@@ -40,7 +41,7 @@ BUDGET = {
     "vehicle": VEHICLE_TRIANGLE_LIMIT,
 }
 
-# 武器全长（米），抄自 Data_Weapons.mjs 的 lengthM，**是史实数据，不许为了好看改**。
+# 武器模型全长（米），应与运行时挂点和动画一致。掷弹筒沿用预演轨道的模型基准比例。
 # 断言的是模型在 Z 上的实际跨度 —— 它一次就逮出了汉阳造的套筒建到枪口前头去、
 # 顺带把那一段的面全朝里翻了的 bug。容差 20 mm 留给准星护翼和枪托底板的圆角。
 WEAPON_LENGTH = {
@@ -154,16 +155,13 @@ def main():
             jobs.append((name, "weapon", builder, ImportBayonets.SOURCES[name]["note"]))
     for name, builder in BuildProps.PROP_BUILDERS.items():
         jobs.append((name, "prop", builder, ""))
-    jobs.append(("Type89Launcher", "weapon", BuildVehicles.BuildType89Launcher,
-                 "八九式重掷弹筒：筒身 + 螺杆 + 弧形驻钣。无两脚架，约 45° 手持发射。"))
+    jobs.append(("Type89Launcher", "weapon", BuildType89Launcher,
+                 "八九式重掷弹筒馆藏外观复原，保留既有道具轨道挂点。"))
     vehicle_names = list(BuildVehicles.VEHICLE_BUILDERS)
     for name in ImportVehicles.SOURCES:
         if name not in vehicle_names:
             vehicle_names.append(name)
     for name in vehicle_names:
-        # 掷弹筒是单兵武器（走上面 weapon 那行），不进 vehicle 名单
-        if name == "Type89Launcher":
-            continue
         imported = ImportVehicles.BuilderFor(name)
         builder = BuildVehicles.VEHICLE_BUILDERS.get(name)
         if imported is None and builder is None:

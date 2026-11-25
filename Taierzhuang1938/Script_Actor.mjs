@@ -4304,6 +4304,9 @@ export class ActorFactory {
       grenade: this.Material("grenade", () => lib.Get("GrenadePbr", {
         roughness: 1, metalness: 1, normalScale: 0.85,
       })),
+      type89LauncherSteel: this.Material("type89LauncherSteel",
+        () => lib.Get(lib.baked?.has("Type89LauncherSteel") ? "Type89LauncherSteel" : "Steel",
+          { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",
         { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
       zb26Wood: this.Material("zb26Wood", () => lib.Get(lib.baked?.has("Zb26VeteranWood") ? "Zb26VeteranWood" : "WoodStock",

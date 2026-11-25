@@ -223,12 +223,16 @@ export const MESHES = {
 
   Type89Launcher: {
     file: "Model_Type89Launcher.tzm.json", category: "weapon",
-    triangles: 318, meshBlocks: 2, nodes: 7, joints: 0,
-    materials: ["steel", "wood"], mounts: WEAPON_MOUNTS,
-    span: [0.098, 0.0932, 0.413], lengthM: 0.413,
-    draws: { high: 2, medium: 2, low: 2 },
-    note: "八九式重掷弹筒。筒身 + 粗牙螺杆 + **弧形驻钣**，侧面一块击发机构。"
-      + "**没有两脚架** —— 加了脚架就成了迫击炮。约 45° 手持抵地发射。",
+    version: "type89-launcher-exterior-20261126",
+    triangles: 9700, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["type89LauncherSteel"], mounts: WEAPON_MOUNTS,
+    span: [0.12804, 0.06149, 0.413], lengthM: 0.413,
+    draws: { high: 1, medium: 1, low: 1 },
+    pbrSets: [{ name: "Type89LauncherSteel",
+      albedo: "./Texture/Texture_Type89LauncherSteelBase.webp?v=type89-exterior-20261126",
+      normal: "./Texture/Texture_Type89LauncherSteelNormal.webp?v=type89-exterior-20261126",
+      orm: "./Texture/Texture_Type89LauncherSteelOrm.webp?v=type89-exterior-20261126" }],
+    note: "按馆藏照片重建的八九式重掷弹筒游戏外观。窄长钢制支柱、侧面滚花旋钮与弧形驻钣。保留现有手持和预演挂点。",
   },
   Type11: {
     file: "Model_Type11.tzm.json", category: "weapon",

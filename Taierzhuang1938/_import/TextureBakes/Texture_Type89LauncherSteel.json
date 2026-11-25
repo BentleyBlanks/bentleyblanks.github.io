@@ -1,0 +1,63 @@
+{
+  "generator": "audit",
+  "date": "2026-11-26",
+  "name": "Type89LauncherSteel",
+  "preset": null,
+  "source": {
+    "path": "_import/Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp",
+    "sha256": "37bca6a281c16e403c59f8478ecac2cc2e574d57e478bcf3f0cef0c5dbffd80a"
+  },
+  "heightSource": null,
+  "params": {
+    "tileM": null,
+    "pack": "orm",
+    "normalConvention": "gl"
+  },
+  "outputs": [
+    {
+      "channel": "Base",
+      "file": "Texture_Type89LauncherSteelBase.webp",
+      "width": 1024,
+      "height": 1024,
+      "bytes": 96758,
+      "sha256": "04168cde888b5df741de4ea31555730bc61b05eb7b3c40f224d71b7f919cace0"
+    },
+    {
+      "channel": "Normal",
+      "file": "Texture_Type89LauncherSteelNormal.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 30188,
+      "sha256": "5c5155eefc170937a0b271fe56854df472f0689ad68a4a4619da4b11212bf213"
+    },
+    {
+      "channel": "Orm",
+      "file": "Texture_Type89LauncherSteelOrm.webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 14208,
+      "sha256": "6fedbeb73c2476203bfbbcf351aa4683fc294f435d69a7ba84f6b91649cef9d7"
+    }
+  ],
+  "totalBytes": 141154,
+  "metrics": {
+    "meanSrgb": [
+      0.3157,
+      0.3185,
+      0.2996
+    ],
+    "luma": 0.3113,
+    "lumaStd": 0.1406,
+    "sat": 0.0594,
+    "clipLow": 0.0,
+    "clipHigh": 0.0,
+    "lowFreq": 0.3447,
+    "seam": 0.1458,
+    "interior": 0.1461,
+    "seamRatio": 0.998,
+    "border": 0.782,
+    "swing": 0.2509,
+    "texelsPerMeter": null
+  },
+  "gateProblems": []
+}

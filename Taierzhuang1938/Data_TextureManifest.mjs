@@ -431,6 +431,18 @@ export const TEXTURE_MANIFEST = Object.freeze([
     files: [["Texture_Zb26VeteranWoodBase.webp", "Base", 1024, 1024], ["Texture_Zb26VeteranWoodNormal.webp", "Normal", 1024, 1024], ["Texture_Zb26VeteranWoodOrm.webp", "Orm", 1024, 1024]],
   },
   {
+    id: "Type89LauncherSteel", kind: "material", tier: "lazy",
+    toneClass: null, toneReason: "UV atlas separates machined steel, forged steel, contact wear and shallow visible recesses.",
+    metersPerTile: null, normalConvention: "gl",
+    bake: "_import/Script_BakeType89LauncherSteel.py", bakeRecord: "_import/TextureBakes/Texture_Type89LauncherSteel.json",
+    source: { provider: "imagegen", date: "2026-11-26", ref: "gpt-image-2 Images API",
+      prompt: "_import/Prompts/Texture_Type89LauncherSteel.txt",
+      note: "OpenAI API steel swatch archived losslessly at _import/Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp." },
+    consumers: [{ file: "Data_Meshes.mjs", token: "Type89LauncherSteel" }, { file: "Script_Actor.mjs", token: "Type89LauncherSteel" }],
+    files: [["Texture_Type89LauncherSteelBase.webp", "Base", 1024, 1024],
+      ["Texture_Type89LauncherSteelNormal.webp", "Normal", 512, 512], ["Texture_Type89LauncherSteelOrm.webp", "Orm", 512, 512]],
+  },
+  {
     id: "WeaponSteelV2", kind: "material", tier: "boot",
     bake: "_import/BuildWeaponPbr.py",
     source: { provider: "imagegen", date: "2026-08-22" },

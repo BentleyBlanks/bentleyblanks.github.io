@@ -30,7 +30,8 @@
   },
   "specialTriangleTargets": {
     "OfficerSwordSet": 7812,
-    "MediumMortar": 9068
+    "MediumMortar": 9068,
+    "Type89Launcher": 10000
   },
   "groups": [
     {
@@ -151,6 +152,14 @@
       "sourceTexture": "局部饰带",
       "runtimeTexture": "饰带保留源 UV；刀身/刀鞘使用共享枪钢",
       "note": "指定特例：以原成品 3,906 三角为基准翻倍，目标 7,812。"
+    },
+    "Type89Launcher": {
+      "name": "八九式重掷弹筒",
+      "group": "assembly",
+      "sourceTriangles": 9700,
+      "sourceTexture": "OpenAI Images API 钢材源图",
+      "runtimeTexture": "专用 1K 底色、512 切线法线与 ORM",
+      "note": "按馆藏照片重建游戏外观，沿用道具挂点，用户指定上限 10,000 三角。"
     },
     "MediumMortar": {
       "name": "八二迫击炮",

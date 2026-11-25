@@ -10,11 +10,11 @@ WEAPON_TRIANGLE_LIMIT = 30000
 VEHICLE_TRIANGLE_LIMIT = 80000
 MIN_DECIMATION_REDUCTION = 0.05
 
-# User-directed exceptions are based on the checked-in game meshes that existed
-# when the rule was approved: 3906 / 4513 / 4534 triangles respectively.
+# User-directed targets for the sword and mortar, plus the launcher ceiling.
 SPECIAL_TRIANGLE_TARGETS = {
     "OfficerSwordSet": 7812,
     "MediumMortar": 9068,
+    "Type89Launcher": 10000,
 }
 
 
