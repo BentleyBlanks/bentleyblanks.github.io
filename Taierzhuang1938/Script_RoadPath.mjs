@@ -296,7 +296,10 @@ export function MakeCrownProfile(path, {
     resolvedAnchors = anchors.map((entry) => {
       if (Array.isArray(entry)) return [entry[0], entry[1]];
       if (Number.isFinite(entry.s)) return [entry.s, entry.y];
-      if (Number.isFinite(entry.z)) return [path.ClosestS(entry.x ?? path.points[0][0], entry.z), entry.y];
+      if (Number.isFinite(entry.z)) {
+        const sVal = Number.isFinite(entry.x) ? path.ClosestS(entry.x, entry.z) : SAtZ(path, entry.z);
+        return [sVal, entry.y];
+      }
       return [0, entry.y ?? 0];
     }).sort((a, b) => a[0] - b[0]);
   }
@@ -338,15 +341,36 @@ export function MakeCrownProfile(path, {
   };
 }
 
+/** 在弯曲样条上精确反查世界坐标 z 对应的弧长 s（线性插值过零，无穿越时取最近点）。 */
+export function SAtZ(path, targetZ) {
+  const n = Math.max(64, Math.ceil(path.length / 4));
+  let prevS = 0;
+  let prevZ = path.At(0).z;
+  let bestS = 0;
+  let bestErr = Math.abs(prevZ - targetZ);
+  for (let i = 1; i <= n; i += 1) {
+    const s = (path.length * i) / n;
+    const z = path.At(s).z;
+    const err = Math.abs(z - targetZ);
+    if (err < bestErr) { bestErr = err; bestS = s; }
+    if ((prevZ <= targetZ && z >= targetZ) || (prevZ >= targetZ && z <= targetZ)) {
+      const dz = z - prevZ;
+      return Math.abs(dz) > 1e-9 ? prevS + ((targetZ - prevZ) / dz) * (s - prevS) : prevS;
+    }
+    prevS = s;
+    prevZ = z;
+  }
+  return bestS;
+}
+
 /** 将世界 z 区间 [[z0,z1],...] 或弧长区间 [[s0,s1],...] 统一折算为弧长缺口。 */
 export function ResolveRailwayGaps(path, gaps = [], zGaps = []) {
   const out = [];
   for (const g of gaps || []) if (Array.isArray(g) && g.length >= 2) out.push([g[0], g[1]]);
-  const refX = path.points[0][0];
   for (const g of zGaps || []) {
     if (!Array.isArray(g) || g.length < 2) continue;
-    const s0 = path.ClosestS(refX, g[0]);
-    const s1 = path.ClosestS(refX, g[1]);
+    const s0 = SAtZ(path, g[0]);
+    const s1 = SAtZ(path, g[1]);
     out.push([Math.min(s0, s1), Math.max(s0, s1)]);
   }
   return out;

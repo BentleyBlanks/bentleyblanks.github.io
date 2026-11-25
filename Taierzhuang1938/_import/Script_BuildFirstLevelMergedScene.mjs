@@ -2730,8 +2730,14 @@ function BuildMergedScene() {
     { id: "FieldDitch_NorthBank", line: NorthBankDitchPts.map(([x, z]) => ({ x, z })), halfW: 0.90, feather: 0.45, color: "#9b8768", strength: 0.68 },
     { id: "FieldDitch_EastN", line: EastFieldDitchNPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
     { id: "FieldDitch_EastS", line: EastFieldDitchSPts.map(([x, z]) => ({ x, z })), halfW: 1.05, feather: 0.50, color: "#9b8768", strength: 0.70 },
-    // 津浦铁路道砟路基碎石带底色（桥北与桥南全线，避免路堤顶面混出青麦色）
-    { id: "RailNorth", line: [{ x: -80, z: 355 }, { x: -80, z: 828 }], halfW: 3.1, feather: 1.0, color: "#4a4640", strength: 0.92 },
+    // 津浦铁路道砟路基碎石带底色（贴合北段弯道与桥北直段，避免路堤顶面混出青麦色）
+    {
+      id: "RailNorth",
+      line: [
+        { x: -82.8, z: 355 }, { x: -80.8, z: 385 }, { x: -80, z: 412 }, { x: -80, z: 828 },
+      ],
+      halfW: 3.1, feather: 1.0, color: "#4a4640", strength: 0.92,
+    },
   );
 
   // Build updated ways.roads & typed spline roadRibbons (Script_RoadPath / Script_RoadSpline)
@@ -2999,32 +3005,54 @@ function BuildMergedScene() {
     }
   }
 
-  // 津浦铁路全线共享 PCG 样条（北起远景 z=-1200，经前沿西翼/北沙河村西/桥北高堤，四孔钢梁桥 z=828..872 留口，
-  // 桥南经道口 z=886 贯通至远景 z=1650；Three.js Play 与 Encounter 编辑器 2D/3D 共用同一份 spec）
+  // 津浦铁路全线共享 PCG 样条（1938 鲁南干线大半径 S 形自然走向，R ≈ 1100–1600 m：
+  // 北起西北丘陵 z=-1200 缓弯南下绕过前沿阵地西侧，经涵洞 z=412 与四孔钢梁桥 z=828..872 工程直线段，
+  // 过南岸平交道口 z=886 后向东南大半径缓弯延伸至远景 z=1680；Three.js Play 与 Encounter 编辑器共用）
   const ownRailways = [
     {
       id: "JinpuMainline",
-      points: [[-80, -1200], [-80, 1650]],
+      points: [
+        [-340, -1200],
+        [-225, -840],
+        [-148, -480],
+        [-136, -240],
+        [-122, -20],
+        [-106, 160],
+        [-89, 300],
+        [-82, 370],
+        [-80, 412],
+        [-80, 465],
+        [-80, 775],
+        [-80, 828],
+        [-80, 872],
+        [-80, 895],
+        [-79.2, 940],
+        [-75.5, 990],
+        [-50, 1140],
+        [6, 1340],
+        [88, 1560],
+        [136, 1680],
+      ],
       gauge: 1.50,
       crown: {
         step: 4,
         filletM: 22,
         clampLo: 0.04,
         anchors: [
-          { z: -1200, y: 7.45 },
-          { z: -700, y: 6.50 },
-          { z: -600, y: 5.05 },
+          { z: -1200, y: 8.60 },
+          { z: -760, y: 9.55 },
+          { z: -600, y: 6.65 },
           { z: -480, y: -1.50 },
           { z: -240, y: -1.35 },
           { z: -120, y: -0.30 },
-          { z: 0, y: 0.95 },
-          { z: 120, y: 2.86 },
+          { z: 0, y: 1.05 },
+          { z: 120, y: 3.05 },
           { z: 260, y: 2.64 },
           { z: 375, y: 2.64 },
           { z: 828, y: 2.64 },
           { z: 872, y: 2.64 },
           { z: 990, y: 2.64 },
-          { z: 1650, y: 0.60 },
+          { z: 1680, y: 0.60 },
         ],
       },
       // 四孔钢梁桥（z=828..872）保留可爆破桥面物件；桥南乡道平交道口（z=886）仅断枕木、双轨连续穿过道口板
@@ -3100,8 +3128,22 @@ function BuildMergedScene() {
       siteBounds: { minX: -160, maxX: 320, minZ: -480, maxZ },
       paint: [
         ...(baseDoc.backdrop?.paint || []).filter((e) => InSouth(e.poly || e.line)).map(ShiftPaintEntry),
-        { id: "RailBackdropNorth", line: [{ x: -80, z: -3200 }, { x: -80, z: -480 }], halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88 },
-        { id: "RailBackdropSouth", line: [{ x: -80, z: 990 }, { x: -80, z: 3200 }], halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88 },
+        {
+          id: "RailBackdropNorth",
+          line: [
+            { x: -1120, z: -3200 }, { x: -720, z: -2200 }, { x: -340, z: -1200 },
+            { x: -225, z: -840 }, { x: -148, z: -480 },
+          ],
+          halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88,
+        },
+        {
+          id: "RailBackdropSouth",
+          line: [
+            { x: -75.5, z: 990 }, { x: -50, z: 1140 }, { x: 6, z: 1340 },
+            { x: 88, z: 1560 }, { x: 136, z: 1680 }, { x: 380, z: 2350 }, { x: 690, z: 3200 },
+          ],
+          halfW: 4.2, feather: 2.2, color: "#524c44", strength: 0.88,
+        },
       ],
     },
     paint: ownPaint,

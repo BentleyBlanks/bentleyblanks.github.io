@@ -179,4 +179,17 @@ import {
   assert.ok(Math.abs(ResolveRailwayGaps(railway.path, [], [[828, 872]])[0][0] - 1228) < 1e-6, "z=828 映射至 s=1228");
 }
 
+// 弯曲铁路上的世界 Z 缺口映射（SAtZ）：两端 X 偏移 >200 m 时，桥段缺口仍精确落在实际 z=828..872
+{
+  const curved = MakeRailwayProfile({
+    id: "CurvedTest",
+    points: [[-340, -1200], [-148, -480], [-80, 412], [-80, 828], [-80, 872], [-80, 895], [136, 1680]],
+    zGaps: [[828, 872]],
+    crown: { step: 4, filletM: 20, anchors: [{ z: -1200, y: 2 }, { z: 828, y: 2.64 }, { z: 1680, y: 0.6 }] },
+  }, () => 0);
+  const [cs0, cs1] = curved.bedGaps[0];
+  assert.ok(Math.abs(curved.path.At(cs0).z - 828) < 0.2 && Math.abs(curved.path.At(cs1).z - 872) < 0.2,
+    `弯曲铁路 zGaps 精确映射桥段 z=828..872，实得 ${curved.path.At(cs0).z.toFixed(2)}..${curved.path.At(cs1).z.toFixed(2)}`);
+}
+
 console.log("ok  RoadPathTest — 样条中心线契约全部通过");
