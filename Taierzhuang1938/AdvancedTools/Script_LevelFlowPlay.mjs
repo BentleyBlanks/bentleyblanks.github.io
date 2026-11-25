@@ -8,8 +8,8 @@ function SetAttribute(element,name,value){if(element.getAttribute(name)!==value)
 
 // One dormant host per editor: Stop clears simulation, retaining loaded assets.
 export class LevelFlowPlay {
-  constructor({snapshot,restore,pause,toast,onState,showSource,previewDebug,getVariant}) {
-    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,previewDebug,getVariant});
+  constructor({snapshot,restore,pause,toast,onState,showSource,onStart,onStop,previewDebug,getVariant}) {
+    Object.assign(this,{snapshot,restore,pause,toast,onState,showSource,onStart,onStop,previewDebug,getVariant});
     this.active=false;this.paused=false;this.state=null;this.cursorTime=0;this.generation=0;
     this.button=document.getElementById("playGame");this.pauseButton=document.getElementById("pauseGame");this.stopButton=document.getElementById("stopGame");
     this.menu=document.getElementById("playGameStart");this.layout=document.getElementById("viewportLayout");
@@ -107,7 +107,9 @@ export class LevelFlowPlay {
     for(const option of this.layout.options)option.hidden=option.disabled=Number(option.value)>2;
     this.layout.value="1";document.body.classList.add("lfPlayingGame");
     document.querySelector("#chatPane").inert=true;document.querySelector("#flowTimeline").inert=true;
-    this.showSource?.();this.UpdateControls();
+    if(this.onStart)this.onStart({variant:variant||null,document:this.saved.document,time});
+    else this.showSource?.();
+    this.UpdateControls();
     this.ShowLoading("正在校验场景与人物资源…");
     this.Launch(payload,generation).catch(error=>{
       if(!this.active||generation!==this.generation)return;
@@ -191,6 +193,9 @@ export class LevelFlowPlay {
     if(!this.paused&&this.state?.ready)this.frame?.focus();
     return true;
   }
+  RefocusGame() {
+    if(this.active&&!this.paused&&this.state?.ready)this.frame?.focus();
+  }
   Stop() {
     if(!this.active)return;
     this.active=false;this.paused=false;this.launching=false;this.generation++;clearInterval(this.timer);clearTimeout(this.deadline);
@@ -202,6 +207,7 @@ export class LevelFlowPlay {
     for(const option of this.layout.options)option.hidden=option.disabled=false;
     document.body.classList.remove("lfPlayingGame");
     document.querySelector("#chatPane").inert=false;document.querySelector("#flowTimeline").inert=false;
+    this.onStop?.();
     this.restore(this.saved);this.layout.value=String(this.saved.viewports.count);this.saved=null;this.state=null;this.UpdateControls();this.button.focus();
   }
   ScheduleRelease(){

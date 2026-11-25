@@ -15,12 +15,13 @@ import { CreateUnitsAttachment } from "./Script_LevelFlowUnits.mjs";
 import { FormatSourcePassage, CreateLocationText } from "./Script_LevelFlowPresentation.mjs";
 import { EncounterSceneControls } from "./Script_LevelFlowControls.mjs";
 import { LevelFlowPlay } from "./Script_LevelFlowPlay.mjs";
+import { LevelFlowPlayGuide } from "./Script_LevelFlowPlayGuide.mjs";
 import { LevelFlowDebug } from "./Script_LevelFlowDebug.mjs";
 import { EncounterTimeline } from "./Script_LevelFlowTimeline.mjs";
 import { PreloadEncounterTerrainLayers } from "./Script_LevelFlowGpuRaster.mjs";
 
 const Element = (id) => document.getElementById(id);
-let canvas, workspace, navigation, annotationEditor, chat, gamePlay, timeline, previewDebug;
+let canvas, workspace, navigation, annotationEditor, chat, gamePlay, playGuide, timeline, previewDebug;
 let storage;
 try { storage = window.localStorage; } catch { storage = null; }
 
@@ -44,7 +45,7 @@ let navigationTool = "select";
 let selectedUnitIds = [], multipleUnits = false;
 let frame = activeVariant.evaluate(0, project.value), shownStage = "", shownBeat = "", lastTimestamp = 0, pointer = null, draft = null;
 let toastTimer = 0, renderPending = false;
-let inspectorCollapsed = false, inspectorTab = "chat";
+let inspectorCollapsed = false, inspectorTab = "chat", playTab = "guide", savedPlaySidebar = null;
 let timelineCollapsed = false;
 const INSPECTOR_COLLAPSED_KEY = "tengxian1938_encounter_sidebar_collapsed_v1";
 const TIMELINE_COLLAPSED_KEY = "tengxian1938_encounter_timeline_collapsed_v1";
@@ -81,6 +82,29 @@ function SetNavigationTool(value) {
   Element("mapTooltip").hidden = true;
   RequestRender();
 }
+function SyncInspectorPanes() {
+  const inPlay = !!gamePlay?.active;
+  const editTabs = Element("editInspectorTabs");
+  const playTabs = Element("playInspectorTabs");
+  if (editTabs) editTabs.hidden = inPlay;
+  if (playTabs) playTabs.hidden = !inPlay;
+  if (inPlay) {
+    Element("chatPane").hidden = true;
+    Element("playGuidePane").hidden = inspectorCollapsed || playTab !== "guide";
+    Element("playDialoguePane").hidden = inspectorCollapsed || playTab !== "dialogue";
+    Element("scriptPane").hidden = inspectorCollapsed || playTab !== "script";
+    for (const button of document.querySelectorAll("[data-play-tab]")) {
+      button.classList.toggle("selected", button.dataset.playTab === playTab);
+    }
+  } else {
+    Element("playGuidePane").hidden = true;
+    Element("playDialoguePane").hidden = true;
+    for (const name of ["chat", "script"]) Element(`${name}Pane`).hidden = inspectorCollapsed || name !== inspectorTab;
+    for (const button of document.querySelectorAll("[data-tab]")) {
+      button.classList.toggle("selected", button.dataset.tab === inspectorTab);
+    }
+  }
+}
 function SetInspectorCollapsed(collapsed, persist = true) {
   inspectorCollapsed = collapsed;
   document.querySelector(".lfWorkspace").dataset.inspectorCollapsed = String(collapsed);
@@ -88,9 +112,16 @@ function SetInspectorCollapsed(collapsed, persist = true) {
   button.setAttribute("aria-expanded", String(!collapsed));
   button.setAttribute("aria-label", label); button.title = label;
   Element("inspectorResizeHandle").hidden = collapsed;
-  for (const name of ["chat", "script"]) Element(`${name}Pane`).hidden = collapsed || name !== inspectorTab;
-  if (persist) { try { storage?.setItem(INSPECTOR_COLLAPSED_KEY, String(collapsed)); } catch { /* Keep this window's layout. */ } }
+  SyncInspectorPanes();
+  if (persist && !gamePlay?.active) { try { storage?.setItem(INSPECTOR_COLLAPSED_KEY, String(collapsed)); } catch { /* Keep this window's layout. */ } }
+  if (gamePlay?.active && !collapsed && playTab === "guide") playGuide?.Refresh(true);
   RequestRender();
+}
+function ShowPlayTab(value) {
+  playTab = ["guide", "dialogue", "script"].includes(value) ? value : "guide";
+  if (inspectorCollapsed) SetInspectorCollapsed(false, false);
+  else SyncInspectorPanes();
+  playGuide?.SetTab(playTab);
 }
 function SetTimelineCollapsed(collapsed, persist = true) {
   timelineCollapsed = collapsed;
@@ -480,6 +511,7 @@ async function SwitchVariant(variantId) {
   if (nextMap !== mapData) {
     mapData = nextMap;
     workspace.SetMapData(mapData);
+    playGuide?.SetMapData(mapData);
   }
   Element("mapLoading").hidden = true;
 
@@ -713,6 +745,10 @@ function BindControls() {
     SetNavigationTool(button.dataset.navigationTool); workspace.active.canvas.focus();
   };
   for (const button of document.querySelectorAll("[data-tab]")) button.onclick = () => ShowTab(button.dataset.tab);
+  for (const button of document.querySelectorAll("[data-play-tab]")) button.onclick = () => {
+    ShowPlayTab(button.dataset.playTab);
+    if (button.dataset.playTab === "guide") gamePlay?.RefocusGame();
+  };
   for (const button of document.querySelectorAll("[data-mode]")) button.onclick = () => SetMode(button.dataset.mode);
   Element("playFlow").onclick = () => { if (time >= activeVariant.duration) Seek(0); SetMode("select"); SetPlaying(!playing); };
   Element("previousBeat").onclick = () => StepBeat(-1); Element("nextBeat").onclick = () => StepBeat(1);
@@ -757,7 +793,7 @@ function CountFpsFrame(timestamp, forceCount) {
 }
 function Tick(timestamp) {
   CountFpsFrame(timestamp, !!gamePlay?.active);
-  if (gamePlay?.active) { lastTimestamp = timestamp; requestAnimationFrame(Tick); return; }
+  if (gamePlay?.active) { playGuide?.Tick(timestamp); lastTimestamp = timestamp; requestAnimationFrame(Tick); return; }
   const elapsed = lastTimestamp ? Math.max(0, (timestamp - lastTimestamp) / 1000) : 0;
   const measuring = !!previewDebug.profiler?.recording;
   const beforeUpdate = measuring ? performance.now() : 0;
@@ -801,18 +837,37 @@ async function Start() {
   navigation = new EncounterSceneControls(workspace, RequestRender);
   for (const entry of workspace.entries) navigation.BindGizmo(entry);
   previewDebug = new LevelFlowDebug({ requestRender: RequestRender, renderFrame: () => Render(), toast: Toast, visible: () => workspace.Visible() });
+  playGuide = new LevelFlowPlayGuide({
+    getGameFrame: () => gamePlay?.frame,
+    getVariant: () => activeVariant,
+    refocusGame: () => gamePlay?.RefocusGame(),
+    onTabChange: (tab) => ShowPlayTab(tab),
+  });
+  playGuide.SetMapData(mapData);
   gamePlay = new LevelFlowPlay({
     getVariant: () => activeVariant,
     snapshot: () => ({ time, document: structuredClone(project.value), viewports: workspace.Serialize(), selection: structuredClone(selection) }),
     pause: () => { SetPlaying(false); navigation.Clear(); },
     restore: (saved) => { Element("playStatus").hidden = true; selection = saved.selection; Seek(saved.time); workspace.Restore(saved.viewports); Render(); },
-    showSource: () => ShowTab("script"),
+    onStart: ({ variant, document: playDoc, time: startTime }) => {
+      savedPlaySidebar = { tab: inspectorTab, collapsed: inspectorCollapsed };
+      playTab = "guide";
+      SetInspectorCollapsed(false, false);
+      SyncInspectorPanes();
+      playGuide.Start({ variant: variant || activeVariant, document: playDoc, mapData, startTime });
+    },
+    onStop: () => {
+      playGuide.Stop();
+      if (savedPlaySidebar) {
+        inspectorTab = savedPlaySidebar.tab;
+        SetInspectorCollapsed(savedPlaySidebar.collapsed, false);
+        savedPlaySidebar = null;
+      }
+      SyncInspectorPanes();
+    },
     onState: (state) => {
       time = state.timelineTime; frame = activeVariant.evaluate(time, project.value); UpdateTimeline();
-      Element("playStatus").hidden = false;
-      Element("playStatusTitle").textContent = (state.paused ? "已暂停 · " : "") + (state.hints?.title || "");
-      Element("playStatusTask").textContent = state.hints?.task || "";
-      Element("playStatusHint").textContent = state.hints?.hint || "";
+      playGuide.OnState(state);
     },
     toast: Toast,
     previewDebug,
@@ -837,7 +892,7 @@ async function Start() {
     Variant: () => ({ id: activeVariant.id, level: activeVariant.spec.level, scene: activeVariant.spec.scene, title: activeVariant.spec.title, badge: activeVariant.spec.badge, duration: activeVariant.duration, forked: !activeVariant.spec.isBaseline }),
     Variants: () => ENCOUNTER_VARIANTS.map((v) => ({ id: v.id, level: v.level, title: v.title, badge: v.badge, scene: v.scene })),
     Timeline: () => timeline.Inspect(),
-    Play: { Start: (mode) => gamePlay.Start(mode), Pause: (on) => gamePlay.Pause(on), Stop: () => gamePlay.Stop(), SetLayout: (count) => gamePlay.SetLayout(count), State: () => gamePlay.Inspect() },
+    Play: { Start: (mode) => gamePlay.Start(mode), Pause: (on) => gamePlay.Pause(on), Stop: () => gamePlay.Stop(), SetLayout: (count) => gamePlay.SetLayout(count), State: () => gamePlay.Inspect(), Guide: () => playGuide?.Inspect() || null, SetGuideTab: (tab) => ShowPlayTab(tab) },
     Evaluate: (value) => activeVariant.evaluate(value, project.value),
     Stealth: () => structuredClone(frame.stealth),
     Inspect: () => ({ variant: activeVariant.id, scene: activeVariant.spec.scene, time, playing, stage: frame.stage.id, beat: frame.beat.id, duration: activeVariant.duration, actors: frame.actors, effects: frame.effects, dialogue: frame.dialogue, stretchersPassed: frame.stretchersPassed, task: frame.beat.task, speechBubbles: workspace.Visible().map((entry) => entry.map.InspectSpeech?.() || entry.map.speechBubbles || []), layers: { ...workspace.active.layers }, view: { center: [...map.center], scale: map.scale }, viewports: workspace.Serialize(), rendering: workspace.Visible().map((entry) => entry.map.Diagnostics?.() || null), mapObjects: mapData.objects.length, terrainBuild: mapData.terrain.buildInfo, groups: frame.groups, triggers: frame.triggers, document: structuredClone(project.value) }),

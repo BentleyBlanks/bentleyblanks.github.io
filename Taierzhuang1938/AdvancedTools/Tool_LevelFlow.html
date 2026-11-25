@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" data-interface-theme href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261125FpsStatus">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261126PlayGuide">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -66,7 +66,11 @@
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
       <div id="inspectorResizeHandle" class="lfInspectorResize" role="separator" aria-label="调整右侧栏宽度" aria-orientation="vertical" tabindex="0" title="拖动调整侧栏宽度，方向键微调，Home 恢复默认"></div>
-      <div class="lfInspectorHeader"><div class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div><button id="toggleInspector" class="lfInspectorToggle" type="button" aria-label="收起右侧栏" aria-controls="chatPane scriptPane" aria-expanded="true" title="收起右侧栏"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button></div>
+      <div class="lfInspectorHeader">
+        <div id="editInspectorTabs" class="lfTabs" aria-label="侧栏功能"><button data-tab="chat" class="selected">会话</button><button data-tab="script">原文</button></div>
+        <div id="playInspectorTabs" class="lfTabs lfPlayTabs" aria-label="试玩辅助功能" hidden><button type="button" data-play-tab="guide" class="selected">地图导览</button><button type="button" data-play-tab="dialogue">对话<span id="playDialogueBadge" class="lfTabBadge" hidden>0</span></button><button type="button" data-play-tab="script">原文</button></div>
+        <button id="toggleInspector" class="lfInspectorToggle" type="button" aria-label="收起右侧栏" aria-controls="chatPane scriptPane playGuidePane playDialoguePane" aria-expanded="true" title="收起右侧栏"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></svg></button>
+      </div>
       <section id="chatPane" class="lfChatPane" aria-label="本机 Agent 会话" data-list-open="false">
         <nav id="codexChatSidebar" class="lfChatSidebar" aria-label="会话列表" hidden><button id="newCodexChat">＋ 新建会话</button><button id="toggleDeletedCodexChats" type="button" aria-pressed="false">已删除</button><div id="codexSessions"></div></nav>
         <div class="lfChatDetail">
@@ -90,7 +94,60 @@
           </form>
         </div>
       </section>
-      <section id="scriptPane" class="lfPane" hidden><div id="playStatus" class="lfPlayStatus" hidden role="status"><strong id="playStatusTitle"></strong><p id="playStatusTask"></p><p id="playStatusHint"></p></div><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <section id="playGuidePane" class="lfPlayGuidePane" aria-label="试玩 2D 地图与任务导览" hidden>
+        <div id="playStatus" class="lfPlayStatus" hidden role="status">
+          <div class="lfPlayStatusHead"><strong id="playStatusTitle"></strong><span id="playStatusBadge" class="lfPlayBadge" data-kind="running">运行中</span></div>
+          <p id="playStatusTask"></p>
+          <div id="playObjectiveMeta" class="lfPlayObjectiveMeta" hidden><span id="playTargetBearing" class="lfPlayTargetChip"></span><span id="playTargetDistance" class="lfPlayTargetDist"></span></div>
+          <ul id="playChecklist" class="lfPlayChecklist" aria-label="当前过关条件"></ul>
+          <p id="playStatusHint"></p>
+        </div>
+        <div class="lfPlayMapSection">
+          <div class="lfPlayMapBar" role="toolbar" aria-label="2D 地图控制">
+            <span class="lfPlayMapTitle">2D 战术地图</span>
+            <div class="lfPlayMapActions">
+              <button type="button" id="playMapFollow" aria-pressed="true" title="自动居中跟随顺子">跟随</button>
+              <button type="button" id="playMapFit" title="同时框住顺子与当前任务目标">全览</button>
+              <button type="button" id="playMapRoutes" aria-pressed="true" title="显示当前节拍引导路线">路线</button>
+              <button type="button" id="playMapLandmarks" aria-pressed="true" title="显示主要地名">地名</button>
+              <button type="button" id="playMapZoomOut" aria-label="缩小地图" title="缩小">−</button>
+              <button type="button" id="playMapZoomIn" aria-label="放大地图" title="放大">＋</button>
+            </div>
+          </div>
+          <div id="playGuideMapWrap" class="lfPlayMapWrap">
+            <canvas id="playGuideMap" aria-label="试玩实时 2D 战术地图"></canvas>
+            <div id="playMapTooltip" class="lfPlayMapTooltip" hidden></div>
+          </div>
+          <div class="lfPlayMapLegend" aria-hidden="true">
+            <span><i class="player"></i>顺子</span>
+            <span><i class="friend"></i>队友</span>
+            <span><i class="enemy"></i>日军</span>
+            <span><i class="civilian"></i>平民</span>
+            <span><i class="target"></i>目标</span>
+            <span id="playMapUnitSummary" class="lfPlayUnitSummary"></span>
+          </div>
+        </div>
+        <div class="lfPlayDialogueDock" aria-label="最近人物对话">
+          <div class="lfPlayDialogueHead">
+            <span>人物对话记录</span>
+            <div class="lfPlayDialogueTools">
+              <button type="button" id="playDialogueJumpLatest" hidden>↓ 最新</button>
+              <button type="button" id="playDialogueExpand" title="切换到完整对话历史页签">完整回溯 ↗</button>
+            </div>
+          </div>
+          <div id="playDialogueLog" class="lfPlayDialogueLog" role="log" aria-live="polite"></div>
+        </div>
+      </section>
+      <section id="playDialoguePane" class="lfPlayDialoguePane" aria-label="试玩对话历史回溯" hidden>
+        <div class="lfPlayDialogueToolbar" role="group" aria-label="筛选对话类型">
+          <button type="button" data-dialogue-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-dialogue-filter="speech" aria-pressed="false">人物对白</button>
+          <button type="button" data-dialogue-filter="order" aria-pressed="false">任务指引</button>
+          <span id="playDialogueCount" class="lfPlayDialogueCount">0 条</span>
+        </div>
+        <div id="playDialogueFullLog" class="lfPlayDialogueLog lfPlayDialogueFull" role="log" aria-live="polite"></div>
+      </section>
 
     </aside>
   </main>

@@ -12,6 +12,8 @@ import {ENCOUNTER_CINEMATICS} from "./Scenes/FirstLevelEncounter/Script_LevelFlo
 import {DebugOptions, DEBUG_OPTION_KEYS} from "./Script_DebugOptions.mjs";
 import {EncounterDialogueLines,EncounterSpeechAnchor} from "./Script_EncounterPlayDialogue.mjs";
 import {CompileEncounterVariant} from "./Script_EncounterVariants.mjs";
+import {CompileEncounters} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
+import {YawForwardXZ,CompassDirection,YawCompass,RelativeDirection,NormalizeDialogueText,MergePlayEntities,BuildPlayObjectiveGuide,PlayDialogueHistory} from "./AdvancedTools/Script_LevelFlowPlayGuideModel.mjs";
 import {FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_OPENING_CONFIG_URL, FIRST_LEVEL_OPENING_SEQUENCES, FIRST_LEVEL_OPENING_TIMELINE_URL} from "./Data_FirstLevelCampaign.mjs";
 import {Vector3,PerspectiveCamera} from "./vendor/three/build/three.module.js";
 for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start,"L1_Original"))){
@@ -261,4 +263,100 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
  assert.equal(spec.shape,"tankette");
  assert.ok(Math.abs(spec.arc.yawDeg+last.turret*180/Math.PI)<1e-9,"Tank turret yaw reaches the puppet");
 }
-console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync and independent scene");
+{
+ // Editor-side Play Guide (2D tactical minimap, facing math, target markers & dialogue history)
+ const Round2=v=>v.map(n=>Math.round(n*1000)/1000+0);
+ assert.deepEqual(Round2(YawForwardXZ(0)),[0,-1],"yaw 0 faces North (-Z)");
+ assert.deepEqual(Round2(YawForwardXZ(-Math.PI/2)),[1,0],"yaw -pi/2 faces East (+X)");
+ assert.deepEqual(Round2(YawForwardXZ(Math.PI)),[0,1],"yaw pi faces South (+Z)");
+ assert.deepEqual(Round2(YawForwardXZ(Math.PI/2)),[-1,0],"yaw +pi/2 faces West (-X)");
+ assert.equal(YawCompass(0),"北");assert.equal(YawCompass(-Math.PI/2),"东");assert.equal(YawCompass(Math.PI),"南");assert.equal(YawCompass(Math.PI/2),"西");
+ assert.equal(CompassDirection(10,0),"东");assert.equal(CompassDirection(-10,10),"西南");
+ assert.equal(RelativeDirection(0,10,0),"右侧");assert.equal(RelativeDirection(0,-10,0),"左侧");
+ assert.equal(RelativeDirection(Math.PI,10,0),"左侧");assert.equal(RelativeDirection(0,0,-10),"正前方");
+
+ for(const variantId of ["L1_Original","L1_BeishaheMerged"]) {
+  const variant=CompileEncounterVariant(variantId);
+  const docBefore=JSON.stringify(variant.defaultDocument);
+  const compiled=CompileEncounters(variant.defaultDocument,variant.timeline);
+  for(const beat of variant.timeline.filter(b=>EncounterCanPlay(b.start,variant))) {
+   const plan=new EncounterPlayPlan(variant.defaultDocument,beat.start,variant);
+   const authored=plan.Frame();
+   const guide=BuildPlayObjectiveGuide({variant,compiled,state:{...plan.State(),ready:true,stealth:authored.stealth},
+    player:{x:authored.player[0],z:authored.player[1],yaw:0,stance:"stand",alive:true},authoredFrame:authored});
+   assert.ok(guide.primaryTarget?.point?.every(Number.isFinite),`${variantId} ${beat.id} resolves a finite primary target`);
+   assert.ok(guide.checklist.length>0,`${variantId} ${beat.id} provides an actionable gate checklist`);
+  }
+  assert.equal(JSON.stringify(variant.defaultDocument),docBefore,`${variantId} play guide never mutates authoring data`);
+ }
+
+ // Combat target tagging + live soldier/puppet heading merge
+ {
+  const merged=CompileEncounterVariant("L1_BeishaheMerged");
+  const compiled=CompileEncounters(merged.defaultDocument,merged.timeline);
+  const beat=merged.BeatById("08c");
+  const plan=new EncounterPlayPlan(merged.defaultDocument,beat.start,merged);
+  const authored=plan.Frame();
+  const soldiersById=new Map([
+   [101,{id:101,kind:"nra",alive:true,position:{x:106,y:0,z:478},yaw:0,stance:"crouch",weapon:"Zb26"}],
+   [202,{id:202,kind:"ija",alive:true,position:{x:100,y:0,z:456},yaw:Math.PI,stance:"stand",weapon:"Type38"}],
+  ]);
+  const liveActors=[
+   {id:"yao",soldierId:101,alive:true,position:[106,0,478],group:null},
+   {id:"MergedBoards_0",soldierId:202,alive:true,position:[100,0,456],group:"MergedBoards"},
+  ];
+  const puppets=[{id:"tank3",kind:"tank",stance:"stand",x:115,z:465.8,yawDeg:180}];
+  const guide=BuildPlayObjectiveGuide({variant:merged,compiled,state:{...plan.State(),ready:true,conditions:["combat"]},
+   player:{x:104,z:478,yaw:0,stance:"crouch",alive:true,fovDeg:75},liveActors,soldiersById,puppets,authoredFrame:authored});
+  const enemy=guide.entities.find(e=>e.id==="MergedBoards_0");
+  const ally=guide.entities.find(e=>e.id==="yao");
+  const tank=guide.entities.find(e=>e.id==="tank3");
+  assert.ok(enemy?.isTarget&&enemy.side==="enemy"&&Math.abs(enemy.yaw-Math.PI)<1e-6,"Required living enemy is tagged with live facing");
+  assert.ok(ally?.side==="friend"&&ally.heavy&&Math.abs(ally.yaw)<1e-6,"Live ally merges heavy flag and facing");
+  assert.ok(tank?.kind==="tank"&&Math.abs(tank.yaw-Math.PI)<1e-6,"Live puppet converts yawDeg to radians");
+  assert.equal(guide.primaryTarget.kind,"combat");
+  assert.deepEqual(guide.primaryTarget.point,[100,456]);
+ }
+
+ // Interact -> Retreat target transition (06f plant first bundle then retreat)
+ {
+  const variant=CompileEncounterVariant("L1_Original");
+  const compiled=CompileEncounters(variant.defaultDocument,variant.timeline);
+  const beat=variant.BeatById("06f");
+  const plan=new EncounterPlayPlan(variant.defaultDocument,beat.start,variant);
+  const area=plan.Area();
+  const beforeInteract=BuildPlayObjectiveGuide({variant,compiled,state:{...plan.State(),ready:true,conditions:["interact","retreat","event"]},
+   player:{x:area.center[0],z:area.center[1],yaw:0,stance:"stand",alive:true},authoredFrame:plan.Frame()});
+  assert.equal(beforeInteract.primaryTarget.kind,"interact");
+  assert.equal(beforeInteract.primaryTarget.canInteractNow,true);
+  const afterInteract=BuildPlayObjectiveGuide({variant,compiled,state:{...plan.State(),ready:true,conditions:["retreat","event"]},
+   player:{x:area.center[0],z:area.center[1],yaw:0,stance:"stand",alive:true},authoredFrame:plan.Frame()});
+  assert.equal(afterInteract.primaryTarget.kind,"retreat");
+  assert.deepEqual(afterInteract.primaryTarget.point,beat.p.at(-1));
+ }
+
+ // Dialogue history dedup, transient F prompt stripping, retry marker and filtering
+ {
+  assert.equal(NormalizeDialogueText({order:true,text:"快去按F\nF · 完成当前交互"}),"快去按F");
+  const log=new PlayDialogueHistory();
+  const sides=new Map([["luo","friend"],["player","player"]]);
+  log.Ingest({beatId:"08a",beatTitle:"抵沟口",elapsed:2,lines:[
+   {id:"08a_0",actorId:"player",name:"顺子",text:"走个锤子！"},
+   {id:"08a_order",actorId:"luo",name:"罗班长",text:"跟车走！",order:true},
+  ],sideByActorId:sides});
+  // Stepping into interact area appends transient prompt; must not duplicate order line
+  log.Ingest({beatId:"08a",beatTitle:"抵沟口",elapsed:4,lines:[
+   {id:"08a_order",actorId:"luo",name:"罗班长",text:"跟车走！\nF · 完成当前交互",order:true},
+  ],sideByActorId:sides});
+  assert.equal(log.LineCount(),2,"Duplicate active lines and transient F suffixes do not spam dialogue history");
+  assert.equal(log.Filtered("speech").filter(e=>e.kind==="line").length,1);
+  assert.equal(log.Filtered("order").filter(e=>e.kind==="line").length,1);
+  assert.equal(log.MarkRetry("08a","抵沟口",0),true);
+  log.Ingest({beatId:"08a",beatTitle:"抵沟口",elapsed:1,lines:[
+   {id:"08a_0",actorId:"player",name:"顺子",text:"走个锤子！"},
+  ],sideByActorId:sides});
+  assert.equal(log.LineCount(),3,"After checkpoint retry, re-spoken lines append cleanly after the retry divider");
+  assert.ok(log.entries.some(e=>e.kind==="divider"&&/检查点重来/.test(e.text)));
+ }
+}
+console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync, playtest 2D guide and independent scene");
