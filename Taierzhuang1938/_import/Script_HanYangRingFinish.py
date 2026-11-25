@@ -26,7 +26,7 @@ def PoseRingNode(name, node, positions, rearBandBounds=None):
         if axis[0]<0:axis=-axis
         roll=Rotation.from_rotvec(np.radians(16.)*np.array([0.,axis[1],-axis[0]]))
         centre=posed.mean(axis=0)
-        shift=(rearBandBounds[1]-rearBandBounds[0])*np.array([.11,-.11,-.19])
+        shift=(rearBandBounds[1]-rearBandBounds[0])*np.array([.09,-.080,-.17])
         translation=centre+roll.apply(translation-centre)+shift
         turn=roll*turn
     node.update(translation=translation.tolist(), rotation=turn.as_quat().tolist())
@@ -67,12 +67,12 @@ def BandTrimSurface(sourcePoints, bounds):
     # The visible tab is a solid exterior relief. Register the face to the band
     # in the side photograph and roll its exposed perimeter into the narrow edge.
     low,high=bounds
-    outline=np.array([(.028,.030),(.160,.053),(.845,.050),(.932,.030),
-                      (.958,-.075),(.918,-.170),(.822,-.211),(.570,-.225),
-                      (.362,-.198),(.103,-.104)])
+    outline=np.array([(.095,.030),(.190,.053),(.822,.050),(.887,.030),
+                      (.888,-.063),(.831,-.122),(.747,-.169),(.568,-.181),
+                      (.411,-.154),(.246,-.081)])
     centre=outline.mean(axis=0)
     extent=high-low
-    halfWidth=.46*np.ptp(sourcePoints[:,0])
+    halfWidth=.36*np.ptp(sourcePoints[:,0])
     centreX=.5*(sourcePoints[:,0].min()+sourcePoints[:,0].max())
     layers=[]
     for side,faceScale in [(-1.,.86),(-.73,1.),(.73,1.),(1.,.86)]:

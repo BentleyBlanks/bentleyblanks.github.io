@@ -10,6 +10,7 @@ archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/
 revision = archive/'ExteriorFinish_20261122'
 output = revision/'Review'
 output.mkdir(exist_ok=True)
+saveOnly = os.environ.get('HANYANG_REVIEW_SAVE_ONLY') == '1'
 assert not bpy.data.filepath or Path(bpy.data.filepath).parent == revision
 poses = {'Side':((0,.37,-.02),(1,0,.04),1.36), 'Receiver':((0,.163,.015),(1,-.09,.20),.328),'Band':((0,.584,.035),(1,-.13,.27),.073),'GuardRaking':((0,.129,-.003),(.78,-.50,-.44),.216),'BandRaking':((0,.584,.035),(1,-.13,.27),.073)}
 sources=[('After','Model_HanYang173R.glb')]
@@ -35,6 +36,8 @@ poses['BandTrim']=((0,.582,.012),(1,-.16,-.13),.059)
 poses['StockTrim']=((0,-.0438,-.035),(1,-.21,-.16),.072)
 poses['BandStrip']=((.010,.615,.028),(1,-.10,.26),.095)
 poses['BandTrimRaking']=poses['BandTrim']
+poses['SightEdges']=((0,.350,.060),(1.,.28,.78),.105)
+poses['CollarEdges']=((0,.245,.052),(1.,.31,.66),.105)
 
 
 def FrameReviewCamera(camera,view):
@@ -46,13 +49,13 @@ def FrameReviewCamera(camera,view):
         right=(Vector((0,1,0))-direction*direction.y).normalized()
         rotation=Matrix((right,direction.cross(right),direction)).transposed().to_quaternion()
     camera.rotation_euler=rotation.to_euler();camera.data.ortho_scale=extent
-if (revision/'ReviewInput.glb').is_file() and not any(output.glob('Before_*.png')):
+if not saveOnly and (revision/'ReviewInput.glb').is_file() and not any(output.glob('Before_*.png')):
     sources.insert(0,('Before','ReviewInput.glb'))
 for label, source in sources:
     for obj in list(bpy.context.scene.objects):
         bpy.data.objects.remove(obj,do_unlink=True)
     bpy.data.orphans_purge(do_recursive=True)
-    bpy.ops.import_scene.gltf(filepath=str(revision/source), merge_vertices=True)
+    bpy.ops.import_scene.gltf(filepath=str(revision/source), merge_vertices=False)
     scene=bpy.context.scene
     with (revision/source).open('rb') as glb:
         header=glb.read(20)
@@ -84,7 +87,7 @@ for label, source in sources:
     originalLights=[(item,item.location.copy(),item.data.energy,item.data.size,item.data.size_y,item.rotation_euler.copy()) for item in scene.objects if item.type=='LIGHT']
     if label=='After':
         camera.name='Review_Side'
-        for view in ('Side','Receiver','Band','ForeWood','UnderWood','Knob','RearSeam','ButtCap','FrontSeam','StockTop','ForeEndFinish','FrontBandSide','RearBandReverse','MidSteel','StockFlank','BandTrim','StockTrim','BandStrip','FrontBandProfile','RearBandProfile'):
+        for view in ('Side','Receiver','Band','ForeWood','UnderWood','Knob','RearSeam','ButtCap','FrontSeam','StockTop','ForeEndFinish','FrontBandSide','RearBandReverse','MidSteel','StockFlank','BandTrim','StockTrim','BandStrip','FrontBandProfile','RearBandProfile','SightEdges','CollarEdges'):
             target=camera if view=='Side' else camera.copy()
             if target!=camera:
                 target.data=camera.data.copy();target.name='Review_'+view;scene.collection.objects.link(target)
@@ -97,6 +100,8 @@ for label, source in sources:
                 shading=area.spaces.active.shading;shading.type='MATERIAL';shading.use_scene_lights=True;shading.use_scene_world=True
         bpy.context.preferences.filepaths.save_version=0
         bpy.ops.file.pack_all();bpy.ops.wm.save_as_mainfile(filepath=str(revision/'Scene_HanYangExterior.blend'))
+        if saveOnly:
+            break
         scene.camera=camera
     firstViews=('FrontBandProfile','RearBandProfile','MidSteel','Receiver','Band','BandRaking','FrontBandSide','Knob','MidSteelRaking','ForeEndFinish','ForeEndSideBox')
     for view in (*firstViews,*(name for name in poses if name not in firstViews)):

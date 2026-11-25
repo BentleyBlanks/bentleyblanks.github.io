@@ -7,20 +7,22 @@ import struct
 from pathlib import Path
 import moderngl
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
-from Script_HanYangBandProfiles import FollowFrontBandOutline, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBandProfiles import SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 from scipy import ndimage
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
 revision = archive / 'ExteriorFinish_20261122'
+outputDirectory = Path(os.environ.get('HANYANG_BAKE_OUTPUT_DIR', str(revision)))
 charts = json.loads((revision/'Data_Charts.json').read_text())
 detailMaps = np.load(revision/'Data_DetailUv.npz', allow_pickle=False)
+bevels = np.load(revision/'Data_InspectionBevels.npz', allow_pickle=False)
 contactFields = np.load(revision/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(revision/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261125R26'
+version = '173R-20261125R27'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling;
@@ -34,34 +36,21 @@ rearTrimProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragm
 stockProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader.replace('#version 330','#version 330\n#define STOCK_CREST_WEAR',1))
 
 
-def StockImpressionTexture():
-    # Trace the two observable contours in the Lu stock photograph. Only the
-    # outline drives the bake; wood fibres and the response to light are separate.
-    outlines = [
-        [(26,20),(55,16),(61,18),(59,26),(43,29),(39,34),(40,41),
-         (45,46),(53,47),(64,44),(69,47),(72,58),(75,87),(73,96),
-         (60,99),(43,101),(40,97),(40,90),(45,89),(50,91),(59,89),
-         (62,85),(60,66),(57,60),(49,57),(34,60),(31,54)],
-        [(78,15),(106,9),(112,10),(116,17),(124,89),(121,92),(94,98),
-         (91,94),(90,84),(95,84),(108,82),(110,80),(107,53),(87,56),(83,51)],
-        [(91,25),(104,22),(106,40),(94,44),(91,40)],
-    ]
-    scale=4
-    mask=Image.new('L',(140*scale,120*scale))
-    pen=ImageDraw.Draw(mask)
-    for index,ring in enumerate(outlines):
-        pen.polygon([(x*scale,y*scale) for x,y in ring], fill=0 if index==2 else 255)
-    inside=np.asarray(mask)>0
-    distance=(ndimage.distance_transform_edt(inside)-ndimage.distance_transform_edt(~inside))/scale
-    field=np.clip(.5+distance/10.,0.,1.)
-    texture=context.texture(mask.size,1,np.rint(field*255).astype('u1').tobytes())
-    texture.filter=(moderngl.LINEAR,moderngl.LINEAR)
-    texture.repeat_x=False
-    texture.repeat_y=False
-    return texture
-
-
-impressionTexture=StockImpressionTexture()
+steelDetails = {
+    'HandledCylinder': 1,
+    'HandleNeck': 2,
+    'HandleRoot': 2,
+    'RearSmallCover': 2,
+    'RearSmallPin': 2,
+    'RearCockingExterior': 3,
+    'RearOuterCover_RoundedSideReturn': 3,
+    'RearTopExternalLever': 3,
+    'Sight_LowContinuousLeaf_NoUnknownNumbers': 4,
+    'Sight_LowCrossPiece': 4,
+    'Sight_ShallowRoundSeat': 4,
+    'Sight_SideRoundHead_1': 4,
+    'Sight_SideRoundHead_-1': 4,
+}
 
 
 def Read(path):
@@ -114,7 +103,7 @@ def NewView(content, target=None):
 
 
 frameRepairs={};ringPresentation={};closedFittings={};filmPayloads=[]
-bandProfiles={}
+bandProfiles={}; modifiedSurfaces={}; beveledParts={}
 bandNode=next(node for node in approvedDoc['nodes'] if node['name']=='FrontBand_ContinuousEnvelopeContact')
 bandSurface=approvedDoc['meshes'][bandNode['mesh']]['primitives'][0]['attributes']['POSITION']
 bandPoints=Array(approvedDoc,approvedBinary,bandSurface).astype(np.float64)
@@ -132,14 +121,12 @@ for node in doc['nodes']:
     if 'mesh' not in node: continue
     name = node['name']; prim = doc['meshes'][node['mesh']]['primitives'][0]; record=partRecords[name]
     detailChart=name+'_UV' in detailMaps
+    bevelChart=name+'_indices' in bevels
     program=stockProgram if name.startswith('MainWood_') else ordinaryProgram
     if name=='FrontBand_ContinuousEnvelopeContact':program=bandProgram
     if name in ('RearBand_ControlledCrown','RearBand_ExternalAttachmentBridge','RearBand_ExternalAttachmentLoop'):
         program=rearTrimProgram
-    if program is stockProgram:
-        impressionTexture.use(6)
-        program['stockImpression']=6
-    if name in charts or detailChart:
+    if name in charts or detailChart or bevelChart:
         update,meshBinary=(approvedDoc,approvedBinary) if name in charts else (doc,binary)
         incoming=update['meshes'][node['mesh']]['primitives'][0]
         incomingNode=next(item for item in update['nodes'] if item.get('name')==name)
@@ -153,6 +140,17 @@ for node in doc['nodes']:
             streams=SmoothStockCrest(name,streams,faceIndices)
             crestNormalCount=int(np.sum(np.linalg.norm(streams['NORMAL']-priorNormals,axis=1)>1e-4))
             streams,faceIndices,endFrameRepairs=RepairTimberFrames(name,streams,faceIndices)
+        if name == 'FrontWood_ContinuousOval':
+            streams,faceIndices=SeatFrontBandTimber(streams,faceIndices,frontBandBounds)
+            modifiedSurfaces[name]=(streams['POSITION'],faceIndices)
+        if name in report['materialMatch']['woodParts']:
+            streams=SeatRearBandTimber(name,streams)
+        if bevelChart:
+            before=faceIndices.size//3
+            streams={key:bevels[name+'_'+key] for key in streams}
+            faceIndices=bevels[name+'_indices']
+            modifiedSurfaces[name]=(streams['POSITION'],faceIndices)
+            beveledParts[name]={'before':before,'after':faceIndices.size//3}
         if detailChart:
             sourceCorners=faceIndices.ravel()
             uv=detailMaps[name+'_UV']
@@ -177,6 +175,7 @@ for node in doc['nodes']:
             newIndex = incoming['indices'] if isIndex else incoming['attributes'][semantic]
             accessor = update['accessors'][newIndex].copy(); data = faceIndices if isIndex else streams[semantic]
             accessor['count']=len(data)
+            if isIndex:accessor['componentType']=5125 if data.dtype.itemsize==4 else 5123
             if 'min' in accessor:accessor['min']=data.min(axis=0).tolist()
             if 'max' in accessor:accessor['max']=data.max(axis=0).tolist()
             accessor.pop('byteOffset',None); accessor['bufferView']=NewView(data.tobytes(),34963 if isIndex else 34962); doc['accessors'][oldIndex]=accessor
@@ -220,6 +219,7 @@ for node in doc['nodes']:
     height=Attribute('POSITION')[:,1];program['heightRange']=(float(height.min()),float(height.max()))
     family=next((index for index,prefixes in [(1,('RearBand_Controlled',)),(7,('FrontBand_Continuous',)),(2,('LongOuterSteel','ReceiverOuter','HY150_VisualFrontSleeve')),(3,('LowerPlateGuard',)),(4,('Handle','RearSmall','RearCocking','RearTopExternal')),(5,('SideWoodButton','MiddleSideDisk','FrontSideBoss'))] if name.startswith(prefixes)),6)
     program['steelFamily']=family
+    program['steelDetail']=steelDetails.get(name, 0)
     program['finishGroup']=1 if name.startswith(('LongOuterSteel_','HY150_VisualFrontSleeve')) else 2 if name=='HandledCylinder' else 3 if name.startswith(('ReceiverOuterCollar','RearOuterCover_')) else 4 if name=='SideWoodButton' else 0
     program['seed']=(node['mesh']*.373)%13.
     for unit,(uniform,tex) in enumerate(zip(('pigmentMap','surfaceMap','detailMap'),maps['Wood' if wood else 'Steel'])):
@@ -249,15 +249,7 @@ for node in doc['nodes']:
         output=io.BytesIO();image.save(output,'WEBP',lossless=True,method=4);content=output.getvalue()
         assert Image.open(io.BytesIO(content)).convert('RGB').tobytes()==image.tobytes()
         filmPayloads.append((not oiledStock,material,name+'_OilFilm',content,hashlib.sha256(image.tobytes()).hexdigest(),coverage))
-    if frontFilm:
-        # The finished pattern is attached to its existing UVs as the covered end bends.
-        shaped=FollowFrontBandOutline({key:Attribute(key) for key in ('POSITION','NORMAL','TANGENT')},frontBandBounds)
-        for key,values in shaped.items():
-            accessor=doc['accessors'][prim['attributes'][key]]
-            blocks[accessor['bufferView']]=values.tobytes()
-            if 'min' in accessor:accessor['min']=values.min(axis=0).tolist()
-            if 'max' in accessor:accessor['max']=values.max(axis=0).tolist()
-    if name in charts or detailChart:
+    if name in charts or detailChart or bevelChart:
         points=Attribute('POSITION'); idx=np.frombuffer(ind,'<u4' if indices['componentType']==5125 else '<u2').reshape(-1,3);tr=points[idx]; surface=np.linalg.norm(np.cross(tr[:,1]-tr[:,0],tr[:,2]-tr[:,0]),axis=1).sum()/2
         record['rebake'].update(pxPerMm=round(float(size*np.sqrt(coverage/surface)/1000),2))
     record['rebake'].update(textureSize=size, tiledUv=False,tileMeters=None,uvCoverage=round(coverage,6))
@@ -283,14 +275,14 @@ doc['bufferViews']=views;doc['buffers'][0]['byteLength']=len(payload); report['t
 report['materialMatch'].update(version=version,geometry='Exterior finish, Blender edge and UV pass',scope='Object-space baked, non-repeating wood and steel; visible exterior only.')
 report['materialMatch']['previousSourceAssets']=report['materialMatch']['sourceAssets']
 report['materialMatch']['sourceAssets']=scanSources
-report['exteriorFinish']={'version':version,'baseline':report['gameSha256'],'newCharts':sorted(set(charts)|{key.removesuffix('_UV') for key in detailMaps.files if key.endswith('_UV')}),'museumObject':'Te Papa 58119','museumImages':[131447,131366,131367,131438,131440],'triangleLimit':80000}
+report['exteriorFinish']={'version':version,'baseline':report['gameSha256'],'newCharts':sorted(set(charts)|set(beveledParts)|{key.removesuffix('_UV') for key in detailMaps.files if key.endswith('_UV')}),'museumObject':'Te Papa 58119','museumImages':[131447,131366,131367,131438,131440],'triangleLimit':80000}
 audit=json.loads((revision/'Data_ExteriorSurface.json').read_text())
 original=archive/'DotsDelivery/HanYang_173R_Runtime_GLB_PBR/Hanyang173R_final.glb'
 assert hashlib.sha256(original.read_bytes()).hexdigest()=='3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c'
 for sourceName,file in [('Dots',original),('R2',revision/'Input_R2.glb')]:
     surfaceDoc,surfaceBinary=Read(file)
     reshaped={name:(points,faces) for name,(points,faces,_) in closedFittings.items()}
-    for name,(points,faces) in (reshaped|bandProfiles).items():
+    for name,(points,faces) in (reshaped|bandProfiles|modifiedSurfaces).items():
         sourceNode=next(node for node in surfaceDoc['nodes'] if node.get('name')==name)
         primitive=surfaceDoc['meshes'][sourceNode['mesh']]['primitives'][0]
         sourcePoints=Array(surfaceDoc,surfaceBinary,primitive['attributes']['POSITION'])
@@ -302,7 +294,8 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R26: unified walnut finish with restrained satin reflection, shaped front band silhouette and seated stock trim.'
+report['rebake']='R27: seated wood under both bands, quieter steel patina, unmarked stock and rounded inspection edges.'
+report['exteriorFinish']['inspectionBevels']=beveledParts
 report['exteriorFinish']['ringPresentation']=ringPresentation
 report['exteriorFinish']['frontTrimPresentation']='Underside silhouette, rigid display pose estimated from the Lu profile photograph.'
 report['exteriorFinish']['closedFittings']={name:{'before':before,'after':faces.size//3} for name,(_,faces,before) in closedFittings.items()}
@@ -314,4 +307,8 @@ report['runtimeLosslessPacking']='Per-image WebP lossless; round-trip RGB equali
 report['exteriorFinish']['contactVisibility']={'parts':sorted(contactFields.files),'channel':'linear ORM red','strength':.85,'sampling':'32 cosine-weighted directions per fixed exterior vertex; inter-part only, short range with distance falloff.'}
 doc['asset']['extras'].update(gameTriangles=report['triangles'],materialMatch=version,rebake=report['rebake'],calibratedBaseColor=True);doc['extensionsRequired']=['EXT_texture_webp']
 header=json.dumps(doc,separators=(',',':')).encode();header+=b' '*((-len(header))%4);out=struct.pack('<4sII',b'glTF',2,28+len(header)+len(payload))+struct.pack('<I4s',len(header),b'JSON')+header+struct.pack('<I4s',len(payload),b'BIN\0')+payload
-report['gameSha256']=hashlib.sha256(out).hexdigest();(revision/'Model_HanYang173R.glb').write_bytes(out);(revision/'Data_GameGeometry.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8');print('READY',report['triangles'],len(out),report['gameSha256'])
+report['gameSha256']=hashlib.sha256(out).hexdigest()
+outputDirectory.mkdir(parents=True,exist_ok=True)
+(outputDirectory/'Model_HanYang173R.glb').write_bytes(out)
+(outputDirectory/'Data_GameGeometry.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
+print('READY',report['triangles'],len(out),report['gameSha256'])
