@@ -12,6 +12,25 @@
     a.edHomeTool { text-decoration: none; }
     .edHomeTag[data-kind="game"] { border-color: #edca8366; color: var(--ed-gold-text); }
     .edHomeTag[data-kind="studio"], .edHomeTag[data-kind="win"] { color: var(--ed-text-3); }
+    .edHomeGroupTitle {
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+    .edHomeGroupTitle::before {
+      --group-icon-size: clamp(22px, 0.7vw + 12px, 28px);
+      content: "";
+      flex: 0 0 var(--group-icon-size);
+      height: var(--group-icon-size);
+      background: url("./Icon_ControlCenterGroups.png?v=20261125") var(--group-icon-position) / 300% 200% no-repeat;
+    }
+    /* 图集按分类顺序排为两行，每行三格。 */
+    .edHomeGroup[data-group="scene"] { --group-icon-position: 0% 0%; }
+    .edHomeGroup[data-group="level"] { --group-icon-position: 50% 0%; }
+    .edHomeGroup[data-group="character"] { --group-icon-position: 100% 0%; }
+    .edHomeGroup[data-group="weapon"] { --group-icon-position: 0% 100%; }
+    .edHomeGroup[data-group="media"] { --group-icon-position: 50% 100%; }
+    .edHomeGroup[data-group="assets"] { --group-icon-position: 100% 100%; }
   </style>
   <!-- 与 SceneEditor.html 同一套：开机先同步读 ../index.html 里那张 import map，键值按 index.html 的位置解析成绝对地址再插进来，
        本页在 AdvancedTools/ 里，不能照抄相对写法；模块版本永远跟游戏一致。 -->
