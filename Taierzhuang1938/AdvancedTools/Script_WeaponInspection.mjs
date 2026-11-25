@@ -169,8 +169,14 @@ function BindViewport() {
     stage.pitch = Math.max(-limit, Math.min(limit, stage.pitch + dy * .009));
     stage.RequestDraw();
   };
-  const Zoom = (factor) => {
+  const Zoom = (factor, offsetX = 0, offsetY = 0) => {
+    const before = stage.span / (stage.zoom * stage.height);
     stage.zoom = Math.max(.38, Math.min(7, stage.zoom * factor));
+    const shift = before - stage.span / (stage.zoom * stage.height);
+    if (shift && (offsetX || offsetY)) {
+      stage.center.addScaledVector(panAxis.setFromMatrixColumn(stage.camera.matrixWorld, 0), offsetX * shift);
+      stage.center.addScaledVector(panAxis.setFromMatrixColumn(stage.camera.matrixWorld, 1), -offsetY * shift);
+    }
     stage.RequestDraw();
   };
   const Pan = (dx, dy) => {
@@ -204,12 +210,72 @@ function BindViewport() {
     stage.Fit();
   });
   let drag = null;
+  const touches = new Map();
+  let pinch = null;
+  let tap = null;
+  let lastTap = null;
+  const Pinch = () => {
+    if (touches.size !== 2) return null;
+    const [a, b] = [...touches.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1) };
+  };
+  const TouchStart = (event) => {
+    canvas.setPointerCapture(event.pointerId);
+    touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    pinch = Pinch();
+    tap = touches.size === 1 ? { time: event.timeStamp, x: event.clientX, y: event.clientY } : null;
+    if (touches.size > 1) lastTap = null;
+  };
+  const TouchMove = (event) => {
+    const point = touches.get(event.pointerId);
+    if (!point) return;
+    const dx = event.clientX - point.x;
+    const dy = event.clientY - point.y;
+    point.x = event.clientX;
+    point.y = event.clientY;
+    if (tap && Math.hypot(point.x - tap.x, point.y - tap.y) >= 10) tap = null;
+    if (touches.size === 1) {
+      if (dx || dy) Rotate(dx, dy);
+    } else if (pinch) {
+      const next = Pinch();
+      const rect = canvas.getBoundingClientRect();
+      Pan(next.x - pinch.x, next.y - pinch.y);
+      Zoom(next.d / pinch.d, next.x - rect.left - rect.width / 2, next.y - rect.top - rect.height / 2);
+      pinch = next;
+    }
+  };
+  const TouchEnd = (event) => {
+    if (!touches.delete(event.pointerId)) return;
+    pinch = Pinch();
+    if (event.type !== "pointerup" || !tap || event.timeStamp - tap.time >= 250) {
+      tap = null;
+      return;
+    }
+    if (lastTap && tap.time - lastTap.time < 300 && Math.hypot(tap.x - lastTap.x, tap.y - lastTap.y) < 10) {
+      lastTap = null;
+      stage.Fit();
+    } else {
+      lastTap = tap;
+    }
+    tap = null;
+  };
   canvas.addEventListener("pointerdown", (event) => {
-    if (!stage.model || !event.isPrimary || (event.button !== 0 && event.button !== 2)) return;
+    if (!stage.model) return;
+    if (event.pointerType === "touch") {
+      TouchStart(event);
+      return;
+    }
+    if (!event.isPrimary || (event.button !== 0 && event.button !== 2)) return;
     canvas.setPointerCapture(event.pointerId);
     drag = { id: event.pointerId, x: event.clientX, y: event.clientY, pan: event.button === 2 || event.shiftKey };
   });
+  canvas.addEventListener("pointerup", TouchEnd);
+  canvas.addEventListener("pointercancel", TouchEnd);
   canvas.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch") {
+      TouchMove(event);
+      return;
+    }
     if (!drag || event.pointerId !== drag.id) return;
     const dx = event.clientX - drag.x;
     const dy = event.clientY - drag.y;
@@ -217,7 +283,10 @@ function BindViewport() {
     drag.x = event.clientX;
     drag.y = event.clientY;
   });
-  canvas.addEventListener("lostpointercapture", () => { drag = null; });
+  canvas.addEventListener("lostpointercapture", (event) => {
+    if (event.pointerType === "touch") TouchEnd(event);
+    else drag = null;
+  });
   canvas.addEventListener("contextmenu", (event) => { if (stage.model) event.preventDefault(); });
   canvas.addEventListener("wheel", (event) => {
     if (!stage.model) return;

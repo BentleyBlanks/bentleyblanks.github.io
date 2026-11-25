@@ -363,6 +363,64 @@ try {
     await canvas.press("Home");
     const [, , resetZoom, ...resetCenter] = await CameraState();
     Check("Home 适配复位倍率和中心", resetZoom === 1 && resetCenter.every((value, index) => Math.abs(value - beforePan[index]) < .001));
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+    const Touch = (type, points) => cdp.send("Input.dispatchTouchEvent", {
+      type, touchPoints: points.map(([x, y], id) => ({ x, y, id })),
+    });
+    const Frames = () => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+    const cx = rect.x + rect.width / 2;
+    const cy = rect.y + rect.height / 2;
+    const [touchYaw] = await CameraState();
+    await Touch("touchStart", [[cx, cy]]);
+    for (let i = 1; i <= 4; i++) await Touch("touchMove", [[cx + i * 15, cy + i * 5]]);
+    await Touch("touchEnd", []);
+    await Frames();
+    Check("单指触摸拖动旋转", Math.abs((await CameraState())[0] - touchYaw) > .1);
+
+    const midX = cx + 120;
+    const probe = () => page.evaluate(([x, y, width, height]) => {
+      const stage = window.WeaponInspection.scene;
+      const e = stage.camera.matrixWorld.elements;
+      const mpp = stage.span / (stage.zoom * stage.height);
+      return { zoom: stage.zoom, probe: [0, 1, 2].map(i => stage.center.getComponent(i) + e[i] * x * mpp - e[4 + i] * y * mpp), width, height };
+    }, [120, 0, rect.width, rect.height]);
+    const Screen = (point) => page.evaluate(([px, py, pz]) => {
+      const stage = window.WeaponInspection.scene;
+      stage.camera.updateMatrixWorld();
+      const v = stage.center.clone().set(px, py, pz).project(stage.camera);
+      return [v.x, v.y];
+    }, point);
+    const { zoom: zoomBefore, probe: pinchPoint } = await probe();
+    await Touch("touchStart", [[midX - 40, cy], [midX + 40, cy]]);
+    for (let i = 1; i <= 8; i++) await Touch("touchMove", [[midX - 40 - i * 10, cy], [midX + 40 + i * 10, cy]]);
+    await Touch("touchEnd", []);
+    await Frames();
+    const [zoomAfter] = [(await CameraState())[2]];
+    const [ndcX, ndcY] = await Screen(pinchPoint);
+    const screenX = rect.x + (ndcX + 1) / 2 * rect.width;
+    const screenY = rect.y + (1 - ndcY) / 2 * rect.height;
+    Check("双指捏合张开放大约三倍，捏合中点下的模型位置不动",
+      zoomAfter / zoomBefore > 2.2 && Math.hypot(screenX - midX, screenY - cy) < 2,
+      JSON.stringify({ zoomBefore, zoomAfter, screenX, screenY, midX, cy }));
+
+    const centerBeforeTouchPan = await page.evaluate(() => window.WeaponInspection.scene.center.toArray());
+    await Touch("touchStart", [[cx - 40, cy], [cx + 40, cy]]);
+    for (let i = 1; i <= 4; i++) await Touch("touchMove", [[cx - 40 + i * 15, cy + i * 8], [cx + 40 + i * 15, cy + i * 8]]);
+    await Touch("touchEnd", []);
+    await Frames();
+    Check("双指同向拖动平移检视中心", await page.evaluate((before) => window.WeaponInspection.scene.center.toArray()
+      .some((value, index) => Math.abs(value - before[index]) > .001), centerBeforeTouchPan));
+
+    await Touch("touchStart", [[cx, cy]]);
+    await Touch("touchEnd", []);
+    await Touch("touchStart", [[cx + 2, cy]]);
+    await Touch("touchEnd", []);
+    await Frames();
+    const [, , tapZoom, ...tapCenter] = await CameraState();
+    Check("双击适配复位倍率和中心", tapZoom === 1 && tapCenter.every((value, index) => Math.abs(value - beforePan[index]) < .001));
+    await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
+    await cdp.detach();
     await page.locator("#gridToggle").click();
     await page.locator("#mountToggle").click();
     await page.waitForFunction(() => !document.querySelector("#muzzleLabel").hidden && !document.querySelector("#gripLabel").hidden);
