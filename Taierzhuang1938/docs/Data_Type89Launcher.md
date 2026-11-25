@@ -12,10 +12,16 @@
 | 小郡驻屯地、函馆驻屯地与哈巴罗夫斯克展品照片 | 补看日方和俄方展示的同型物件，核对收窄支柱、筒尾外轮廓和弧形驻钣。 [小郡](https://ki43.on.coocan.jp/injapan/heiki9/ogori/ogori.html) [函馆](https://ki43.on.coocan.jp/injapan/heiki/hakodate/hakodate.html) [哈巴罗夫斯克](https://ki43.on.coocan.jp/oversea/khaba/khaba.html) |
 | 维基共享资源的两张公开影印照 | 核对驻钣在更接近正面的投影以及筒身可见的细线。 [静物影印](https://commons.wikimedia.org/wiki/File:Japanese_Type_89_grenade_discharger.gif) [人物影印](https://commons.wikimedia.org/wiki/File:Japanese50mmGrenadeMortar.jpg) |
 
-筒身至尾箍约占整体长度的 42%，模型采用同一比例关系。筒口浅凹、支柱槽纹、侧面滚花、尾段环纹和鞍形驻钣均为静态外观。发蓝钢底色、刮擦与浅氧化按游戏时段重建。公开图证覆盖的是同型实物，滕县现场的具体批次和表面状态仍待考。
+筒身至尾箍约占整体长度的 42%，模型采用同一比例关系。筒口浅凹、支柱槽纹、侧面滚花、尾段环纹和鞍形驻钣均为静态外观。公开图证覆盖的是同型实物，滕县现场的具体批次和表面状态仍待考。
+
+## 金属表面修订
+
+- 美国水手博物馆馆藏的第 3、4、6、7 张近照提供滚花、支柱擦痕、驻钣铸造纹和筒身点蚀依据。以整体照采样筒身相对亮度和冷暖变化，滤去圆柱反光的宽亮带后保留局部氧化位置。冲压号 `44023` 参考第 6、7 张照片。 [馆藏](https://catalogs.marinersmuseum.org/object/CL2830) [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- BlenderMCP 重排 13 个 UV 区域。筒身、箍圈、旋钮、窄槽、尾套和驻钣分别控制露钢、残留发蓝层、腐蚀与抛光。以粗糙度和金属度区分镜面反射和哑光氧化，浅点蚀和字戳使用切线法线，沿用一套材质。
+- 对照在枪械检查台固定机位和照明拍摄，新旧材质另在近似馆藏的双条灯下同场比较。照片曝光、灯位和未拍到的表面仍有推定空间。检查范围包括筒口、筒身、筒尾箍、旋钮、驻钣和背面。
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
-- OpenAI Images API 的 `gpt-image-2` 接收钢材材质提示词。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 1024² 底色、512² 切线法线与 512² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。源工程、GLB、参考图原件和近景取证位于 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/`。
+- OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。修订版工程、GLB、照片裁样和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV2/`。参考图原件在同级 `ReferencePhotos/`。

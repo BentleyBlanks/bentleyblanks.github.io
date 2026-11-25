@@ -2,6 +2,7 @@
 
 from math import cos, hypot, pi, sin
 from pathlib import Path
+import json
 
 import bmesh
 import bpy
@@ -24,8 +25,7 @@ MOUNTS = {
 MATERIAL = "type89LauncherSteel"
 BLENDER_TO_GAME = Matrix.Rotation(-pi / 2, 4, "X")
 
-MACHINED, COLLAR, CAST, RIBBED, RECESSED, WORN, PAINT, OXIDE = range(8)
-CHANNEL = 8
+ATLAS = json.loads(Path(__file__).with_name("Data_Type89LauncherSteelAtlas.json").read_text(encoding="utf-8"))
 
 
 def NativePoint(point):
@@ -34,10 +34,10 @@ def NativePoint(point):
 
 
 def AtlasUv(tile, u, v):
-    if tile in (RECESSED, CHANNEL):
-        v = .48 + v * .52 if tile == CHANNEL else v * .44
-        tile = RECESSED
-    return ((tile % 4 + 0.022 + 0.956 * u) / 4, (tile // 4 + 0.018 + 0.964 * v) / 2)
+    x, y, width, height = ATLAS["regions"][tile]
+    size, padding = ATLAS["size"], ATLAS["padding"]
+    return ((x + padding + u * (width - 2 * padding)) / size,
+            (size - y - height + padding + v * (height - 2 * padding)) / size)
 
 
 def MeshObject(collection, name, vertices, faces, uvFaces, smooth=None):
@@ -59,7 +59,7 @@ def MeshObject(collection, name, vertices, faces, uvFaces, smooth=None):
     return obj
 
 
-def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile=MACHINED,
+def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel",
             bandTiles=None, paintBand=None, toothed=False):
     """Closed visual profile. The opening on the tube ends at a recessed dark face."""
     angles = [i * 2 * pi / sides for i in range(sides)]
@@ -85,7 +85,7 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile=MACHINED
             stopAngle = angles[j] if j else 2 * pi
             band = (bandTiles or {}).get(ring, tile)
             if ring == paintBand and abs((angle + stopAngle) / 2 - pi / 2) < 0.032:
-                band = PAINT
+                band = "Stripe"
             u0, u1 = angle / (2 * pi), stopAngle / (2 * pi)
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
@@ -112,19 +112,19 @@ def Stem(collection):
         v0, v1 = ((sections[i][0] - sections[0][0]) / (sections[-1][0] - sections[0][0]) for i in (ring, ring + 1))
         for i in range(count):
             j = (i + 1) % count
-            tile = CHANNEL if i == 3 else RECESSED if i in (2, 4) else WORN if i in (1, 5) else MACHINED
+            tile = "Channel" if i == 3 else "Recess" if i in (2, 4) else "Edge" if i in (1, 5) else "Stem"
             u0, u1 = i / count, (i + 1) / count
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(tile, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
             smooth.append(i >= 7)
     for ring in (0, len(sections) - 1):
         faces.append(tuple(ring * count + i for i in range(count)))
-        uvFaces.append([AtlasUv(COLLAR, x / .052 + .5, y / .052 + .5) for x, y in outline])
+        uvFaces.append([AtlasUv("Collar", x / .052 + .5, y / .052 + .5) for x, y in outline])
         smooth.append(False)
     return MeshObject(collection, "FlutedSteelStem", vertices, faces, uvFaces, smooth)
 
 
-def FlatPart(collection, name, outline, x0, x1, tile=CAST, bevel=.0017):
+def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017):
     """Rounded, flat silhouette plate. Outline vertices are (height, along)."""
     count = len(outline)
     vertices = [(x, y, along) for x in (x0, x1) for y, along in outline]
@@ -142,7 +142,7 @@ def FlatPart(collection, name, outline, x0, x1, tile=CAST, bevel=.0017):
     return obj
 
 
-def OvalLoop(collection, name, center, height, length, wire, tile=WORN):
+def OvalLoop(collection, name, center, height, length, wire, tile="Edge"):
     cx, cy, along = center
     sides, cross = 28, 8
     vertices = []
@@ -186,7 +186,7 @@ def Saddle(collection):
     vertices = [(x, y, along - correction) for x, y, along in vertices]
     faces, uvFaces = [], []
     for ring in range(len(rings) - 1):
-        tile = CAST if ring < 3 else WORN if ring < 6 else OXIDE
+        tile = "Saddle" if ring < 3 else "Edge" if ring < 6 else "SaddleBack"
         for i in range(sides):
             j = (i + 1) % sides
             face = (ring * sides + i, ring * sides + j, (ring + 1) * sides + j, (ring + 1) * sides + i)
@@ -195,7 +195,7 @@ def Saddle(collection):
                 uvFaces.append([AtlasUv(tile, (i + u) / sides, (ring - 3 + v) / 3) for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))])
             else:
                 uvFaces.append([AtlasUv(tile, vertices[index][0] / .32 + .5, vertices[index][1] / .149 + .5) for index in face])
-    for ring, tile in ((0, CAST), (len(rings) - 1, OXIDE)):
+    for ring, tile in ((0, "Saddle"), (len(rings) - 1, "SaddleBack")):
         face = tuple(ring * sides + i for i in range(sides))
         faces.append(face)
         uvFaces.append([AtlasUv(tile, vertices[i][0] / .32 + .5, vertices[i][1] / .149 + .5) for i in face])
@@ -209,27 +209,27 @@ def BuildExterior():
     Revolve(collection, "TubeAndRecess", [(.027, .040), (.003, .0395), (0, .041), (0, .0445),
         (.002, .046), (.007, .046), (.013, .0448), (.025, .0447), (.354, .0447), (.372, .0453),
         (.377, .048), (.381, .051), (.385, .051), (.387, .050), (.391, .052), (.405, .052),
-        (.411, .049), (.414, .045)], sides=56, tile=COLLAR,
-        bandTiles={0: RECESSED, 1: RECESSED, 2: WORN, 3: WORN, 5: MACHINED, 6: MACHINED,
-                   7: MACHINED, 8: MACHINED, 9: WORN, 12: RECESSED}, paintBand=7)
+        (.411, .049), (.414, .045)], sides=56, tile="Collar",
+        bandTiles={0: "Recess", 1: "Recess", 2: "Edge", 3: "Edge", 5: "Barrel", 6: "Barrel",
+                   7: "Barrel", 8: "Barrel", 9: "Edge", 12: "Recess"}, paintBand=7)
     Revolve(collection, "CollarShoulder", [(.398, .044), (.412, .044), (.425, .0355),
-        (.441, .030), (.451, .0257), (.454, .024)], sides=40, tile=COLLAR)
+        (.441, .030), (.451, .0257), (.454, .024)], sides=40, tile="Collar")
     Stem(collection)
 
     Revolve(collection, "ScallopedThumbWheel", [(.416, .023), (.419, .024), (.429, .024), (.431, .022)],
-        sides=48, center=(.039, .017), tile=WORN, toothed=True)
+        sides=48, center=(.039, .017), tile="Edge", toothed=True)
     Revolve(collection, "KnurledSideGrip", [(.427, .009), (.451, .009), (.455, .0165),
         (.461, .018), (.503, .018), (.508, .016), (.510, .009), (.520, .009)],
-        sides=32, center=(.046, .019), tile=RIBBED, bandTiles={0: COLLAR, 1: COLLAR, 5: COLLAR, 6: COLLAR})
+        sides=32, center=(.046, .019), tile="Knurl", bandTiles={0: "Collar", 1: "Collar", 5: "Collar", 6: "Collar"})
     OvalLoop(collection, "SmallSideEye", (.046, .019, .529), .008, .014, .0023)
     FlatPart(collection, "SideBracket", [(-.013, .418), (.004, .413), (.032, .417),
-        (.039, .433), (.020, .442), (-.010, .446), (-.022, .436)], .012, .043, COLLAR)
+        (.039, .433), (.020, .442), (-.010, .446), (-.022, .436)], .012, .043, "Collar")
 
     FlatPart(collection, "CurvedRearTab", [(.017, .756), (.018, .721), (.025, .702), (.041, .683),
         (.056, .676), (.065, .680), (.066, .691), (.058, .697), (.052, .691), (.046, .694),
         (.037, .708), (.034, .727), (.040, .752), (.030, .761)], -.010, .011)
     FlatPart(collection, "RearTabShoulder", [(.016, .711), (.031, .728), (.040, .751),
-        (.034, .763), (.008, .766), (.003, .737)], -.020, .019, COLLAR)
+        (.034, .763), (.008, .766), (.003, .737)], -.020, .019, "Collar")
     OvalLoop(collection, "RearTabEye", (0, .062, .684), .013, .010, .0029)
 
     profile = [(.734, .022), (.746, .026), (.753, .027), (.766, .0235)]
@@ -237,9 +237,9 @@ def BuildExterior():
         start = .768 + i * .0083
         profile.extend([(start, .024), (start + .002, .0265), (start + .0048, .0264), (start + .0064, .0232)])
     profile += [(.894, .024), (.901, .0245), (.905, .021)]
-    Revolve(collection, "RibbedLowerSleeve", profile, sides=24, tile=COLLAR, bandTiles={1: OXIDE, 2: OXIDE})
+    Revolve(collection, "RibbedLowerSleeve", profile, sides=24, tile="Sleeve")
     Revolve(collection, "BaseNeck", [(.878, .018), (.902, .020), (.910, .024), (.918, .033), (.934, .038)],
-        sides=32, tile=CAST)
+        sides=32, tile="Neck")
     Saddle(collection)
 
     root = bpy.data.objects.new("Type89Launcher", None)

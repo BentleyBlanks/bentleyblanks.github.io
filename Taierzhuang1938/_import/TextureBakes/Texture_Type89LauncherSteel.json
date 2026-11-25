@@ -5,7 +5,7 @@
   "preset": null,
   "source": {
     "path": "_import/Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp",
-    "sha256": "37bca6a281c16e403c59f8478ecac2cc2e574d57e478bcf3f0cef0c5dbffd80a"
+    "sha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8"
   },
   "heightSource": null,
   "params": {
@@ -17,47 +17,51 @@
     {
       "channel": "Base",
       "file": "Texture_Type89LauncherSteelBase.webp",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 96758,
-      "sha256": "04168cde888b5df741de4ea31555730bc61b05eb7b3c40f224d71b7f919cace0"
+      "width": 2048,
+      "height": 2048,
+      "bytes": 319074,
+      "sha256": "7d7d3cc6fab11c00fc6d9ca474a646970ac7832f0d9178fb4de005219d46e7ef"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
-      "width": 512,
-      "height": 512,
-      "bytes": 30188,
-      "sha256": "5c5155eefc170937a0b271fe56854df472f0689ad68a4a4619da4b11212bf213"
+      "width": 2048,
+      "height": 2048,
+      "bytes": 461046,
+      "sha256": "ad97a4188520cb73212fb118aa99732def89b1001d542274eb71df73d1a214e6"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
-      "width": 512,
-      "height": 512,
-      "bytes": 14208,
-      "sha256": "6fedbeb73c2476203bfbbcf351aa4683fc294f435d69a7ba84f6b91649cef9d7"
+      "width": 1024,
+      "height": 1024,
+      "bytes": 43190,
+      "sha256": "e711e499cc0f4e813b686dda33c8b5c65502647f0f099d91713478f571375120"
     }
   ],
-  "totalBytes": 141154,
+  "totalBytes": 823310,
   "metrics": {
     "meanSrgb": [
-      0.3157,
-      0.3185,
-      0.2996
+      0.4173,
+      0.407,
+      0.3781
     ],
-    "luma": 0.3113,
-    "lumaStd": 0.1406,
-    "sat": 0.0594,
+    "luma": 0.4008,
+    "lumaStd": 0.0993,
+    "sat": 0.094,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.3447,
-    "seam": 0.1458,
-    "interior": 0.1461,
-    "seamRatio": 0.998,
-    "border": 0.782,
-    "swing": 0.2509,
+    "lowFreq": 0.1174,
+    "seam": 0.1158,
+    "interior": 0.0209,
+    "seamRatio": 5.528,
+    "border": 0.903,
+    "swing": 0.1163,
     "texelsPerMeter": null
   },
-  "gateProblems": []
+  "gateProblems": [],
+  "reference": {
+    "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
+    "sha256": "7dfdf73ad10836494099ee738b532053b10fb9fb9af4f4655b70d9beacf7e299"
+  }
 }
