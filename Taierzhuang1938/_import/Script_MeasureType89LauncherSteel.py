@@ -183,6 +183,59 @@ def TabFinish(folder, number):
     return field
 
 
+def EyeFinish(folder):
+    # V runs around the loop from its outer tip. Photo 5 shows the wire nearly
+    # edge-on, giving an unsigned distance from the tip along the visible bar.
+    # The oblique reverse view in photo 2 also distinguishes the two arcs.
+    traces = {
+        "front": (5, [[0, 517, 821], [.065, 463, 824], [.115, 418, 825], [.17, 375, 823],
+                      [.226, 335, 820], [.27, 289, 816], [.326, 248, 815], [.38, 214, 813]]),
+        "reverse": (2, [[.655, 940, 181], [.70, 971, 165], [.75, 1001, 148], [.80, 1032, 143],
+                        [.85, 1052, 161], [.90, 1064, 184], [.95, 1068, 212], [0, 1069, 238],
+                        [.04, 1067, 269], [.10, 1048, 288], [.16, 1017, 291], [.22, 981, 283],
+                        [.28, 946, 269], [.345, 915, 252]]),
+    }
+    result = {}
+    for side, (number, trace) in traces.items():
+        image, source = Photo(folder, number)
+        xy = np.asarray(trace)[:, 1:]
+        tangent = np.gradient(xy, axis=0)
+        across = tangent[:, ::-1] * [-1, 1] / np.linalg.norm(tangent, axis=1)[:, None]
+        offsets = np.linspace(-12, 12, 5)
+        samples = np.array([[Sample(image, *(position + axis * offset), radius=4) for offset in offsets]
+                            for position, axis in zip(xy, across)])
+        lightness = samples @ LUMA
+        tone = np.median(lightness, axis=1)
+        warmth = np.median((samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25), axis=1)
+        lo, hi = np.percentile(tone, [15, 85])
+        rubbed = np.clip((tone - lo) / (hi - lo), 0, 1)
+        rubbed *= np.clip((.53 - warmth) / .30, .15, 1)
+        source["trace"] = trace
+        result[side] = {"source": source, "v": [point[0] for point in trace],
+                        "sampleLuminance": np.rint(tone).astype(int).tolist(),
+                        "sampleWarmth": np.round(warmth.astype(np.float64), 3).tolist(),
+                        "rubbedCoverage": np.rint(100 * rubbed).astype(int).tolist()}
+    return result
+
+
+def WheelFinish(folder):
+    image, source = Photo(folder, 3)
+    # Average several teeth at each cross-rim station. Reflected light changes
+    # with each facet, while the warm oxide is concentrated away from the lips.
+    columns = list(range(267, 324, 4))
+    top, bottom = 272, 612
+    warmth = []
+    for x in columns:
+        pixels = image[top:bottom, x:x+3]
+        lightness = pixels @ LUMA
+        warmth.append(np.median((pixels[..., 0] - pixels[..., 2]) / np.maximum(lightness, 25)))
+    rubbed = np.clip((.49 - np.array(warmth)) / .17, 0, 1)
+    source.update({"columns": columns, "sampleY": [top, bottom]})
+    return {"source": source, "v": np.linspace(.06, .94, len(columns)).round(4).tolist(),
+            "sampleWarmth": np.round(np.asarray(warmth, dtype=np.float64), 3).tolist(),
+            "rubbedCoverage": np.rint(100 * rubbed).astype(int).tolist()}
+
+
 def KnurlFrequency(folder):
     image, source = Photo(folder, 3)
     x0, y0, x1, y1 = bounds = [665, 338, 883, 513]
@@ -210,6 +263,8 @@ def Main():
     record["closeups"] = {"Barrel": BarrelFinish(args.photos), "Stem": StemFinish(args.photos),
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
+    record["ringFinish"] = EyeFinish(args.photos)
+    record["wheelFinish"] = WheelFinish(args.photos)
     record["knurl"] = KnurlFrequency(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
     encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",

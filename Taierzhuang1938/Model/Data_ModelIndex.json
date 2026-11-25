@@ -416,11 +416,11 @@
    "name": "Type89Launcher",
    "category": "weapon",
    "file": "Model_Type89Launcher.tzm.json",
-   "triangles": 9700,
+   "triangles": 9924,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 209751,
+   "bytes": 213551,
    "materials": [
     "type89LauncherSteel"
    ],
@@ -444,7 +444,7 @@
      0.185
     ]
    },
-   "sourceTriangles": 9700,
+   "sourceTriangles": 9924,
    "targetTriangles": 10000,
    "triangleLimit": 10000
   },

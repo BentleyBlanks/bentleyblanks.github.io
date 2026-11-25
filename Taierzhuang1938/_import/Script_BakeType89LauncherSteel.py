@@ -36,7 +36,8 @@ FINISHES = {
     "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
     "TabBack": (2, (169, 163, 153), (80, 74, 66), .47, (.348, .65), (.96, .43), .71),
-    "RearEye": (2, (151, 141, 129), (66, 56, 45), .46, (.36, .67), (.95, .42), .56),
+    "RearEye": (2, (162, 150, 136), (67, 53, 43), .52, (.40, .71), (.95, .44), .67),
+    "Wheel": (2, (151, 136, 120), (56, 37, 28), .66, (.45, .76), (.95, .38), .77),
 }
 
 # Finish, coverage channel, roughness, metallic, blend strength and relief attenuation.
@@ -163,6 +164,19 @@ def SampleTile(sample, width, height, index):
     return np.asarray(sample.resize((width, height), Image.Resampling.LANCZOS), dtype=np.float32) / 255
 
 
+def EyeWear(reference, xx, vv):
+    front, reverse = reference["front"], reference["reverse"]
+    tipDistance = np.minimum(vv, 1 - vv)
+    frontArc = np.interp(tipDistance, front["v"], front["rubbedCoverage"]) / 100
+    frontArc *= np.clip((.47 - tipDistance) / .09, 0, 1)
+    reverseArc = np.interp(vv, reverse["v"], reverse["rubbedCoverage"], period=1) / 100
+    reverseArc *= np.clip((abs(vv - .5) - .08) / .075, 0, 1)
+    # Use the observed arc profiles on opposite sides of the round wire.
+    frontWear = frontArc * np.exp(-((xx - .25) / .138) ** 2)
+    reverseWear = reverseArc * np.exp(-((xx - .75) / .148) ** 2)
+    return frontWear, reverseWear
+
+
 def BakeRegion(name, sample, size, index, reference):
     sourceIndex, metalColor, oxideColor, coverage, roughness, metalness, strength = FINISHES[name]
     width, height = size
@@ -236,6 +250,26 @@ def BakeRegion(name, sample, size, index, reference):
         exposed = np.exp(-((xx - .088) / .071) ** 2) + .7 * np.exp(-((xx - .581) / .091) ** 2)
         oxidation -= .16 * exposed
         roughnessDelta -= .066 * exposed
+    if name in ("RearEye", "Wheel"):
+        # Separately retain small pits and bright flecks in the API steel.
+        # Larger scale changes in finish come from the measured photo profiles.
+        speckle = UnitVariation(luminance, .5, 2.4)
+        darkPits = np.clip((-.24 - speckle) * .58, 0, 1)
+        flecks = np.clip((speckle - .47) * .42, 0, 1)
+        oxidation += .15 * darkPits - .12 * flecks
+        tonalDelta += 14 * flecks - 17 * darkPits
+        heightField -= .27 * darkPits
+        roughnessDelta += .077 * darkPits - .03 * flecks
+    if name == "Wheel":
+        rim = reference["wheelFinish"]
+        lip = np.interp(vv, rim["v"], rim["rubbedCoverage"]) / 100
+        # The exposed corners carry narrower reflections than the pitted
+        # recessed facets. The sides of the teeth retain dark oxidation.
+        crown = .5 + .5 * np.cos(2 * np.pi * (12 * xx - .125))
+        oxidation += .19 * (1 - crown) - .14 * lip
+        shoulders = np.maximum(np.exp(-((vv - .20) / .057) ** 2), .86 * np.exp(-((vv - .82) / .059) ** 2))
+        wheelWear = np.maximum(.64 * lip, .94 * shoulders) * (.38 + .62 * crown)
+        wheelWear *= 1 - .43 * darkPits
     if name in ("Barrel", "Collar"):
         brushing = CircumferentialAbrasion(luminance) * np.clip(.92 - oxidation, .08, .9)
         tonalDelta += 4.8 * brushing
@@ -294,23 +328,37 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (finishMetal - metal) * weight
         heightField *= 1 - smoothing * weight
     if name == "RearEye":
-        # The outer face in photograph 5 has a rubbed surface. The reverse
-        # in photograph 2 retains a duller finish, including around the tip.
-        wear = .88 * np.exp(-((xx - .25) / .124) ** 2)
-        rubbed = SrgbToLinear(np.array([203, 193, 177], dtype=np.float32) / 255)
-        linear += (rubbed - linear) * wear[..., None]
-        rough += (.375 - rough) * wear
-        metal += (.79 - metal) * wear
-        heightField *= 1 - .34 * wear
+        front, reverse = EyeWear(reference["ringFinish"], xx, vv)
+        front *= (1 - .31 * darkPits)
+        reverse *= (1 - .31 * darkPits) * .93
+        exposed = SrgbToLinear(np.array([237, 224, 207], dtype=np.float32) / 255)
+        rubbed = SrgbToLinear(np.array([221, 205, 187], dtype=np.float32) / 255)
+        linear += (exposed - linear) * front[..., None] + (rubbed - linear) * reverse[..., None]
+        rough += (.362 - rough) * front + (.434 - rough) * reverse
+        metal += (.79 - metal) * front + (.80 - metal) * reverse
+        heightField *= 1 - .24 * (front + reverse)
+    if name == "Wheel":
+        bareRim = SrgbToLinear(np.array([217, 202, 180], dtype=np.float32) / 255)
+        linear += (bareRim - linear) * wheelWear[..., None]
+        rough += (.29 - rough) * wheelWear
+        metal += (.84 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
-    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye"):
+    surface = np.stack([rough, metal, ao], axis=-1)
+    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
         base = SeamBlend(base)
         heightField = SeamBlend(heightField[..., None])[..., 0]
-        rough, metal, ao = np.moveaxis(SeamBlend(np.stack([rough, metal, ao], axis=-1)), -1, 0)
-    normal = NormalFromHeight(GaussianPeriodic(heightField, .72), .00012, .12, 1.0, "gl") * .5 + .5
+        surface = SeamBlend(surface)
+    if name == "RearEye":
+        # The wire and the length around the loop both wrap at their UV seams.
+        SeamBlend(base.swapaxes(0, 1), pixels=10)
+        SeamBlend(heightField.T[..., None], pixels=10)
+        SeamBlend(surface.swapaxes(0, 1), pixels=10)
+    rough, metal, ao = np.moveaxis(surface, -1, 0)
+    relief = .00018 if name in ("RearEye", "Wheel") else .00012
+    normal = NormalFromHeight(GaussianPeriodic(heightField, .72), relief, .12, 1.0, "gl") * .5 + .5
     orm = np.stack([ao, np.clip(rough, .17, .92), metal], axis=-1)
     return tuple(np.rint(255 * np.clip(arr, 0, 1)).astype(np.uint8) for arr in (base, normal, orm))
 

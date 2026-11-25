@@ -145,23 +145,25 @@ def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017, backTil
     return obj
 
 
-def OvalLoop(collection, name, center, height, length, wire, tile="Edge"):
+def OvalLoop(collection, name, center, height, length, wire, tile="Edge", crossSegments=8):
     cx, cy, along = center
-    sides, cross = 28, 8
+    sides = 28
     vertices = []
     for i in range(sides):
         t = 2 * pi * i / sides
-        for j in range(cross):
-            a = 2 * pi * j / cross
+        for j in range(crossSegments):
+            a = 2 * pi * j / crossSegments
             radial = wire * cos(a)
             vertices.append((cx + wire * sin(a), cy + (height + radial) * cos(t), along + (length + radial) * sin(t)))
     faces, uvFaces = [], []
     for i in range(sides):
         k = (i + 1) % sides
-        for j in range(cross):
-            n = (j + 1) % cross
-            faces.append((i * cross + j, i * cross + n, k * cross + n, k * cross + j))
-            uvFaces.append([AtlasUv(tile, (j + u) / cross, (i + v) / sides) for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))])
+        for j in range(crossSegments):
+            n = (j + 1) % crossSegments
+            faces.append((i * crossSegments + j, i * crossSegments + n,
+                          k * crossSegments + n, k * crossSegments + j))
+            uvFaces.append([AtlasUv(tile, (j + u) / crossSegments, (i + v) / sides)
+                            for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))])
     return MeshObject(collection, name, vertices, faces, uvFaces)
 
 
@@ -220,7 +222,7 @@ def BuildExterior():
     Stem(collection)
 
     Revolve(collection, "ScallopedThumbWheel", [(.416, .023), (.419, .024), (.429, .024), (.431, .022)],
-        sides=48, center=(.039, .017), tile="Edge", toothed=True)
+        sides=48, center=(.039, .017), tile="Wheel", toothed=True)
     Revolve(collection, "KnurledSideGrip", [(.427, .009), (.451, .009), (.455, .0165),
         (.461, .018), (.503, .018), (.508, .016), (.510, .009), (.520, .009)],
         sides=32, center=(.046, .019), tile="Knurl", bandTiles={0: "Collar", 1: "Collar", 5: "Collar", 6: "Collar"})
@@ -233,7 +235,7 @@ def BuildExterior():
         (.037, .708), (.034, .727), (.040, .752), (.030, .761)], -.010, .011, backTile="TabBack")
     FlatPart(collection, "RearTabShoulder", [(.016, .711), (.031, .728), (.040, .751),
         (.034, .763), (.008, .766), (.003, .737)], -.020, .019, "Collar")
-    OvalLoop(collection, "RearTabEye", (0, .062, .684), .013, .010, .0029, tile="RearEye")
+    OvalLoop(collection, "RearTabEye", (0, .062, .684), .013, .010, .0029, tile="RearEye", crossSegments=12)
 
     profile = [(.734, .022), (.746, .026), (.753, .027), (.766, .0235)]
     for i in range(15):
