@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>场景编辑器 · 血战滕县</title>
-  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261124-preview">
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" href="./Style_SceneEditor.css?v=20261126-topbar">
   <!--
     场景编辑器（docs/Data_Scene.md §6）。导入表不在这里另抄一份版本戳：开机先同步读 ../index.html 里那张 import map
     （线上发布的 index.html 也保留它），键值按 index.html 的位置解析成绝对地址再插进来、再起主程序，
@@ -34,18 +35,62 @@
   <script type="module">import("./Script_SceneEditor.mjs").catch((error) => { document.getElementById("seStatus").textContent = "场景编辑器起不来：" + error.message; console.error(error); });</script>
 </head>
 <body>
-  <header class="seBar">
-    <div class="seTitle"><span class="seEyebrow">台儿庄 · 血战滕县</span><h1>场景编辑器</h1></div>
-    <label class="seScenePick">场景 <select id="seScene" aria-label="场景"></select></label>
-    <div id="seInheritNote" class="seInheritNote" hidden></div>
-    <a id="seEncounterLink" class="seEncounterLink" href="./Tool_LevelFlow.html" hidden>遭遇设计 ↗</a>
-    <div class="seActions">
-      <span id="seDirty" class="seDirty">读取中…</span>
-      <button id="seUndo" title="撤销（Ctrl+Z）">撤销</button>
-      <button id="seRedo" title="重做（Ctrl+Y）">重做</button>
-      <button id="seReload" title="丢掉没保存的改动，重新读盘">重新读取</button>
-      <button id="seDownload" title="把当前场景存成文件下载">下载</button>
-      <button id="seSave" class="sePrimary" title="保存（Ctrl+S）">保存</button>
+  <header class="seBar" aria-label="场景编辑器顶部工具栏">
+    <div class="seBarLeft">
+      <div class="seBrand" title="台儿庄 · 血战滕县 · 场景编辑器">
+        <svg class="seBrandIcon" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M10 2.5 17 6.3v7.4L10 17.5 3 13.7V6.3Z"/><path d="M10 10.1 17 6.3M10 10.1 3 6.3M10 10.1v7.4"/></svg>
+        <h1>场景编辑器</h1>
+      </div>
+      <span class="seBarSep" aria-hidden="true"></span>
+      <select id="seScene" class="seSrOnly" aria-label="场景" tabindex="-1"></select>
+      <details id="seScenePicker" class="seScenePicker">
+        <summary id="seSceneSummary" class="sePickerSummary" aria-label="切换场景" title="按分类浏览并切换场景">
+          <span id="seSceneCatBadge" class="seCatBadge" data-cat="level">关卡</span>
+          <strong id="seSceneCurrentTitle" class="sePickerTitle">加载中…</strong>
+          <span id="seSceneStyleTag" class="seStyleTag">白盒</span>
+        </summary>
+        <div id="seSceneMenu" class="seSceneMenu" role="region" aria-label="分类场景选择器">
+          <div class="seSceneMenuHead">
+            <div id="seSceneCats" class="seSceneCats" role="tablist" aria-label="场景分类"></div>
+            <input id="seSceneFilter" class="seSceneFilter" type="search" placeholder="筛选场景名、ID 或说明…" aria-label="筛选场景">
+          </div>
+          <div id="seSceneList" class="seSceneList"></div>
+        </div>
+      </details>
+      <details id="seInheritNote" class="seInheritPicker" hidden>
+        <summary class="seInheritSummary" title="查看与控制继承北段显示及分界线">
+          <svg class="seBranchIcon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="4" cy="3.8" r="1.7"/><circle cx="4" cy="12.2" r="1.7"/><circle cx="12" cy="6.2" r="1.7"/><path d="M4 5.5v5M4 10.4c0-2.3 8-1.4 8-2.5"/></svg>
+          <span id="seInheritLabel">继承北段</span>
+        </summary>
+        <div id="seInheritMenu" class="seInheritMenu" role="region" aria-label="分支继承设置">
+          <div id="seInheritMeta" class="seInheritMeta"></div>
+          <p class="seInheritDesc">继承区域按整图一致外观预览（不置灰），仅通过分界线、HUD 区域提示与点选检视区分只读归属。</p>
+          <div class="seInheritToggles">
+            <label class="seCheck"><input id="seToggleInherited" type="checkbox" checked>显示继承北段</label>
+            <label class="seCheck"><input id="seToggleInheritBounds" type="checkbox" checked>标示继承分界线</label>
+          </div>
+          <div class="seInheritActions">
+            <button id="seFocusSeam" type="button">定位分界线</button>
+            <button id="seJumpBase" type="button" class="sePrimary">编辑基线场景 ↗</button>
+          </div>
+        </div>
+      </details>
+      <a id="seEncounterLink" class="seContextLink" href="./Tool_LevelFlow.html" hidden>遭遇设计 ↗</a>
+    </div>
+    <div class="seBarRight">
+      <span id="seDirty" class="seDirty" role="status">读取中…</span>
+      <span class="seBarSep" aria-hidden="true"></span>
+      <div class="seSegGroup" role="group" aria-label="历史操作">
+        <button id="seUndo" type="button" title="撤销（Ctrl+Z）"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 4 2.5 7l3 3"/><path d="M3 7h6.2a3.8 3.8 0 1 1 0 7.6H7.5"/></svg><span>撤销</span></button>
+        <button id="seRedo" type="button" title="重做（Ctrl+Y）"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 4 3 3-3 3"/><path d="M13 7H6.8a3.8 3.8 0 1 0 0 7.6h1.7"/></svg><span>重做</span></button>
+      </div>
+      <span class="seBarSep" aria-hidden="true"></span>
+      <div class="seFileActions" role="group" aria-label="场景读写">
+        <button id="seReload" type="button" title="丢掉未保存的改动，重新读盘"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8a5 5 0 1 1-1.4-3.5L13 6"/><path d="M13 2.8V6H9.8"/></svg><span>重载</span></button>
+        <button id="seDownload" type="button" title="把当前场景存成 JSON 文件下载"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.8m0 0-2.8-2.8M8 10.3l2.8-2.8M3 13h10"/></svg><span>下载</span></button>
+        <button id="seSave" type="button" class="sePrimary" title="保存（Ctrl+S）"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2.5h8.2L13.5 5v8.5H3Z"/><path d="M5.5 2.5v3.5h5V2.5M5.5 13.5V9.5h5v4"/></svg><span id="seSaveLabel">保存</span></button>
+      </div>
+      <a class="seHomeLink" href="./ControlCenter.html" title="返回高级工具控制中心">控制中心 ↗</a>
     </div>
   </header>
   <div id="seBanner" class="seBanner" role="alert" hidden></div>

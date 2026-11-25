@@ -251,6 +251,55 @@ try {
   await page.locator("#seClosePreview").click();
   Check("退出正式预览释放画面且保留未保存编辑", await page.locator("#sePreviewMount iframe").count() === 0
     && (await E(() => window.SceneEditor.State())).dirty);
+
+  // 8. 顶栏分类场景选择器 + 合并分支无置灰继承预览与分界标示
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=FirstLevelMerged`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.SceneEditor?.State().objects > 0 && window.SceneEditor?.State().inheritedObjects > 1000, null, { timeout: 60000 });
+  await E(() => window.SceneEditor.ready);
+  await Wait(300);
+  const catInfo = await E(() => {
+    const groups = [...document.querySelectorAll("#seScene optgroup")].map((g) => [g.label, g.children.length]);
+    return {
+      groups,
+      catBadge: document.getElementById("seSceneCatBadge")?.textContent,
+      inheritHidden: document.getElementById("seInheritNote")?.hidden,
+      encounterHidden: document.getElementById("seEncounterLink")?.hidden,
+    };
+  });
+  Check("顶栏场景按分类分组（遭遇编辑器 / 关卡场景 / 原画与气氛 / 测试场景）",
+    catInfo.groups.length === 4 && ["遭遇编辑器", "关卡场景", "原画与气氛", "测试场景"].every((l) => catInfo.groups.some(([g]) => g === l))
+    && catInfo.catBadge === "遭遇" && !catInfo.inheritHidden && !catInfo.encounterHidden,
+    JSON.stringify(catInfo));
+  await page.locator("#seSceneSummary").click();
+  await page.locator('#seSceneCats button[data-cat="test"]').click();
+  const testOnlyCount = await page.locator("#seSceneList .seSceneOption").count();
+  Check("分类场景选择器可按「测试场景」筛选", testOnlyCount >= 9, `count=${testOnlyCount}`);
+  await page.keyboard.press("Escape");
+
+  const inhLayers = await E(() => window.SceneEditor.InheritedLayers());
+  Check("合并分支继承北段按多材质原貌分批渲染（不置灰、不降为单一半透明灰盒）",
+    inhLayers.length >= 6 && inhLayers.every((l) => l.color !== 0x8ea0aa && !l.transparent),
+    JSON.stringify(inhLayers.slice(0, 6)));
+  await page.locator("#seInheritNote > summary").click();
+  await page.locator("#seToggleInheritBounds").uncheck();
+  Check("可单独开关继承分界线且不影响北段预览", !(await E(() => window.SceneEditor.State().showInheritBounds))
+    && (await E(() => window.SceneEditor.State().showInherited)));
+  await page.locator("#seToggleInheritBounds").check();
+  await page.locator("#seInheritNote > summary").click();
+  await E(() => {
+    const first = window.SceneEditor.State().inheritedObjects > 0 ? "ParapetWest" : null;
+    if (first) window.SceneEditor.SelectInherited(first);
+  });
+  const inhInsp = await E(() => ({
+    sel: window.SceneEditor.State().inheritedSelected,
+    dirty: window.SceneEditor.State().dirty,
+    card: !!document.querySelector("#seInspector .seInheritedCard"),
+    text: window.SceneEditor.InspectorText(),
+  }));
+  Check("点选继承北段物件显示只读来源卡且不弄脏当前分支",
+    inhInsp.sel === "ParapetWest" && !inhInsp.dirty && inhInsp.card && /FirstLevelEncounter/.test(inhInsp.text),
+    JSON.stringify({ sel: inhInsp.sel, dirty: inhInsp.dirty, card: inhInsp.card }));
+  await Shot("07_MergedInherited");
 } catch (error) {
   Check("跑完没抛错", false, String(error?.stack || error).slice(0, 600));
 } finally {

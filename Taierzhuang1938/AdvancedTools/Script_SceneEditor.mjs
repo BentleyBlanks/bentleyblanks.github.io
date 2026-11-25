@@ -8,7 +8,7 @@
 // 只给开发用，面板文字不走文本表（项目契约 10 的开发者面板例外）。
 
 import * as THREE from "three";
-import { SCENE_ASSETS, SCENE_MATERIALS, SceneInfo } from "../Data_SceneAssets.mjs";
+import { SCENE_ASSETS, SCENE_CATEGORIES, SCENE_LIST, SCENE_MATERIALS, SceneInfo } from "../Data_SceneAssets.mjs";
 import { SCENE_IDS, SceneDir, SceneFileName, DecodeSceneHeights, FlatSceneHeights, IsFlatTerrain, FormatSceneJson, IsSceneCamera, SceneStyle } from "../Script_SceneDoc.mjs";
 import { SceneEditModel, SplitGroup } from "./Script_SceneEditModel.mjs";
 import {
@@ -69,14 +69,23 @@ const StageName = /^\d{2}[–-]\d{2}/;
 
 class SceneEditorApp {
   constructor() {
-    this.sceneId = new URLSearchParams(location.search).get("scene") || SCENE_IDS[0];
+    const params = new URLSearchParams(location.search);
+    this.sceneId = params.get("scene") || SCENE_IDS[0];
     if (!SCENE_IDS.includes(this.sceneId)) this.sceneId = SCENE_IDS[0];
+    this.initialSelect = params.get("select") || null;
     this.style = SceneStyle(this.sceneId);
     this.previewParam = SceneInfo(this.sceneId)?.previewParam;
     this.model = null;
     this.writable = false;
     this.revision = null;
     this.show = { backdrop: true, hidden: false };
+    this.showInherited = true;
+    this.showInheritBounds = true;
+    this.inherited = null;
+    this.inheritedTerrain = null;
+    this.inheritedSelected = null;
+    this.inheritedObjectCount = 0;
+    this.sceneFilterCat = "all";
     this.layers = [];
     this.where = new Map();          // id → { layer, index }
     this.open = new Set();           // 层级里展开的文件夹（路径），记在本机
@@ -84,6 +93,8 @@ class SceneEditorApp {
     this.LoadOpen();
     this.LoadFolds();                // 检视里各节折叠没有，记在本机
     this.terrainLook = "tint";       // 地面现在怎么画：tint 高度色带 + 米格线；layers 正式场景的分层地表
+    this.terrainTokens = {};
+    this.terrainPackPromises = new Map();
     this.drag = null;
     this.keys = new Set();
     this.cam = { pos: new THREE.Vector3(), yaw: 0, pitch: -0.5 };
@@ -126,8 +137,9 @@ class SceneEditorApp {
     this.inheritedGroup = new THREE.Group();
     this.inheritedGroup.name = "SceneEditor_InheritedNorth";
     this.scene.add(this.inheritedGroup);
-    this.showInherited = true;
-    this.inheritedObjectCount = 0;
+    this.inheritedOverlayGroup = new THREE.Group();
+    this.inheritedOverlayGroup.name = "SceneEditor_InheritedBounds";
+    this.scene.add(this.inheritedOverlayGroup);
     this.selectionLines = new THREE.Group();
     this.scene.add(this.selectionLines);
     this.BuildGizmo();
@@ -145,6 +157,7 @@ class SceneEditorApp {
     };
     this.edges = new THREE.EdgesGeometry(this.geometry.box);
     this.edgeMaterial = new THREE.LineBasicMaterial({ color: 0xedca83, depthTest: false, transparent: true, opacity: 0.95 });
+    this.inheritedEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x72cae8, depthTest: false, transparent: true, opacity: 0.95 });
     new ResizeObserver(() => this.Resize()).observe(canvas.parentElement);
     this.Resize();
   }
@@ -215,13 +228,24 @@ class SceneEditorApp {
     this.lookKey = null;
     this.Rebuild();
     await this.SyncInheritedPreview();
-    if (!keepCamera) this.Home();
+    if (!keepCamera) {
+      const targetId = this.initialSelect;
+      this.initialSelect = null;
+      if (targetId && this.model.Find(targetId)) {
+        this.SelectIds([targetId]);
+        this.Frame([targetId]);
+      } else this.Home();
+    }
     this.RenderTree();
     this.RenderInspector();
     this.SyncPreviewControls();
     if (this.previewFrame) this.StartFormalPreview();
     this.UpdateDirty();
-    this.Status(`${doc.title}：${doc.objects.length} 个物件 · ${this.writable ? "本机预览，能直接保存" : this.writeReason}`);
+    const statusParts = [
+      `${doc.title}：${doc.objects.length} 个物件${this.inherited ? `（另含 ${this.inheritedObjectCount} 个只读继承物件）` : ""}`,
+      this.writable ? "本机预览，能直接保存" : this.writeReason,
+    ].filter(Boolean);
+    this.Status(statusParts.join(" · "));
   }
 
   // ------------------------------------------------------------------ 地形与物件
@@ -235,64 +259,243 @@ class SceneEditorApp {
     this.BuildTrenchDressing();
   }
 
+  DisposeGroup(group) {
+    const shared = new Set([this.geometry.box, this.geometry.sphere, this.geometry.cone, this.edges]);
+    group.traverse((child) => {
+      if (child.isInstancedMesh) child.dispose?.();
+      if (child.geometry && !shared.has(child.geometry)) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+        else child.material.dispose();
+      }
+    });
+    group.clear();
+  }
+
   ClearInheritedPreview() {
-    while (this.inheritedGroup.children.length) {
-      const child = this.inheritedGroup.children.pop();
-      if (child.geometry && child.geometry !== this.geometry.box) child.geometry.dispose();
-      if (child.material) child.material.dispose();
-    }
+    this.DisposeGroup(this.inheritedGroup);
+    this.DisposeGroup(this.inheritedOverlayGroup);
+    this.inherited = null;
+    this.inheritedTerrain = null;
+    this.inheritedSelected = null;
     this.inheritedObjectCount = 0;
+  }
+
+  SyncContextLinks() {
+    const link = $("seEncounterLink");
+    if (!link) return;
+    const matched = ENCOUNTER_VARIANTS.find((v) => v.scene === this.sceneId);
+    if (matched) {
+      link.href = `./Tool_LevelFlow.html${matched.id === ENCOUNTER_DEFAULT_VARIANT_ID ? "" : `?variant=${encodeURIComponent(matched.id)}`}`;
+      link.target = "";
+      link.rel = "";
+      link.textContent = "遭遇设计 ↗";
+      link.title = `在遭遇设计编辑器打开：${matched.title}`;
+      link.hidden = false;
+      return;
+    }
+    const info = SceneInfo(this.sceneId);
+    if (info?.runParam) {
+      link.href = `../index.html?${encodeURIComponent(info.runParam)}=1`;
+      link.target = "_blank";
+      link.rel = "noopener";
+      link.textContent = "运行测试场 ↗";
+      link.title = `在新标签页启动测试场（?${info.runParam}=1）`;
+      link.hidden = false;
+      return;
+    }
+    link.hidden = true;
+  }
+
+  SyncInheritedUi() {
+    const note = $("seInheritNote");
+    if (!note) return;
+    if (!this.inherited) {
+      note.hidden = true;
+      note.open = false;
+      return;
+    }
+    const { info, baseDoc, objects, trenchSegments } = this.inherited;
+    const baseInfo = SceneInfo(info.scene);
+    $("seInheritLabel").textContent = `继承 z<${info.maxZ}`;
+    const meta = $("seInheritMeta");
+    meta.textContent = "";
+    meta.append(
+      document.createTextNode(`北段继承自「${baseInfo?.title || baseDoc.title || info.scene}」`),
+      El("small", "", `${info.scene} · z < ${info.maxZ} m · ${objects.length} 物件${trenchSegments.length ? ` · ${trenchSegments.length} 段壕沟` : ""}`),
+    );
+    $("seToggleInherited").checked = this.showInherited;
+    $("seToggleInheritBounds").checked = this.showInheritBounds;
+    note.hidden = false;
+  }
+
+  RebuildInheritedObjects() {
+    if (!this.inherited) return;
+    if (this.inherited.objectGroup) {
+      this.inheritedGroup.remove(this.inherited.objectGroup);
+      this.DisposeGroup(this.inherited.objectGroup);
+      this.inherited.objectGroup = null;
+    }
+    const { baseDoc, objects } = this.inherited;
+    const visible = [];
+    const groups = new Map();
+    for (const obj of objects) {
+      if (obj.layer === "backdrop" && !this.show.backdrop) continue;
+      if (obj.visual === false && !this.show.hidden) continue;
+      visible.push(obj);
+      const key = this.LayerKey(obj);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(obj);
+    }
+    this.inherited.visibleObjects = visible;
+    const objGroup = new THREE.Group();
+    objGroup.name = "SceneEditor_InheritedObjects";
+    const matrix = new THREE.Matrix4(), color = new THREE.Color();
+    for (const [key, list] of groups) {
+      const kind = key.startsWith("bd:") ? key.slice(3) : "box";
+      const geometry = kind === "backdropBlob" || kind === "backdropHill" ? this.geometry.sphere
+        : kind === "backdropTree" || key === "tree" ? this.geometry.cone : this.geometry.box;
+      const mesh = new THREE.InstancedMesh(geometry, this.MakeLayerMaterial(key, baseDoc), list.length);
+      mesh.frustumCulled = false;
+      mesh.name = `SceneEditor_Inherited_${key}`;
+      list.forEach((obj, i) => {
+        mesh.setMatrixAt(i, this.Matrix(obj, matrix, this.inherited));
+        if (key.startsWith("bd:")) {
+          const p = obj.params || {};
+          color.setHex(HexInt(kind === "backdropTree" ? "#5a5446" : p.color, 0x8a8370), THREE.SRGBColorSpace);
+          mesh.setColorAt(i, color);
+        }
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      objGroup.add(mesh);
+    }
+    this.inherited.objectGroup = objGroup;
+    this.inheritedGroup.add(objGroup);
+  }
+
+  BuildInheritedTrenches() {
+    if (!this.inherited) return;
+    if (this.inherited.trenchGroup) {
+      this.inheritedGroup.remove(this.inherited.trenchGroup);
+      this.DisposeGroup(this.inherited.trenchGroup);
+      this.inherited.trenchGroup = null;
+    }
+    const { baseDoc, sampler, bounds, trenchPlan, trenchSegments, objects } = this.inherited;
+    if (!trenchPlan || !trenchSegments.length) return;
+    const group = new THREE.Group();
+    group.name = "SceneEditor_InheritedTrenches";
+    const northSegIds = new Set(trenchSegments.map((s) => s.id));
+    const northPlan = { ...trenchPlan, segments: trenchPlan.segments.filter((s) => northSegIds.has(s.id)) };
+    const keep = objects.filter((o) => o.layer !== "backdrop" && o.solid !== false && o.tag !== "airWall" && o.size)
+      .map((o) => ({ x: o.pos[0], z: o.pos[2], w: o.size[0], d: o.size[2], h: o.size[1], ry: (o.yawDeg || 0) * DEG, solid: true }));
+    const { blocks } = SceneTrenchDressing(northPlan, sampler, keep, bounds);
+    if (blocks.length) {
+      const bySemantic = new Map();
+      for (const b of blocks) { if (!bySemantic.has(b.semantic)) bySemantic.set(b.semantic, []); bySemantic.get(b.semantic).push(b); }
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      for (const [semantic, list] of bySemantic) {
+        const mesh = new THREE.InstancedMesh(this.geometry.box,
+          new THREE.MeshStandardMaterial({ color: this.SemanticColor(semantic, baseDoc), roughness: 0.9, transparent: true, opacity: 0.85 }), list.length);
+        list.forEach((b, i) => { m.compose(new THREE.Vector3(b.x, b.y, b.z), q.setFromAxisAngle(up, b.ry || 0), new THREE.Vector3(b.w, b.h, b.d)); mesh.setMatrixAt(i, m); });
+        mesh.frustumCulled = false;
+        group.add(mesh);
+      }
+    }
+    const Lift = (x, z, up) => new THREE.Vector3(x, (Inside(bounds, x, z) ? sampler(x, z) : 0) + up, z);
+    for (const seg of trenchSegments) {
+      const compiled = northPlan.segments.find((s) => s.id === seg.id);
+      const pts = compiled ? compiled.path.points : seg.points;
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => Lift(x, z, 0.25))),
+        new THREE.LineBasicMaterial({ color: 0xc98a4b, depthTest: false, transparent: true, opacity: 0.6 }),
+      );
+      line.renderOrder = 25;
+      group.add(line);
+    }
+    this.inherited.trenchGroup = group;
+    this.inheritedGroup.add(group);
+  }
+
+  /** 只用分界线与外圈细虚线标示继承范围，不对地图画面置灰或降对比。 */
+  BuildInheritedBoundsOverlay() {
+    this.DisposeGroup(this.inheritedOverlayGroup);
+    if (!this.inherited) return;
+    const { info, bounds, sampler } = this.inherited;
+    const { minX, maxX, minZ } = bounds;
+    const maxZ = info.maxZ;
+    const At = (x, z, up = 0.32) => new THREE.Vector3(x, sampler(x, z) + up, z);
+
+    // 1. z = maxZ 主分界虚线
+    const seamPts = [];
+    for (let x = minX; x <= maxX; x += 4) seamPts.push(At(x, maxZ));
+    if (seamPts.length && seamPts[seamPts.length - 1].x !== maxX) seamPts.push(At(maxX, maxZ));
+    const seamLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(seamPts),
+      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 3.5, gapSize: 2, depthTest: false, transparent: true, opacity: 0.92 }),
+    );
+    seamLine.computeLineDistances();
+    seamLine.renderOrder = 24;
+    this.inheritedOverlayGroup.add(seamLine);
+
+    // 2. 沿分界线每隔 40 m 画向北（-Z）的地面小箭头，一眼看出哪一侧是继承北段
+    const chevronPts = [];
+    for (let x = Math.ceil((minX + 16) / 40) * 40; x <= maxX - 16; x += 40) {
+      const tip = At(x, maxZ - 5.5, 0.36);
+      const left = At(x - 3.2, maxZ - 1.4, 0.36);
+      const right = At(x + 3.2, maxZ - 1.4, 0.36);
+      chevronPts.push(left, tip, right, tip);
+    }
+    if (chevronPts.length) {
+      const chevrons = new THREE.LineSegments(
+        new THREE.BufferGeometry().setFromPoints(chevronPts),
+        new THREE.LineBasicMaterial({ color: 0x76cde8, depthTest: false, transparent: true, opacity: 0.85 }),
+      );
+      chevrons.renderOrder = 24;
+      this.inheritedOverlayGroup.add(chevrons);
+    }
+
+    // 3. 继承区域外围淡细框（西 / 北 / 东三边），远眺全图也能看清继承范围
+    const outerPts = [];
+    for (let z = maxZ; z >= minZ; z -= 16) outerPts.push(At(minX, z, 0.4));
+    outerPts.push(At(minX, minZ, 0.4));
+    for (let x = minX + 16; x <= maxX; x += 16) outerPts.push(At(x, minZ, 0.4));
+    outerPts.push(At(maxX, minZ, 0.4));
+    for (let z = minZ + 16; z <= maxZ; z += 16) outerPts.push(At(maxX, z, 0.4));
+    outerPts.push(At(maxX, maxZ, 0.4));
+    const outerLine = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(outerPts),
+      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 6, gapSize: 5, depthTest: false, transparent: true, opacity: 0.42 }),
+    );
+    outerLine.computeLineDistances();
+    outerLine.renderOrder = 23;
+    this.inheritedOverlayGroup.add(outerLine);
+    this.inheritedOverlayGroup.visible = this.showInheritBounds;
   }
 
   async SyncInheritedPreview() {
     this.ClearInheritedPreview();
-    const encLink = $("seEncounterLink");
-    if (encLink) {
-      const matched = ENCOUNTER_VARIANTS.find((v) => v.scene === this.sceneId);
-      encLink.hidden = !matched;
-      if (matched) {
-        encLink.href = `./Tool_LevelFlow.html${matched.id === ENCOUNTER_DEFAULT_VARIANT_ID ? "" : `?variant=${encodeURIComponent(matched.id)}`}`;
-        encLink.textContent = "遭遇设计 ↗";
-        encLink.title = `在遭遇设计编辑器打开：${matched.title}`;
-      }
-    }
-    const note = $("seInheritNote");
+    this.SyncContextLinks();
     const inherit = this.model?.doc?.inherit;
     if (!inherit) {
-      if (note) note.hidden = true;
+      this.SyncInheritedUi();
       return;
     }
-    if (note) {
-      note.textContent = "";
-      note.append(El("span", "", `🔗 z<${inherit.maxZ} 继承 ${inherit.scene}`));
-      const toggleWrap = El("label", "");
-      const toggle = El("input");
-      toggle.type = "checkbox";
-      toggle.checked = this.showInherited;
-      toggle.addEventListener("change", () => {
-        this.showInherited = toggle.checked;
-        this.inheritedGroup.visible = this.showInherited;
-      });
-      toggleWrap.append(toggle, document.createTextNode("预览北段"));
-      const jumpBase = El("button", "", "编辑基线 ↗");
-      jumpBase.addEventListener("click", () => {
-        if (this.model?.dirty && !confirm("有没保存的改动，换场景就丢掉了，继续？")) return;
-        const nextUrl = new URL(location.href);
-        nextUrl.searchParams.set("scene", inherit.scene);
-        location.assign(nextUrl.href);
-      });
-      note.append(toggleWrap, jumpBase);
-      note.hidden = false;
-    }
     this.inheritedGroup.visible = this.showInherited;
+    this.inheritedOverlayGroup.visible = this.showInheritBounds;
     try {
       const baseUrl = new URL(`../${SceneDir(inherit.scene)}/${SceneFileName(inherit.scene)}`, location.href);
       const res = await fetch(`${baseUrl.href}?t=${Date.now()}`, { cache: "no-store" });
       if (!res.ok) return;
       const baseDoc = await res.json();
-      const hRes = await fetch(`${new URL(baseDoc.terrain.file, baseUrl).href}?t=${Date.now()}`, { cache: "no-store" });
-      if (!hRes.ok) return;
-      const basePre = DecodeSceneHeights(await hRes.arrayBuffer(), baseDoc.terrain);
+      let basePre;
+      if (IsFlatTerrain(baseDoc.terrain)) {
+        basePre = FlatSceneHeights(baseDoc.terrain);
+      } else {
+        const hRes = await fetch(`${new URL(baseDoc.terrain.file, baseUrl).href}?t=${Date.now()}`, { cache: "no-store" });
+        if (!hRes.ok) return;
+        basePre = DecodeSceneHeights(await hRes.arrayBuffer(), baseDoc.terrain);
+      }
       let baseDatum = [];
       if (baseDoc.trenches?.datum?.file) {
         const dRes = await fetch(`${new URL(baseDoc.trenches.datum.file, baseUrl).href}?t=${Date.now()}`, { cache: "no-store" });
@@ -303,11 +506,13 @@ class SceneEditorApp {
       const northPlan = CompileSceneTrenches(baseDoc.trenches, { datum: baseDatum, pre: GridSampler(bt, basePre) });
       const carved = CarveSceneHeights(bt, basePre, northPlan);
       const northSampler = HeightGridSampler({ ...bt, heights: carved });
-      const step = Math.max(1, Math.ceil(Math.sqrt(((bt.cols + 1) * (splitRow + 1)) / (E.terrainMaxVerts * 0.5))));
+      const step = Math.max(1, Math.ceil(Math.sqrt(((bt.cols + 1) * (splitRow + 1)) / E.terrainMaxVerts)));
       const nx = Math.floor(bt.cols / step), nz = Math.floor(splitRow / step);
       const positions = new Float32Array((nx + 1) * (nz + 1) * 3);
       const colors = new Float32Array(positions.length);
-      const tint = baseDoc.look?.heightTint || { lo: -3, hi: 8 };
+      const tint = baseDoc.look?.heightTint || { lo: northSampler.minY, hi: Math.max(northSampler.minY + 0.5, northSampler.maxY) };
+      const flatColor = typeof baseDoc.look?.groundColor === "string" ? new THREE.Color().setHex(HexInt(baseDoc.look.groundColor), THREE.SRGBColorSpace) : null;
+      const paint = BuildGroundPaint(baseDoc.paint, baseDoc.bounds);
       const rgb = [0, 0, 0], col = new THREE.Color();
       let k = 0;
       for (let iz = 0; iz <= nz; iz++) {
@@ -316,9 +521,14 @@ class SceneEditorApp {
           const gx = ix === nx ? bt.cols : ix * step;
           const x = bt.minX + gx * bt.cellM, z = bt.minZ + gz * bt.cellM, y = carved[gz * (bt.cols + 1) + gx];
           positions[k] = x; positions[k + 1] = y; positions[k + 2] = z;
-          BlockoutTintColor(y, tint, rgb);
-          col.setRGB(rgb[0] * 0.78, rgb[1] * 0.85, Math.min(1, rgb[2] * 0.94), THREE.SRGBColorSpace);
-          colors[k] = col.r; colors[k + 1] = col.g; colors[k + 2] = col.b;
+          if (flatColor && !paint) {
+            colors[k] = flatColor.r; colors[k + 1] = flatColor.g; colors[k + 2] = flatColor.b;
+          } else {
+            BlockoutTintColor(y, tint, rgb);
+            if (paint) paint.Blend(x, z, rgb);
+            col.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
+            colors[k] = col.r; colors[k + 1] = col.g; colors[k + 2] = col.b;
+          }
           k += 3;
         }
       }
@@ -340,38 +550,51 @@ class SceneEditorApp {
       ApplyPatches(mat, [MakeWhiteboxGridPatch(E.grid)]);
       const northTerrain = new THREE.Mesh(geo, mat);
       northTerrain.name = "SceneEditor_InheritedTerrain";
+      this.inheritedTerrain = northTerrain;
       this.inheritedGroup.add(northTerrain);
 
-      const northBoxes = (baseDoc.objects || []).filter((o) =>
-        o.pos && o.pos[2] < inherit.maxZ && o.layer !== "backdrop" && o.visual !== false && o.tag !== "airWall" && o.size);
-      this.inheritedObjectCount = northBoxes.length;
-      if (northBoxes.length) {
-        const boxMat = new THREE.MeshStandardMaterial({ color: 0x8ea0aa, roughness: 0.92, metalness: 0, transparent: true, opacity: 0.86 });
-        const inst = new THREE.InstancedMesh(this.geometry.box, boxMat, northBoxes.length);
-        const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
-        northBoxes.forEach((o, i) => {
-          const [x, rawY, z] = o.pos, [w, h, d] = o.size;
-          const baseY = rawY === null ? northSampler(x, z) : rawY;
-          m.compose(new THREE.Vector3(x, baseY + h / 2, z), q.setFromAxisAngle(up, (o.yawDeg || 0) * DEG), new THREE.Vector3(w, h, d));
-          inst.setMatrixAt(i, m);
-        });
-        inst.frustumCulled = false;
-        this.inheritedGroup.add(inst);
-      }
+      const ownIds = new Set(this.model.objects.map((o) => o.id));
+      const excludeIds = new Set(inherit.excludeIds || []);
+      const northObjects = (baseDoc.objects || []).filter((o) =>
+        !ownIds.has(o.id) && !excludeIds.has(o.id) && (!o.pos || o.pos[2] < inherit.maxZ));
+      const ownSegIds = new Set(this.model.trenchSegments.map((s) => s.id));
+      const northTrenchSegments = (baseDoc.trenches?.segments || []).filter((s) =>
+        !ownSegIds.has(s.id) && s.points.every((pt) => pt[1] < inherit.maxZ));
+      const northBackdropAt = baseDoc.backdrop
+        ? BackdropGroundSampler(baseDoc.backdrop, northSampler, baseDoc.backdrop.siteBounds || baseDoc.bounds, inherit.scene)
+        : null;
 
-      const seamPts = [];
-      for (let x = baseDoc.bounds.minX; x <= baseDoc.bounds.maxX; x += 4) {
-        seamPts.push(new THREE.Vector3(x, northSampler(x, inherit.maxZ) + 0.35, inherit.maxZ));
+      this.inheritedObjectCount = northObjects.length;
+      this.inherited = {
+        info: inherit,
+        doc: baseDoc,
+        baseDoc,
+        sampler: northSampler,
+        backdropAt: northBackdropAt,
+        bounds: { minX: bt.minX, maxX: bt.minX + bt.cols * bt.cellM, minZ: bt.minZ, maxZ: inherit.maxZ },
+        objects: northObjects,
+        objectMap: new Map(northObjects.map((o) => [o.id, o])),
+        visibleObjects: [],
+        trenchPlan: northPlan,
+        trenchSegments: northTrenchSegments,
+        objectGroup: null,
+        trenchGroup: null,
+      };
+
+      this.RebuildInheritedObjects();
+      this.BuildInheritedTrenches();
+      this.BuildInheritedBoundsOverlay();
+      this.SyncInheritedUi();
+
+      if (this.style === "formal" || this.model.doc.look?.terrainLayers || baseDoc.look?.terrainLayers) {
+        this.DressTerrainMesh(northTerrain, {
+          doc: baseDoc, sceneId: inherit.scene, sampler: northSampler, trenchPlan: northPlan, tokenKey: "inherited",
+          setName: baseDoc.look?.terrainLayers || this.model.doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers,
+        });
       }
-      const seamLine = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints(seamPts),
-        new THREE.LineDashedMaterial({ color: 0x8fc4d8, dashSize: 3, gapSize: 2, depthTest: false, transparent: true, opacity: 0.9 }),
-      );
-      seamLine.computeLineDistances();
-      seamLine.renderOrder = 24;
-      this.inheritedGroup.add(seamLine);
     } catch (error) {
       console.warn("[SceneEditor] 继承北段预览读取失败", error);
+      this.SyncInheritedUi();
     }
   }
 
@@ -536,6 +759,7 @@ class SceneEditorApp {
 
   SelectTrench(id, point = null) {
     this.cameraSelected = false;
+    this.inheritedSelected = null;
     this.model.SelectTrench(id, point);
     const seg = this.model.FindTrench(id);
     if (seg) { const parts = SplitGroup(TrenchGroup(seg)); for (let i = 1; i <= parts.length; i++) this.open.add(parts.slice(0, i).join("/")); this.SaveOpen(); }
@@ -555,8 +779,8 @@ class SceneEditorApp {
     this.LookAt(center, Math.max(14, size * 1.1), Math.min(-25, this.cam.pitch / DEG));
   }
 
-  SemanticColor(semantic) {
-    const own = this.model.doc.look?.semanticColors?.[semantic];
+  SemanticColor(semantic, doc = this.model.doc) {
+    const own = doc?.look?.semanticColors?.[semantic];
     if (own) return HexInt(own);
     return HexInt(MISSION_LAYOUT.semanticColors?.[semantic]);
   }
@@ -630,29 +854,42 @@ class SceneEditorApp {
     }
   }
 
-  /**
-   * 正式场景的地面同游戏里那份（试玩建的）：MissionPlain 四层贴图（底土 / 车道 / 翻土 / 草茬），权重按涂色、路、沟、陡坡算
-   *（Script_EditorBlockoutLevels.BuildSceneGroundSurface，数在 Data_SceneGroundLayers）。贴图读不到就留高度色带并在状态栏说。
-   */
-  async DressFormalTerrain(mesh) {
-    const token = (this.terrainToken = (this.terrainToken || 0) + 1);
-    try {
-      const [{ MaterialLibrary }, { LoadTerrainLayers, CreateTerrainMaterial }] = await Promise.all([
-        import("../Script_Materials.mjs"), import("../Script_TerrainMaterial.mjs")]);
-      const setName = this.model.doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers;
-      if (this.terrainPack?.setName !== setName) {
+  async EnsureTerrainPack(setName) {
+    if (this.terrainPack?.setName === setName) return this.terrainPack;
+    if (!this.terrainPackPromises.has(setName)) {
+      const load = (async () => {
+        const { LoadTerrainLayers } = await import("../Script_TerrainMaterial.mjs");
         const pack = await LoadTerrainLayers(setName, {
           anisotropy: this.renderer.capabilities.getMaxAnisotropy(), assetBase: new URL("../", location.href),
         });
-        if (token !== this.terrainToken || mesh !== this.terrain) {
-          pack.albedo.dispose(); pack.surface.dispose();
-          return false;
-        }
-        this.terrainPack?.albedo.dispose(); this.terrainPack?.surface.dispose();
         this.terrainPack = pack;
-      }
-      if (token !== this.terrainToken || mesh !== this.terrain) return false;
-      const surface = BuildSceneGroundSurface({ ...this.model.doc, scene: this.sceneId, trenchPlan: this.trenchPlan }, this.sampler);
+        return pack;
+      })().catch((error) => {
+        this.terrainPackPromises.delete(setName);
+        throw error;
+      });
+      this.terrainPackPromises.set(setName, load);
+    }
+    return this.terrainPackPromises.get(setName);
+  }
+
+  /**
+   * 正式场景（或带 look.terrainLayers 的场景）地面同游戏里那份：四层贴图（底土 / 车道 / 翻土 / 草茬），
+   * 权重按涂色、路、沟、陡坡算（Script_EditorBlockoutLevels.BuildSceneGroundSurface）。
+   * 支持给本场景地面和继承北段地面共用同一套贴图包与着色器。
+   */
+  async DressTerrainMesh(mesh, { doc, sceneId, sampler, trenchPlan, tokenKey = "main", setName } = {}) {
+    const token = (this.terrainTokens[tokenKey] = (this.terrainTokens[tokenKey] || 0) + 1);
+    const targetName = setName || doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers;
+    try {
+      const [{ MaterialLibrary }, { CreateTerrainMaterial }, pack] = await Promise.all([
+        import("../Script_Materials.mjs"),
+        import("../Script_TerrainMaterial.mjs"),
+        this.EnsureTerrainPack(targetName),
+      ]);
+      const expected = tokenKey === "main" ? this.terrain : this.inheritedTerrain;
+      if (token !== this.terrainTokens[tokenKey] || mesh !== expected) return false;
+      const surface = BuildSceneGroundSurface({ ...doc, scene: sceneId, trenchPlan }, sampler);
       const position = mesh.geometry.getAttribute("position"), n = position.count;
       const colors = new Float32Array(n * 3), layers = new Float32Array(n * 4), c = [1, 1, 1], w = [0, 0, 1, 1];
       const color = new THREE.Color();
@@ -664,37 +901,48 @@ class SceneEditorApp {
       mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
       this.materialLibrary ||= new MaterialLibrary(this.renderer);
-      const material = CreateTerrainMaterial(this.materialLibrary, this.terrainPack, { quality: "medium", name: "SceneEditor_TerrainLayers" });
+      const material = CreateTerrainMaterial(this.materialLibrary, pack, {
+        quality: "medium", name: tokenKey === "main" ? "SceneEditor_TerrainLayers" : "SceneEditor_InheritedTerrainLayers",
+      });
       mesh.material.dispose();
       mesh.material = material;
-      this.terrainLook = "layers";
+      if (tokenKey === "main") this.terrainLook = "layers";
       return true;
     } catch (error) {
       console.warn("[SceneEditor] 分层地表读不到", error);
-      this.Status("正式场景的分层地表贴图读不到，地面先按高度色带画", true);
+      if (tokenKey === "main") this.Status("正式场景的分层地表贴图读不到，地面先按高度色带画", true);
       return false;
     }
   }
 
+  DressFormalTerrain(mesh) {
+    return this.DressTerrainMesh(mesh, {
+      doc: this.model.doc, sceneId: this.sceneId, sampler: this.sampler, trenchPlan: this.trenchPlan, tokenKey: "main",
+    });
+  }
+
   /** y 为 null 的物件脚落在中心与四角最低的地面上（同 Script_EditorBlockoutLevels 的 GroundedBlock）。 */
-  GroundY(obj) {
+  GroundY(obj, ctx = null) {
+    const sampler = ctx?.sampler || this.sampler;
+    const backdropAt = ctx ? ctx.backdropAt : this.backdropAt;
+    const doc = ctx?.doc || this.model.doc;
     const [x, , z] = obj.pos;
-    if (obj.layer === "backdrop") return this.backdropAt ? this.backdropAt(x, z) : (this.model.doc.backdrop?.ground?.y ?? 0);
-    if (obj.params?.grounding === "conform") return this.sampler(x, z);
+    if (obj.layer === "backdrop") return backdropAt ? backdropAt(x, z) : (doc.backdrop?.ground?.y ?? 0);
+    if (obj.params?.grounding === "conform") return sampler(x, z);
     const [w, , d] = obj.size || [0, 0, 0];
     const ry = (obj.yawDeg || 0) * DEG, c = Math.cos(ry), s = Math.sin(ry), hx = w / 2, hz = d / 2;
-    let lowest = this.sampler(x, z);
-    for (const [lx, lz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]]) lowest = Math.min(lowest, this.sampler(x + lx * c + lz * s, z - lx * s + lz * c));
+    let lowest = sampler(x, z);
+    for (const [lx, lz] of [[-hx, -hz], [hx, -hz], [-hx, hz], [hx, hz]]) lowest = Math.min(lowest, sampler(x + lx * c + lz * s, z - lx * s + lz * c));
     return lowest;
   }
 
-  BaseY(obj) { return obj.pos[1] === null ? this.GroundY(obj) : obj.pos[1]; }
+  BaseY(obj, ctx = null) { return obj.pos[1] === null ? this.GroundY(obj, ctx) : obj.pos[1]; }
 
   /** 物件的包围盒：中心、半尺寸、朝向（弧度）。远景的椭球 / 山 / 树也按盒子算（选它用）。 */
-  Shape(obj) {
+  Shape(obj, ctx = null) {
     const yaw = (obj.yawDeg || 0) * DEG;
     const p = obj.params || {};
-    const base = this.BaseY(obj);
+    const base = this.BaseY(obj, ctx);
     const x = obj.pos[0], z = obj.pos[2];
     switch (SCENE_ASSETS[obj.asset]?.kind) {
       case "box": case "prop": { const [w, h, d] = obj.size; return { kind: "box", c: [x, base + h / 2, z], half: [w / 2, h / 2, d / 2], yaw }; }
@@ -708,8 +956,8 @@ class SceneEditorApp {
     }
   }
 
-  Matrix(obj, out = new THREE.Matrix4()) {
-    const s = this.Shape(obj);
+  Matrix(obj, out = new THREE.Matrix4(), ctx = null) {
+    const s = this.Shape(obj, ctx);
     return out.compose(new THREE.Vector3(...s.c), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), s.yaw),
       new THREE.Vector3(s.half[0] * 2, s.half[1] * 2, s.half[2] * 2));
   }
@@ -731,7 +979,7 @@ class SceneEditorApp {
     return `box:${obj.material}`;
   }
 
-  MakeLayerMaterial(key) {
+  MakeLayerMaterial(key, doc = this.model.doc) {
     if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.22, depthWrite: false });
     if (key.startsWith("bd:")) return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
     if (key === "tree") return new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 });
@@ -742,11 +990,11 @@ class SceneEditorApp {
     }
     // 道具：按弹着表面的语义色画、提亮一档（只是预览，真样子是模型）
     if (key.startsWith("prop:")) {
-      const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_ASSETS[key.slice(5)]?.semantic), roughness: 0.8 });
+      const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_ASSETS[key.slice(5)]?.semantic, doc), roughness: 0.8 });
       material.color.multiplyScalar(1.25);
       return material;
     }
-    const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_MATERIALS[key.slice(4)]?.semantic), roughness: 0.95 });
+    const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_MATERIALS[key.slice(4)]?.semantic, doc), roughness: 0.95 });
     ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
     return material;
   }
@@ -813,6 +1061,16 @@ class SceneEditorApp {
       lines.matrix.copy(this.Matrix(obj));
       lines.renderOrder = 20;
       this.selectionLines.add(lines);
+    }
+    if (!ids.length && this.inheritedSelected && this.inherited) {
+      const obj = this.inherited.objectMap.get(this.inheritedSelected);
+      if (obj) {
+        const lines = new THREE.LineSegments(this.edges, this.inheritedEdgeMaterial);
+        lines.matrixAutoUpdate = false;
+        lines.matrix.copy(this.Matrix(obj, new THREE.Matrix4(), this.inherited));
+        lines.renderOrder = 20;
+        this.selectionLines.add(lines);
+      }
     }
   }
 
@@ -883,12 +1141,12 @@ class SceneEditorApp {
   }
 
   /** 最近的物件（按包围盒；远景只在显示时能选）。 */
-  PickObject(ray) {
+  PickFromList(ray, list, ctx = null) {
     const o = ray.origin, d = ray.direction;
     let best = null, bestT = Infinity;
-    for (const obj of this.model.objects) {
-      if (!this.Visible(obj)) continue;
-      const s = this.Shape(obj);
+    for (const obj of list) {
+      if (!ctx && !this.Visible(obj)) continue;
+      const s = this.Shape(obj, ctx);
       const c = Math.cos(-s.yaw), sn = Math.sin(-s.yaw);
       const rx = o.x - s.c[0], ry = o.y - s.c[1], rz = o.z - s.c[2];
       const lo = [rx * c + rz * sn, ry, -rx * sn + rz * c];
@@ -909,14 +1167,26 @@ class SceneEditorApp {
     return best ? { id: best, t: bestT } : null;
   }
 
-  /** 视线打到地面的点（场地内按高度图步进，场地外落在远景地面高度）。 */
+  PickObject(ray) { return this.PickFromList(ray, this.model.objects); }
+
+  PickInheritedObject(ray) {
+    if (!this.inherited || !this.showInherited || !this.inherited.visibleObjects.length) return null;
+    return this.PickFromList(ray, this.inherited.visibleObjects, this.inherited);
+  }
+
+  SampleGroundAt(x, z) {
+    if (Inside(this.model.doc.bounds, x, z)) return this.sampler(x, z);
+    if (this.inherited && this.showInherited && Inside(this.inherited.bounds, x, z)) return this.inherited.sampler(x, z);
+    return this.model.doc.backdrop?.ground?.y ?? 0;
+  }
+
+  /** 视线打到地面的点（场地内与继承北段按高度图步进，场地外落在远景地面高度）。 */
   PickGround(ray, maxM = 4000) {
-    const o = ray.origin, d = ray.direction, b = this.model.doc.bounds;
+    const o = ray.origin, d = ray.direction;
     let prev = 0;
     const Above = (t) => {
       const x = o.x + d.x * t, z = o.z + d.z * t;
-      const g = Inside(b, x, z) ? this.sampler(x, z) : (this.model.doc.backdrop?.ground?.y ?? 0);
-      return o.y + d.y * t - g;
+      return o.y + d.y * t - this.SampleGroundAt(x, z);
     };
     if (Above(0) < 0) return null;
     for (let t = 1; t <= maxM; t += t < 200 ? 0.5 : 2) {
@@ -966,6 +1236,7 @@ class SceneEditorApp {
     const pose = this.ShotPose();
     if (!pose) return;
     this.model.Select([]);
+    this.inheritedSelected = null;
     this.cameraSelected = true;
     this.showShotGizmo = true;
     if (frame) {
@@ -1056,12 +1327,36 @@ class SceneEditorApp {
     return a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT") && a.type !== "checkbox";
   }
 
+  FrameInherited(id = this.inheritedSelected) {
+    const obj = this.inherited?.objectMap.get(id);
+    if (!obj) return;
+    const s = this.Shape(obj, this.inherited);
+    const r = Math.hypot(...s.half);
+    this.LookAt(new THREE.Vector3(...s.c), Math.max(10, r * 2.6), Math.min(-18, this.cam.pitch / DEG));
+  }
+
+  FocusInheritSeam() {
+    if (!this.inherited) return;
+    const { bounds, info, sampler } = this.inherited;
+    const x = this.model?.doc?.spawn?.x ?? (bounds.minX + bounds.maxX) / 2;
+    const z = info.maxZ;
+    this.cam.yaw = 0;
+    this.LookAt(new THREE.Vector3(x, sampler(x, z), z), 90, -35);
+  }
+
   UpdateHud() {
     if ((this.hudFrame = (this.hudFrame || 0) + 1) % 6) return;
-    const p = this.camera.position, ground = Inside(this.model.doc.bounds, p.x, p.z) ? this.sampler(p.x, p.z) : 0;
+    const p = this.camera.position, ground = this.SampleGroundAt(p.x, p.z);
     const sel = this.model.selection.size;
-    $("seHud").textContent = `相机 x ${Fixed(p.x, 1)}  z ${Fixed(p.z, 1)}  离地 ${Fixed(p.y - ground, 1)} m  朝向 ${Fixed(this.camera.rotation.y / DEG, 0)}°`
-      + (sel ? `\n选中 ${sel} 个` : "");
+    const lines = [`相机 x ${Fixed(p.x, 1)}  z ${Fixed(p.z, 1)}  离地 ${Fixed(p.y - ground, 1)} m  朝向 ${Fixed(this.camera.rotation.y / DEG, 0)}°`];
+    if (this.inherited) {
+      lines.push(p.z < this.inherited.info.maxZ
+        ? `区域：继承北段（只读 · ${this.inherited.info.scene}）`
+        : `区域：本分支可编辑段（z ≥ ${this.inherited.info.maxZ}）`);
+    }
+    if (sel) lines.push(`选中 ${sel} 个`);
+    else if (this.inheritedSelected) lines.push(`只读继承物件：${this.inheritedSelected}`);
+    $("seHud").textContent = lines.join("\n");
   }
 
   SyncPreviewControls(message = "", error = false) {
@@ -1139,6 +1434,143 @@ class SceneEditorApp {
 
   // ------------------------------------------------------------------ 鼠标与键盘
 
+  SceneCategoryOf(scene) {
+    return SCENE_CATEGORIES.find((c) => c.id === scene?.category) || SCENE_CATEGORIES[1];
+  }
+
+  SceneShortTitle(scene) {
+    if (!scene) return "";
+    if (scene.category === "test") return scene.title.replace(/^测试场景\s*·\s*/, "");
+    return scene.title;
+  }
+
+  SwitchScene(id, { select = null } = {}) {
+    if (!SCENE_IDS.includes(id)) return;
+    if (id === this.sceneId && !select) { $("seScenePicker").open = false; return; }
+    if (this.model?.dirty && !confirm("有没保存的改动，换场景就丢掉了，继续？")) {
+      $("seScene").value = this.sceneId;
+      return;
+    }
+    const url = new URL(location.href);
+    url.searchParams.set("scene", id);
+    if (select) url.searchParams.set("select", select);
+    else url.searchParams.delete("select");
+    location.assign(url.href);
+  }
+
+  InitScenePicker() {
+    const select = $("seScene");
+    select.textContent = "";
+    for (const cat of SCENE_CATEGORIES) {
+      const items = SCENE_LIST.filter((s) => (s.category || "level") === cat.id);
+      if (!items.length) continue;
+      const group = document.createElement("optgroup");
+      group.label = cat.label;
+      for (const s of items) group.append(new Option(s.title, s.id));
+      select.append(group);
+    }
+    select.value = this.sceneId;
+    select.addEventListener("change", () => this.SwitchScene(select.value));
+
+    const current = SceneInfo(this.sceneId);
+    const cat = this.SceneCategoryOf(current);
+    const badge = $("seSceneCatBadge");
+    badge.textContent = cat.short;
+    badge.dataset.cat = cat.id;
+    $("seSceneCurrentTitle").textContent = this.SceneShortTitle(current) || this.sceneId;
+    const styleTag = $("seSceneStyleTag");
+    styleTag.textContent = this.style === "formal" ? "正式" : "白盒";
+    styleTag.dataset.style = this.style;
+
+    const catsWrap = $("seSceneCats");
+    const tabs = [{ id: "all", label: "全部", count: SCENE_LIST.length },
+      ...SCENE_CATEGORIES.map((c) => ({ id: c.id, label: c.label, count: SCENE_LIST.filter((s) => (s.category || "level") === c.id).length }))];
+    catsWrap.textContent = "";
+    for (const tab of tabs) {
+      const btn = El("button", "seSceneCatTab");
+      btn.type = "button";
+      btn.setAttribute("role", "tab");
+      btn.dataset.cat = tab.id;
+      btn.setAttribute("aria-selected", String(this.sceneFilterCat === tab.id));
+      btn.append(document.createTextNode(tab.label), El("small", "", String(tab.count)));
+      btn.addEventListener("click", () => {
+        this.sceneFilterCat = tab.id;
+        for (const b of catsWrap.querySelectorAll(".seSceneCatTab")) {
+          b.setAttribute("aria-selected", String(b.dataset.cat === tab.id));
+        }
+        this.RenderScenePicker();
+      });
+      catsWrap.append(btn);
+    }
+
+    const filter = $("seSceneFilter");
+    filter.addEventListener("input", () => this.RenderScenePicker());
+    const picker = $("seScenePicker");
+    picker.addEventListener("toggle", () => {
+      if (picker.open) {
+        $("seInheritNote").open = false;
+        this.RenderScenePicker();
+        filter.focus();
+      }
+    });
+    const inheritPicker = $("seInheritNote");
+    inheritPicker.addEventListener("toggle", () => {
+      if (inheritPicker.open) picker.open = false;
+    });
+    document.addEventListener("pointerdown", (e) => {
+      if (picker.open && !picker.contains(e.target)) picker.open = false;
+      if (inheritPicker.open && !inheritPicker.contains(e.target)) inheritPicker.open = false;
+    });
+    this.RenderScenePicker();
+  }
+
+  RenderScenePicker() {
+    const list = $("seSceneList");
+    const q = ($("seSceneFilter")?.value || "").trim().toLowerCase();
+    list.textContent = "";
+    const cats = this.sceneFilterCat === "all"
+      ? SCENE_CATEGORIES
+      : SCENE_CATEGORIES.filter((c) => c.id === this.sceneFilterCat);
+    let shown = 0;
+    for (const cat of cats) {
+      const items = SCENE_LIST.filter((s) => {
+        if ((s.category || "level") !== cat.id) return false;
+        if (!q) return true;
+        return `${s.title} ${s.id} ${s.note || ""} ${cat.label}`.toLowerCase().includes(q);
+      });
+      if (!items.length) continue;
+      const section = El("section", "seSceneGroup");
+      const head = El("div", "seSceneGroupHead");
+      const title = El("span", "seSceneGroupTitle");
+      const pill = El("span", "seCatBadge", cat.short);
+      pill.dataset.cat = cat.id;
+      title.append(pill, document.createTextNode(`${cat.label}（${items.length}）`));
+      head.append(title, El("span", "seSceneGroupNote", cat.note));
+      section.append(head);
+      for (const s of items) {
+        const btn = El("button", `seSceneOption${s.id === this.sceneId ? " active" : ""}`);
+        btn.type = "button";
+        btn.dataset.sceneId = s.id;
+        const top = El("div", "seSceneOptionTop");
+        top.append(El("span", "seSceneOptionName", this.SceneShortTitle(s)));
+        const st = El("span", "seStyleTag", s.style === "formal" ? "正式" : "白盒");
+        st.dataset.style = s.style;
+        top.append(st);
+        const variant = ENCOUNTER_VARIANTS.find((v) => v.scene === s.id);
+        if (s.inheritFrom) top.append(El("span", "seInheritChip", `↳ 继承 ${s.inheritFrom}`));
+        else if (variant?.isBaseline) top.append(El("span", "seInheritChip", "基线"));
+        top.append(El("span", "seSceneOptionId", s.id));
+        btn.append(top);
+        if (s.note) btn.append(El("div", "seSceneOptionNote", s.note));
+        btn.addEventListener("click", () => this.SwitchScene(s.id));
+        section.append(btn);
+        shown++;
+      }
+      list.append(section);
+    }
+    if (!shown) list.append(El("div", "seSceneEmpty", "没有匹配的场景，试试清空关键词或切回「全部」分类。"));
+  }
+
   BindUi() {
     const c = this.canvas;
     c.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -1151,12 +1583,28 @@ class SceneEditorApp {
     window.addEventListener("blur", () => this.keys.clear());
     window.addEventListener("beforeunload", (e) => { if (this.model?.dirty) { e.preventDefault(); e.returnValue = ""; } });
 
-    const select = $("seScene");
-    for (const id of SCENE_IDS) select.append(new Option(SceneInfo(id)?.title || id, id));
-    select.value = this.sceneId;
-    select.addEventListener("change", () => {
-      if (this.model?.dirty && !confirm("有没保存的改动，换场景就丢掉了，继续？")) { select.value = this.sceneId; return; }
-      const url = new URL(location.href); url.searchParams.set("scene", select.value); location.assign(url.href);
+    this.InitScenePicker();
+    $("seToggleInherited").addEventListener("change", (e) => {
+      this.showInherited = e.target.checked;
+      this.inheritedGroup.visible = this.showInherited;
+      if (!this.showInherited && this.inheritedSelected) {
+        this.inheritedSelected = null;
+        this.SyncSelectionLines();
+        this.RenderInspector();
+      }
+    });
+    $("seToggleInheritBounds").addEventListener("change", (e) => {
+      this.showInheritBounds = e.target.checked;
+      this.inheritedOverlayGroup.visible = this.showInheritBounds;
+    });
+    $("seFocusSeam").addEventListener("click", () => {
+      $("seInheritNote").open = false;
+      this.FocusInheritSeam();
+      this.canvas.focus();
+    });
+    $("seJumpBase").addEventListener("click", () => {
+      if (!this.inherited) return;
+      this.SwitchScene(this.inherited.info.scene);
     });
     $("seUndo").addEventListener("click", () => this.Undo());
     $("seRedo").addEventListener("click", () => this.Redo());
@@ -1184,9 +1632,14 @@ class SceneEditorApp {
       this.show.backdrop = e.target.checked;
       if (this.backdropGround) this.backdropGround.visible = this.show.backdrop;
       this.RebuildObjects();
+      this.RebuildInheritedObjects();
       if (this.previewFrame) this.StartFormalPreview();
     });
-    $("seShowHidden").addEventListener("change", (e) => { this.show.hidden = e.target.checked; this.RebuildObjects(); });
+    $("seShowHidden").addEventListener("change", (e) => {
+      this.show.hidden = e.target.checked;
+      this.RebuildObjects();
+      this.RebuildInheritedObjects();
+    });
   }
 
   Tab(which) {
@@ -1218,6 +1671,7 @@ class SceneEditorApp {
     const shotHit = this.shotHelper.visible && raycaster.intersectObject(this.shotHelper)[0];
     if (shotHit && (!hit || shotHit.distance < hit.t)) { this.down.shot = true; return; }
     this.down.hit = hit;
+    if (!hit) this.down.inheritedHit = this.PickInheritedObject(raycaster.ray);
     if (hit && this.model.selection.has(hit.id) && !this.down.ctrl && !this.down.shift) this.down.bodyDrag = true;
   }
 
@@ -1254,6 +1708,7 @@ class SceneEditorApp {
     if (down.handled || down.moved) return;
     if (down.shot) this.SelectShot();
     else if (down.hit) this.SelectIds([down.hit.id], { toggle: down.ctrl, add: down.shift });
+    else if (down.inheritedHit && !down.ctrl && !down.shift) this.SelectInherited(down.inheritedHit.id);
     else if (!down.ctrl && !down.shift) {
       // 没点中物件：点在沟里（含沟沿弃土）就选那段沟
       const trench = this.TrenchAt(this.PickGround(this.Ray(e.clientX, e.clientY).ray));
@@ -1281,6 +1736,8 @@ class SceneEditorApp {
     if (ctrl && e.code === "KeyD") { e.preventDefault(); this.DuplicateSelection(); return; }
     if (e.code === "Delete" || e.code === "Backspace") { e.preventDefault(); this.DeleteSelection(); return; }
     if (e.code === "Escape") {
+      if ($("seScenePicker")?.open) { $("seScenePicker").open = false; return; }
+      if ($("seInheritNote")?.open) { $("seInheritNote").open = false; return; }
       if (this.previewFrame) this.StopFormalPreview();
       else if (this.drag) this.CancelDrag();
       else this.SelectIds([]);
@@ -1288,6 +1745,7 @@ class SceneEditorApp {
     }
     if (e.code === "KeyF" && !ctrl) {
       if (this.cameraSelected) this.SelectShot({ frame: true });
+      else if (this.inheritedSelected) this.FrameInherited();
       else if (this.model.trench) this.FrameTrench();
       else this.Frame();
       return;
@@ -1424,9 +1882,20 @@ class SceneEditorApp {
 
   SelectIds(ids, opts = {}) {
     this.cameraSelected = false;
+    this.inheritedSelected = null;
     this.model.Select(ids, opts);
     this.RevealSelection();
     this.revealPending = true;
+    this.SyncSelectionLines();
+    this.RenderTree();
+    this.RenderInspector();
+  }
+
+  SelectInherited(id) {
+    if (!this.inherited?.objectMap.has(id)) return;
+    this.cameraSelected = false;
+    this.model.Select([]);
+    this.inheritedSelected = id;
     this.SyncSelectionLines();
     this.RenderTree();
     this.RenderInspector();
@@ -1453,7 +1922,10 @@ class SceneEditorApp {
 
   DuplicateSelection() {
     const ids = [...this.model.selection];
-    if (!ids.length) return;
+    if (!ids.length) {
+      if (this.inheritedSelected) this.Toast("继承物件为只读，请前往基线场景编辑");
+      return;
+    }
     this.model.Duplicate(ids, [1, 0, 1]);
     this.AfterEdit(null, { structural: true });
   }
@@ -1473,7 +1945,10 @@ class SceneEditorApp {
       return;
     }
     const ids = [...this.model.selection];
-    if (!ids.length) return;
+    if (!ids.length) {
+      if (this.inheritedSelected) this.Toast("继承物件为只读，请前往基线场景编辑");
+      return;
+    }
     this.model.Delete(ids);
     this.AfterEdit(null, { structural: true });
     this.Toast(`删了 ${ids.length} 个（Ctrl+Z 撤销）`);
@@ -1579,7 +2054,33 @@ ${seg.note}` : ""}`;
       return;
     }
     const root = this.model.Hierarchy();
-    $("seCount").textContent = `${root.count - this.model.trenchSegments.length} 个物件、${this.model.trenchSegments.length} 段壕沟 · 双击文件夹选中里面全部 · 把物件拖到文件夹上挪分组`;
+    $("seCount").textContent = `${root.count - this.model.trenchSegments.length} 个物件、${this.model.trenchSegments.length} 段壕沟${this.inherited ? ` · 另继承 ${this.inheritedObjectCount} 件` : ""}`;
+    if (this.inherited) {
+      const card = El("details", "seInheritTreeCard");
+      const summary = El("summary");
+      summary.append(
+        El("span", "", `↳ 继承北段 (z<${this.inherited.info.maxZ})`),
+        El("small", "", `${this.inheritedObjectCount} 件`),
+      );
+      const body = El("div", "seInheritTreeBody");
+      const stageCounts = new Map();
+      for (const obj of this.inherited.objects) {
+        const top = SplitGroup(obj.group)[0] || "未分组";
+        stageCounts.set(top, (stageCounts.get(top) || 0) + 1);
+      }
+      body.append(El("div", "seInheritTreeRow", `来源：${this.inherited.info.scene}`));
+      for (const [name, cnt] of [...stageCounts.entries()].slice(0, 6)) {
+        const row = El("div", "seInheritTreeRow");
+        row.append(El("span", "", name), El("code", "", `${cnt} 件`));
+        body.append(row);
+      }
+      const jump = El("button", "", `前往 ${this.inherited.info.scene} 编辑 ↗`);
+      jump.type = "button";
+      jump.addEventListener("click", () => this.SwitchScene(this.inherited.info.scene));
+      body.append(jump);
+      card.append(summary, body);
+      tree.append(card);
+    }
     const Folder = (node, depth) => {
       const open = this.open.has(node.path);
       const head = El("button", `seFolder${open ? " open" : ""}`);
@@ -1808,10 +2309,46 @@ ${seg.note}` : ""}`;
     }
   }
 
+  RenderInheritedInspector(box, obj) {
+    const { info } = this.inherited;
+    const asset = SCENE_ASSETS[obj.asset] || {};
+    const material = SCENE_MATERIALS[obj.material];
+    const card = El("section", "seObjectCard seInheritedCard");
+    const head = El("div", "seObjHead");
+    head.append(
+      El("div", "seInheritedBadge", `↳ 继承自 ${info.scene}（z < ${info.maxZ} · 只读）`),
+      El("div", "seObjTitle", obj.id),
+      El("p", "seMuted", "此物件属于基线场景的继承北段，在当前合并分支中按原貌参与整图预览，修改请前往基线场景。"),
+    );
+    const meta = El("div", "seObjMeta");
+    const k = this.InspectorKit(box, [], El("div"));
+    k.Row(meta, "资产", El("span", "seId", asset.label || obj.asset));
+    if (material) k.Row(meta, "材质", El("span", "seId", `${material.label}（${obj.material}）`));
+    if (obj.group) k.Row(meta, "分组", El("span", "seId", obj.group));
+    const y = this.BaseY(obj, this.inherited);
+    k.Row(meta, "位置", El("code", "", `${Fixed(obj.pos[0], 2)}, ${Fixed(y, 2)}, ${Fixed(obj.pos[2], 2)}${obj.pos[1] === null ? "（落地）" : ""}`));
+    if (obj.size) k.Row(meta, "尺寸 m", El("code", "", obj.size.map((v) => Fixed(v, 2)).join(" × ")));
+    card.append(head, meta);
+    box.append(card);
+    const actions = El("div", "seButtons seInspectorButtons");
+    const frame = El("button", "", "看它（F）");
+    frame.type = "button";
+    frame.addEventListener("click", () => this.FrameInherited(obj.id));
+    const editBase = El("button", "sePrimary", `在 ${info.scene} 中编辑 ↗`);
+    editBase.type = "button";
+    editBase.addEventListener("click", () => this.SwitchScene(info.scene, { select: obj.id }));
+    actions.append(frame, editBase);
+    box.append(actions);
+  }
+
   RenderInspector() {
     const box = $("seInspector");
     box.textContent = "";
     if (this.cameraSelected && this.model.doc.camera) { this.RenderShotInspector(box); return; }
+    if (this.inheritedSelected && this.inherited?.objectMap.has(this.inheritedSelected)) {
+      this.RenderInheritedInspector(box, this.inherited.objectMap.get(this.inheritedSelected));
+      return;
+    }
     if (this.model.trench) { this.RenderTrenchInspector(box, this.model.FindTrench(this.model.trench)); return; }
     const list = this.model.Selected();
     if (!list.length) { box.append(El("p", "seMuted seEmpty", "在视图或层级中选中物件。")); return; }
@@ -2069,11 +2606,14 @@ ${seg.note}` : ""}`;
   UpdateDirty() {
     const dirty = this.model?.dirty;
     const node = $("seDirty");
-    node.textContent = dirty ? "有没保存的改动" : "已和盘上一致";
+    node.textContent = dirty ? "未保存" : "已保存";
+    node.title = dirty ? "有未保存的改动（Ctrl+S 保存）" : "已和盘上一致";
     node.classList.toggle("dirty", !!dirty);
     $("seUndo").disabled = !this.model?.undo.length;
     $("seRedo").disabled = !this.model?.redo.length;
-    $("seSave").textContent = this.writable ? "保存" : "保存（下载）";
+    const saveLabel = $("seSaveLabel");
+    if (saveLabel) saveLabel.textContent = this.writable ? "保存" : "保存（下载）";
+    else $("seSave").textContent = this.writable ? "保存" : "保存（下载）";
     document.title = `${dirty ? "● " : ""}场景编辑器 · ${this.sceneId}`;
   }
 
@@ -2150,7 +2690,10 @@ ${seg.note}` : ""}`;
   Toast(text) {
     this.Status(text);
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => this.Status(`${this.model?.doc.title || ""} · ${this.writable ? "本机预览，能直接保存" : this.writeReason}`), 4000);
+    this.toastTimer = setTimeout(() => {
+      const parts = [this.model?.doc.title, this.writable ? "本机预览，能直接保存" : this.writeReason].filter(Boolean);
+      this.Status(parts.join(" · "));
+    }, 4000);
   }
 
   Banner(text, actions = []) {
@@ -2180,6 +2723,7 @@ ${seg.note}` : ""}`;
         trenchDressing: this.trenchDressingCount ?? 0,
         layers: this.layers.map(l => ({ key: l.key, count: l.ids.length })), terrainStep: this.terrainStep, terrainLook: this.terrainLook, style: this.style,
         inheritedFrom: this.model?.doc.inherit || null, inheritedObjects: this.inheritedObjectCount || 0,
+        showInherited: this.showInherited, showInheritBounds: this.showInheritBounds, inheritedSelected: this.inheritedSelected,
         camera: { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z,
           yawDeg: this.camera.rotation.y / DEG, pitchDeg: this.camera.rotation.x / DEG, fovDeg: this.camera.fov },
         viewMode: this.viewMode, shotGizmo: this.shotHelper?.visible ?? false, cameraSelected: this.cameraSelected,
@@ -2236,7 +2780,11 @@ ${seg.note}` : ""}`;
       TerrainReady: () => this.terrainReady || Promise.resolve(false),
       Tree: () => [...document.querySelectorAll("#seTree .seFolder, #seTree .seItem")].map((n) => ({ folder: n.classList.contains("seFolder"), text: n.querySelector(".seName")?.textContent, indent: parseInt(n.style.paddingLeft, 10) || 0 })),
       Open: (paths) => { for (const p of paths) this.open.add(p); this.RenderTree(); },
-      Show: (opts) => { Object.assign(this.show, opts); this.RebuildObjects(); },
+      Show: (opts) => { Object.assign(this.show, opts); this.RebuildObjects(); this.RebuildInheritedObjects(); },
+      SelectInherited: (id) => this.SelectInherited(id),
+      InheritedLayers: () => (this.inherited?.objectGroup?.children || []).map((m) => ({
+        name: m.name, count: m.count ?? 0, color: m.material?.color?.getHex?.() ?? null, transparent: !!m.material?.transparent,
+      })),
       // 壕沟（docs/Data_Scene.md §9）
       Trench: (id) => this.model.FindTrench(id),
       SelectTrench: (id, point = null) => this.SelectTrench(id, point),

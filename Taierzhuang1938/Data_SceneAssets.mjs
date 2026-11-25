@@ -8,22 +8,40 @@
 // 不给它配贴图外观（用户 2026-11-01：「不算正式资产，你不要自己造出来」），等做了正式的房子模型再换。
 
 /**
+ * 场景分类：场景编辑器顶栏按分类组织场景（遭遇编辑器 / 关卡场景 / 原画与气氛 / 测试场景）。
+ */
+export const SCENE_CATEGORIES = Object.freeze([
+  Object.freeze({ id: "encounter", label: "遭遇编辑器", short: "遭遇", note: "Encounter Designer 与实玩共用的关卡场景及分支" }),
+  Object.freeze({ id: "level", label: "关卡场景", short: "关卡", note: "主战役白盒与正式打磨场景" }),
+  Object.freeze({ id: "concept", label: "原画与气氛", short: "原画", note: "带原画机位与正式渲染预览的独立定调场景" }),
+  Object.freeze({ id: "test", label: "测试场景", short: "测试", note: "玩法、战斗、物理、材质与渲染功能实验场" }),
+]);
+
+/**
  * 场景清单：场景编辑器的下拉、本机存盘口 /__scene/*、白盒编辑器按 id 找场景都查这张表。
  * style：whitebox = 白盒的样子（灰面 + 米格线、高度色带地面）；formal = 正式场景（体块照旧灰面 + 米格线；道具模型、树、植被、分层地表是正式的）。
+ * category：对应 SCENE_CATEGORIES 里的 id。
  */
 export const SCENE_LIST = Object.freeze([
-  Object.freeze({ id: "FirstLevelWhitebox", title: "第一关 · 白盒", style: "whitebox", note: "白盒编辑器的编辑与预演跑这个" }),
-  Object.freeze({ id: "FirstLevel", title: "第一关 · 正式", style: "formal", previewParam: "firstLevelScenePreview", previewCameraOptional: true,
+  Object.freeze({ id: "FirstLevelWhitebox", title: "第一关 · 白盒", style: "whitebox", category: "level",
+    note: "白盒编辑器的编辑与预演跑这个" }),
+  Object.freeze({ id: "FirstLevel", title: "第一关 · 正式", style: "formal", category: "level", previewParam: "firstLevelScenePreview", previewCameraOptional: true,
     note: "白盒编辑器的试玩跑这个；2026-11-01 照白盒布局复制，道具换外部模型、地面换分层地表，体块仍是白盒网格，之后单独打磨" }),
-  Object.freeze({ id: "FirstLevelEncounter", title: "第一关 · Encounter Play", style: "whitebox", note: "独立遭遇场景；编排和 Play 共用，原场景保持独立" }),
-  Object.freeze({ id: "DugoutAidOpenFields", title: "沟底包扎 · 朝田野敞开的木棚", style: "formal", previewParam: "dugoutAidOpenFields" }),
-  Object.freeze({ id: "FirstLevelMerged", title: "第一关 · 北沙河单村合并版", style: "whitebox",
+  Object.freeze({ id: "FirstLevelEncounter", title: "第一关 · Encounter Play", style: "whitebox", category: "encounter",
+    note: "独立遭遇场景（现行双村版基线）；编排和 Play 共用，原场景保持独立" }),
+  Object.freeze({ id: "DugoutAidOpenFields", title: "沟底包扎 · 朝田野敞开的木棚", style: "formal", category: "concept", previewParam: "dugoutAidOpenFields",
+    note: "独立定调场景 · 带原画机位与正式预览" }),
+  Object.freeze({ id: "FirstLevelMerged", title: "第一关 · 北沙河单村合并版", style: "whitebox", category: "encounter",
+    inheritFrom: "FirstLevelEncounter", inheritMaxZ: 355,
     note: "01–07（z<355）实时继承 FirstLevelEncounter，z>=355 为合并后的北沙河单村分叉段" }),
-  Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", previewParam: "gengjiazhuangFieldApproach" }),
-  Object.freeze({ id: "GengjiazhuangEastSmoke", title: "凹路尽头 · 望庄东", style: "formal", previewParam: "gengjiazhuangEastSmoke" }),
-  Object.freeze({ id: "TanketteAdvanceEastTrack", title: "从沟沿望向东侧战车道", style: "formal",
-    previewParam: "tanketteAdvanceEastTrack" }),
-  Object.freeze({ id: "AircraftEvacuationDitch", title: "凹路撤运 · 沟底仰视三机", style: "formal", previewParam: "aircraftEvacuationDitch" }),
+  Object.freeze({ id: "GengjiazhuangFieldApproach", title: "从沟沿望向耿家庄", style: "formal", category: "concept", previewParam: "gengjiazhuangFieldApproach",
+    note: "独立定调场景 · 带原画机位与正式预览" }),
+  Object.freeze({ id: "GengjiazhuangEastSmoke", title: "凹路尽头 · 望庄东", style: "formal", category: "concept", previewParam: "gengjiazhuangEastSmoke",
+    note: "独立定调场景 · 带原画机位与正式预览" }),
+  Object.freeze({ id: "TanketteAdvanceEastTrack", title: "从沟沿望向东侧战车道", style: "formal", category: "concept",
+    previewParam: "tanketteAdvanceEastTrack", note: "独立定调场景 · 带原画机位与正式预览" }),
+  Object.freeze({ id: "AircraftEvacuationDitch", title: "凹路撤运 · 沟底仰视三机", style: "formal", category: "concept", previewParam: "aircraftEvacuationDitch",
+    note: "独立定调场景 · 带原画机位与正式预览" }),
   Object.freeze({ id: "TestRange", title: "测试场景 · 玩法测试靶场", style: "whitebox", category: "test", runParam: "range",
     note: "步枪 / 投弹 / 白刃三工位靶场（?range=1）" }),
   Object.freeze({ id: "TestMelee", title: "测试场景 · 白刃战实验场", style: "whitebox", category: "test", runParam: "melee",
