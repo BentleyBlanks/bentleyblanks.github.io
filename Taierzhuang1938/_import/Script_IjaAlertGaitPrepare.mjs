@@ -6,7 +6,7 @@ import path from 'node:path';
 import { LoadGlb, PoseScene } from './Script_LugouGlbPose.mjs';
 import { ACTOR_LOCOMOTION_PROFILES } from '../Data_ActorLocomotion.mjs';
 const project=path.resolve(import.meta.dirname,'..');
-const model='Model/Character/Model_TengxianIja01.glb';
+const model='Model/Character/Model_JapaneseSoldierYiHumanoid.glb';
 const scene=new PoseScene(LoadGlb(path.join(project,model)));
 const names=JSON.parse(fs.readFileSync(path.join(project,'Model/Character/Data_TengxianHumanoid.json'))).bodyBones.map(b=>b.name);
 const index=new Map(scene.nodes.map((n,i)=>[n.name,i]));

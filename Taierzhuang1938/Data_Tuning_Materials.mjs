@@ -117,36 +117,15 @@ export const FPS_CLOTH_DETAIL = Object.freeze({
 // 打标时关掉 vertexColors（逐像素无差），日军的皮肤于是与国军的皮肤共用程序。
 const SkinPart = (uvMeters, extra = {}) => Object.freeze({ role: "skin", cls: "skin", uvMeters, ...extra });
 const NraClothPart = (extra = {}) => Object.freeze({ role: "nraCloth", cls: "cloth", ...extra });
-const IjaWoolPart = (extra = {}) => Object.freeze({ role: "ijaWool", cls: "cloth", ...extra });
-// 装具（背包、卷毯、子弹盒；Spetsnaz 配件 atlas，布面均色 0x85754b）：与呢子同一份补丁、同一个程序，
-// 着色签名也相同 —— 尸体层把呢子与装具拼成一只图集网格（合批变体不做钢盔 / 细节 / 装具开关，见补丁）。
-const GEAR_PART = IjaWoolPart({ gear: true, wool: 0x85754b });
 const NOT_SKIN = Object.freeze({ role: null, cls: "none" });
 // 手 / 前臂 / 脖颈那份皮（国军的 John_All Body、日军的 #25、第一人称手）：比脸更脏、更暗（CHARACTER_SKIN.hands）。
 const HANDS = Object.freeze({ hands: true });
-// 九〇式钢盔圆盘（IJA01/02/03 共用这一块 atlas 布局；IJA06 在同一位置换成了九八式略帽的布面）。
-const IJA_HELMET_DISC = Object.freeze([0.861, 0.350, 0.138]);
 export const CHARACTER_SURFACE_PARTS = Object.freeze({
-  TengxianIja01: Object.freeze({
-    "Material #54": SkinPart(0.475), "Material #25": SkinPart(0.475, HANDS), "Material #45": NOT_SKIN, "Material #47": NOT_SKIN,
-    "Material #57": IjaWoolPart({ wool: 0x594a29, officer: true, helmet: IJA_HELMET_DISC }),
-  }),
-  TengxianIja02: Object.freeze({
-    // 脸的法线强度 0.35 → 0.3，与手（#25）一致：尸体层按着色签名把脸和手拼成一只网格（少一组 draw）。
-    "Material #48": SkinPart(0.475, { normalScale: 0.3 }), "Material #25": SkinPart(0.475, HANDS),
-    "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }), "Material #164": GEAR_PART,
-  }),
-  TengxianIja03: Object.freeze({
-    "Material #26": SkinPart(0.525), "Material #25": SkinPart(0.479, HANDS), "Material #29": NOT_SKIN,
-    "Material #55": IjaWoolPart({ wool: 0x938049, helmet: IJA_HELMET_DISC }),
-    // 挂在 Spine2 骨上的刚体小件（非蒙皮，位置是骨局部坐标）：只换色，不按高度上泥。
-    "Material #55.001": IjaWoolPart({ wool: 0x938049 }),
-    "Material #164": GEAR_PART,
-  }),
-  TengxianIja06: Object.freeze({
-    "Material #48": SkinPart(0.477, { normalScale: 0.3 }), "Material #25": SkinPart(0.475, HANDS),
-    "Material #55": IjaWoolPart({ wool: 0x94814a }), "Material #164": GEAR_PART,
-  }),
+  // Each adopted Japanese appearance uses one authored PBR atlas across skin and clothing.
+  TengxianIja01: Object.freeze({ M_JapaneseSoldierYi: NOT_SKIN }),
+  TengxianIja02: Object.freeze({ M_JapaneseSoldierA: NOT_SKIN }),
+  TengxianIja03: Object.freeze({ M_JapaneseSoldierC: NOT_SKIN }),
+  TengxianIja06: Object.freeze({ M_JapaneseSoldierJia: NOT_SKIN }),
   // NRA02 的毛巾与枪套（Material #1721585343 / #29）不打部件：它们与帽徽、眼球是同一种平铺着色，
   // 尸体层 / 任务人物按着色签名合成一只图集网格；单独打成装具就多一个 draw（第一关 CPU 提交瓶颈）。
   TengxianNra02: Object.freeze({

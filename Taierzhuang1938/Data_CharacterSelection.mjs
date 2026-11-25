@@ -1,13 +1,16 @@
 // User-approved appearances, 2026-09-11. Indices are zero-based source numbers.
 // Retain source assets for animation provenance; only these appearances may spawn.
-// 2026-09-24: the user approved IJA06 (index 5), the standard IJA rifleman built from
-// IJA02 in Blender (_import/Script_BuildLugouIja06.py): gaunt face, moustache, stubble,
-// Type 98 field cap. It is the main anonymous IJA look and 日兵甲's pinned face.
+// IJA slot numbers remain stable for saved scenes and authored motion libraries.
 // 2026-09-24: the user approved NRA06 (index 5), the interpreter built from NRA02 in
 // Blender (_import/Script_BuildLugouNra06.py): round face, wire spectacles, buck tooth,
 // star cap, open dark jacket over a white vest. It is not a soldier look: it only
 // spawns for a pinned speaking role (CHARACTER_CAST_VARIANTS_BY_KIND), never in the
 // kind lists, the anonymous pools or the actor editor's lineup.
+export const IJA_APPEARANCE_BY_RIG = Object.freeze({
+  TengxianIja01: "JapaneseSoldierYi", TengxianIja02: "JapaneseSoldierA",
+  TengxianIja03: "JapaneseSoldierC", TengxianIja06: "JapaneseSoldierJia",
+});
+
 const nra = Object.freeze([1, 4]);
 const ija = Object.freeze([0, 1, 2, 5]);
 export const CHARACTER_MODEL_VARIANTS_BY_KIND = Object.freeze({
@@ -29,20 +32,12 @@ export const CHARACTER_INFANTRY_SOURCE_BY_MODEL = Object.freeze({
 // profiles) is looked up under the source id (CharacterRig.clipModelId).
 export const CHARACTER_CLIP_SOURCE_BY_MODEL = Object.freeze({ TengxianNra06: "TengxianNra02", TengxianIja06: "TengxianIja02" });
 
-// Anonymous spawns. NRA favours its lighter skin (NRA05: 8,683 triangles). IJA: the user
-// made IJA06 the standard rifleman (2026-09-24), so it is the most frequent anonymous IJA
-// (3 of 7), mixed with IJA01/02/03 so a crowd never shares one face. Triangles: IJA01
-// 11,106, IJA02 14,703, IJA03 15,573, IJA06 14,643; the mean anonymous IJA goes from
-// 12,719 to 13,774 (+8.3 %).
-
+// Preserve the established appearance distribution across existing encounters.
 const nraRandom = Object.freeze([1, 4, 4, 4]);
 export const CHARACTER_RANDOM_VARIANTS_BY_KIND = Object.freeze({
   nra: nraRandom, nraDare: nraRandom, ija: Object.freeze([5, 5, 5, 0, 0, 1, 2]),
 });
 
-// The distant crowd layer (Script_ActorCrowd) bakes one skin per kind. IJA keeps IJA01,
-// the skin it baked before the IJA06 pool change: the lightest IJA (11,106 triangles
-// against IJA06's 14,643, per instance) and a helmet silhouette at range. Kinds not
-// listed bake the seed-picked skin as before.
+// The distant IJA crowd uses the same Yi appearance as near actors in slot zero.
 export const CHARACTER_CROWD_VARIANT_BY_KIND = Object.freeze({ ija: 0 });
 

@@ -7,6 +7,7 @@
 // Frames: glTF +Y up, asset forward +Z (+X is the soldier's left), metres of the shipped GLB. The actor is scaled by
 // 1.66 / 1.817118 = 0.91353 at runtime, "world" numbers below apply that factor; the rifle keeps its real size, so in
 // model metres it is 1 / 0.91353 times its mesh.
+import { CharacterBodyPath } from "./Script_CharacterSelection.mjs";
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -762,8 +763,8 @@ export function Measure({ clipPath = path.join(project, clipFile), quiet = false
     const names = new Set(motion.map((t) => t.name.split('.')[0]));
     const missing = [];
     for (const id of ['Nra02', 'Nra05', 'Nra06', 'Ija01', 'Ija02', 'Ija03', 'Ija06']) {
-      const file = path.join(project, 'Model/Character/Model_Tengxian' + id + '.glb');
-      if (!fs.existsSync(file)) continue;
+      const file = path.join(project, CharacterBodyPath('Tengxian'+id));
+      assert.ok(fs.existsSync(file), file);
       const have = new Set(LoadGlb(file).json.nodes.map((n) => THREE.PropertyBinding.sanitizeNodeName(n.name || '')));
       for (const n of names) if (!have.has(n)) missing.push(id + ':' + n);
     }

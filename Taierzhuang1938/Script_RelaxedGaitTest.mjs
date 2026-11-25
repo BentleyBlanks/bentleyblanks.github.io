@@ -54,7 +54,7 @@ assert.ok(L > .45 && R > .45, `walking, not running: stance share L ${L} R ${R}`
 // Every Tengxian model binds every track.
 const catalog = JSON.parse(fs.readFileSync(path.join(here, 'Model/Character/Data_TengxianCharacterManifest.json'), 'utf8'));
 for (const record of catalog.models) {
-  const glb = LoadGlb(fs.readFileSync(path.join(here, `Model/Character/Model_${record.id}.glb`)));
+  const glb = LoadGlb(fs.readFileSync(path.join(here, record.url)));
   const names = new Set(glb.json.nodes.map(node => node.name.replace(/\s/g, '_')));
   for (const clip of data.clips) for (const track of clip.tracks) assert.ok(names.has(track.name.split('.')[0]), `${record.id} lacks ${track.name}`);
 }

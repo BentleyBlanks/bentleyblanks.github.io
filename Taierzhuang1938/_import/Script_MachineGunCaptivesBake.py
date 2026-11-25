@@ -22,12 +22,14 @@ skinned vertex of that frame rests at `CLEARANCE`; the runtime therefore needs n
 floor probe. The exporter converts each Blender bone frame back to the source GLB
 local frame, so the runtime never imports a new rig.
 """
+import runpy
 import bpy, json, math, struct, hashlib, os, time
 from contextlib import contextmanager
 from pathlib import Path
 from mathutils import Matrix, Vector, Quaternion
 
 project = Path(os.environ.get('CAPTIVES_PROJECT', str(Path.cwd() / 'Taierzhuang1938')))
+CharacterBodyPath = runpy.run_path(str(project / '_import/Script_CharacterPaths.py'))['CharacterBodyPath']
 private = Path(os.environ.get('CAPTIVES_BLEND',
     'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/MachineGunCaptives_20260915'))
 output = project / 'Animation/MachineGunCaptives'
@@ -201,7 +203,7 @@ def AuthoringRig(modelId):
     """(authoring GLB path, f): the shipped body uniformly scaled by f about its origin (joint
     translations, vertex positions and inverse-bind translations; clips dropped)."""
     import numpy as np
-    shipped = project / 'Model/Character' / ('Model_' + modelId + '.glb')
+    shipped = CharacterBodyPath(project, modelId)
     manifest = json.loads((project / 'Model/Character/Data_TengxianCharacterManifest.json').read_text(encoding='utf-8'))
     record = next(r for r in manifest['models'] if r['id'] == modelId)
     height = float(record.get('scaleHeight') or record['bounds']['size'][2])   # Script_CharacterModel CharacterScaleHeight
@@ -295,7 +297,7 @@ def Bake(modelId, probe=None):
     ResetScene()
     scene = bpy.context.scene
     scene.render.fps = fps
-    source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
+    source = CharacterBodyPath(project, modelId)
     rigFile, authoringFactor = AuthoringRig(modelId)
     document = ReadGlb(rigFile)
     nodes = document['nodes']
@@ -1770,7 +1772,7 @@ if __name__ == '__main__':
                 'sha256': hashlib.sha256(file.read_bytes()).hexdigest(),
                 'clipIds': clips,
                 'originalModelSha256': hashlib.sha256(
-                    (project / 'Model/Character' / ('Model_' + modelId + '.glb')).read_bytes()).hexdigest()})
+                    (CharacterBodyPath(project, modelId)).read_bytes()).hexdigest()})
     manifestFile = output / 'Data_MachineGunCaptivesAnimation.json'
     temporary = manifestFile.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')

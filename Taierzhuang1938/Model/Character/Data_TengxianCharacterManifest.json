@@ -4,22 +4,22 @@
   "models": [
     {
       "id": "TengxianIja01",
-      "facialUrl": "./Model/Character/Model_TengxianIja01Facial.glb",
-      "facialVersion": "6aa5cdb504f8276a",
+      "facialUrl": "./Model/Character/Model_JapaneseSoldierYiFacial.glb",
+      "facialVersion": "e4016e831c767bfe",
       "facialCast": [
         "ijaB",
         "ijaC",
         "frontOfficer"
       ],
       "faction": "ija",
-      "url": "./Model/Character/Model_TengxianIja01.glb",
-      "source": "Model_LugouIja01.fbx",
+      "url": "./Model/Character/Model_JapaneseSoldierYiHumanoid.glb",
+      "source": "Model_JapaneseSoldierYi.glb",
       "animationSource": "TengxianHumanoidV1",
       "animationSourceModel": "TengxianNra02",
-      "vertices": 6574,
-      "triangles": 11106,
-      "limitedWeightVertices": 266,
-      "bytes": 3169716,
+      "vertices": 41356,
+      "triangles": 44468,
+      "limitedWeightVertices": 0,
+      "bytes": 3202736,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -40,19 +40,19 @@
       },
       "bounds": {
         "min": [
-          -0.887993,
-          -0.185672,
+          -0.8831880310756662,
+          -0.20126072629729103,
           0
         ],
         "max": [
-          0.887993,
-          0.185672,
-          1.817118
+          0.8831865115405715,
+          0.1557771030064739,
+          1.784135471080287
         ],
         "size": [
-          1.775986,
-          0.371343,
-          1.817118
+          1.7663745426162376,
+          0.35703782930376493,
+          1.784135471080287
         ]
       },
       "sockets": [
@@ -108,30 +108,30 @@
           "WoundedLimp"
         ],
         "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.057914,
-          "AdvanceKneelFire": 0.092483,
-          "AttackCommand": 0.049348,
-          "CrouchFire": 0.038502,
-          "CrouchFireAlt": 0.039002,
-          "CrouchIdle": 0.060905,
-          "EmplacementIdle": 0.038734,
-          "LeanWallSitPeek": 0.076069,
-          "MachineGunFire": 0.009638,
-          "PistolFire": 0.019723,
-          "ProneFire": 0.027951,
-          "RifleIdle": 0.031092,
-          "RifleIdleAlt": 0.031092,
-          "RifleRun": 0.088699,
-          "StandFireCrouch": 0.121769,
-          "StandFireCrouchAlt": 0.056771,
-          "CarryStretcherFront": 0.017732,
-          "CarryStretcherRear": 0.019894,
-          "WoundedLimp": 0.01087
+          "AdvanceFire": 0.01832093555942743,
+          "AdvanceKneelFire": 0.017829661692056874,
+          "AttackCommand": 0.01737917564088764,
+          "CrouchFire": 0.009994141473948975,
+          "CrouchFireAlt": 0.009994219772016644,
+          "CrouchIdle": 0.005843028042979342,
+          "EmplacementIdle": 0.010005607012682716,
+          "LeanWallSitPeek": 0,
+          "MachineGunFire": 0.015814852911190308,
+          "PistolFire": 0.009788299460790652,
+          "ProneFire": 0.007207855821269502,
+          "RifleIdle": 0,
+          "RifleIdleAlt": 0,
+          "RifleRun": 0.017261852734139455,
+          "StandFireCrouch": 0.017412303692067848,
+          "StandFireCrouchAlt": 0.013206386752472566,
+          "CarryStretcherFront": 0,
+          "CarryStretcherRear": 0.017719588259973662,
+          "WoundedLimp": 0.01848674118539146
         }
       },
       "pelvisHeightSpreadMeters": 0.830984,
       "pelvisTrackSource": "3d1f879b",
-      "sourceRevision": "b3ba06096ae9929a44220b07cdedf86dbba8b197",
+      "sourceRevision": "025a54b4a9e67b3c8bdc90a01a91b4257051cb67",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -378,7 +378,7 @@
             0.7515273331544465,
             0.8579512039820354
           ],
-          "maxGroundPenetrationMeters": 0.0029707452260769604
+          "maxGroundPenetrationMeters": 0.017261852734139455
         },
         "CrouchFire": {
           "sourceFrames": 24,
@@ -387,7 +387,7 @@
             0.6097885295772691,
             0.6107733845593781
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.009994141473948975
         },
         "CrouchFireAlt": {
           "sourceFrames": 9,
@@ -396,7 +396,7 @@
             0.6098381355404854,
             0.6107693269765264
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.009994219772016644
         },
         "CrouchIdle": {
           "sourceFrames": 2,
@@ -405,7 +405,7 @@
             0.6629180535674094,
             0.6629180535674096
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.005843028042979342
         },
         "MachineGunFire": {
           "sourceFrames": 31,
@@ -414,7 +414,7 @@
             0.536283690482378,
             0.5399628691375256
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.015814852911190308
         },
         "EmplacementIdle": {
           "sourceFrames": 2,
@@ -423,7 +423,7 @@
             0.6090990155935287,
             0.6090990155935287
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.010005607012682716
         },
         "AttackCommand": {
           "sourceFrames": 121,
@@ -432,7 +432,7 @@
             0.8213830270432615,
             0.9321533983484722
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.01737917564088764
         },
         "ProneFire": {
           "sourceFrames": 14,
@@ -441,7 +441,7 @@
             0.9392116839618286,
             0.9434013832360506
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.007207855821269502
         },
         "StandFireCrouch": {
           "sourceFrames": 2,
@@ -450,7 +450,7 @@
             0.3350129574537277,
             0.3350129574537277
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.017412303692067848
         },
         "StandFireCrouchAlt": {
           "sourceFrames": 96,
@@ -459,7 +459,7 @@
             0.38330774011532576,
             0.8320647561355492
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013206386752472566
         },
         "AdvanceKneelFire": {
           "sourceFrames": 101,
@@ -468,7 +468,7 @@
             0.40783504821947675,
             0.8194971678530427
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.017829661692056874
         },
         "AdvanceFire": {
           "sourceFrames": 88,
@@ -477,7 +477,7 @@
             0.8313994690818501,
             0.993513843945735
           ],
-          "maxGroundPenetrationMeters": 0.0013393703338748738
+          "maxGroundPenetrationMeters": 0.01832093555942743
         },
         "PistolFire": {
           "sourceFrames": 81,
@@ -486,7 +486,7 @@
             0.4656063793304585,
             0.4699905080653996
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.009788299460790652
         },
         "CarryStretcherFront": {
           "sourceFrames": 25,
@@ -501,39 +501,46 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9080292870057747,
-            0.9632505346089602
+            0.9084265443243112,
+            0.962517026660277
           ],
-          "maxGroundPenetrationMeters": 0.007935385737809553
+          "maxGroundPenetrationMeters": 0.017719588259973662
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.8770804572850466,
-            0.9504716470837593
+            0.8777212026282554,
+            0.9504494886858778
           ],
-          "maxGroundPenetrationMeters": 0.000993302392683408
+          "maxGroundPenetrationMeters": 0.01848674118539146
         }
       },
-      "skeleton": "TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1",
+      "version": "8306922849f653c1",
+      "appearance": "JapaneseSoldierYi",
+      "motionSourceSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
+      "infantryUrl": "./Model/Character/Animation_TengxianIja01Infantry.glb",
+      "scaleHeight": 1.817118,
+      "appearanceSha256": "d44b326e217fb6cb3b07f4cc083101d4bfa0162c41889087fe17987a3f0e7c81",
+      "infantryVersion": "520926cb98581807"
     },
     {
       "id": "TengxianIja02",
-      "facialUrl": "./Model/Character/Model_TengxianIja02Facial.glb",
-      "facialVersion": "743a48293ee66e2e",
+      "facialUrl": "./Model/Character/Model_JapaneseSoldierAFacial.glb",
+      "facialVersion": "44c98c0c0cdea62b",
       "facialCast": [
         "ijaD"
       ],
       "faction": "ija",
-      "url": "./Model/Character/Model_TengxianIja02.glb",
-      "source": "Model_LugouIja02.fbx",
+      "url": "./Model/Character/Model_JapaneseSoldierAHumanoid.glb",
+      "source": "Model_JapaneseSoldierA.glb",
       "animationSource": "TengxianHumanoidV1",
       "animationSourceModel": "TengxianNra02",
-      "vertices": 8888,
-      "triangles": 14703,
-      "limitedWeightVertices": 131,
-      "bytes": 3447016,
+      "vertices": 34372,
+      "triangles": 41018,
+      "limitedWeightVertices": 0,
+      "bytes": 2846756,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -554,19 +561,19 @@
       },
       "bounds": {
         "min": [
-          -0.887993,
-          -0.185672,
+          -0.8864467864455706,
+          -0.19964207617964086,
           0
         ],
         "max": [
-          0.887993,
-          0.185672,
-          1.817118
+          0.8863775976179143,
+          0.19572928344219628,
+          1.7943290637932885
         ],
         "size": [
-          1.775986,
-          0.371343,
-          1.817118
+          1.772824384063485,
+          0.3953713596218371,
+          1.7943290637932885
         ]
       },
       "sockets": [
@@ -622,30 +629,30 @@
           "WoundedLimp"
         ],
         "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.057811,
-          "AdvanceKneelFire": 0.084658,
-          "AttackCommand": 0.049305,
-          "CrouchFire": 0.038517,
-          "CrouchFireAlt": 0.038924,
-          "CrouchIdle": 0.060916,
-          "EmplacementIdle": 0.038657,
-          "LeanWallSitPeek": 0.077558,
-          "MachineGunFire": 0.009692,
-          "PistolFire": 0.016323,
-          "ProneFire": 0.026205,
-          "RifleIdle": 0.0375,
-          "RifleIdleAlt": 0.0375,
-          "RifleRun": 0.091975,
-          "StandFireCrouch": 0.204532,
-          "StandFireCrouchAlt": 0.05766,
-          "CarryStretcherFront": 0.019966,
-          "CarryStretcherRear": 0.019894,
-          "WoundedLimp": 0.01087
+          "AdvanceFire": 0.02068385487050288,
+          "AdvanceKneelFire": 0.016768508176039556,
+          "AttackCommand": 0.016405234659399755,
+          "CrouchFire": 0.008754161992173756,
+          "CrouchFireAlt": 0.008754295752070318,
+          "CrouchIdle": 0.004435331958005023,
+          "EmplacementIdle": 0.008745855862842183,
+          "LeanWallSitPeek": 0.008441481469052353,
+          "MachineGunFire": 0.01590997187065178,
+          "PistolFire": 0.014221137966094515,
+          "ProneFire": 0.02212553218111343,
+          "RifleIdle": 0.002301989262858305,
+          "RifleIdleAlt": 0.002301989262858305,
+          "RifleRun": 0.01705799133875068,
+          "StandFireCrouch": 0.019829256580375966,
+          "StandFireCrouchAlt": 0.019206485921898345,
+          "CarryStretcherFront": 0.01950530998427228,
+          "CarryStretcherRear": 0.025143344735417225,
+          "WoundedLimp": 0.019693099958179406
         }
       },
       "pelvisHeightSpreadMeters": 0.854822,
       "pelvisTrackSource": "3d1f879b",
-      "sourceRevision": "b3ba06096ae9929a44220b07cdedf86dbba8b197",
+      "sourceRevision": "025a54b4a9e67b3c8bdc90a01a91b4257051cb67",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -865,7 +872,7 @@
             0.2183669584506095,
             0.23105234716937034
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.008441481469052353
         },
         "RifleIdle": {
           "sourceFrames": 52,
@@ -874,7 +881,7 @@
             0.3827004065121069,
             0.3833204189827003
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.002301989262858305
         },
         "RifleIdleAlt": {
           "sourceFrames": 52,
@@ -883,7 +890,7 @@
             0.3827004065121069,
             0.3833204189827003
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.002301989262858305
         },
         "RifleRun": {
           "sourceFrames": 44,
@@ -892,7 +899,7 @@
             0.7487395999544919,
             0.8579188759128252
           ],
-          "maxGroundPenetrationMeters": 0.002920844198744338
+          "maxGroundPenetrationMeters": 0.01705799133875068
         },
         "CrouchFire": {
           "sourceFrames": 24,
@@ -901,7 +908,7 @@
             0.6100509837293764,
             0.6110358387114856
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.008754161992173756
         },
         "CrouchFireAlt": {
           "sourceFrames": 9,
@@ -910,7 +917,7 @@
             0.6101005598902702,
             0.6110317515125762
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.008754295752070318
         },
         "CrouchIdle": {
           "sourceFrames": 2,
@@ -919,7 +926,7 @@
             0.6632360890507698,
             0.6632360890507698
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.004435331958005023
         },
         "MachineGunFire": {
           "sourceFrames": 31,
@@ -928,7 +935,7 @@
             0.5362836830317974,
             0.5400167740881443
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.01590997187065178
         },
         "EmplacementIdle": {
           "sourceFrames": 2,
@@ -937,7 +944,7 @@
             0.6093616187572479,
             0.6093616187572479
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.008745855862842183
         },
         "AttackCommand": {
           "sourceFrames": 121,
@@ -946,7 +953,7 @@
             0.8213830171712402,
             0.9321533908978916
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.016405234659399755
         },
         "ProneFire": {
           "sourceFrames": 14,
@@ -955,7 +962,7 @@
             0.9392116731584863,
             0.9434013683348894
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.02212553218111343
         },
         "StandFireCrouch": {
           "sourceFrames": 2,
@@ -964,7 +971,7 @@
             0.33502343297004694,
             0.33502343297004705
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.019829256580375966
         },
         "StandFireCrouchAlt": {
           "sourceFrames": 96,
@@ -973,7 +980,7 @@
             0.3833077728978806,
             0.8281411007265476
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.019206485921898345
         },
         "AdvanceKneelFire": {
           "sourceFrames": 101,
@@ -982,7 +989,7 @@
             0.40788965903297336,
             0.810538066085428
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.016768508176039556
         },
         "AdvanceFire": {
           "sourceFrames": 88,
@@ -991,7 +998,7 @@
             0.8292498365094507,
             0.9937522525929829
           ],
-          "maxGroundPenetrationMeters": 0.0013350859942174074
+          "maxGroundPenetrationMeters": 0.02068385487050288
         },
         "PistolFire": {
           "sourceFrames": 81,
@@ -1000,7 +1007,7 @@
             0.4653448180530457,
             0.46956030413768235
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.014221137966094515
         },
         "CarryStretcherFront": {
           "sourceFrames": 25,
@@ -1009,40 +1016,47 @@
             0.8786387686294787,
             0.9434590384780699
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.01950530998427228
         },
         "CarryStretcherRear": {
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9055116325616837,
-            0.9532169904559851
+            0.9055981031305547,
+            0.9525208647198428
           ],
-          "maxGroundPenetrationMeters": 0.008187317618770036
+          "maxGroundPenetrationMeters": 0.025143344735417225
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.8700513751246035,
-            0.9476136565208435
+            0.8706996980412413,
+            0.9471564583181624
           ],
-          "maxGroundPenetrationMeters": 0.000802103515044272
+          "maxGroundPenetrationMeters": 0.019693099958179406
         }
       },
-      "skeleton": "TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1",
+      "version": "96db97aaa7abebfc",
+      "appearance": "JapaneseSoldierA",
+      "motionSourceSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
+      "infantryUrl": "./Model/Character/Animation_TengxianIja02Infantry.glb",
+      "scaleHeight": 1.817118,
+      "appearanceSha256": "51d30a4ba5e9631557c0a48ec2bc5cbb2723191bb5bd558ecff65223497e0f0a",
+      "infantryVersion": "89f1380aa460bcc3"
     },
     {
       "id": "TengxianIja03",
       "faction": "ija",
-      "url": "./Model/Character/Model_TengxianIja03.glb",
-      "source": "Model_LugouIja03.fbx",
+      "url": "./Model/Character/Model_JapaneseSoldierCHumanoid.glb",
+      "source": "Model_JapaneseSoldierC.glb",
       "animationSource": "TengxianHumanoidV1",
       "animationSourceModel": "TengxianNra02",
-      "vertices": 9251,
-      "triangles": 15573,
-      "limitedWeightVertices": 226,
-      "bytes": 3682568,
+      "vertices": 29454,
+      "triangles": 36419,
+      "limitedWeightVertices": 0,
+      "bytes": 2583264,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -1063,19 +1077,19 @@
       },
       "bounds": {
         "min": [
-          -0.887993,
-          -0.185672,
+          -0.8709946698055306,
+          -0.1849680527844473,
           0
         ],
         "max": [
-          0.887993,
-          0.185672,
-          1.817118
+          0.8709443133908538,
+          0.17719748283633938,
+          1.7872562148597075
         ],
         "size": [
-          1.775986,
-          0.371343,
-          1.817118
+          1.7419389831963845,
+          0.3621655356207867,
+          1.7872562148597075
         ]
       },
       "sockets": [
@@ -1131,30 +1145,30 @@
           "WoundedLimp"
         ],
         "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.057841,
-          "AdvanceKneelFire": 0.08467,
-          "AttackCommand": 0.049337,
-          "CrouchFire": 0.038515,
-          "CrouchFireAlt": 0.038932,
-          "CrouchIdle": 0.060939,
-          "EmplacementIdle": 0.038664,
-          "LeanWallSitPeek": 0.07752,
-          "MachineGunFire": 0.009765,
-          "PistolFire": 0.016372,
-          "ProneFire": 0.026338,
-          "RifleIdle": 0.037407,
-          "RifleIdleAlt": 0.037407,
-          "RifleRun": 0.092036,
-          "StandFireCrouch": 0.211359,
-          "StandFireCrouchAlt": 0.057537,
-          "CarryStretcherFront": 0.019913,
-          "CarryStretcherRear": 0.019936,
-          "WoundedLimp": 0.010959
+          "AdvanceFire": 0.015666436946350476,
+          "AdvanceKneelFire": 0.014792048146475204,
+          "AttackCommand": 0.015750946411685136,
+          "CrouchFire": 0.0037713754372561276,
+          "CrouchFireAlt": 0.0037714570760339627,
+          "CrouchIdle": 0,
+          "EmplacementIdle": 0.003762279964702686,
+          "LeanWallSitPeek": 0.008263652056946041,
+          "MachineGunFire": 0.011378962180486823,
+          "PistolFire": 0.011453483397673709,
+          "ProneFire": 0.005096502015548703,
+          "RifleIdle": 0,
+          "RifleIdleAlt": 0,
+          "RifleRun": 0.01608258407429865,
+          "StandFireCrouch": 0.006500733130625889,
+          "StandFireCrouchAlt": 0.013407786156026523,
+          "CarryStretcherFront": 0.004774938625838249,
+          "CarryStretcherRear": 0.015495300415430027,
+          "WoundedLimp": 0.017323700083171138
         }
       },
       "pelvisHeightSpreadMeters": 0.861522,
       "pelvisTrackSource": "3d1f879b",
-      "sourceRevision": "b3ba06096ae9929a44220b07cdedf86dbba8b197",
+      "sourceRevision": "025a54b4a9e67b3c8bdc90a01a91b4257051cb67",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -1374,7 +1388,7 @@
             0.21831778908895555,
             0.23100208778871698
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.008263652056946041
         },
         "RifleIdle": {
           "sourceFrames": 52,
@@ -1401,7 +1415,7 @@
             0.7487535653181091,
             0.8579759411513805
           ],
-          "maxGroundPenetrationMeters": 0.0029293942528291574
+          "maxGroundPenetrationMeters": 0.01608258407429865
         },
         "CrouchFire": {
           "sourceFrames": 24,
@@ -1410,7 +1424,7 @@
             0.6100162006938585,
             0.6110010258736468
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.0037713754372561276
         },
         "CrouchFireAlt": {
           "sourceFrames": 9,
@@ -1419,7 +1433,7 @@
             0.6100658401846886,
             0.6109969945540915
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.0037714570760339627
         },
         "CrouchIdle": {
           "sourceFrames": 2,
@@ -1437,7 +1451,7 @@
             0.5362875796854496,
             0.5400405749678612
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.011378962180486823
         },
         "EmplacementIdle": {
           "sourceFrames": 2,
@@ -1446,7 +1460,7 @@
             0.6093262284994125,
             0.6093262284994125
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.003762279964702686
         },
         "AttackCommand": {
           "sourceFrames": 121,
@@ -1455,7 +1469,7 @@
             0.8213856755381252,
             0.9321837024561974
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.015750946411685136
         },
         "ProneFire": {
           "sourceFrames": 14,
@@ -1464,7 +1478,7 @@
             0.9393007351637078,
             0.9434990677982569
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.005096502015548703
         },
         "StandFireCrouch": {
           "sourceFrames": 2,
@@ -1473,7 +1487,7 @@
             0.335026852786541,
             0.335026852786541
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.006500733130625889
         },
         "StandFireCrouchAlt": {
           "sourceFrames": 96,
@@ -1482,7 +1496,7 @@
             0.3830541149013169,
             0.8281141079985964
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013407786156026523
         },
         "AdvanceKneelFire": {
           "sourceFrames": 101,
@@ -1491,7 +1505,7 @@
             0.40782868209887135,
             0.8105046055279672
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.014792048146475204
         },
         "AdvanceFire": {
           "sourceFrames": 88,
@@ -1500,7 +1514,7 @@
             0.8292160005616352,
             0.9938088422366541
           ],
-          "maxGroundPenetrationMeters": 0.0013357096494987766
+          "maxGroundPenetrationMeters": 0.015666436946350476
         },
         "PistolFire": {
           "sourceFrames": 81,
@@ -1509,7 +1523,7 @@
             0.4653507668843991,
             0.46959553229883333
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.011453483397673709
         },
         "CarryStretcherFront": {
           "sourceFrames": 25,
@@ -1518,48 +1532,54 @@
             0.8785962629930614,
             0.943362778610225
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.004774938625838249
         },
         "CarryStretcherRear": {
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9054757682606578,
-            0.9531830046325922
+            0.9055621794644706,
+            0.9524885433858138
           ],
-          "maxGroundPenetrationMeters": 0.008151289924687413
+          "maxGroundPenetrationMeters": 0.015495300415430027
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.8701343983411789,
-            0.9476437447592616
+            0.8707824160336495,
+            0.9471845211604533
           ],
-          "maxGroundPenetrationMeters": 0.0008031246607173447
+          "maxGroundPenetrationMeters": 0.017323700083171138
         }
       },
-      "skeleton": "TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1",
+      "version": "6aeb6943a06e8244",
+      "appearance": "JapaneseSoldierC",
+      "motionSourceSha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952",
+      "infantryUrl": "./Model/Character/Animation_TengxianIja03Infantry.glb",
+      "scaleHeight": 1.817118,
+      "appearanceSha256": "6efd16287130f188057475ee492f1840c40212560bdfa332a2a25a14a51d83ce",
+      "infantryVersion": "b2ee76e7f27d2006"
     },
     {
       "id": "TengxianIja06",
-      "facialUrl": "./Model/Character/Model_TengxianIja06Facial.glb",
-      "facialVersion": "9eee205ee7b3f407",
+      "facialUrl": "./Model/Character/Model_JapaneseSoldierJiaFacial.glb",
+      "facialVersion": "ac4023dc6c9453d3",
       "facialCast": [
         "ijaA"
       ],
       "faction": "ija",
-      "url": "./Model/Character/Model_TengxianIja06.glb",
-      "source": "Model_LugouIja02.glb",
-      "derivedFrom": "TengxianIja02",
+      "url": "./Model/Character/Model_JapaneseSoldierJiaHumanoid.glb",
+      "source": "Model_JapaneseSoldierJia.glb",
       "builder": "_import/Script_BuildLugouIja06.py",
       "approved": "2026-09-24",
       "animationSource": "TengxianHumanoidV1",
       "animationSourceModel": "TengxianNra02",
-      "vertices": 8909,
-      "triangles": 14643,
-      "limitedWeightVertices": 131,
-      "bytes": 3589152,
+      "vertices": 34045,
+      "triangles": 39179,
+      "limitedWeightVertices": 0,
+      "bytes": 2820736,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -1580,19 +1600,19 @@
       },
       "bounds": {
         "min": [
-          -0.887993,
-          -0.185672,
+          -0.885605727263623,
+          -0.18632546024400884,
           0
         ],
         "max": [
-          0.887993,
-          0.185672,
-          1.817118
+          0.8849376391361766,
+          0.19344791101926898,
+          1.7751171956734186
         ],
         "size": [
-          1.775986,
-          0.371343,
-          1.817118
+          1.7705433663997996,
+          0.3797733712632778,
+          1.7751171956734186
         ]
       },
       "sockets": [
@@ -1648,30 +1668,30 @@
           "WoundedLimp"
         ],
         "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.057811,
-          "AdvanceKneelFire": 0.084658,
-          "AttackCommand": 0.049305,
-          "CrouchFire": 0.038517,
-          "CrouchFireAlt": 0.038924,
-          "CrouchIdle": 0.060916,
-          "EmplacementIdle": 0.038657,
-          "LeanWallSitPeek": 0.077558,
-          "MachineGunFire": 0.009692,
-          "PistolFire": 0.016323,
-          "ProneFire": 0.026205,
-          "RifleIdle": 0.0375,
-          "RifleIdleAlt": 0.0375,
-          "RifleRun": 0.091975,
-          "StandFireCrouch": 0.204532,
-          "StandFireCrouchAlt": 0.05766,
-          "CarryStretcherFront": 0.019966,
-          "CarryStretcherRear": 0.019894,
-          "WoundedLimp": 0.01087
+          "AdvanceFire": 0.01630417195892136,
+          "AdvanceKneelFire": 0.013550546781401043,
+          "AttackCommand": 0.013857552343287076,
+          "CrouchFire": 0,
+          "CrouchFireAlt": 0,
+          "CrouchIdle": 0,
+          "EmplacementIdle": 0,
+          "LeanWallSitPeek": 0,
+          "MachineGunFire": 0.006795621465150795,
+          "PistolFire": 0.013029284726221361,
+          "ProneFire": 0.013067231698786964,
+          "RifleIdle": 0,
+          "RifleIdleAlt": 0,
+          "RifleRun": 0.015536146438538602,
+          "StandFireCrouch": 0.023310224965946504,
+          "StandFireCrouchAlt": 0.014009966427415851,
+          "CarryStretcherFront": 0,
+          "CarryStretcherRear": 0.01181561988791141,
+          "WoundedLimp": 0.016122406411639117
         }
       },
       "pelvisHeightSpreadMeters": 0.854822,
       "pelvisTrackSource": "3d1f879b",
-      "sourceRevision": "b39cd831066e1e2527389edd504048b4b5120ac6",
+      "sourceRevision": "025a54b4a9e67b3c8bdc90a01a91b4257051cb67",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -1918,7 +1938,7 @@
             0.7487395999544919,
             0.8579188759128252
           ],
-          "maxGroundPenetrationMeters": 0.002920844198744338
+          "maxGroundPenetrationMeters": 0.015536146438538602
         },
         "CrouchFire": {
           "sourceFrames": 24,
@@ -1954,7 +1974,7 @@
             0.5362836830317974,
             0.5400167740881443
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.006795621465150795
         },
         "EmplacementIdle": {
           "sourceFrames": 2,
@@ -1972,7 +1992,7 @@
             0.8213830171712402,
             0.9321533908978916
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013857552343287076
         },
         "ProneFire": {
           "sourceFrames": 14,
@@ -1981,7 +2001,7 @@
             0.9392116731584863,
             0.9434013683348894
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013067231698786964
         },
         "StandFireCrouch": {
           "sourceFrames": 2,
@@ -1990,7 +2010,7 @@
             0.33502343297004694,
             0.33502343297004705
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.023310224965946504
         },
         "StandFireCrouchAlt": {
           "sourceFrames": 96,
@@ -1999,7 +2019,7 @@
             0.3833077728978806,
             0.8281411007265476
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.014009966427415851
         },
         "AdvanceKneelFire": {
           "sourceFrames": 101,
@@ -2008,7 +2028,7 @@
             0.40788965903297336,
             0.810538066085428
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013550546781401043
         },
         "AdvanceFire": {
           "sourceFrames": 88,
@@ -2017,7 +2037,7 @@
             0.8292498365094507,
             0.9937522525929829
           ],
-          "maxGroundPenetrationMeters": 0.0013350859942174074
+          "maxGroundPenetrationMeters": 0.01630417195892136
         },
         "PistolFire": {
           "sourceFrames": 81,
@@ -2026,7 +2046,7 @@
             0.4653448180530457,
             0.46956030413768235
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.013029284726221361
         },
         "CarryStretcherFront": {
           "sourceFrames": 25,
@@ -2041,22 +2061,29 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9055116325616837,
-            0.9532169904559851
+            0.9055981031305547,
+            0.9525208647198428
           ],
-          "maxGroundPenetrationMeters": 0.008187317618770036
+          "maxGroundPenetrationMeters": 0.01181561988791141
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.8700513751246035,
-            0.9476136565208435
+            0.8706996980412413,
+            0.9471564583181624
           ],
-          "maxGroundPenetrationMeters": 0.000802103515044272
+          "maxGroundPenetrationMeters": 0.016122406411639117
         }
       },
-      "skeleton": "TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1",
+      "version": "a552b535c5e98641",
+      "appearance": "JapaneseSoldierJia",
+      "motionSourceSha256": "433015bec29e79fa7508b86f51f4d31bb1e669b3cc0d668745f5e202945d613e",
+      "infantryUrl": "./Model/Character/Animation_JapaneseSoldierJiaInfantry.glb",
+      "scaleHeight": 1.817118,
+      "appearanceSha256": "8f5f681741dff0f532d54e80a4d1b7297159e31f0c2ecf2163031ce65608272e",
+      "infantryVersion": "46d3f8f8d43a066c"
     },
     {
       "id": "TengxianNra02",

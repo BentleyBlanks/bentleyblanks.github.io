@@ -1,3 +1,4 @@
+import { CharacterBodyPath } from "./Script_CharacterSelection.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -98,11 +99,17 @@ assert.ok(paired>=8,`paired contacts cross-checked: ${paired}`);
 // ---- baked rigs --------------------------------------------------------------------------
 let frames=0,clipCount=0;
 const assets=new Map();
+const bodies=JSON.parse(Read("Model/Character/Data_TengxianCharacterManifest.json")).models;
 for(const row of manifest.models){
   const bytes=Read("Animation/OpeningStoryboards/"+row.file),asset=JSON.parse(bytes);
   assets.set(row.id,asset);
   assert.equal(Hash(bytes),row.sha256,`${row.id}: manifest matches baked bytes`);
-  assert.equal(Hash(Read(`Model/Character/Model_${row.id}.glb`)),asset.originalModelSha256,`${row.id}: original rig unchanged`);
+  const body = bodies.find(record => record.id === row.id);
+  const runtimeHash = Hash(Read(body.url));
+  if (body.motionSourceSha256 && runtimeHash !== asset.originalModelSha256) {
+    assert.equal(body.motionSourceSha256, asset.originalModelSha256, row.id + ": authored motion rig provenance");
+    assert.equal(runtimeHash.slice(0, 16), body.version, row.id + ": approved replacement rig bytes");
+  } else assert.equal(runtimeHash, asset.originalModelSha256, row.id + ": authored body hash");
   assert.equal(asset.modelId,row.id);assert.equal(asset.stride,7);assert.equal(asset.fps,manifest.fps);
   const stride=asset.bones.length*7,reports=new Map((row.clips||[]).map(report=>[report.clip,report]));
   for(const [id,spec] of Object.entries(manifest.clips)){
@@ -258,7 +265,7 @@ for(const [asset,a,ia,b,ib] of [[comrade,"WoundedSitRifleIdle",0,"BanterPatRifle
 const glb=new Map();
 const Glb=id=>{
   if(glb.has(id))return glb.get(id);
-  const bytes=Read(`Model/Character/Model_${id}.glb`),json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
+  const bytes=Read(CharacterBodyPath(id)),json=JSON.parse(bytes.subarray(20,20+bytes.readUInt32LE(12)).toString());
   const parent=new Array(json.nodes.length).fill(-1);json.nodes.forEach((n,i)=>(n.children||[]).forEach(c=>parent[c]=i));
   const out={json,parent,byName:new Map(json.nodes.map((n,i)=>[n.name,i]))};glb.set(id,out);return out;
 };

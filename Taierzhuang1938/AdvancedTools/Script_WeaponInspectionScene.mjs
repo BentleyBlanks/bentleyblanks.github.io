@@ -245,7 +245,7 @@ export class WeaponInspectionScene {
     this.renderer.toneMappingExposure = 1.08;
     SetTextureImportRenderer(this.renderer);
     this.library = new MaterialLibrary(this.renderer);
-    this.factory = new ActorFactory(this.library);
+    this.factory = new ActorFactory(this.library, {view: {camera: this.camera, renderer: this.renderer}});
     this.documents = new Map();
     this.configuredGlbs = new WeakSet();
     this.center = new THREE.Vector3();

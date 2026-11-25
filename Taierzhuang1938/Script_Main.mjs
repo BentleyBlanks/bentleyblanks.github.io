@@ -1562,7 +1562,7 @@ async function Boot() {
     BOOT.progress.field.from, BOOT.progress.field.to, NextFrame);
 
   setStep(T("boot.step.actors"), BOOT.progress.actors);
-  actorFactory = new ActorFactory(library, { quality: QUALITY });
+  actorFactory = new ActorFactory(library, { quality: QUALITY, view: {camera, renderer, lightRig: lights} });
   // 人物合批：全场人物的分件按「几何 × 材质」收成 InstancedMesh，
   // 一帧 1408 个人物 draw call 收到几十个。逐像素等价，账见 Script_ActorBatch.mjs。
   actorBatch = new ActorBatcher(scene, renderer);

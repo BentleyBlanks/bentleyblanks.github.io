@@ -263,10 +263,9 @@ export class ActorCrowd {
    */
   _BakeKind(kind) {
     const started = Now();
-    // 远景层钉哪套皮由 Data_CharacterSelection.CHARACTER_CROWD_VARIANT_BY_KIND 决定（日军钉 IJA01，
-    // 不随 2026-09-24 的匿名池改动变成更重的 IJA06）；没列的 kind 仍按种子抽。
+    // 远景人群与同槽位的近景人物共用正式外观。远处无需逐根绘制毛发。
     const modelVariant = CHARACTER_CROWD_VARIANT_BY_KIND[kind];
-    const actor = this.factory.Create(kind, Number.isInteger(modelVariant) ? { seed: 4213, modelVariant } : { seed: 4213 });
+    const actor = this.factory.Create(kind, Number.isInteger(modelVariant) ? { seed: 4213, modelVariant, groom: false } : { seed: 4213, groom: false });
     // 烘焙不做贴地 IK。探针量的是「烘这一刻 root 恰好落在世界哪一点」的地面高度，
     // 与将来这批实例站的地方毫无关系，却会被整批人一起继承（六帧收敛一半的那个偏移）。
     // 关掉它，烘出来的姿势才是确定的、可复现的。

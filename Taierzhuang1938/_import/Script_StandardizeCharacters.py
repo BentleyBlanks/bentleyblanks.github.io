@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 import re
+import runpy
 import struct
 import subprocess
 from pathlib import Path
@@ -26,6 +27,7 @@ from mathutils import Matrix, Vector, Quaternion
 
 REPO = Path(__file__).resolve().parents[2]
 PROJECT = REPO / 'Taierzhuang1938'
+CharacterBodyPath = runpy.run_path(str(PROJECT / '_import/Script_CharacterPaths.py'))['CharacterBodyPath']
 REVISION = 'b3ba06096ae9929a44220b07cdedf86dbba8b197'
 ADOPTED = ('Nra02', 'Nra05', 'Ija01', 'Ija02', 'Ija03')
 # Second source (2026-09-26): the 01-06 refactor / 01-03 storyboard round authored these on the
@@ -543,7 +545,7 @@ def BakeStoryLibraries(outputs):
                 clip['values'] = result
             record['bones'] = [Name(name) for name in record['bones']]
             record['modelId'] = Name(record['modelId']); record['skeleton'] = 'TengxianHumanoidV1'
-            modelPath = PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')
+            modelPath = CharacterBodyPath(PROJECT, 'Tengxian' + identifier)
             record['originalModelSha256'] = hashlib.sha256(modelPath.read_bytes()).hexdigest()
             row['originalModelSha256'] = record['originalModelSha256']
             row['id'] = Name(row['id']); row['file'] = Name(row['file'])
@@ -556,13 +558,20 @@ def BakeStoryLibraries(outputs):
         (PROJECT / 'Animation' / folder / manifestName).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf8')
 
 def WriteManifest(outputs):
+    current = json.loads((PROJECT / 'Model/Character/Data_TengxianCharacterManifest.json').read_text(encoding='utf-8'))
+    formal = {r['id']: r for r in current['models'] if r.get('appearance')}
     # The storyboard head's manifest is the adopted rows plus the derived looks and the facial
     # cast (facialUrl / facialCast); every other adopted-row field is the same as in REVISION.
     manifest = json.loads(Source('Model/Character/Data_LugouCharacterManifest.json', STORYBOARD_REVISION))
     manifest['models'] = [row for row in manifest['models'] if row['id'].replace('Lugou', '') in (*ADOPTED, *DERIVED)]
     manifest['generatedBy'] = 'Script_StandardizeCharacters.py'; manifest['skeleton'] = 'TengxianHumanoidV1'
     for row in manifest['models']:
-        identifier = row['id'].replace('Lugou', ''); glb, source, bounds = outputs[identifier]
+        identifier = row['id'].replace('Lugou', '')
+        if 'Tengxian' + identifier in formal:
+            row.clear()
+            row.update(formal['Tengxian' + identifier])
+            continue
+        glb, source, bounds = outputs[identifier]
         row['id'] = Name(row['id']); row['url'] = Name(row['url'])
         row['sourceRevision'] = STORYBOARD_REVISION if identifier in DERIVED else REVISION
         row['animationSource'] = 'TengxianHumanoidV1'; row['animationSourceModel'] = 'TengxianNra02'
@@ -589,6 +598,8 @@ def WriteManifest(outputs):
     infantry['models'] = [row for row in infantry['models'] if row['id'].replace('Lugou', '') in ('Nra02', 'Ija01', 'Ija02', 'Ija03')]
     for row in infantry['models']:
         row['id'] = Name(row['id']); row['file'] = Name(row['file'])
+    current_infantry = json.loads((PROJECT / 'Model/Character/Data_InfantryAnimations.json').read_text(encoding='utf-8'))
+    infantry['models'] = [r for r in infantry['models'] if r['id'] not in formal] + [r for r in current_infantry['models'] if r['id'] in formal]
     infantry['skeleton'] = 'TengxianHumanoidV1'
     (PROJECT / 'Model/Character/Data_InfantryAnimations.json').write_text(json.dumps(infantry, indent=2) + '\n', encoding='utf8')
     subprocess.run(['node', str(PROJECT / '_import/Script_StandardCharacterAudit.mjs')], cwd=str(REPO), check=True)
@@ -603,7 +614,7 @@ def SaveBlenderSource():
     scene = bpy.context.scene; scene.unit_settings.system = 'METRIC'; scene.unit_settings.scale_length = 1
     for identifier in (*ADOPTED, *DERIVED, *FACIAL):
         before = set(bpy.data.objects)
-        bpy.ops.import_scene.gltf(filepath=str(PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')))
+        bpy.ops.import_scene.gltf(filepath=str(CharacterBodyPath(PROJECT, 'Tengxian' + identifier)))
         collection = bpy.data.collections.new('Character_Tengxian' + identifier); scene.collection.children.link(collection)
         for obj in set(bpy.data.objects) - before:
             for old in list(obj.users_collection): old.objects.unlink(obj)
@@ -746,9 +757,13 @@ def Main(skipBodies=False):
     outputs = {}
     for identifier in (*ADOPTED, *DERIVED, *FACIAL):
         revision = REVISION if identifier in ADOPTED else STORYBOARD_REVISION
-        outputs[identifier] = (Glb((PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')).read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb', revision)), None) if skipBodies else BakeModel(identifier, revision=revision)
+        if skipBodies or identifier.startswith('Ija'):
+            body = CharacterBodyPath(PROJECT, 'Tengxian' + identifier)
+            outputs[identifier] = (Glb(body.read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb', revision)), None)
+        else:
+            outputs[identifier] = BakeModel(identifier, revision=revision)
         print('Baked', identifier, flush=True)
-    for identifier in ('Nra02', 'Ija01', 'Ija02', 'Ija03'):
+    for identifier in ('Nra02',):
         source = 'Model/Character/Animation_Lugou' + identifier + 'Infantry.glb'
         BakeModel(identifier, source, PROJECT / Name(source))
         print('Retargeted infantry', identifier, flush=True)
@@ -781,7 +796,7 @@ def RebakeBodyHashRecords():
     source = 'Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb'
     BakeModel('NraBackRifleRun', source, PROJECT / Name(source))
     AdoptBackRifleAppearance()
-    BakeStoryLibraries({identifier: (Glb((PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')).read_bytes()),
+    BakeStoryLibraries({identifier: (Glb(CharacterBodyPath(PROJECT, 'Tengxian' + identifier).read_bytes()),
                                      Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb')), None) for identifier in ADOPTED})
     subprocess.run(['node', str(PROJECT / '_import/Script_LocomotionProfileBake.mjs')], cwd=str(REPO), check=True)
     print('Body hash records rebaked.', flush=True)

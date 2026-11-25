@@ -45,7 +45,7 @@ function Measure(file, id) {
 }
 
 for(const record of catalog.models) {
-  const entries={RifleRun:Measure(`Model/Character/Model_${record.id}.glb`,'RifleRun')};
+  const entries={RifleRun:Measure(record.url.replace(/^\.\//, ""),'RifleRun')};
   // The crouch source already has independently verified sole-contact correction.
   // Keep its measured linear travel speed; ankle roll is not root travel.
   const infantrySource=CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id]||record.id;

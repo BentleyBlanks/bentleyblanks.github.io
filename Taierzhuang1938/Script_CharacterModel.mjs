@@ -4,7 +4,7 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { IJA_APPEARANCE_BY_RIG, CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { CharacterClipModelId, IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
@@ -21,6 +21,8 @@ import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs"
 import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
+import { HairGroom, LoadHairAtlas, LoadHairGroom } from "./Script_HairGroom.mjs";
+import { HAIR_QUALITY } from "./Data_Tuning_Hair.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 // 中弹踉跄（_ApplyHurtTilt）的临时量。只在 hurt > 0 的那几帧用到。
@@ -176,7 +178,7 @@ export function GetLugouCharacterVariantEntries(kind) {
     modelVariant,
     role: profile?.role || "soldier",
     modelNumber: modelVariant + 1,
-    modelId: `${profile?.faction === "ija" ? "TengxianIja" : "TengxianNra"}${String(modelVariant + 1).padStart(2, "0")}`,
+    modelId: IJA_APPEARANCE_BY_RIG[LugouCharacterModelId(kind, modelVariant)] || LugouCharacterModelId(kind, modelVariant),
   }));
 }
 
@@ -321,7 +323,7 @@ const MODEL_FORWARD_YAW = Math.PI;
 // and every dependent GLB together after the offline normalization bake (_import/Script_StandardizeCharacters.py).
 // 2026-09-27: CarryStretcherRear / WoundedLimp foot tracks flipped back sole-down and re-grounded
 // in all seven model GLBs (_import/Script_FixMocapFootRoll.mjs); manifest audit rewritten with them.
-const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260927MocapFootRoll";
+const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20261126FormalIja";
 const ASSET_VERSION = "20260927MocapFootRoll";
 const DEATH_COLLAPSE_ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
@@ -522,6 +524,26 @@ export function IsFacialCastId(library, castId) {
   return false;
 }
 
+let campaignHairAtlas;
+const campaignGrooms = new Map();
+function LoadAppearanceGroom(gltf) {
+  const info = gltf.userData?.appearanceGroom;
+  if (!info) return null;
+  if (!campaignGrooms.has(info.file)) {
+    campaignHairAtlas ??= LoadHairAtlas("./Hair/Textures/Texture_HairCardAtlas.png")
+      .catch(error => { campaignHairAtlas = null; throw error; });
+    const resource = Promise.all([LoadHairGroom("./Hair/Grooms/" + info.file), campaignHairAtlas])
+      .then(([groom, atlas]) => ({groom, atlas, anchors: info.anchors}))
+      .catch(error => {
+        campaignGrooms.delete(info.file);
+        console.warn("[CharacterModel] " + info.file + " " + error);
+        return null;
+      });
+    campaignGrooms.set(info.file, resource);
+  }
+  return campaignGrooms.get(info.file);
+}
+
 async function LoadAsset(record) {
   try {
     const gltf = await LOADER.loadAsync(VersionedUrl(record.url, record.version));
@@ -530,7 +552,8 @@ async function LoadAsset(record) {
     const infantrySource = CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id] || record.id;
     if (!infantrySource.endsWith("05")) {
       try {
-        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${infantrySource}Infantry.glb?v=20260926HumanoidV1`);
+        const infantryUrl = record.infantryUrl || `./Model/Character/Animation_${infantrySource}Infantry.glb`;
+        infantry = await LOADER.loadAsync(VersionedUrl(infantryUrl, record.infantryVersion || "20260926HumanoidV1"));
         if (infantrySource !== record.id) {
           // NRA05 shares NRA02's limb axes. Transfer local rest offsets and omit
           // source-only unweighted helpers; the visible model remains NRA05.
@@ -566,7 +589,8 @@ async function LoadAsset(record) {
     let proneCrawl = null;
     try { proneCrawl = await LoadProneCrawl(); }
     catch (error) { console.warn('[ProneCrawl] optional library unavailable', String(error)); }
-    return { record, gltf, infantry, death, facial, proneCrawl, error: null };
+    const groom = await LoadAppearanceGroom(gltf);
+    return { record, gltf, infantry, death, facial, proneCrawl, groom, error: null };
   } catch (error) {
     console.warn(`[CharacterModel] ${record.id} 读取失败：${String(error).slice(0, 180)}`);
     return { record, gltf: null, error: String(error) };
@@ -643,9 +667,10 @@ export async function LoadLugouPoseAssets(kind, variants) {
   const manifest = await response.json();
   const records = (manifest.models || []).filter(record => ids.has(record.id));
   if (records.length !== ids.size) throw new Error("A posed scenery figure is missing its body record");
-  const bodies = await Promise.all(records.map(async record => ({
-    record, gltf: await LOADER.loadAsync(VersionedUrl(record.url, record.version)),
-  })));
+  const bodies = await Promise.all(records.map(async record => {
+    const gltf = await LOADER.loadAsync(VersionedUrl(record.url, record.version));
+    return {record, gltf, groom: await LoadAppearanceGroom(gltf)};
+  }));
   return { byFaction: { [FactionForKind(kind)]: bodies } };
 }
 
@@ -845,11 +870,13 @@ function FullSizeProneClip(asset, reference) {
 
 /** One independently animated, skeleton-cloned soldier. */
 export class LugouCharacterRig {
-  constructor(asset, { kind, targetHeight, seed, variantIndex, materialLibrary = null }) {
+  constructor(asset, { kind, targetHeight, seed, variantIndex, materialLibrary = null, groom = true }) {
+    this.useGroom = groom;
     this.asset = asset;
     this.kind = kind;
     this.variantIndex = variantIndex;
-    this.modelId = asset.record.id;
+    this.modelId = asset.record.id; // Stable animation and saved-scene slot.
+    this.appearanceId = asset.record.appearance || this.modelId;
     // Per-model clip libraries are keyed by this id (IJA06 plays IJA02's: same skeleton).
     this.clipModelId = CharacterClipModelId(this.modelId);
     // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
@@ -862,7 +889,8 @@ export class LugouCharacterRig {
     this.speakerHead = null;
     // Optional authored clip layer ({Restore, Apply}), set by the scene that owns this body.
     this.authoredPose = null;
-    this.root.name = `Rigged_${this.modelId}`;
+    this.root.name = `Rigged_${this.appearanceId}`;
+    this.root.userData.appearanceId = this.appearanceId;
     this.actor = null;
     this.forcedClip = null;
     this.currentId = null;
@@ -1036,6 +1064,20 @@ export class LugouCharacterRig {
   Attach(actor) {
     this.actor = actor;
     actor.body.add(this.root);
+    const resource = this.asset.groom;
+    if (!this.hair && this.useGroom && resource && actor.factory?.view?.camera) {
+      const anchors = {};
+      for (const [name, binding] of Object.entries(resource.anchors)) {
+        const bone = new THREE.Bone();
+        bone.name = name;
+        bone.matrixAutoUpdate = false;
+        bone.matrix.fromArray(binding.matrix);
+        this.root.getObjectByName(binding.parent).add(bone);
+        anchors[name] = bone;
+      }
+      this.hair = new HairGroom(resource.groom, { atlas: resource.atlas, boneRoot: this.root, lightRig: actor.factory.view.lightRig });
+      anchors.Head.add(this.hair.root);
+    }
     this.attachBodyY = actor.body.position.y;
     // The offline bake recentres the complete skinned model and grounds every
     // animation frame against the actual deformed mesh.  A Biped Foot node is an
@@ -1514,6 +1556,11 @@ export class LugouCharacterRig {
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
     this.speakerHead?.Apply(dt, state);
     this.facial?.Update(dt, state);
+    if (this.hair && this.headVisible && this.root.visible) {
+      const view = this.actor.factory.view;
+      this.hair.maxLod = HAIR_QUALITY[this.actor.quality];
+      this.hair.Update(dt, view.camera, view.renderer);
+    }
   }
 
   /** The captured side-on thrust looks across the rifle; face the committed attack instead. */
@@ -1636,6 +1683,7 @@ export class LugouCharacterRig {
     if (this.disposed) return;
     this.hitReaction?.Reset();
     this.facial?.Reset();
+    this.hair?.Dispose();
     this.mixer.stopAllAction();
     this.mixer.uncacheRoot(this.root);
     if (this.root.parent) this.root.parent.remove(this.root);
@@ -1673,6 +1721,6 @@ export function CreateLugouCharacterRig(
     || (options.facial !== false && asset.record.facialCast?.includes(options.castId));
   const selected = wantsFace && asset.facial ? { ...asset, gltf: asset.facial } : asset;
   return new LugouCharacterRig(selected, {
-    kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary,
+    kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary, groom: options.groom !== false,
   });
 }

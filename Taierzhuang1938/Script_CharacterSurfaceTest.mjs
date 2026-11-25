@@ -28,7 +28,8 @@ const GLB_BY_MODEL = {
   FpsHanYang: "Model/Model_FpsHanYangHands.glb",
   FirstPersonBody: "Model/Model_FirstPersonBody.glb",
 };
-const GlbPath = (id) => path.join(here, GLB_BY_MODEL[id] || `Model/Character/Model_${id}.glb`);
+const manifest = JSON.parse(fs.readFileSync(path.join(here, "Model/Character/Data_TengxianCharacterManifest.json"), "utf8"));
+const GlbPath = id => path.join(here, GLB_BY_MODEL[id] || manifest.models.find(row => row.id === id).url);
 
 function ReadGlb(file) {
   const buf = fs.readFileSync(file);
@@ -129,21 +130,25 @@ for (const [modelId, table] of Object.entries(CHARACTER_SURFACE_PARTS)) {
     }
   }
 }
-Check(parts >= 30, "部件表条目数", String(parts));
+Check(parts >= 18 && parts === Object.values(CHARACTER_SURFACE_PARTS).reduce((n, table) => n + Object.keys(table).length, 0), "每个登记材质均已检查", String(parts));
 Check(specChecked >= 5, "带 spec 图的部件都查过 alpha", String(specChecked));
 // NRA05 的脸与眼球：按名字分类会反过来（眼球叫「头部」），部件表必须压住。
 Check(CHARACTER_SURFACE_PARTS.TengxianNra05["Material #26"]?.cls === "skin"
   && CHARACTER_SURFACE_PARTS.TengxianNra05["战士1_头部"]?.cls === "none", "NRA05 脸 = 皮肤、眼球不当皮肤");
-Check(Object.keys(CHARACTER_SURFACE_PARTS).filter((id) => id.startsWith("TengxianIja"))
-  .every((id) => Object.values(CHARACTER_SURFACE_PARTS[id]).some((p) => p.role === "skin")
-    && Object.values(CHARACTER_SURFACE_PARTS[id]).some((p) => p.role === "ijaWool")), "每款日军都有皮肤与呢子部件");
+for (const record of manifest.models.filter(row => row.faction === "ija")) {
+  const {json: body} = ReadGlb(GlbPath(record.id));
+  const {json: kit} = ReadGlb(path.join(here, "Model/Character", body.extras.appearanceMaterial.file));
+  const mat = kit.materials[0];
+  Check(mat.name === body.extras.appearanceMaterial.material && kit.images.length === 3
+    && !!mat.pbrMetallicRoughness.baseColorTexture && !!mat.normalTexture,
+    record.id + " 的正式角色图集保留颜色与法线，原材质不被整身呢子染色");
+}
 
 // ---- 覆盖面：第一关 01–06 实际在场的每个人物模型都有部件表，每只 GLB 的每个材质都有着落 -------------
 // 在场的人 = 选模清单的全部外观（匿名池、具名说话人、远景人群）+ 带脸皮的骨骼口型模型（清单 facialUrl，
 // 材质按名字绑回基础 GLB 的同名材质）+ 第一人称双臂 / 汉阳造手 / 身体。每个材质要么在部件表里，
 // 要么在下面这张「有意不动」表里（写理由）—— 重建模型改了材质名、或者新加一款外观没登记，这里就红。
 const selection = await import("./Data_CharacterSelection.mjs");
-const manifest = JSON.parse(fs.readFileSync(path.join(here, "Model/Character/Data_TengxianCharacterManifest.json"), "utf8"));
 const ModelId = (kind, variant) => `Tengxian${kind.startsWith("ija") ? "Ija" : "Nra"}${String(variant + 1).padStart(2, "0")}`;
 const onField = new Set(["FpsArms", "FpsHanYang", "FirstPersonBody"]);
 for (const [kind, list] of Object.entries(selection.CHARACTER_MODEL_VARIANTS_BY_KIND)) for (const v of list) onField.add(ModelId(kind, v));
@@ -164,8 +169,9 @@ for (const modelId of onField) {
   if (!table) continue;
   const parts = Object.values(table);
   // 第一人称身体只有军装（低头看见的上衣、裤腿、鞋），手在双臂模型里。
-  if (modelId !== "FirstPersonBody") Check(parts.some((p) => p.role === "skin"), `${modelId} 至少有一份皮肤部件`);
-  if (!["TengxianNra06"].includes(modelId) && !modelId.startsWith("Fps")) {
+  const formalIja = manifest.models.some(row => row.id === modelId && row.appearance);
+  if (!formalIja && modelId !== "FirstPersonBody") Check(parts.some((p) => p.role === "skin"), `${modelId} 至少有一份皮肤部件`);
+  if (!formalIja && !["TengxianNra06"].includes(modelId) && !modelId.startsWith("Fps")) {
     Check(parts.some((p) => p.role === "nraCloth" || p.role === "ijaWool"), `${modelId} 至少有一份军装部件`);
   }
   const files = [GlbPath(modelId)];

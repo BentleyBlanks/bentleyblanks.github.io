@@ -26,7 +26,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianIja01.glb",
+      "source": "Model/Character/Model_JapaneseSoldierYiHumanoid.glb",
       "sha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1"
     },
     "RifleCrouchAdvance": {
@@ -59,7 +59,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianIja02.glb",
+      "source": "Model/Character/Model_JapaneseSoldierAHumanoid.glb",
       "sha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61"
     },
     "RifleCrouchAdvance": {
@@ -92,7 +92,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianIja03.glb",
+      "source": "Model/Character/Model_JapaneseSoldierCHumanoid.glb",
       "sha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952"
     },
     "RifleCrouchAdvance": {
@@ -125,7 +125,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianIja06.glb",
+      "source": "Model/Character/Model_JapaneseSoldierJiaHumanoid.glb",
       "sha256": "433015bec29e79fa7508b86f51f4d31bb1e669b3cc0d668745f5e202945d613e"
     },
     "RifleCrouchAdvance": {

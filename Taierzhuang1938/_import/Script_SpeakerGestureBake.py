@@ -47,11 +47,13 @@ character's own left +X, ground z = 0. The keys below are REAL (runtime) metres 
 side's own rest shoulder in the body frame (out, forward, up): out is away from the body (the
 character's left for an L clip, his right for an R clip). Runtime = source x scale (scale = nominalScale).
 """
+import runpy
 import bpy, os, runpy, json, math, hashlib, time
 from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion, bvhtree
 
 project = Path(os.environ['GESTURE_PROJECT'])
+CharacterBodyPath = runpy.run_path(str(project / '_import/Script_CharacterPaths.py'))['CharacterBodyPath']
 output = Path(os.environ.get('GESTURE_OUTPUT') or (project / 'Animation/SpeakerGestures'))
 work = Path(os.environ.get('GESTURE_WORK') or (project.parent / 'tmp/SpeakerGestures/Bake'))
 reviews = Path(os.environ.get('GESTURE_REVIEW') or (project.parent / 'tmp/SpeakerGestures/BlenderReview'))
@@ -693,7 +695,7 @@ def BakeRig(ctx):
             ('lips %.4f' % report['lipsGapM']) if 'lipsGapM' in report else '', time.time() - started), flush=True)
 
     work.mkdir(parents=True, exist_ok=True)
-    source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
+    source = CharacterBodyPath(project, modelId)
     asset = {'schema': 1, 'modelId': modelId, 'fps': FPS, 'stride': 4,
              'coordinates': 'glTF node-local bone rotations (q xyzw) of the listed bones; strokeDir is the '
                             'shoulder -> hand (index tip for a point) direction at the stroke, three.js actor frame',

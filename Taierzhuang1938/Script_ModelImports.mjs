@@ -6,6 +6,42 @@ import {LoadKtxTexture, ResolvePublishedModelUrl} from './Script_TextureImports.
 export class ManagedGLTFLoader extends GLTFLoader {
   constructor(manager) {
     super(manager);
+    // The campaign and Mixamo rigs share the exact same material and texture payload.
+    // Keep the cache on this loader so a preview or a separate game session owns its resources.
+    const appearanceMaterials = new Map();
+    this.register(parser => ({
+      name: 'TengxianCharacterAppearance',
+      afterRoot: async gltf => {
+        const source = parser.json.extras?.appearanceMaterial;
+        if (!source) return;
+        const url = parser.options.path + source.file;
+        let promise = appearanceMaterials.get(url);
+        if (!promise) {
+          promise = this.loadAsync(url).then(appearance => {
+            const materials = new Map();
+            appearance.scene.traverse(node => {
+              if (!node.isMesh) return;
+              for (const material of Array.isArray(node.material) ? node.material : [node.material]) materials.set(material.name, material);
+              node.geometry.dispose();
+            });
+            return materials;
+          }).catch(error => { appearanceMaterials.delete(url); throw error; });
+          appearanceMaterials.set(url, promise);
+        }
+        const material = (await promise).get(source.material);
+        if (!material) throw Error(`Missing character material ${source.material} in ${url}`);
+        const replaced = new Set();
+        gltf.scene.traverse(node => {
+          if (node.isMesh && node.material.name === source.material) {
+            replaced.add(node.material);
+            node.material = material;
+          }
+        });
+        if (!replaced.size) throw Error(`Missing character surface ${source.material}`);
+        for (const placeholder of replaced) placeholder.dispose();
+      },
+    }));
+
     this.setKTX2Loader({load(url, onLoad, _onProgress, onError) {
       LoadKtxTexture(url).then(onLoad, onError);
     }});

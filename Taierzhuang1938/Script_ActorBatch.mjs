@@ -394,7 +394,7 @@ export class ActorBatcher {
     record.revision = actor.partsRevision | 0;
     const root = actor.root;
     root.traverse((object) => {
-      if (!object.isMesh || object.isInstancedMesh || object.isSkinnedMesh) return;
+      if (!object.isMesh || object.isInstancedMesh || object.isSkinnedMesh || object.userData.hairGroom) return;
       if (!object.geometry || !object.material || Array.isArray(object.material)) return;
       // Scope the new rigged path to the measured bottleneck. No body, hair,
       // transparency, deformation or draw-hook substitution is admitted.

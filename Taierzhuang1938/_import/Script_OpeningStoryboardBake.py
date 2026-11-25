@@ -84,11 +84,13 @@ so the lowest skinned vertex rests at CLEARANCE. Anything a director or partner 
 in RUNTIME metres (source x scale) in the three.js actor frame (+x right, +y up, -z
 forward): runtime = (-X, Z, Y) * scale.
 """
+import runpy
 import bpy, os, runpy, json, math, hashlib, time, struct, subprocess
 from pathlib import Path
 from mathutils import Vector, Matrix, Quaternion
 
 project = Path(os.environ['OPENING_PROJECT'])
+CharacterBodyPath = runpy.run_path(str(project / '_import/Script_CharacterPaths.py'))['CharacterBodyPath']
 NAME = os.environ.get('OPENING_LIBRARY_NAME') or 'OpeningStoryboards'
 OWN = NAME == 'OpeningStoryboards'
 private = Path(os.environ.get('OPENING_BLEND_DIR')
@@ -1304,7 +1306,7 @@ def BakeRig(ctx):
         print('PARTNER_DUMP', modelId, list(partnerDump), flush=True)
         return {'id': modelId, 'partner': list(partnerDump)}
 
-    source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
+    source = CharacterBodyPath(project, modelId)
     file = output / ('Animation_' + modelId + NAME + '.json')
     if selectedClips and file.exists() and PASS != 'verify':
         previous = json.loads(file.read_text())
@@ -1541,7 +1543,7 @@ def WriteManifest(results):
             row = rows.setdefault(modelId, {'id': modelId, 'file': file.name})
             asset = json.loads(file.read_text())
             row['sha256'] = Sha(file)
-            row['originalModelSha256'] = Sha(project / 'Model/Character' / ('Model_' + modelId + '.glb'))
+            row['originalModelSha256'] = Sha(CharacterBodyPath(project, modelId))
             row['clipIds'] = list(asset['clips'])
             row['contactPoints'] = asset.get('contactPoints', {})
             blend = private / ('Scene_' + modelId + NAME + '.blend')

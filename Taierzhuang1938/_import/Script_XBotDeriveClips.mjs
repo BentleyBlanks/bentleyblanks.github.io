@@ -20,6 +20,7 @@
 //     挑最少的（POSE_GUARD：不为了不进身体把手甩走）；可循环的首尾接回去；
 //   · 镜像的只推出、去抽搐。
 //   每条改过的写调整记录 _import/MixamoFixes/Animation_XBot_<名>.Derive.fix.json（改前改后按审查脚本同一套量法）。
+import { CharacterBodyPath } from "../Script_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -212,7 +213,7 @@ const XBOT_OF = new Map(Object.entries(XBOT_FROM_SOLDIER).map(([s, x]) => [BoneK
 function SourceRest(modelId, bones) {
   const key = `${modelId}:${bones.join(",")}`;
   if (!sourceRests.has(key)) {
-    const file = path.join(PROJECT, "Model", "Character", `Model_${modelId}.glb`);
+    const file = path.join(PROJECT, CharacterBodyPath(modelId));
     const { rest, above } = SkinRest(file, bones);
     const retarget = new XBotRetarget(rest, xbot.rest, { targetParentOfRoot: xbot.above });
     // 原身体的胶囊按换算的修正量对齐到 X Bot 骨的轴向（目标世界 = 源世界 × C → 胶囊坐标系 = 源骨 × C）

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "source": "Seedance 2.5 \u2192 GVHMR \u2192 contact-corrected original rigs",
+  "source": "Seedance 2.5 → GVHMR → contact-corrected original rigs",
   "models": [
     {
       "id": "TengxianNra02",
@@ -12,7 +12,7 @@
           "loop": true,
           "referenceSpeedMps": 0.2554529916490837,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 2.2926596019712253e-05,
+          "maxSegmentErrorMeters": 0.000022926596019712253,
           "uncorrectedFloorRange": [
             -0.0060917365530563615,
             -0.005972609601516698
@@ -24,7 +24,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 2.124621163451801e-05,
+          "maxSegmentErrorMeters": 0.00002124621163451801,
           "uncorrectedFloorRange": [
             -0.057941615435186,
             -0.006056975332726612
@@ -36,7 +36,7 @@
           "loop": true,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 2.020372347968924e-05,
+          "maxSegmentErrorMeters": 0.00002020372347968924,
           "uncorrectedFloorRange": [
             -0.05528171723829189,
             -0.05380953525591508
@@ -48,7 +48,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 2.0940627704468806e-05,
+          "maxSegmentErrorMeters": 0.000020940627704468806,
           "uncorrectedFloorRange": [
             -0.05539762034342306,
             -0.006057057749554122
@@ -60,7 +60,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": 2.15,
-          "maxSegmentErrorMeters": 1.2813034882486196e-05,
+          "maxSegmentErrorMeters": 0.000012813034882486196,
           "uncorrectedFloorRange": [
             -0.0062158026636431165,
             -0.005287344519976539
@@ -78,7 +78,7 @@
           "loop": true,
           "referenceSpeedMps": 0.23864468053263868,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.4110485699159181e-05,
+          "maxSegmentErrorMeters": 0.000014110485699159181,
           "uncorrectedFloorRange": [
             0.002999900311175795,
             0.003000595793725982
@@ -90,7 +90,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3201124939715703e-05,
+          "maxSegmentErrorMeters": 0.000013201124939715703,
           "uncorrectedFloorRange": [
             -0.004490815118900682,
             0.0030004647181285106
@@ -102,7 +102,7 @@
           "loop": true,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3131309416908321e-05,
+          "maxSegmentErrorMeters": 0.000013131309416908321,
           "uncorrectedFloorRange": [
             -0.004884528550858279,
             -0.004442348300809328
@@ -114,7 +114,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3131362170432093e-05,
+          "maxSegmentErrorMeters": 0.000013131362170432093,
           "uncorrectedFloorRange": [
             -0.004490815119199113,
             0.0030005369524337498
@@ -126,7 +126,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": 2.15,
-          "maxSegmentErrorMeters": 1.1833754057999357e-05,
+          "maxSegmentErrorMeters": 0.000011833754057999357,
           "uncorrectedFloorRange": [
             0.002792409806704462,
             0.0032473356020529583
@@ -144,7 +144,7 @@
           "loop": true,
           "referenceSpeedMps": 0.23864468053263868,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.4046298048686623e-05,
+          "maxSegmentErrorMeters": 0.000014046298048686623,
           "uncorrectedFloorRange": [
             -0.00046198434019935114,
             0.004803843412623286
@@ -156,7 +156,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3184879628785895e-05,
+          "maxSegmentErrorMeters": 0.000013184879628785895,
           "uncorrectedFloorRange": [
             -0.004040039305580736,
             0.0037569983571654406
@@ -168,7 +168,7 @@
           "loop": true,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3114893734261779e-05,
+          "maxSegmentErrorMeters": 0.000013114893734261779,
           "uncorrectedFloorRange": [
             -0.00452848819407112,
             -0.004014707471424957
@@ -180,7 +180,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3114943862663209e-05,
+          "maxSegmentErrorMeters": 0.000013114943862663209,
           "uncorrectedFloorRange": [
             -0.004040039306003159,
             0.0035060164354628427
@@ -192,7 +192,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": 2.15,
-          "maxSegmentErrorMeters": 1.183928372158749e-05,
+          "maxSegmentErrorMeters": 0.00001183928372158749,
           "uncorrectedFloorRange": [
             0.0027027997683407253,
             0.008168030920342607
@@ -210,7 +210,7 @@
           "loop": true,
           "referenceSpeedMps": 0.23864468053263868,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.4140933552564405e-05,
+          "maxSegmentErrorMeters": 0.000014140933552564405,
           "uncorrectedFloorRange": [
             -0.0004626906013460168,
             0.0047921732106079844
@@ -222,7 +222,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3230895667321052e-05,
+          "maxSegmentErrorMeters": 0.000013230895667321052,
           "uncorrectedFloorRange": [
             -0.004040687290352712,
             0.0037730103103208153
@@ -234,7 +234,7 @@
           "loop": true,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3161017496654548e-05,
+          "maxSegmentErrorMeters": 0.000013161017496654548,
           "uncorrectedFloorRange": [
             -0.004533885690254502,
             -0.00401538807046091
@@ -246,7 +246,7 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": null,
-          "maxSegmentErrorMeters": 1.3161067880435029e-05,
+          "maxSegmentErrorMeters": 0.000013161067880435029,
           "uncorrectedFloorRange": [
             -0.004040687290779868,
             0.003520964635435412
@@ -258,10 +258,76 @@
           "loop": false,
           "referenceSpeedMps": 0,
           "releaseTimeSeconds": 2.15,
-          "maxSegmentErrorMeters": 1.1838426236865374e-05,
+          "maxSegmentErrorMeters": 0.000011838426236865374,
           "uncorrectedFloorRange": [
             0.0027083857391939766,
             0.008143412204768724
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TengxianIja06",
+      "file": "Animation_JapaneseSoldierJiaInfantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.23864468053263868,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000014046298048686623,
+          "uncorrectedFloorRange": [
+            -0.00046198434019935114,
+            0.004803843412623286
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013184879628785895,
+          "uncorrectedFloorRange": [
+            -0.004040039305580736,
+            0.0037569983571654406
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013114893734261779,
+          "uncorrectedFloorRange": [
+            -0.00452848819407112,
+            -0.004014707471424957
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000013114943862663209,
+          "uncorrectedFloorRange": [
+            -0.004040039306003159,
+            0.0035060164354628427
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.00001183928372158749,
+          "uncorrectedFloorRange": [
+            0.0027027997683407253,
+            0.008168030920342607
           ]
         }
       ]

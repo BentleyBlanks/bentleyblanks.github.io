@@ -1,3 +1,4 @@
+import { CharacterBodyPath } from "./Script_CharacterSelection.mjs";
 // Actual game factory, both factions/all eight skins, contact and playback integration.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -32,7 +33,7 @@ function Points(scene, skin) {
 let maximumPlantedDrift = 0;
 // Use the original mesh/skin with the library's animation samplers, independently of its bake audit.
 for (const record of catalog.models) {
-  const original = LoadGlb(path.join(folder, `Model_${record.id}.glb`));
+  const original = LoadGlb(path.join(project, CharacterBodyPath(record.id)));
   const library = LoadGlb(path.join(folder, record.file));
   assert.equal(library.json.meshes, undefined, 'animation library must not duplicate characters');
   const scene = new PoseScene(library), skin = BuildSkin(original);
@@ -70,7 +71,7 @@ const browser = await LaunchBrowser();
 const output = process.env.INFANTRY_TEST_OUTPUT || path.join(project, '_shots/InfantryIntegration');
 fs.mkdirSync(output, { recursive: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = []; page.on('pageerror', error => errors.push(String(error)));
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?poseTest=1`, { waitUntil: 'load', timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
@@ -80,9 +81,20 @@ try {
     const check = (v, message) => { if (!v) throw new Error(message); };
     const factory = window.Taierzhuang.actorFactory;
     const actors = [], stats = [];
-    for (const [kind, variants] of [['nra', [1, 4]], ['ija', [0, 1, 2]]]) for (const modelVariant of variants) {
+    for (const [kind, variants] of [['nra', [1, 4]], ['ija', [0, 1, 2, 5]]]) for (const modelVariant of variants) {
       const actor = factory.Create(kind, { seed: 41938, modelVariant }); const rig = actor.characterRig;
       check(rig?.asset.infantry, `${kind}/${modelVariant}: missing library`);
+      if (kind === 'ija') {
+        const name = ({0:'JapaneseSoldierYi',1:'JapaneseSoldierA',2:'JapaneseSoldierC',5:'JapaneseSoldierJia'})[modelVariant];
+        let textured = false;
+        rig.root.traverse(node => {
+          if (node.isSkinnedMesh && node.material.name === 'M_' + name
+            && node.material.map && node.material.normalMap) textured = true;
+        });
+        check(rig.asset.record.appearance === name && textured, 'actual appearance for slot ' + modelVariant);
+        check(rig.hair?.asset.header.model === 'Model_' + name + '.glb' || rig.hair?.asset.header.model?.endsWith('/Model_' + name + '.glb'),
+          'approved facial hair for ' + name);
+      }
       for (const id of INFANTRY_ANIMATION_IDS) {
         check(rig.clipById.has(id), `${rig.modelId}: missing ${id}`);
         actor.PlayImportedAnimation(id); actor.Update(.2, {});
@@ -257,5 +269,5 @@ try {
   }
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(output, 'Data_IntegrationValidation.json'), JSON.stringify(result, null, 2));
-  console.log('PASS InfantryAnimationTest: 5 adopted game models, 25 clip bindings, transitions, props, velocity and one-shot release; max sole drift', maximumPlantedDrift, output);
+  console.log('PASS InfantryAnimationTest: 6 adopted game models, 30 clip bindings, transitions, props, velocity and one-shot release; max sole drift', maximumPlantedDrift, output);
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

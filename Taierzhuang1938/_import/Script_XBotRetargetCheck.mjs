@@ -1,3 +1,4 @@
+import { CharacterBodyPath } from "../Script_CharacterSelection.mjs";
 // 白盒 X Bot 换算动作的复查（docs/Data_EditorBlockout.md §18）：
 //   node Taierzhuang1938/_import/Script_XBotRetargetCheck.mjs [片段名…]
 // 对照表里每条换算的预演片段，逐帧比士兵原动作与换算后 X Bot 的肢体方向（模型空间）：上臂→手、大腿→脚、骨盆→头、手腕→中指根。
@@ -58,7 +59,7 @@ for (const [id, spec] of Object.entries(XBOT_PREVIZ_CLIPS)) {
   if (!spec.retarget || (only.size && !only.has(id))) continue;
   const src = sources.get(id); if (!src) { report.push({ id, error: "no source" }); continue; }
   const key = src.modelId + src.bones.join();
-  if (!cache.has(key)) { const s = SkinRest(path.join(PROJECT, "Model/Character", `Model_${src.modelId}.glb`), src.bones); cache.set(key, { ...s, off: Offsets(s.rest), rt: new XBotRetarget(s.rest, xbot.rest, { targetParentOfRoot: xbot.above }) }); }
+  if (!cache.has(key)) { const s = SkinRest(path.join(PROJECT, CharacterBodyPath(src.modelId)), src.bones); cache.set(key, { ...s, off: Offsets(s.rest), rt: new XBotRetarget(s.rest, xbot.rest, { targetParentOfRoot: xbot.above }) }); }
   const { rest, above, off, rt } = cache.get(key);
   const srcQ = rest.bones.map(() => new THREE.Quaternion()), pel = new THREE.Vector3(), outQ = xbot.rest.bones.map(() => new THREE.Quaternion()), hips = new THREE.Vector3();
   const sP = rest.bones.map(() => new THREE.Vector3()), xP = xbot.rest.bones.map(() => new THREE.Vector3());

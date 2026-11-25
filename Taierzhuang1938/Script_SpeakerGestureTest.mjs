@@ -1,3 +1,4 @@
+import { CharacterBodyPath } from "./Script_CharacterSelection.mjs";
 // Speaker gestures (03-06), pure node: the line table (Data_FirstLevelSpeakerGestures) covers every 03-06 line a body
 // speaks, rows name existing clips and resolvable targets, the baked clips (Animation/SpeakerGestures) match the
 // table's windows, move only one arm and the spine (never neck, head or Face_*), are unit quaternions with seamless
@@ -124,7 +125,7 @@ for (const row of manifest.models) {
   // Baked on the shipped bodies: the reference and every speaking body (its own clothes, its own face).
   assert.ok(asset.reference && asset.bakedOnModelSha256[asset.reference], "reference body baked");
   for (const [body, sha] of Object.entries(asset.bakedOnModelSha256)) {
-    const glb = fs.readFileSync(path.join(projectDir, "Model/Character", `Model_${body}.glb`));
+    const glb = fs.readFileSync(path.join(projectDir, CharacterBodyPath(body)));
     assert.equal(crypto.createHash("sha256").update(glb).digest("hex"), sha, `${body}: baked on the shipped GLB`);
   }
   for (const body of rigs) assert.ok(asset.bakedOnModelSha256[body], `${body}: its own bake checked`);

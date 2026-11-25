@@ -183,7 +183,7 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
 
   // --- 人物、枪、特效 -----------------------------------------------------------------------
   onStep("读取人物与枪模", 0.65);
-  const actorFactory = new ActorFactory(library, { quality: QUALITY });
+  const actorFactory = new ActorFactory(library, { quality: QUALITY, view: {camera, renderer, lightRig: lights} });
   const actorBatch = new ActorBatcher(scene);
   actorFactory.SetBatcher(actorBatch);
   actorFactory.groundProbe = () => ({ y: 0, normal: FLAT_NORMAL, tag: "terrain" });

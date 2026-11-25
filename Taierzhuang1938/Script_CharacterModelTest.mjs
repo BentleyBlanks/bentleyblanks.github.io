@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 // Ten imported soldiers: offline GLB contract + runtime wiring (pure Node).
 //
 // ===========================================================================
@@ -24,7 +25,7 @@
 
 import assert from "node:assert/strict";
 import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND } from "./Data_CharacterSelection.mjs";
-import { IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
+import { CharacterBodyPath, IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -173,16 +174,24 @@ for (const model of manifest.models) {
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
 
-  if (model.id === "TengxianIja03") {
-    const helmetIndex = gltf.nodes.findIndex(node => node.name === "Object005");
-    const chest = gltf.nodes.find(node => node.name === model.boneRoles.chest);
-    assert.ok(helmetIndex >= 0 && chest?.children?.includes(helmetIndex),
-      "Ija03 carries its spare steel helmet on the backpack/chest, not the head or scene root");
-    const face = gltf.materials.find(material => material.name === "Material #26");
-    assert.equal(face?.alphaMode || "OPAQUE", "OPAQUE", "Ija03 skin must be opaque despite source image alpha");
-    assert.ok(face?.pbrMetallicRoughness?.baseColorTexture && face.normalTexture,
-      "Ija03 keeps its original facial colour and normal texture");
-    assert.equal(model.bytes, fs.statSync(glbPath).size, "Ija03 manifest byte count matches repaired GLB");
+  if (model.faction === "ija") {
+    assert.equal(model.url, CharacterBodyPath(model.id), "saved appearance slot matches authoring tools");
+    const kit = gltf.extras.appearanceMaterial;
+    const nativePath = path.join(characterDir, kit.file);
+    const native = ReadGlbJson(nativePath);
+    assert.equal(kit.file, "Model_" + model.appearance + ".glb");
+    assert.equal(gltf.materials[0].name, native.materials[0].name);
+    assert.equal(kit.material, native.materials[0].name);
+    assert.equal(crypto.createHash("sha256").update(fs.readFileSync(nativePath)).digest("hex"), model.appearanceSha256);
+    assert.equal(native.meshes[0].primitives.length, 1);
+    assert.equal(gltf.meshes.length, 1);
+    assert.equal(gltf.meshes[0].primitives.length, 1);
+    assert.equal(gltf.accessors[gltf.meshes[0].primitives[0].indices].count,
+      native.accessors[native.meshes[0].primitives[0].indices].count);
+    assert.equal(gltf.images?.length || 0, 0, "the native character supplies the only texture payload");
+    assert.equal(model.bytes, fs.statSync(glbPath).size);
+    assert.ok(!fs.existsSync(path.join(characterDir, "Model_" + model.id + ".glb")));
+    assert.ok(!fs.existsSync(path.join(characterDir, "Model_" + model.id + "Facial.glb")));
   }
 
   // ── 朝向闸：资产正面与引擎契约差多少，量出来钉死 ────────────────────────────
@@ -283,7 +292,7 @@ for (const id of ["TengxianNra02", "TengxianNra06"]) {
 const shoulderReference = JSON.parse(fs.readFileSync(new URL("./_blender/Data_TengxianShoulderReference.json", import.meta.url)));
 for (const [sourceId, reference] of Object.entries(shoulderReference)) {
   const id = sourceId.replace("Lugou", "Tengxian");
-  if (!manifest.models.some(model => model.id === id)) continue;
+  if (!manifest.models.some(model => model.id === id && !model.appearance)) continue; // Landmarks are indexed into the retired mesh topology.
   const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
   for (const landmark of reference.landmarks) {
     const primitive = glb.json.meshes[landmark.mesh].primitives[landmark.primitive];
@@ -383,9 +392,10 @@ assert.match(runtime, /this\.mixer\.setTime\([^\n]*\n\s*ShareSkinnedCullSphere\(
   "every skinned part shares one padded, pose-independent culling sphere set after the spawn pose");
 assert.match(runtime, /union\.radius \+= SKINNED_CULL_MARGIN_METERS[\s\S]*?mesh\.boundingSphere = union\.clone\(\)/,
   "the shared culling sphere is padded for crouched, seated and fallen poses");
-assert.match(fs.readFileSync(path.join(here, "Script_CharacterWounds.mjs"), "utf8"),
-  /const cullSphere=candidate\.boundingSphere;[\s\S]*?candidate\.boundingSphere=cullSphere/,
-  "wound raycasts restore the shared culling sphere instead of freezing the hit pose");
+const woundsSource = fs.readFileSync(path.join(here, "Script_CharacterWounds.mjs"), "utf8");
+assert.match(woundsSource, /PartSurface\(candidate,flags,/);
+assert.doesNotMatch(woundsSource, /\.boundingSphere\s*=|\.computeBoundingSphere\(/,
+  "posed wound queries preserve the character's pose-independent culling sphere");
 assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");
@@ -406,7 +416,7 @@ for (const record of manifest.models) {
   assert.equal(record.loadOnDemand === true, castOnly, `${record.id}: loadOnDemand exactly for cast-only looks`);
 }
 assert.match(runtime, /filter\(\(record\) => !record\.loadOnDemand\)\.map\(LoadAsset\)/, "boot load skips loadOnDemand records");
-assert.match(mainSource, /FIRST_LEVEL_P012_WHITEBOX && actorFactory\?\.characterAssets\)[\s\S]*?LoadLugouCastModels\(actorFactory\.characterAssets, Object\.values\(FIRST_LEVEL_SPEAKING_CAST\)\)[\s\S]*?await WarmActorShaders\(/,
+assert.match(mainSource, /ARCHIVED_P012_FIXTURE && actorFactory\?\.characterAssets\)[\s\S]*?LoadLugouCastModels\(actorFactory\.characterAssets, Object\.values\(FIRST_LEVEL_SPEAKING_CAST\)\)[\s\S]*?await WarmActorShaders\(/,
   "the first level fetches its cast-only looks before the actor shader warm-up");
 assert.match(mainSource, /CHARACTER_CAST_VARIANTS_BY_KIND\[kind\][\s\S]*?for \(const facial of \[true, false\]\)/,
   "the warm-up also places every loaded cast-only look (facial and base skin)");

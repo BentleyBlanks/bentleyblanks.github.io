@@ -3705,8 +3705,9 @@ export class ActorFactory {
    *   quality 主要影响材质桶数量（≈ 每人的 draw call）：high≈20、medium≈16、low≈12。
    *   24 人同屏建议只给最近的几个 high，其余用 medium/low 各建一个工厂。
    */
-  constructor(library, { quality = "high" } = {}) {
+  constructor(library, { quality = "high", view = null } = {}) {
     this.library = library;
+    this.view = view;
     this.quality = quality === "low" || quality === "medium" ? quality : "high";
     this.batcher = null;             // 人物合批层，见 SetBatcher
     this.kindCache = new Map();      // kind -> { dims, bones }
