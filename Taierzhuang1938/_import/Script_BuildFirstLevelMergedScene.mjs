@@ -661,9 +661,19 @@ function BuildMergedScene() {
   }
 
   // ---------------------------------------------------------------------------
-  // 7) 既有院落按鲁南社会经济梯度差异化（打破千院一面，同时 100% 保护主线可进院落）
+  // 7) 既有院落按 1930 年代鲁南农村四档阶层差异化（彻底打破“家家 2.2m 四面高墙堡垒”！）：
+  //    · 一档殷实大户/临街商宅：2.20–2.42m 青砖/石勒脚高墙 + 瓦压顶（旧制七八尺防匪）
+  //    · 二档普通中农（主力）：1.58–1.92m 夯土/土坯院墙（各段微差体现手工夯筑与风雨剥蚀；
+  //      保护 NA1–NA3 潜行遮挡墙 >=1.88m 与 NB2/NC1/DA1/GW1 标语墙 >=1.98m）
+  //    · 三档下中农/贫户：1.04–1.36m 矮土坯堰 / 干砌碎石墙 / 0.22m 薄荆条高粱秸篱笆（拦鸡犬、人过路可望院内）
+  //    · 四档赤贫户/村缘排房：敞院/半敞院（拆前院墙、仅留低矮侧篱或土埂，房前直连夯土小场、柴垛与破水缸）
   // ---------------------------------------------------------------------------
   const SKIP_DIVERSIFY = new Set(["MA3", "MA4", "Aid", "Tian", "Mat", "Church", "YBombed", "Merged", "LoneYard"]);
+  const OPEN_FRONT_YARDS = new Set(["MA1", "NC2", "DC4", "WB2", "MB1", "SA2", "SB1", "GW3", "LzN3"]);
+  const LOW_FENCE_YARDS = new Set(["NB4", "DB3", "DC2", "WB1", "GW2", "GE2", "SW1", "LzN2", "LzS1"]);
+  const RICH_WALLED_YARDS = new Set(["DA1", "DB2", "GE1", "GW1", "SR2", "MC1", "NB3"]);
+  const SLOGAN_YARDS = new Set(["NB2", "NC1", "DA1", "GW1"]);
+  const STEALTH_LOCKED_WALLS = new Set(["NA1", "NA2", "NA3", "MA2"]);
   const compoundOrder = [];
   const compoundMap = new Map();
   for (const obj of ownObjects) {
@@ -678,48 +688,138 @@ function BuildMergedScene() {
     compoundMap.get(prefix).push(obj);
   }
   const decorAdded = [];
+  const removeWallIds = new Set();
   for (let idx = 0; idx < compoundOrder.length; idx++) {
     const prefix = compoundOrder[idx];
     const parts = compoundMap.get(prefix);
     const hVal = HashStr(prefix);
-    const isEdgePoor = /^(NA1|NA2|NC2|WB|SW|Lz)/.test(prefix);
-    const isRichCenter = /^(DA1|DB2|GE1|GW1|SR2|MC1)/.test(prefix);
-    const style = isRichCenter ? 2 : isEdgePoor ? (hVal % 2 === 0 ? 1 : 3) : ((hVal + idx * 2) % 5);
+    const isRichCenter = RICH_WALLED_YARDS.has(prefix);
+    const isOpenFront = OPEN_FRONT_YARDS.has(prefix);
+    const isLowFence = LOW_FENCE_YARDS.has(prefix);
+    const isStealthLocked = STEALTH_LOCKED_WALLS.has(prefix);
+    const hasSlogan = SLOGAN_YARDS.has(prefix);
+    const style = isRichCenter ? 2 : isOpenFront ? 3 : isLowFence ? 1 : ((hVal + idx * 2) % 5 === 2 ? 0 : (hVal + idx) % 2 === 0 ? 1 : 0);
     const isNorthFront = /^(NA|NB|NC)/.test(prefix);
     const walls = parts.filter((o) => o.id.startsWith(`${prefix}_Wall`));
     const roofs = parts.filter((o) => /_House\d+_Roof$/.test(o.id));
     const houseWalls = parts.filter((o) => /_House\d+/.test(o.id) && !/_Roof$/.test(o.id));
 
+    // --- A) 按四档农村社会经济梯度重塑围墙有无、材质、厚度与高度 ---
+    if (isOpenFront) {
+      // 四档敞院 / 半敞前场草屋：拆除朝街前院墙（无封闭院门），侧墙降为 0.92–1.08m 矮荆条篱笆，后墙降为低矮土埂
+      for (const w of walls) {
+        if (/_WallF_/.test(w.id)) {
+          removeWallIds.add(w.id);
+          continue;
+        }
+        if (/_Wall[LR]$/.test(w.id)) {
+          w.material = "Whitebox/Timber";
+          w.size[0] = 0.22;
+          w.size[1] = Fix(0.92 + (hVal % 3) * 0.07);
+        } else {
+          w.material = "Whitebox/Step";
+          w.size[1] = Fix(1.25 + (hVal % 3) * 0.08);
+          w.size[2] = 0.36;
+        }
+      }
+      const mainRoof = roofs.find((r) => r.id.includes("House1"));
+      const wallL = walls.find((w) => w.id.endsWith("_WallL"));
+      if (mainRoof && wallL) {
+        decorAdded.push(
+          {
+            id: `${prefix}_OpenFirewood`, asset: "Whitebox/Box", material: "Whitebox/Timber",
+            pos: [Fix(wallL.pos[0] + (mainRoof.pos[0] > wallL.pos[0] ? 1.15 : -1.15)), null, Fix(wallL.pos[2])],
+            size: [1.15, 0.88, 2.0], yawDeg: wallL.yawDeg, group: wallL.group,
+          },
+          {
+            id: `${prefix}_OpenVat`, asset: "Whitebox/Box", material: "Whitebox/EarthDark",
+            pos: [Fix((mainRoof.pos[0] + wallL.pos[0]) * 0.5), null, Fix(wallL.pos[2] + (hVal % 2 === 0 ? 1.6 : -1.6))],
+            size: [0.74, 0.78, 0.74], yawDeg: wallL.yawDeg, group: wallL.group,
+          },
+        );
+      }
+    } else if (isLowFence) {
+      // 三档贫户/下中农：奇数户用 1.04–1.16m 薄荆条/高粱秸篱笆，偶数户用 1.24–1.38m 矮土坯/干砌碎石矮墙
+      const useThornFence = hVal % 2 === 1;
+      for (let wi = 0; wi < walls.length; wi++) {
+        const w = walls[wi];
+        const jitter = ((wi + hVal) % 3 - 1) * 0.05;
+        if (useThornFence) {
+          w.material = "Whitebox/Timber";
+          if (w.size[0] <= 0.55) w.size[0] = 0.22;
+          if (w.size[2] <= 0.55) w.size[2] = 0.22;
+          w.size[1] = Fix(1.08 + jitter);
+        } else {
+          w.material = (hVal % 4 === 0) ? "Whitebox/EarthDark" : "Whitebox/Step";
+          if (w.size[0] <= 0.55) w.size[0] = 0.36;
+          if (w.size[2] <= 0.55) w.size[2] = 0.36;
+          w.size[1] = Fix(1.30 + jitter);
+        }
+      }
+    } else if (isRichCenter) {
+      // 一档殷实大户：青砖/毛石勒脚高墙 2.22–2.40m + 灰瓦压顶（旧制七八尺防匪）
+      const richH = Fix(2.24 + (hVal % 3) * 0.08);
+      for (const w of walls) {
+        w.size[1] = richH;
+        decorAdded.push({
+          id: `${w.id}_Coping`, asset: "Whitebox/Box", material: "Whitebox/Coping",
+          pos: [w.pos[0], Fix(richH + 0.27), w.pos[2]],
+          size: [Fix(w.size[0] + 0.08), 0.16, Fix(w.size[2] + 0.08)],
+          yawDeg: w.yawDeg, group: w.group, solid: false,
+        });
+      }
+    } else {
+      // 二档普通中农：1.62–1.92m 手工夯土/土坯院墙（保护 NA1–NA3 >=1.88m 遮挡与标语前墙 >=1.98m）
+      const baseMudH = isStealthLocked ? 1.92 : Fix(1.66 + (hVal % 4) * 0.08);
+      for (let wi = 0; wi < walls.length; wi++) {
+        const w = walls[wi];
+        const isFrontSloganWall = hasSlogan && w.id.endsWith("_WallF_1");
+        if (isFrontSloganWall) {
+          w.size[1] = Math.max(2.02, baseMudH + 0.18);
+          continue;
+        }
+        if (isStealthLocked) {
+          w.size[1] = Fix(Math.max(1.88, baseMudH + ((wi % 3) - 1) * 0.05));
+          w.material = (prefix === "NA3") ? "Whitebox/Plaster" : "Whitebox/Step";
+        } else {
+          // 侧墙/后墙略矮且带风雨风蚀低段，呈现真实农村土墙高低参差
+          const sideDip = /_Wall[BLR]$/.test(w.id) ? -0.10 : 0;
+          const jitter = ((wi + hVal) % 3 - 1) * 0.06;
+          w.size[1] = Fix(Math.max(1.48, baseMudH + sideDip + jitter));
+          w.material = (hVal % 3 === 0) ? "Whitebox/Plaster" : "Whitebox/Step";
+          if (w.size[0] <= 0.55) w.size[0] = 0.42;
+          if (w.size[2] <= 0.55) w.size[2] = 0.42;
+        }
+      }
+    }
+
+    // --- B) 屋身与屋顶样式差异化（草顶 / 青瓦硬山 / 高脊大瓦房 / 战损残梁） ---
     if (style === 0) {
       for (const r of roofs) {
         const isMain = r.id.includes("House1");
-        const lift = isMain ? 0.35 : 0.1;
+        const lift = isMain ? 0.32 : 0.1;
         r.pos[1] = Fix(r.pos[1] + lift);
         r.size[1] = Fix(isMain ? 0.40 : 0.36);
         decorAdded.push({
           id: `${r.id}_Ridge`, asset: "Whitebox/Box", material: "Whitebox/Roof",
           pos: [r.pos[0], Fix(r.pos[1] + r.size[1] * 0.90), r.pos[2]],
-          size: [Fix(r.size[0] * 0.94), Fix(isMain ? 0.56 : 0.40), Fix(r.size[2] * 0.52)],
+          size: [Fix(r.size[0] * 0.94), Fix(isMain ? 0.54 : 0.38), Fix(r.size[2] * 0.52)],
           yawDeg: r.yawDeg, group: r.group,
         });
         if (isMain) {
           decorAdded.push({
             id: `${r.id}_Crest`, asset: "Whitebox/Box", material: "Whitebox/Structure",
-            pos: [r.pos[0], Fix(r.pos[1] + r.size[1] + 0.50), r.pos[2]],
+            pos: [r.pos[0], Fix(r.pos[1] + r.size[1] + 0.48), r.pos[2]],
             size: [Fix(r.size[0] * 0.96), 0.22, 0.38],
             yawDeg: r.yawDeg, group: r.group,
           });
         }
       }
       for (const hw of houseWalls) {
-        if (hw.id.includes("House1") && hw.size[1] >= 2.5) hw.size[1] = Fix(hw.size[1] + 0.35);
+        if (hw.id.includes("House1") && hw.size[1] >= 2.5) hw.size[1] = Fix(hw.size[1] + 0.32);
       }
     } else if (style === 1) {
-      // 陡坡厚草顶土坯农舍（T2 半面槽风貌）
-      for (const w of walls) {
-        w.material = "Whitebox/Step";
-        w.size[1] = Fix(1.88 + (hVal % 3) * 0.08);
-      }
+      // 陡坡厚草顶土坯农舍（T2 半面槽/低矮草屋风貌）
       for (const hw of houseWalls) {
         if (hw.material === "Whitebox/Plaster") hw.material = "Whitebox/Step";
       }
@@ -752,36 +852,27 @@ function BuildMergedScene() {
       }
     } else if (style === 2) {
       // 殷实砖瓦高脊大院（T4/T5）
-      for (const w of walls) {
-        w.size[1] = 2.45;
-        decorAdded.push({
-          id: `${w.id}_Coping`, asset: "Whitebox/Box", material: "Whitebox/Coping",
-          pos: [w.pos[0], 2.72, w.pos[2]],
-          size: [Fix(w.size[0] + 0.08), 0.16, Fix(w.size[2] + 0.08)],
-          yawDeg: w.yawDeg, group: w.group, solid: false,
-        });
-      }
       for (const r of roofs) {
         const isMain = r.id.includes("House1");
-        r.pos[1] = Fix(r.pos[1] + (isMain ? 0.55 : 0.25));
+        r.pos[1] = Fix(r.pos[1] + (isMain ? 0.52 : 0.24));
         r.size[1] = 0.44;
         decorAdded.push({
           id: `${r.id}_HighRidge`, asset: "Whitebox/Box", material: "Whitebox/Roof",
           pos: [r.pos[0], Fix(r.pos[1] + 0.40), r.pos[2]],
-          size: [Fix(r.size[0] * 0.92), Fix(isMain ? 0.72 : 0.46), Fix(r.size[2] * 0.48)],
+          size: [Fix(r.size[0] * 0.92), Fix(isMain ? 0.70 : 0.46), Fix(r.size[2] * 0.48)],
           yawDeg: r.yawDeg, group: r.group,
         });
         if (isMain) {
           decorAdded.push({
             id: `${r.id}_BrickCrest`, asset: "Whitebox/Box", material: "Whitebox/Structure",
-            pos: [r.pos[0], Fix(r.pos[1] + 1.08), r.pos[2]],
+            pos: [r.pos[0], Fix(r.pos[1] + 1.06), r.pos[2]],
             size: [Fix(r.size[0] * 0.96), 0.22, 0.38],
             yawDeg: r.yawDeg, group: r.group,
           });
         }
       }
       for (const hw of houseWalls) {
-        if (hw.id.includes("House1") && hw.size[1] >= 2.5) hw.size[1] = Fix(hw.size[1] + 0.55);
+        if (hw.id.includes("House1") && hw.size[1] >= 2.5) hw.size[1] = Fix(hw.size[1] + 0.52);
       }
       const mainRoof = roofs.find((r) => r.id.includes("House1"));
       const wallF = walls.find((w) => w.id.endsWith("_WallF_1"));
@@ -793,41 +884,22 @@ function BuildMergedScene() {
         });
       }
     } else if (style === 3) {
-      // 矮墙偏棚草房院（T2 贫户）
-      for (const w of walls) {
-        w.material = (hVal % 2 === 0) ? "Whitebox/EarthDark" : "Whitebox/Step";
-        w.size[1] = 1.72;
+      // 贫户草屋 / 敞前场偏棚草房
+      for (const hw of houseWalls) {
+        if (hw.material === "Whitebox/Plaster") hw.material = "Whitebox/Step";
       }
       for (const r of roofs) {
-        if (r.id.includes("House2")) {
-          r.material = "Whitebox/Canvas";
-          r.pos[1] = Fix(r.pos[1] - 0.18);
-          r.size[1] = 0.38;
-        } else {
-          r.material = "Whitebox/Roof";
-          decorAdded.push({
-            id: `${r.id}_LowPitch`, asset: "Whitebox/Box", material: "Whitebox/Roof",
-            pos: [r.pos[0], Fix(r.pos[1] + 0.42), r.pos[2]],
-            size: [Fix(r.size[0] * 0.90), 0.40, Fix(r.size[2] * 0.46)],
-            yawDeg: r.yawDeg, group: r.group,
-          });
-        }
-      }
-      const wallL = walls.find((w) => w.id.endsWith("_WallL"));
-      const mainRoof = roofs.find((r) => r.id.includes("House1"));
-      if (wallL && mainRoof) {
+        r.material = "Whitebox/Canvas";
+        r.size[1] = 0.44;
         decorAdded.push({
-          id: `${prefix}_Firewood`, asset: "Whitebox/Box", material: "Whitebox/Timber",
-          pos: [Fix(wallL.pos[0] + (mainRoof.pos[0] > wallL.pos[0] ? 1.2 : -1.2)), null, Fix(wallL.pos[2])],
-          size: [1.1, 0.92, 2.1], yawDeg: wallL.yawDeg, group: wallL.group,
+          id: `${r.id}_ThatchCrown`, asset: "Whitebox/Box", material: "Whitebox/Canvas",
+          pos: [r.pos[0], Fix(r.pos[1] + 0.38), r.pos[2]],
+          size: [Fix(r.size[0] * 0.88), 0.44, Fix(r.size[2] * 0.56)],
+          yawDeg: r.yawDeg, group: r.group,
         });
       }
     } else {
       // 炮损/战损残梁院落（T7）
-      for (const w of walls) {
-        w.material = isNorthFront ? "Whitebox/Step" : "Whitebox/Plaster";
-        if (w.id.endsWith("_WallF_2") || w.id.endsWith("_WallB")) w.size[1] = 1.32;
-      }
       for (const r of roofs) {
         if (r.id.includes("House1")) {
           r.material = "Whitebox/Roof";
@@ -846,6 +918,11 @@ function BuildMergedScene() {
           );
         }
       }
+    }
+  }
+  if (removeWallIds.size) {
+    for (let i = ownObjects.length - 1; i >= 0; i--) {
+      if (removeWallIds.has(ownObjects[i].id)) ownObjects.splice(i, 1);
     }
   }
   const ma4MainRoof = ownObjects.find((o) => o.id === "MA4_House1_Roof");
@@ -982,20 +1059,28 @@ function BuildMergedScene() {
       Push("Dugout_Mouth", lx, null, lz + 1.15, 1.15, 0.72, 0.32, "Whitebox/Void", { solid: false });
     };
 
-    // ----- T1：贫农独栋/排房草屋（无完整砖墙，矮荆笆围前场） -----
+    // ----- T1：贫农独栋/排房草屋（无砖院墙；半数完全敞前场，半数仅前侧 0.95–1.10m 矮荆笆） -----
     if (type === "T1") {
       const hW = Math.max(5.8, w - 0.8), hD = Math.min(4.5, Math.max(3.6, d * 0.44));
       const hZ = gateSide === "N" ? (hd - hD / 2 - 0.3) : (-hd + hD / 2 + 0.3);
-      const eaveH = 2.18;
+      const eaveH = 2.15;
       Push("House1_Body", 0, null, hZ, hW, eaveH, hD, "Whitebox/Step");
       Push("House1_DoorVoid", 0, null, hZ + (gateSide === "N" ? -hD / 2 - 0.04 : hD / 2 + 0.04), 1.05, 1.72, 0.12, "Whitebox/Void", { solid: false });
       AddPitchedRoof("House1", 0, hZ, hW, hD, eaveH + 0.18, opts.damaged ? "damaged" : "thatch");
       Push("Chimney", hW * 0.38, eaveH + 0.2, hZ, 0.48, 1.35, 0.48, "Whitebox/Structure");
-      // 前场矮荆条篱笆（敞口柴门）
+      const openFront = opts.openFront ?? (hVal % 2 === 0);
       const fZ = gateSide === "N" ? (-hd + 0.35) : (hd - 0.35);
-      Push("Fence_FrontL", -hw * 0.56, null, fZ, hw * 0.72, 1.05, 0.22, "Whitebox/Timber");
-      Push("Fence_FrontR", hw * 0.56, null, fZ, hw * 0.72, 1.05, 0.22, "Whitebox/Timber");
-      Push("Fence_SideW", -hw + 0.25, null, (fZ + hZ) * 0.5, 0.22, 1.05, Math.max(1.8, Math.abs(fZ - hZ) - hD * 0.45), "Whitebox/Timber");
+      const fenceH = Fix(0.92 + (hVal % 3) * 0.08);
+      if (openFront) {
+        // 赤贫敞院：无前院墙/前篱笆，仅留一侧半截荆条风障拦鸡犬，正房前敞开土场摆柴垛、水缸与石槽
+        Push("Fence_SideW", -hw + 0.25, null, (fZ + hZ) * 0.5, 0.20, fenceH, Math.max(1.8, Math.abs(fZ - hZ) - hD * 0.55), "Whitebox/Timber");
+        Push("StoneTrough", hw * 0.42, null, (fZ + hZ) * 0.5, 0.56, 0.42, 1.35, "Whitebox/Structure");
+      } else {
+        // 贫农荆条/高粱秸篱笆院（仅 0.92–1.08m 矮薄篱笆，敞口柴门）
+        Push("Fence_FrontL", -hw * 0.56, null, fZ, hw * 0.72, fenceH, 0.20, "Whitebox/Timber");
+        Push("Fence_FrontR", hw * 0.56, null, fZ, hw * 0.72, fenceH, 0.20, "Whitebox/Timber");
+        Push("Fence_SideW", -hw + 0.25, null, (fZ + hZ) * 0.5, 0.20, fenceH, Math.max(1.8, Math.abs(fZ - hZ) - hD * 0.45), "Whitebox/Timber");
+      }
       // 檐下柴禾垛 + 破陶水缸
       Push("Firewood", -hW * 0.34, null, hZ + (gateSide === "N" ? -hD * 0.65 : hD * 0.65), 1.6, 0.85, 0.9, "Whitebox/Timber");
       Push("WaterVat", hW * 0.26, null, hZ + (gateSide === "N" ? -hD * 0.62 : hD * 0.62), 0.72, 0.82, 0.72, "Whitebox/EarthDark");
@@ -1041,8 +1126,14 @@ function BuildMergedScene() {
       return;
     }
 
-    // ----- T2 / T3 / T4 / T5 围合院落 -----
-    const wallH = type === "T5" ? 2.50 : type === "T4" ? 2.18 : type === "T3" ? 1.98 : 1.86;
+    // ----- T2 / T3 / T4 / T5 围合院落（按阶层拉开墙高：T2 矮土堰 1.28–1.42m 或普通土墙 1.58–1.78m；T3 1.72m；T4 2.08m；T5 2.38m） -----
+    const isLowMudT2 = type === "T2" && (opts.lowWall ?? (hVal % 2 === 1));
+    const wallH = type === "T5" ? 2.38
+      : type === "T4" ? Fix(2.06 + (hVal % 3) * 0.06)
+      : type === "T3" ? Fix(1.70 + (hVal % 3) * 0.06)
+      : isLowMudT2 ? Fix(1.26 + (hVal % 3) * 0.07)
+      : Fix(1.58 + (hVal % 3) * 0.08);
+    const localWallT = isLowMudT2 ? 0.34 : (type === "T2" || type === "T3") ? 0.40 : wallT;
     const wallMat = (type === "T4" || type === "T5") ? "Whitebox/Plaster" : (hVal % 2 === 0 ? "Whitebox/Step" : "Whitebox/EarthDark");
     const mainH = type === "T5" ? 3.25 : type === "T4" ? 2.85 : type === "T3" ? 2.48 : 2.38;
     const mainRoofStyle = opts.damaged ? "damaged"
@@ -1052,12 +1143,13 @@ function BuildMergedScene() {
     const gateW = type === "T3" ? 1.55 : type === "T5" ? 2.25 : 1.95;
 
     const AddSideWall = (sideName, isHoriz, offset, span, hasGate, gateOffset = 0) => {
+      const segH = hasGate ? wallH : Fix(Math.max(1.12, wallH - (sideName === "N" || sideName === "W" ? 0.08 : 0.04)));
       if (!hasGate) {
-        if (isHoriz) Push(`Wall${sideName}`, 0, null, offset, span, wallH, wallT, wallMat);
-        else Push(`Wall${sideName}`, offset, null, 0, wallT, wallH, span, wallMat);
+        if (isHoriz) Push(`Wall${sideName}`, 0, null, offset, span, segH, localWallT, wallMat);
+        else Push(`Wall${sideName}`, offset, null, 0, localWallT, segH, span, wallMat);
         if (type === "T5") {
-          if (isHoriz) Push(`Wall${sideName}_Coping`, 0, wallH + 0.16, offset, span + 0.08, 0.16, wallT + 0.10, "Whitebox/Coping", { solid: false });
-          else Push(`Wall${sideName}_Coping`, offset, wallH + 0.16, 0, wallT + 0.10, 0.16, span + 0.08, "Whitebox/Coping", { solid: false });
+          if (isHoriz) Push(`Wall${sideName}_Coping`, 0, segH + 0.16, offset, span + 0.08, 0.16, localWallT + 0.10, "Whitebox/Coping", { solid: false });
+          else Push(`Wall${sideName}_Coping`, offset, segH + 0.16, 0, localWallT + 0.10, 0.16, span + 0.08, "Whitebox/Coping", { solid: false });
         }
         return;
       }
@@ -1066,27 +1158,27 @@ function BuildMergedScene() {
       const leftCenter = -span / 2 + leftSpan / 2;
       const rightCenter = span / 2 - rightSpan / 2;
       if (isHoriz) {
-        Push(`Wall${sideName}_1`, leftCenter, null, offset, leftSpan, wallH, wallT, wallMat);
-        Push(`Wall${sideName}_2`, rightCenter, null, offset, rightSpan, wallH, wallT, wallMat);
+        Push(`Wall${sideName}_1`, leftCenter, null, offset, leftSpan, segH, localWallT, wallMat);
+        Push(`Wall${sideName}_2`, rightCenter, null, offset, rightSpan, segH, localWallT, wallMat);
         if (type === "T4" || type === "T5") {
           // 鲁南硬山砖门楼 + 院内影壁
-          Push("Gatehouse_Roof", gateOffset, wallH + 0.32, offset, gateW + 1.15, 0.42, 1.35, "Whitebox/Roof", { solid: false });
-          Push("Gatehouse_Ridge", gateOffset, wallH + 0.70, offset, gateW + 0.85, 0.34, 0.62, "Whitebox/Roof", { solid: false });
+          Push("Gatehouse_Roof", gateOffset, segH + 0.32, offset, gateW + 1.15, 0.42, 1.35, "Whitebox/Roof", { solid: false });
+          Push("Gatehouse_Ridge", gateOffset, segH + 0.70, offset, gateW + 0.85, 0.34, 0.62, "Whitebox/Roof", { solid: false });
           const screenZ = offset + (offset > 0 ? -2.2 : 2.2);
           Push("SpiritScreen", gateOffset, null, screenZ, Math.min(2.6, gateW + 0.4), 1.95, 0.34, "Whitebox/Plaster");
-        } else {
-          Push("GateLintel", gateOffset, wallH + 0.10, offset, gateW + 0.45, 0.28, wallT + 0.12, "Whitebox/Timber", { solid: false });
+        } else if (!isLowMudT2) {
+          Push("GateLintel", gateOffset, segH + 0.10, offset, gateW + 0.45, 0.28, localWallT + 0.12, "Whitebox/Timber", { solid: false });
         }
       } else {
-        Push(`Wall${sideName}_1`, offset, null, leftCenter, wallT, wallH, leftSpan, wallMat);
-        Push(`Wall${sideName}_2`, offset, null, rightCenter, wallT, wallH, rightSpan, wallMat);
+        Push(`Wall${sideName}_1`, offset, null, leftCenter, localWallT, segH, leftSpan, wallMat);
+        Push(`Wall${sideName}_2`, offset, null, rightCenter, localWallT, segH, rightSpan, wallMat);
         if (type === "T4" || type === "T5") {
-          Push("Gatehouse_Roof", offset, wallH + 0.32, gateOffset, 1.35, 0.42, gateW + 1.15, "Whitebox/Roof", { solid: false });
-          Push("Gatehouse_Ridge", offset, wallH + 0.70, gateOffset, 0.62, 0.34, gateW + 0.85, "Whitebox/Roof", { solid: false });
+          Push("Gatehouse_Roof", offset, segH + 0.32, gateOffset, 1.35, 0.42, gateW + 1.15, "Whitebox/Roof", { solid: false });
+          Push("Gatehouse_Ridge", offset, segH + 0.70, gateOffset, 0.62, 0.34, gateW + 0.85, "Whitebox/Roof", { solid: false });
           const screenX = offset + (offset > 0 ? -2.2 : 2.2);
           Push("SpiritScreen", screenX, null, gateOffset, 0.34, 1.95, Math.min(2.6, gateW + 0.4), "Whitebox/Plaster");
-        } else {
-          Push("GateLintel", offset, wallH + 0.10, gateOffset, wallT + 0.12, 0.28, gateW + 0.45, "Whitebox/Timber", { solid: false });
+        } else if (!isLowMudT2) {
+          Push("GateLintel", offset, segH + 0.10, gateOffset, localWallT + 0.12, 0.28, gateW + 0.45, "Whitebox/Timber", { solid: false });
         }
       }
     };
@@ -1291,6 +1383,130 @@ function BuildMergedScene() {
     { id: "Village_GardenFence_W2", asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [59.8, null, 658.4], size: [0.20, 0.92, 8.2], yawDeg: 2, group: "08–13合并/村街烟火" },
     { id: "Village_ThreshRoller_S", asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [131.5, null, 654.5], size: [1.35, 0.68, 0.72], yawDeg: 28, group: "08–13合并/村街烟火" },
   );
+
+  // 10D) 1938 年 3 月鲁南村内小路/巷道真实街景风物（贴墙根与街角放置，严守全村通行净宽与 0 穿墙）：
+  //      · 贴墙高粱秸/枣木柴草垛（过冬烧剩半垛，压泥防风）
+  //      · 街边沤肥土粪堆与矮土圈（明恩溥记北方村巷最常见的农肥堆积）
+  //      · 门前坐石礅、饮畜石槽、拴马桩、屋檐陶水缸、石磨盘、木独轮车与卸轮大车
+  //      · 巷口“泰山石敢当”镇煞小石碑、拐角小土地龛、房前屋后老槐/泡桐/枣树与战时逃难遗落杂物
+  const laneG = "08–13合并/村街烟火/巷边风物";
+  // 1) 贴墙柴草垛（12 处，贴墙根/夹道拐角码放，高 0.92–1.35m）
+  for (const [id, x, z, w, h, d, yaw] of [
+    ["NB1_E", 130.6, 515.4, 1.9, 1.15, 0.95, -4],
+    ["NB3_W", 145.4, 516.8, 1.7, 1.05, 0.90, 6],
+    ["DB1_S", 159.5, 542.6, 2.1, 1.22, 0.95, -5],
+    ["DB3_S", 189.2, 543.2, 1.8, 1.08, 0.92, 4],
+    ["DC2_S", 178.4, 563.8, 1.9, 1.02, 0.88, -9],
+    ["MA1_S", 92.2, 582.0, 2.0, 1.18, 0.92, -6],
+    ["WB1_N", 69.5, 562.2, 1.8, 1.12, 0.95, 8],
+    ["SA2_N", 109.6, 585.8, 1.9, 1.04, 0.90, -5],
+    ["MCW_N", 95.4, 631.4, 2.1, 1.24, 0.95, 3],
+    ["MCE_S", 156.2, 662.2, 1.8, 1.10, 0.90, -7],
+    ["GW2_W", 172.0, 710.8, 2.0, 1.16, 0.94, -18],
+    ["Lz_N", -22.8, 775.4, 2.1, 1.15, 0.92, 5],
+  ]) {
+    ownObjects.push(
+      { id: `Lane_Firewood_${id}`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [x, null, z], size: [w, h, d], yawDeg: yaw, group: laneG },
+      { id: `Lane_FirewoodCap_${id}`, asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [x, Fix(HeightAtOwn(x, z) + h), z], size: [Fix(w * 0.86), 0.18, Fix(d * 0.84)], yawDeg: yaw, solid: false, group: laneG },
+    );
+  }
+  // 2) 街边土粪堆 / 沤肥坑（9 处，背街墙角/水塘沿/村缘胡同，0.52–0.78m 矮土堆 + 围坎）
+  for (const [id, x, z, yaw] of [
+    ["N_Pond", 171.6, 495.5, 14],
+    ["W_Pond", 54.4, 555.2, -18],
+    ["NE_Alley", 197.8, 520.2, 8],
+    ["E_Back", 215.2, 540.5, -12],
+    ["W_Lane", 77.6, 610.5, 16],
+    ["Mid_Pond", 155.4, 636.8, -10],
+    ["S_Back", 79.4, 682.4, 22],
+    ["SE_Alley", 199.4, 712.8, -15],
+    ["Lz_E", 16.8, 773.6, 12],
+  ]) {
+    ownObjects.push(
+      { id: `Lane_ManureBase_${id}`, asset: "Whitebox/Box", material: "Whitebox/EarthDark", pos: [x, null, z], size: [2.1, 0.42, 1.75], yawDeg: yaw, group: laneG },
+      { id: `Lane_ManureTop_${id}`, asset: "Whitebox/Box", material: "Whitebox/EarthDark", pos: [x, null, z], size: [1.25, 0.72, 1.05], yawDeg: yaw + 12, group: laneG },
+    );
+  }
+  // 3) 门前青石坐礅、长饮畜石槽与拴马桩（大户院门/官道铺面/公井旁，高 0.45–1.15m）
+  for (const [id, x, z, kind, yaw] of [
+    ["NB3_Stone", 150.2, 517.8, "seat", -3],
+    ["DA1_Hitch", 129.6, 536.2, "hitch", -38],
+    ["DB2_Trough", 174.2, 540.2, "trough", 5],
+    ["MC1_Trough", 198.2, 571.6, "trough", 1],
+    ["Main_Hitch1", 168.4, 622.5, "hitch", 4],
+    ["Main_Trough1", 178.4, 621.2, "trough", -4],
+    ["Well3_Trough", 184.6, 685.6, "trough", -24],
+    ["GW1_Stone", 177.2, 695.6, "seat", -33],
+    ["GE1_Hitch", 190.2, 694.8, "hitch", -28],
+    ["SR2_Stone", 149.2, 688.8, "seat", 20],
+  ]) {
+    if (kind === "seat") {
+      ownObjects.push(
+        { id: `Lane_GateStone_${id}A`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [x, null, z], size: [0.58, 0.46, 0.48], yawDeg: yaw, group: laneG },
+        { id: `Lane_GateStone_${id}B`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [Fix(x + 2.4), null, Fix(z + 0.15)], size: [0.56, 0.44, 0.46], yawDeg: yaw + 6, group: laneG },
+      );
+    } else if (kind === "trough") {
+      ownObjects.push({ id: `Lane_Trough_${id}`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [x, null, z], size: [1.75, 0.50, 0.62], yawDeg: yaw, group: laneG });
+    } else {
+      ownObjects.push({ id: `Lane_HitchPost_${id}`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [x, null, z], size: [0.24, 1.18, 0.24], yawDeg: yaw, group: laneG });
+    }
+  }
+  // 4) 巷口“泰山石敢当”小石碑与拐角小土地龛（鲁南胡同丁字口民俗标配）
+  for (const [id, x, z, yaw] of [
+    ["NorthT", 145.6, 523.4, 4],
+    ["MidEastT", 186.2, 565.6, -8],
+    ["SouthMidT", 124.2, 634.2, 10],
+  ]) {
+    ownObjects.push(
+      { id: `Lane_ShigandangBase_${id}`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [x, null, z], size: [0.58, 0.28, 0.42], yawDeg: yaw, group: laneG },
+      { id: `Lane_ShigandangStele_${id}`, asset: "Whitebox/Box", material: "Whitebox/Plaster", pos: [x, Fix(HeightAtOwn(x, z) + 0.26), z], size: [0.36, 0.92, 0.16], yawDeg: yaw, group: laneG },
+    );
+  }
+  // 5) 街边石磨盘、靠墙木独轮车、停靠大车架、破陶水缸与逃难遗落包袱/靠墙门板
+  for (const [id, x, z, kind, yaw] of [
+    ["NorthSt", 163.5, 515.6, "barrow", 18],
+    ["EastLane", 156.6, 548.2, "mill", 12],
+    ["MidWest", 98.4, 584.2, "barrow", -26],
+    ["SouthMidW", 88.2, 633.8, "vat", 0],
+    ["SouthMidE", 191.2, 639.2, "cart", 14],
+    ["SouthStW", 89.2, 685.6, "barrow", -16],
+    ["SouthStE", 157.8, 684.6, "vat", 0],
+    ["GW_Corner", 179.4, 703.0, "bundle", 28],
+    ["MidAlley", 139.2, 581.4, "boards", -12],
+    ["SouthExit", 126.4, 711.2, "bundle", -20],
+    ["Lz_Lane", -11.6, 780.4, "barrow", 34],
+  ]) {
+    if (kind === "barrow") {
+      ownObjects.push(
+        { id: `Lane_BarrowFrame_${id}`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [x, null, z], size: [1.65, 0.56, 0.78], yawDeg: yaw, group: laneG },
+        { id: `Lane_BarrowWheel_${id}`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [Fix(x + 0.2), null, z], size: [0.14, 0.82, 0.82], yawDeg: yaw, group: laneG },
+      );
+    } else if (kind === "mill") {
+      ownObjects.push(
+        { id: `Lane_MillBase_${id}`, asset: "Whitebox/Box", material: "Whitebox/Step", pos: [x, null, z], size: [1.22, 0.54, 1.22], yawDeg: yaw, group: laneG },
+        { id: `Lane_MillStone_${id}`, asset: "Whitebox/Box", material: "Whitebox/Structure", pos: [x, Fix(HeightAtOwn(x, z) + 0.52), z], size: [0.92, 0.34, 0.92], yawDeg: yaw + 15, group: laneG },
+      );
+    } else if (kind === "cart") {
+      ownObjects.push({ id: `Lane_Cart_${id}`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [x, null, z], size: [2.35, 0.72, 1.25], yawDeg: yaw, group: laneG });
+    } else if (kind === "vat") {
+      ownObjects.push({ id: `Lane_Vat_${id}`, asset: "Whitebox/Box", material: "Whitebox/EarthDark", pos: [x, null, z], size: [0.76, 0.80, 0.76], group: laneG });
+    } else if (kind === "boards") {
+      ownObjects.push({ id: `Lane_SpareBoards_${id}`, asset: "Whitebox/Box", material: "Whitebox/Timber", pos: [x, null, z], size: [1.95, 0.92, 0.24], yawDeg: yaw, group: laneG });
+    } else {
+      ownObjects.push({ id: `Lane_EvacBundle_${id}`, asset: "Whitebox/Box", material: "Whitebox/Canvas", pos: [x, null, z], size: [0.95, 0.44, 0.68], yawDeg: yaw, group: laneG });
+    }
+  }
+  // 6) 村内胡同拐角与房前屋后老槐/泡桐/枣树（9 株，《滕县志》“房前屋后种泡桐、杨槐、果树”）
+  for (const [idx, x, z, h] of [
+    [1, 132.4, 517.8, 6.2], [2, 174.2, 514.2, 6.8], [3, 155.2, 543.8, 5.9],
+    [4, 87.6, 583.4, 6.4], [5, 191.5, 566.2, 6.1], [6, 117.4, 610.2, 6.6],
+    [7, 160.2, 660.4, 5.8], [8, 177.6, 688.4, 6.5], [9, -11.8, 776.8, 6.3],
+  ]) {
+    ownObjects.push({
+      id: `Lane_Tree_${idx}`, asset: "Whitebox/Box", material: "Whitebox/Foliage",
+      pos: [x, null, z], size: [0.42, h, 0.42], group: laneG,
+    });
+  }
 
   // 环村自然老榆/旱柳树环（明恩溥记“山东村落远看一团树裹着土屋”）
   for (const [idx, x, z, h] of [
