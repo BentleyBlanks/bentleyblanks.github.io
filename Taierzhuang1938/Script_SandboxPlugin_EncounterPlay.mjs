@@ -18,6 +18,7 @@ export function CreateEncounterPlayPluginInstance(h, options = {}) {
     CapturesInput: () => runtime.CapturesInput(),
     ApplyCamera: (camera) => runtime.ApplyCamera(camera),
     OnKey: (detail) => runtime.OnKey(detail),
+    OnTankHit: (tankId, point, from) => runtime.OnTankHit(tankId, point, from),
     OnPlayerDown: () => runtime.Fail(),
     ViewportSize: () => runtime.view.Size(),
     AfterRender: (dt, frameOptions) => runtime.AfterRender(dt, frameOptions),

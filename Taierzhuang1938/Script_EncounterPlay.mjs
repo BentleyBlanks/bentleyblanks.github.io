@@ -12,6 +12,7 @@ import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
 import { EncounterPlayDialogue, EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
+import { EncounterTankRuntime } from "./Script_EncounterTankRuntime.mjs";
 import { LoadToolsVolume, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -139,6 +140,9 @@ export class EncounterPlay {
     this.puppets=new BlockoutPuppets({scene:host.scene,actorFactory:host.actorFactory,library:host.library,loadCast:LoadEncounterCast,
       groundAt,formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
       characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...Object.values(XBOT_FACTION_CHARACTERS).flat()])]});
+    this.tanks=new EncounterTankRuntime(host,this.puppets,{groundAt});
+    this.blastHookInstalled=false;this.previousOnBlast=null;this.blastHandler=null;
+    this.InstallBlastHook();
     this.view=this.isCampaign?CreateSingleViewportStub(host):new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
     this.opening=this.isCampaign
@@ -147,10 +151,28 @@ export class EncounterPlay {
     this.BuildUi();
     this.api={State:()=>this.State(),MissionState:()=>this.MissionState(),Stages:()=>this.Stages(),
       SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
-      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Retry:opts=>this.Retry(opts),
+      Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Tanks:()=>this.tanks?.State()||[],Retry:opts=>this.Retry(opts),
       Begin:p=>this.Begin(p),JumpToStage:v=>this.JumpToStage(v),SkipOpening:()=>this.SkipOpening(),
       Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
     this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);console.error(error);this.Send("error",{message:String(error.message||error)});});
+  }
+  InstallBlastHook() {
+    const ch=this.host.combat?.host;
+    if(!ch||this.blastHookInstalled)return;
+    this.previousOnBlast=ch.onBlast||null;
+    this.blastHandler=event=>{this.previousOnBlast?.(event);if(this.active&&this.combatStarted&&!this.failed)this.tanks?.OnBlast(event);};
+    ch.onBlast=this.blastHandler;
+    this.blastHookInstalled=true;
+  }
+  RestoreBlastHook() {
+    const ch=this.host.combat?.host;
+    if(!ch||!this.blastHookInstalled)return;
+    if(ch.onBlast===this.blastHandler)ch.onBlast=this.previousOnBlast;
+    this.blastHookInstalled=false;this.previousOnBlast=null;this.blastHandler=null;
+  }
+  OnTankHit(tankId,point,from) {
+    if(!this.active||!this.combatStarted||this.failed)return null;
+    return this.tanks?.OnBulletHit(tankId,point,from)??null;
   }
   BuildUi() {
     document.body.classList.add(this.isCampaign?"encounterCampaign":"encounterGame");
@@ -339,6 +361,7 @@ export class EncounterPlay {
     if(this.active||this.ready||this.entries.size||this.pendingActions.size||this.openingActive)this.Suspend();
     else this.view.SetLayout(1);
     this.starting=true;this.active=true;this.token=payload.token||(this.isCampaign?"campaign":"standalone");
+    this.InstallBlastHook();
     const token=this.token;
     if(payload.variantId&&payload.variantId!==this.variant.id) {
       this.variant=CompileEncounterVariant(payload.variantId);
@@ -388,6 +411,8 @@ export class EncounterPlay {
   }
   Suspend() {
     this.opening?.Stop();
+    this.tanks?.Reset();
+    this.RestoreBlastHook();
     this.openingActive=false;this.pendingOpening=false;this.combatStarted=false;
     if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
     if(this.previousMissionCoverRules!==undefined) this.host.ai.missionCoverRules=this.previousMissionCoverRules;
@@ -833,10 +858,15 @@ export class EncounterPlay {
     this.UpdateEnemyAwareness(frame,dt);
     this.orderClock-=dt;
     if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=cfg.orderEveryS;}
+    const tankOverrides=this.tanks.Update(frame,dt,this.entries);
     const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)&&!this.plan.groups.has(a.groupId)).map(a=>{
       const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId),this.variant);
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
       if(a.kind==="litter")spec.kind="litter";
+      if(a.kind==="tank"){
+        const ov=tankOverrides.get(a.id);
+        if(ov&&Number.isFinite(ov.turretYawDeg))spec.arc={yawDeg:ov.turretYawDeg};
+      }
       if(a.heading===undefined&&!a.parentId)spec.yawDeg=EncounterPuppetYaw(this.puppets.puppets.get(a.id),spec,dt,cfg.puppetFacing);
       return spec;
     });
@@ -844,6 +874,7 @@ export class EncounterPlay {
       yawDeg:player.yaw*180/Math.PI,stance:player.stance,state:"alive",visible:this.view.count===2||this.preparingPuppets===true,
       weapon:state.activeSlot==="melee"?"Dadao":this.host.Weapon()});
     this.puppets.SyncFrame(units,dt,this.view.count===2?null:player.position);
+    this.tanks.PostSync(dt);
     this.playerPuppet=this.puppets.puppets.get("player");
     this.SetPlayerPuppetVisible(false);
     this.view.Update(id=>this.Position(id),dt);
@@ -985,11 +1016,11 @@ export class EncounterPlay {
       opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,
       time:this.openingActive?(this.opening?.State().t||0):this.plan.time,
       elapsed:this.plan.elapsed,waiting:this.plan.waiting,completed:this.plan.completed,failed:this.failed,
-      objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),
+      objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],
       dead:[...this.plan.dead],triggers:[...this.plan.triggers.keys()],signals:this.sceneSignals||[],
     };
   }
-  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),signals:this.sceneSignals||[]};}
+  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],signals:this.sceneSignals||[]};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.openingActive || !this.combatStarted || this.failed || !!this.stealth?.CapturesInput()
       || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
@@ -1050,6 +1081,7 @@ export class EncounterPlay {
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     this.entries.clear();
     this.host.ai.tactics.Reset();
+    this.tanks?.Reset();
     this.puppets.SyncFrame([],0);
     combat.ClearProjectiles();
     this.pendingActions.clear();
@@ -1092,6 +1124,8 @@ export class EncounterPlay {
     if(this.previousMissionCoverRules!==undefined)this.host.ai.missionCoverRules=this.previousMissionCoverRules;
     if(this.previousMissionReactions!==undefined)this.host.ai.missionReactions=this.previousMissionReactions;
     this.opening?.Dispose();
+    this.tanks?.Dispose();
+    this.RestoreBlastHook();
     this.host.audio.Music(null,{fadeOut:0});this.host.audio.Dispose();this.view.Dispose();
     for(const entry of this.entries.values())this.host.ai.Remove(entry.soldier);
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);

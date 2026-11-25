@@ -3039,6 +3039,7 @@ function SandboxHost() {
     },
     EnsureDebugInventory,
     SetBootStep: (label, progress) => SetBootStep(label, BootProgress(BOOT.progress.warmActors, progress)),
+    FireVehicleBullet,
     // 主文件的工具箱：靶场与白刃实验场的运行时（Script_RangeTargets / Script_MeleeLabRuntime）从这里读写主文件的状态。
     ctx,
     GoreDebug: () => window.Taierzhuang?.Debug?.Gore || null,
@@ -7696,7 +7697,7 @@ const SURFACE_BY_TAG = {
   // 【2026-09-22】第一关白盒的墙、门、顶棚与战车一直没登记：战车机枪打白盒墙、打战车都落回
   // dirt 出土灰，硬面火星（Data_Tuning_BulletVisual）永远触发不了。tag 这一层只能按最常见的
   // 墙体算砖；同一个 whiteboxWall 底下的沙袋墙与木料由碰撞盒自带的 surface 分开（ImpactSurface）。
-  whiteboxWall: "brick", whiteboxGate: "wood", whiteboxCeiling: "wood", missionTank: "metal",
+  whiteboxWall: "brick", whiteboxGate: "wood", whiteboxCeiling: "wood", missionTank: "metal", encounterTank: "metal",
 };
 
 /**
@@ -8103,10 +8104,12 @@ function TryFire(dt, returningGrenade = false) {
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
     const surface = ImpactSurface(shot.wall.box, "brick");
-    const tankHit = shot.wall.box?.tag === "missionTank";
+    const tag = shot.wall.box?.tag;
+    const tankHit = tag === "missionTank" || tag === "encounterTank";
     vfx.Impact(_hitPoint, n, surface, { weaponKind: weapon.kind, hardSparks: tankHit });
-    // 打在第一关那辆战车上：火花 + 叮当照旧（metal 面），再告诉战车大脑（关观察窗 / 被牵一次注意）。
-    if (tankHit) missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
+    // 打在第一关战车或遭遇战九四式上：火花 + 叮当照旧（metal 面），再告诉战车大脑（关观察窗 / 被牵注意 / 甩塔反压）。
+    if (tag === "missionTank") missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
+    else if (tag === "encounterTank") sandbox?.OnTankHit?.(shot.wall.box.tankId, _hitPoint.clone(), player.position.clone());
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
     // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
     // 逐轮录音比对要可复现，与曳光按 playerShots 取模是同一条理由。
@@ -8231,9 +8234,11 @@ function FireEmplacedShot(shot) {
   } else if (result.wall) {
     const n = new THREE.Vector3(result.wall.normal[0], result.wall.normal[1], result.wall.normal[2]);
     const surface = ImpactSurface(result.wall.box, "brick");
-    const tankHit = result.wall.box?.tag === "missionTank";
+    const tag = result.wall.box?.tag;
+    const tankHit = tag === "missionTank" || tag === "encounterTank";
     vfx.Impact(_hitPoint, n, surface, { weaponKind: mountedWeapon.kind, hardSparks: tankHit });
-    if (tankHit) missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
+    if (tag === "missionTank") missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
+    else if (tag === "encounterTank") sandbox?.OnTankHit?.(result.wall.box.tankId, _hitPoint.clone(), player.position.clone());
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
     audioWiring.Ricochet(_hitPoint, surface, shot.index);
   }

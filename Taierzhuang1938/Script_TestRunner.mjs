@@ -48,6 +48,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   EncounterPlayTest: {file:"Script_EncounterPlayTest.mjs",desc:"Independent scene, keyframe starts, real arrival and survival, reinforcement slots and immutable drafts"},
+  EncounterTankTest: {file:"Script_EncounterTankTest.mjs",desc:"Type 94 tankette combat AI, walk-in warning bursts, cover suppression, armor aggro, Yao decoy and dead-zone rules"},
   EncounterVariantsTest: {file:"Script_EncounterVariantsTest.mjs",desc:"Multi-level encounter variants, 01-07 shared parity, z<355 scene inheritance, overrides, isolated drafts and merged 08-13 Play gates"},
   EncounterLibraryTest: {file:"Script_EncounterLibraryTest.mjs",desc:"Derived asset cache reuse, source and import settings invalidation, terrain precision and packet validation"},
   EncounterLibraryBrowserTest: {file:"Script_EncounterLibraryBrowserTest.mjs",timeoutMs:420000,desc:"Fresh browser uses the disk Library, warm shader variants, retained editor activity and explicit cache release"},
@@ -803,6 +804,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "EncounterPlayTest",
+  "EncounterTankTest",
   "EncounterVariantsTest",
   "HairGroomTest",
   "TimelineTest",
@@ -964,7 +966,7 @@ export const domains = {
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothBloodAsyncTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
+  levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterTankTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "PropLibraryBrowserTest", "AssetStandardsTest", "AssetStandardsSaveTest", "AssetStandardsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -1109,7 +1111,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterVariants|EncounterFarmland|BeishaheDem|BeishaheGeography|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|ArchivedP012Split|SceneSurface/ },
+  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterTank|EncounterVariants|EncounterFarmland|BeishaheDem|BeishaheGeography|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|ArchivedP012Split|SceneSurface/ },
   { domain: "advancedTools", pattern: /AssetStandards|AssetPipeline|AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},
