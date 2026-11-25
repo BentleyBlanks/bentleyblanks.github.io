@@ -21,8 +21,8 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 # API sample quadrant, polished sRGB, oxidized sRGB, oxide coverage,
 # polished / oxidized roughness, polished / oxidized metalness, relief strength.
 FINISHES = {
-    "Barrel": (0, (163, 160, 151), (72, 67, 59), .63, (.205, .53), (.99, .68), .64),
-    "Stem": (1, (155, 150, 138), (64, 56, 48), .57, (.31, .62), (.96, .48), .71),
+    "Barrel": (0, (168, 165, 155), (74, 69, 61), .63, (.205, .53), (.99, .68), .64),
+    "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
@@ -32,6 +32,7 @@ FINISHES = {
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
     "Neck": (2, (148, 144, 131), (60, 51, 43), .55, (.34, .70), (.94, .34), .77),
     "Recess": (1, (41, 39, 36), (24, 22, 20), .61, (.67, .85), (.32, .16), .28),
+    "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
 }
@@ -75,6 +76,18 @@ def ReferenceField(data, xx, vv, values):
     fade = np.clip((1.26 - abs(arc)) * 3.8, 0, 1)
     fade *= np.clip((axial + .14) * 7, 0, 1) * np.clip((1.13 - axial) * 7, 0, 1)
     return (a * (1 - dv) + b * dv) * fade
+
+
+def CircumferentialAbrasion(luminance):
+    """Extract long, irregular strokes across the turned finish."""
+    height, width = luminance.shape
+    spectrum = np.fft.rfft2(luminance)
+    fy = np.fft.fftfreq(height)[:, None] ** 2
+    fx = np.fft.rfftfreq(width)[None, :] ** 2
+    across = np.exp(-2 * np.pi ** 2 * 12 ** 2 * fx)
+    along = np.exp(-2 * np.pi ** 2 * .72 ** 2 * fy) - np.exp(-2 * np.pi ** 2 * 4.4 ** 2 * fy)
+    strokes = np.fft.irfft2(spectrum * across * along, s=(height, width), axes=(0, 1))
+    return np.clip(strokes / max(strokes.std(), 1e-6), -2.8, 2.8)
 
 
 def Engraving(size, center, width, height):
@@ -137,23 +150,28 @@ def BakeRegion(name, sample, size, index, reference):
     tonalDelta = detail * 3.0 + medium * 4.0
     warmth = (srgb[:, :, 0] - srgb[:, :, 2])
     warmth -= GaussianPeriodic(warmth, 65)
+    closeup = reference["closeups"].get(name)
+    if closeup:
+        measuredTone = ReferenceField(closeup, xx, vv, "relativeLuminance")
+        measuredWarmth = ReferenceField(closeup, xx, vv, "relativeWarmth")
+        oxidation += np.clip(-measuredTone / 207, -.13, .13) + np.clip(measuredWarmth / 240, -.08, .08)
+        tonalDelta += measuredTone * .48
+        warmth += measuredWarmth / 254
     if name == "Barrel":
+        # Keep the axial contrast of the specimen's photographed patches.
+        # Reduce the synthetic intermediate-scale islands between those patches.
+        oxidation += .039 * medium + .038 * cloud
+        tonalDelta -= 1.55 * medium
         evidence = ReferenceField(reference, xx, vv, "relativeLuminance")
         heat = ReferenceField(reference, xx, vv, "relativeWarmth")
         oxidation += np.clip(-evidence / 183, -.13, .13) + np.clip(heat / 161, -.08, .08)
         tonalDelta += evidence * .39
-        tonalDelta += 1.7 * np.sin(2 * np.pi * (177 * vv + .12 * medium))
         warmth += heat / 330
         # The photographed barrel retains a mottled blue-gray finish across the
         # middle of the visible arc and worn-through steel outside that patch.
         blue = np.exp(-(((xx - .397) / .14) ** 2 + ((vv - .46) / .47) ** 2))
         oxidation += .090 * blue
         warmth -= .021 * blue
-    if name in ("Saddle", "SaddleBack"):
-        # The reference shoe has warmer wear toward its lower corner and a
-        # more graphite-colored center. Neither is a painted shadow.
-        warmth += .06 * np.exp(-(((xx - .74) / .24) ** 2 + ((yy - .28) / .29) ** 2))
-        oxidation += .11 * np.exp(-(((xx - .76) / .23) ** 2 + ((yy - .31) / .25) ** 2))
     if name == "Sleeve":
         # The thin brown residue at the stem-side shoulder is visible on the
         # overall and side close-ups of the same object.
@@ -162,13 +180,34 @@ def BakeRegion(name, sample, size, index, reference):
         oxidation += .13 * shoulder
 
     heightField = strength * (.23 * detail + .17 * medium - .22 * pits)
+    roughnessDelta = np.zeros_like(luminance)
+    if name == "Barrel":
+        heightField -= .066 * medium
+        clusteredPits = UnitVariation(luminance, 2.6, 9.4)
+        tonalDelta += 3.4 * clusteredPits
+        heightField += .158 * clusteredPits
+        roughnessDelta += .024 * clusteredPits
+    if name == "SaddleRim":
+        # A few exposed contact marks interrupt the dark forged edge.
+        exposed = np.exp(-((xx - .088) / .071) ** 2) + .7 * np.exp(-((xx - .581) / .091) ** 2)
+        oxidation -= .16 * exposed
+        roughnessDelta -= .066 * exposed
+    if name in ("Barrel", "Collar"):
+        brushing = CircumferentialAbrasion(luminance) * np.clip(.92 - oxidation, .08, .9)
+        tonalDelta += 4.8 * brushing
+        heightField += .23 * brushing
+        roughnessDelta -= .037 * brushing
     if name == "Knurl":
-        left = np.abs(np.sin(np.pi * (54 * xx + 25 * vv)))
-        right = np.abs(np.sin(np.pi * (54 * xx - 25 * vv)))
-        diamonds = np.minimum(left, right) ** .84
-        tonalDelta += (diamonds - .38) * 10.0
-        heightField += diamonds * .88
-        oxidation += (.38 - diamonds) * .17
+        angular = reference["knurl"]["angularCycles"] * xx
+        axial = reference["knurl"]["axialCycles"] * vv
+        left, right = np.mod(angular + axial, 1), np.mod(angular - axial, 1)
+        diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
+        shoulders = np.minimum(diamonds / .82, 1)
+        grooves = np.clip(1 - diamonds / .30, 0, 1)
+        tonalDelta += 9 * (shoulders - .45) - 10 * grooves
+        heightField += 1.12 * shoulders
+        oxidation += .135 * grooves
+        roughnessDelta += .075 * grooves - .048 * shoulders
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -185,13 +224,22 @@ def BakeRegion(name, sample, size, index, reference):
     mix = oxidation[..., None].astype(np.float32)
     clean = SrgbToLinear(np.asarray(metalColor, dtype=np.float32) / 255)
     oxide = SrgbToLinear(np.asarray(oxideColor, dtype=np.float32) / 255)
-    base = LinearToSrgb((1 - mix) * clean + mix * oxide)
-    base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
-    rough = roughness[0] + (roughness[1] - roughness[0]) * oxidation + .028 * medium + .020 * pits
+    linear = (1 - mix) * clean + mix * oxide
+    rough = roughness[0] + (roughness[1] - roughness[0]) * oxidation + .028 * medium + .020 * pits + roughnessDelta
     metal = metalness[0] + (metalness[1] - metalness[0]) * oxidation
+    if name == "Barrel":
+        # Rubbed bluing between bright ridges and opaque tarnish carries a
+        # wider reflection than bare steel and keeps the ends of the range.
+        rubbed = np.clip(1 - np.abs(oxidation - .575) / .34, 0, 1) * .66
+        rubbedColor = SrgbToLinear(np.array([130, 132, 126], dtype=np.float32) / 255)
+        linear += (rubbedColor - linear) * rubbed[..., None]
+        rough += (.463 - rough) * rubbed
+        metal += (.735 - metal) * rubbed
+    base = LinearToSrgb(linear)
+    base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
-    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck"):
+    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim"):
         base = SeamBlend(base)
         heightField = SeamBlend(heightField[..., None])[..., 0]
         rough, metal, ao = np.moveaxis(SeamBlend(np.stack([rough, metal, ao], axis=-1)), -1, 0)

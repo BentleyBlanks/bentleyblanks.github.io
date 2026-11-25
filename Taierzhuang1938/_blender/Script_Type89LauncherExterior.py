@@ -186,7 +186,7 @@ def Saddle(collection):
     vertices = [(x, y, along - correction) for x, y, along in vertices]
     faces, uvFaces = [], []
     for ring in range(len(rings) - 1):
-        tile = "Saddle" if ring < 3 else "Edge" if ring < 6 else "SaddleBack"
+        tile = "Saddle" if ring < 3 else "SaddleRim" if ring < 6 else "SaddleBack"
         for i in range(sides):
             j = (i + 1) % sides
             face = (ring * sides + i, ring * sides + j, (ring + 1) * sides + j, (ring + 1) * sides + i)
