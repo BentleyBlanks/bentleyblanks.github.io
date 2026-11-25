@@ -53,7 +53,7 @@
 
 ### 2.1 测试场景实机封面规范与自动更新
 
-- **存放与命名**：所有功能测试场的实机封面统一存放在 `Taierzhuang1938/AdvancedTools/Covers/Texture_TestSceneCover_<PascalId>.webp`（例如 `Texture_TestSceneCover_Explosions.webp`），规格固定为 `1280×720` WebP（位于 `AdvancedTools/` 下，不进入线上 GitHub Pages 发布包，不占玩家下载体积）。
+- **存放与命名**：所有功能测试场的实机封面统一存放在 `Taierzhuang1938/AdvancedTools/Covers/Texture_TestSceneCover_<PascalId>.webp`（例如 `Texture_TestSceneCover_Explosions.webp`），规格固定为 `1600×900` WebP（位于 `AdvancedTools/` 下，不进入线上 GitHub Pages 发布包，不占玩家下载体积）。
 - **自动采集与更新**：任何时候修改了测试场景布局（`Scenes/Test*/`）、场地渲染或新增了功能测试场，直接运行自动化工具进游戏静音实机重拍并覆盖对应 WebP：
   - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs --changed`：按 Git 改动自动识别受影响的测试场（及缺失封面的新增测试场）增量重拍；
   - `node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs --only=explosions,gore`：只重拍指定测试场；

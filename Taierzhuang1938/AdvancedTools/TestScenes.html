@@ -15,22 +15,20 @@
       overflow: hidden;
       background: #060706;
     }
-    /* 1:1 沿用主菜单「选择关卡 / 测试场景」整套冷灰 / 旧金 / 羽化大图封面语言 */
+    /* 完全沿用游戏主菜单「任务选择」(#menu.levelsOn) 原生布局、字号、左侧列表与氛围底图 */
     #menu.tsLauncher {
       pointer-events: auto;
-      background: #070807;
+      background: #090a08;
     }
     #menu.tsLauncher .mnPanel::before {
       display: block;
-      opacity: 0.42;
-      filter: grayscale(1) blur(7px) brightness(0.32);
+      opacity: 0.52;
+      filter: sepia(0.28) saturate(0.55) blur(8px) brightness(0.36);
     }
     #menu.tsLauncher .mnPanelHead {
       align-items: flex-end;
       justify-content: space-between;
       gap: 20px;
-      min-height: 13vh;
-      padding: 4vh 0 2vh;
     }
     .tsHeadTools {
       display: flex;
@@ -58,26 +56,20 @@
     }
     .tsSearch::placeholder { color: #8b9188; }
     .tsSearch:focus { outline: 1px solid var(--ui-gold); border-color: var(--ui-gold); }
-    /* 列表区域严格沿用 #menu.levelsOn .mnLevel / .mnSandboxLevel 原生字号与冷灰→旧金选中态，略收行距让 10 项在一屏完整可见 */
-    #menu.tsLauncher .mnLevelList {
-      padding: 1vh 6px 1vh 0;
-    }
-    #menu.tsLauncher .mnLevel {
-      min-height: clamp(44px, 5.6vh, 54px);
-      margin-bottom: 0.55vh;
-    }
+    /* 禁止右侧简报区出现任何横向滚动条（原生 .mnMissionArt 负右偏移在无 overflow-x:hidden 时会撑出横条） */
     #menu.tsLauncher .mnBrief {
-      padding: 0 2vw 2vh;
+      overflow-x: hidden;
+      overflow-y: auto;
     }
     #menu.tsLauncher .mnMissionArt {
-      inset: 0 -1vw 4% 0;
+      inset: 0 0 3% 0;
     }
     #menu.tsLauncher .mnMissionArt img {
-      filter: saturate(0.86) brightness(0.82) contrast(1.04);
+      filter: saturate(0.92) brightness(0.88) contrast(1.03);
     }
     #menu.tsLauncher .mnMissionArt::after {
       box-shadow: none;
-      background: linear-gradient(0deg, #060706eb 0%, #06070699 36%, #06070624 66%, transparent 100%);
+      background: linear-gradient(0deg, #060706e8 0%, #06070688 34%, #06070618 64%, transparent 100%);
     }
     .tsSceneFile {
       margin-top: 8px;

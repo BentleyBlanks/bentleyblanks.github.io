@@ -2,7 +2,7 @@
 //
 // 规范：
 //   1. 每个功能测试场（Data_SandboxRanges.SANDBOX_RANGES 中 kind === "functional"）在
-//      Taierzhuang1938/AdvancedTools/Covers/ 下对应一张 1280x720 实机 WebP 封面：
+//      Taierzhuang1938/AdvancedTools/Covers/ 下对应一张 1600x900 实机 WebP 封面：
 //      Texture_TestSceneCover_<PascalId>.webp（AdvancedTools/ 不进 GitHub Pages 发布包）。
 //   2. 任何时候更新了测试场景 JSON、场地代码或视觉表现，运行下面任意一条即可自动刷新封面：
 //        node Taierzhuang1938/AdvancedTools/Script_CaptureTestSceneCovers.mjs                  全量重拍 10 张
@@ -22,8 +22,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(here, "..");
 const repoRoot = path.resolve(projectDir, "..");
 export const COVERS_DIR = path.join(here, "Covers");
-export const COVER_WIDTH = 1280;
-export const COVER_HEIGHT = 720;
+export const COVER_WIDTH = 1600;
+export const COVER_HEIGHT = 900;
 
 export const FUNCTIONAL_RANGES = Object.freeze(
   SANDBOX_RANGES.filter((entry) => entry.kind === "functional"),
@@ -55,10 +55,10 @@ const WATCH_PATTERNS = Object.freeze({
   hair: [/Scenes\/TestHair\//i, /HairRange/i, /Script_SandboxPlugin_Hair/i],
 });
 
-// 各测试场的实机干净取景配置（隐藏调试面板与启动幕，推帧让模型/阴影/风场/烟尘稳定后截取）
+// 各测试场的实机干净取景配置（全分辨率 quality=high，不带 scale=small，推帧让模型/阴影/风场/烟尘稳定后截取）
 const SHOT_PRESETS = Object.freeze({
   movement: {
-    query: "movement=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "movement=1&shot=1&manual=1&quality=high&audio=0",
     frames: 30,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -73,7 +73,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   weapons: {
-    query: "weapons=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "weapons=1&shot=1&manual=1&quality=high&audio=0",
     frames: 30,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -85,7 +85,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   range: {
-    query: "range=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "range=1&shot=1&manual=1&quality=high&audio=0",
     frames: 30,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -96,7 +96,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   explosions: {
-    query: "explosions=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "explosions=1&shot=1&manual=1&quality=high&audio=0",
     frames: 40,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -109,7 +109,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   melee: {
-    query: "melee=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "melee=1&shot=1&manual=1&quality=high&audio=0",
     frames: 45,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -117,7 +117,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   gore: {
-    query: "gore=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "gore=1&shot=1&manual=1&quality=high&audio=0",
     frames: 45,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -129,7 +129,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   impacts: {
-    query: "impacts=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "impacts=1&shot=1&manual=1&quality=high&audio=0",
     frames: 35,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -146,7 +146,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   reactions: {
-    query: "reactions=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "reactions=1&shot=1&manual=1&quality=high&audio=0",
     frames: 35,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -157,7 +157,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   cloth: {
-    query: "cloth=1&shot=1&manual=1&quality=medium&scale=small&audio=0",
+    query: "cloth=1&shot=1&manual=1&quality=high&audio=0",
     frames: 90,
     Stage: () => {
       const T = window.Taierzhuang;
@@ -165,7 +165,7 @@ const SHOT_PRESETS = Object.freeze({
     },
   },
   hair: {
-    query: "hair=1&shot=1&manual=1&quality=high&scale=small&audio=0",
+    query: "hair=1&shot=1&manual=1&quality=high&audio=0",
     frames: 60,
     Ready: () => {
       const state = window.Taierzhuang?.Debug.HairRange?.State();
@@ -190,7 +190,7 @@ export function CheckTestSceneCovers() {
     if (!fs.existsSync(file)) { missing.push(entry.id); continue; }
     const buf = fs.readFileSync(file);
     const isWebp = buf.length >= 16 && buf.toString("ascii", 0, 4) === "RIFF" && buf.toString("ascii", 8, 12) === "WEBP";
-    if (!isWebp || buf.length < 4096 || buf.length > 512 * 1024) {
+    if (!isWebp || buf.length < 4096 || buf.length > 1024 * 1024) {
       invalid.push(`${entry.id} (${buf.length} B, webp=${isWebp})`);
     } else {
       items.push({ id: entry.id, file: CoverStemFor(entry.id), bytes: buf.length });
@@ -275,7 +275,7 @@ async function CaptureIds(ids) {
       const pngBuffer = await page.screenshot({ type: "png" });
       const webpBuffer = await sharp(pngBuffer)
         .resize(COVER_WIDTH, COVER_HEIGHT, { fit: "cover" })
-        .webp({ quality: 84 })
+        .webp({ quality: 92, smartSubsample: false })
         .toBuffer();
       const dest = CoverPathFor(id);
       fs.writeFileSync(dest, webpBuffer);
