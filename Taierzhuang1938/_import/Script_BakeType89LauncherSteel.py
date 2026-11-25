@@ -21,7 +21,7 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 # API sample quadrant, polished sRGB, oxidized sRGB, oxide coverage,
 # polished / oxidized roughness, polished / oxidized metalness, relief strength.
 FINISHES = {
-    "Barrel": (0, (168, 165, 155), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
+    "Barrel": (0, (184, 178, 162), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
     "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
@@ -33,7 +33,6 @@ FINISHES = {
     "Neck": (2, (142, 138, 125), (60, 51, 43), .55, (.385, .70), (.94, .34), .77),
     "Recess": (1, (41, 39, 36), (24, 22, 20), .61, (.67, .85), (.32, .16), .28),
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
-    "Stripe": (0, (154, 149, 134), (87, 78, 66), .23, (.62, .77), (.11, .07), .48),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
     "TabBack": (2, (169, 163, 153), (80, 74, 66), .47, (.348, .65), (.96, .43), .71),
     "RearEye": (2, (162, 150, 136), (67, 53, 43), .52, (.40, .71), (.95, .44), .67),
@@ -101,6 +100,40 @@ def BarrelGrain(closeup, xx, vv):
              "warmth": (warmth - 128) / detail["warmthScale"], "confidence": confidence / 255}
     coverage = ReferenceField(plate, xx, vv, "confidence")
     return ReferenceField(plate, xx, vv, "tone"), ReferenceField(plate, xx, vv, "warmth"), coverage
+
+
+def BarrelPatina(overall, closeup, xx, vv):
+    footprint = closeup["footprint"]
+    u = (xx - footprint["uCenter"]) / footprint["uHalfSpan"]
+    lower, upper = footprint["vRange"]
+    v = (vv - lower) / (upper - lower)
+    angularFade = np.clip((1.14 - abs(u)) * 4.4, 0, 1)
+    axialFade = np.clip((v + .12) * 6, 0, 1) * np.clip((1.12 - v) * 6, 0, 1)
+    near = angularFade * axialFade
+    finishes = []
+    for channel in ("oxideCoverage", "coolFilmCoverage", "exposedSteelCoverage"):
+        whole = ReferenceField(overall, xx, vv, channel)
+        photographed = ReferenceField(closeup, xx, vv, channel)
+        finishes.append((whole + near * (photographed - whole)) / 100)
+    return near, *finishes
+
+
+def SampleBarrelStripe(maps, size):
+    # The existing narrow UV strip follows the adjoining barrel's finish.
+    # Keep its texture continuous across the two chart edges.
+    x, y, width, height = ATLAS["regions"]["Barrel"]
+    pad = ATLAS["padding"]
+    halfSpan = .032 / (2 * np.pi)
+    span = width - 2 * pad
+    extent = (x + pad + (.25 - halfSpan) * span, y + pad,
+              x + pad + (.25 + halfSpan) * span, y + height - pad)
+    inner = (size[0] - 2 * pad, size[1] - 2 * pad)
+    padding = ((pad, pad), (pad, pad), (0, 0))
+    sampled = []
+    for pixels in maps:
+        crop = Image.fromarray(pixels).transform(inner, Image.Transform.EXTENT, extent, Image.Resampling.BILINEAR)
+        sampled.append(np.pad(np.asarray(crop), padding, mode="edge"))
+    return sampled
 
 
 def CircumferentialAbrasion(luminance):
@@ -338,13 +371,28 @@ def BakeRegion(name, sample, size, index, reference):
     rough = roughness[0] + (roughness[1] - roughness[0]) * oxidation + .028 * medium + .020 * pits + roughnessDelta
     metal = metalness[0] + (metalness[1] - metalness[0]) * oxidation
     if name == "Barrel":
-        # Rubbed bluing between bright ridges and opaque tarnish carries a
-        # wider reflection than bare steel and keeps the ends of the range.
-        rubbed = np.clip(1 - np.abs(oxidation - .575) / .34, 0, 1) * .66
-        rubbedColor = SrgbToLinear(np.array([127, 128, 123], dtype=np.float32) / 255)
+        # Blue-gray residue remains between exposed steel and matte oxide.
+        near, oxideCoverage, coolFilm, exposedSteel = BarrelPatina(reference["barrelPatina"], closeup, xx, vv)
+        rubbed = np.clip(1 - np.abs(oxidation - .575) / .34, 0, 1) * .58
+        rubbed = np.maximum(rubbed, .68 * coolFilm) * (1 - .57 * oxideCoverage) * (1 - .54 * exposedSteel)
+        rubbedColor = SrgbToLinear(np.array([103, 108, 107], dtype=np.float32) / 255)
         linear += (rubbedColor - linear) * rubbed[..., None]
-        rough += (.495 - rough) * rubbed
-        metal += (.715 - metal) * rubbed
+        rough += (.463 - rough) * rubbed
+        metal += (.801 - metal) * rubbed
+        rust = .58 * oxideCoverage
+        rustColor = SrgbToLinear(np.array([87, 75, 64], dtype=np.float32) / 255)
+        linear += (rustColor - linear) * rust[..., None]
+        rough += (.646 - rough) * rust
+        metal += (.438 - metal) * rust
+        exposed = .56 * exposedSteel * (1 - oxideCoverage)
+        steelColor = SrgbToLinear(np.array([175, 172, 163], dtype=np.float32) / 255)
+        linear += (steelColor - linear) * exposed[..., None]
+        rough += (.348 - rough) * exposed
+        metal += (.918 - metal) * exposed
+        # The close-up shows more diffuse wear beside the stamp. Ease the
+        # polished response there while keeping the photographed color field.
+        rough += .11 * near * (1 - .64 * oxideCoverage)
+        metal -= .48 * near * np.maximum(metal - .55, 0)
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
         weight = ReferenceField(closeup, xx, sampledV, channel) * influence / 100
@@ -410,9 +458,14 @@ def Bake():
     size = ATLAS["size"]
     maps = [np.zeros((size, size, 3), dtype=np.uint8) for _ in range(3)]
     for index, (name, (x, y, width, height)) in enumerate(ATLAS["regions"].items()):
+        if name == "Stripe":
+            continue
         tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
+    x, y, width, height = ATLAS["regions"]["Stripe"]
+    for atlas, pixels in zip(maps, SampleBarrelStripe(maps, (width, height))):
+        atlas[y:y + height, x:x + width] = pixels
 
     for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 86.5, 87)):
         image = Image.fromarray(pixels)

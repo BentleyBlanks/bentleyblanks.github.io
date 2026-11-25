@@ -27,9 +27,10 @@
 - 侧轮按第 3 张近照的四个完整齿面分别采样。以相位配准后的色差区分齿顶露钢、齿侧氧化和暗槽，再将去掉宽反光的细坑变化用于底色和粗糙度。256×128 的轮缘区域按四种齿面磨损展开，每齿环向有效像素由约 9 增至 58。轮缘两端面使用共用钢材，图集同时缩小驻钣的窄边区域。侧轮在四个机位及两套布光复核，照片另留一齿用于对照。 [轮缘采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 对照在枪械检查台固定机位和照明拍摄，新旧材质另在近似馆藏的双条灯下同场比较。照片曝光、灯位和未拍到的表面仍有推定空间。检查范围包括筒口、筒身、筒尾箍、旋钮、驻钣和背面。
 - 筒身按第 7 张近照配准细点蚀和氧化色差。采样图编码滤去宽反光后的局部亮度与色差，避开冲压痕并沿边缘衰减。可配准区域叠加照片采样，其余筒身用 OpenAI API 钢材源图生成相近尺度的点蚀。冲压轮廓单独描摹并烘入浅凹法线，磨花发蓝层的粗糙度与反射按正视、斜视和近似馆藏布光复核。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 筒身以第 1 张整体照和第 7 张近照的亮钢色为各自色差基准，配准露钢、发蓝和氧化区域。露钢、发蓝残留与褐色氧化按各自粗糙度和金属度混合，冲压号附近的磨损区域采用较柔的反射。原窄条 UV 从邻接筒身采样颜色、法线和 ORM，消除检查台默认灯光下过亮的白线。两组布光下分别复核正面整体与近景，并检查背面材质过渡。 [反光与色差采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV10/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV11/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

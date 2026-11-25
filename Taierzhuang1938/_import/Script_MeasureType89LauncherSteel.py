@@ -67,6 +67,37 @@ def FinishMap(samples, evidence, footprint, planar=False):
             "relativeWarmth": np.clip(np.rint(warmth), -18, 18).astype(int).tolist()}
 
 
+def PatinaMap(samples):
+    lightness = samples @ LUMA
+    warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    middle, bright, peak = np.percentile(lightness, [50, 82, 95])
+    neutral = float(np.median(warmth[(lightness >= bright) & (lightness <= peak)]))
+    # Compare hue to the same photograph's bright steel. Use the color
+    # separation to distinguish brown oxide from the cooler worn finish.
+    oxide = np.clip((warmth - neutral - .020) / .212, 0, 1)
+    cool = np.clip((neutral + .022 - warmth) / .097, 0, 1)
+    cool *= np.clip((peak - lightness) / (.60 * peak), 0, 1)
+    polished = np.clip((neutral + .10 - warmth) / .105, 0, 1)
+    polished *= np.clip((lightness - middle) / max(bright - middle, 12), 0, 1)
+    return {"neutralWarmth": round(neutral, 4), "oxideCoverage": np.rint(100 * oxide).astype(int).tolist(),
+            "coolFilmCoverage": np.rint(100 * cool).astype(int).tolist(),
+            "exposedSteelCoverage": np.rint(100 * polished).astype(int).tolist()}
+
+
+def OverallBarrelPatina(folder, footprint):
+    image, source = Photo(folder, 1)
+    # Image-space silhouette rails keep samples on the external steel surface.
+    rails = [[83, 550, 682], [200, 548, 683], [400, 544, 684], [611, 541, 685]]
+    stations, top, bottom = np.asarray(rails).T
+    xs = np.linspace(stations[0], stations[-1], 43)
+    lo, hi = np.interp(xs, stations, top), np.interp(xs, stations, bottom)
+    angles = np.linspace(-footprint["uHalfSpan"], footprint["uHalfSpan"], 25)
+    ys = (lo + hi) / 2 + (hi - lo) / 2 * np.sin(2 * np.pi * angles[:, None])
+    samples = np.array([[Sample(image, x, y, radius=4) for x, y in zip(xs, row)] for row in ys])
+    source["sampleRails"] = rails
+    return {"source": source, "footprint": footprint, **PatinaMap(samples)}
+
+
 def BarrelDetail(image, projection, halfSpan):
     photo = Image.fromarray(image.astype(np.uint8))
     fine = np.asarray(photo.filter(ImageFilter.GaussianBlur(.58)), dtype=np.float32)
@@ -118,6 +149,7 @@ def BarrelFinish(folder):
     source["sampleBounds"] = [int(xs[0]), int(ys[0]), int(xs[-1]), int(ys[-1])]
     source["projection"] = projection
     result = FinishMap(samples, source, {"uCenter": .398, "uHalfSpan": halfSpan, "vRange": [.722, .849]})
+    result.update(PatinaMap(samples))
     result["detail"] = BarrelDetail(image, projection, halfSpan)
     result["stampTrace"] = {
         "bounds": [130, 165, 852, 363], "imageCenter": center, "imageRadius": radius,
@@ -406,6 +438,7 @@ def Main():
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
+    record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": BarrelFinish(args.photos), "Stem": StemFinish(args.photos),
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
