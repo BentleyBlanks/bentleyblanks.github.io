@@ -19,6 +19,10 @@ let ctx = null;
 let meleeLab = null;
 let meleeScenario = "DadaoOne";
 let meleePaused = false;
+/** 敌军全倒下后自动原地复活的延迟（秒），保留倒地演出又无需手点重开。 */
+const AUTO_RESPAWN_DELAY_S = 2.6;
+let respawnAt = null;
+let lastPanelActive = false;
 /** 日军用遭遇编辑器那套正式人物：只装日兵甲一个人，读完之前对手先用原身体，读完马上换。 */
 const MELEE_ENEMY_CHARACTER = "ijaJia";
 let enemySkins = null;
@@ -78,7 +82,7 @@ function ResetSoldierInPlace(s, p, spec) {
 
 function StartMeleeScenario(id) {
   const spec = MELEE_SCENARIOS.find(s => s.id === id) || MELEE_SCENARIOS[0];
-  meleeScenario = spec.id; meleePreview = null;
+  meleeScenario = spec.id; meleePreview = null; respawnAt = null;
   ctx.post.hasPrev=false;ctx.post.hasTaaHistory=false;
   ctx.meleeCombat.Reset(); pendingGround = null;
   meleeVariant = ctx.meleeCombat.SetVariant(meleeVariant);
@@ -158,8 +162,57 @@ function SeedMeleeTargets() {
   StartMeleeScenario(meleeScenario);
 }
 
+function RespawnFallenEnemies() {
+  const spec = MELEE_SCENARIOS.find(s => s.id === meleeScenario) || MELEE_SCENARIOS[0];
+  const plan = PlannedTargets(spec);
+  const px = ctx.player.position.x, pz = ctx.player.position.z, pyaw = ctx.player.yaw || 0;
+  for (let i = 0; i < meleeTargets.length; i++) {
+    const entry = meleeTargets[i], s = entry.soldier, p = plan[i];
+    if (!s || s.side !== "ija" || s.alive || !p) continue;
+    let rx = s.position.x, rz = s.position.z;
+    // 玩家站在尸体旁太近时，把复活点移到玩家正前方 1.55 m，避免贴身重叠。
+    if (Math.hypot(rx - px, rz - pz) < 1.15) {
+      rx = Math.max(1389, Math.min(1411, px - Math.sin(pyaw) * 1.55));
+      rz = Math.max(1454, Math.min(1476, pz - Math.cos(pyaw) * 1.55));
+    }
+    const yaw = Math.atan2(rx - px, rz - pz);
+    const canReuse = !s.actor?.disposed && !!s.actor?.characterRig && !s.gore?.severed?.size && !s.actor.goreWeaponHold;
+    if (canReuse && ResetSoldierInPlace(s, { ...p, x: rx, z: rz, yaw }, spec)) {
+      const f = ctx.meleeCombat.fighters?.get(s);
+      if (f) {
+        ctx.meleeCombat.SetState(f, "idle");
+        f.poise = 100; f.stamina = 100; f.buffer = null;
+        f.lodgedBy = null; f.reelBy = null; f.cleavedBy = null; f.slideBy = null; f.crushedBy = null;
+      }
+      s.meleeCombat = null;
+    } else {
+      ctx.meleeCombat.fighters?.delete(s);
+      ctx.ai.Remove(s);
+      const fresh = ctx.ai.Spawn(p.side, rx, rz, { weapon: p.weapon, squadId: `Melee_${spec.id}_${p.slot}` });
+      if (fresh) {
+        fresh.dummy = true; fresh.bayonetFixed = true; fresh.yaw = yaw;
+        fresh.meleeTraining = { kind: spec.kind, slot: p.slot, passive: meleePaused };
+        fresh.holdZone = null; fresh.goal.copy(fresh.position);
+        entry.soldier = fresh;
+      }
+    }
+  }
+  SkinEnemies();
+  meleeLab?.Update(MeleeSnapshot());
+}
+
+function StepAutoRespawn() {
+  if (meleePreview || ctx.meleeCombat.Active || !ctx.player.Alive) { respawnAt = null; return; }
+  const enemies = meleeTargets.filter(t => t.soldier?.side === "ija");
+  if (!enemies.length || enemies.some(t => t.soldier.alive)) { respawnAt = null; return; }
+  const now = ctx.state.elapsed || 0;
+  if (respawnAt === null) { respawnAt = now + AUTO_RESPAWN_DELAY_S; return; }
+  if (now >= respawnAt) { respawnAt = null; RespawnFallenEnemies(); }
+}
+
 /** 白刃层每帧之前：喂这一帧的鼠标位移（拖拽挥砍带刀、出刀）；按着左键拖刀时视角只跟 viewFollow 倍。 */
 function BeforeMeleeStep() {
+  StepAutoRespawn();
   const input = ctx.input;
   if (pendingGround && ctx.meleeCombat.Fighter(ctx.player)?.state === "down") {
     ctx.meleeCombat.BeginScriptedGround(ctx.player, pendingGround, { reason: "labScripted" }); pendingGround = null;
@@ -168,9 +221,15 @@ function BeforeMeleeStep() {
   if (input && ctx.meleeCombat.CapturesLook) { input.lookX *= meleeViewFollow; input.lookY *= meleeViewFollow; }
 }
 
+function IsPanelActive() {
+  return !!(ctx?.state?.ready && ctx.state.running && !ctx.state.menu && !ctx.state.warming);
+}
+
 function MeleeSnapshot() {
   const core = ctx.meleeCombat.State();
-  return { ...core, scenario: meleeScenario, viewFollow: meleeViewFollow, menu: ctx.state.menu, health: ctx.player.health, alive: ctx.player.Alive,
+  const now = ctx.state.elapsed || 0;
+  return { ...core, panelVisible: IsPanelActive(), respawnIn: respawnAt === null ? null : Math.max(0, respawnAt - now),
+    scenario: meleeScenario, viewFollow: meleeViewFollow, menu: ctx.state.menu, health: ctx.player.health, alive: ctx.player.Alive,
     weapon: ctx.meleeCombat.Weapon(ctx.player), stance:ctx.meleeStance?'melee':'fire', preview: meleePreview, paused: meleePaused,
     targets: meleeTargets.map(({ soldier: s, id }) => ({ id, runtimeId: s.id, side: s.side, health: s.health, alive: s.alive, x: s.position.x, z: s.position.z, distance: Math.hypot(s.position.x - ctx.player.position.x, s.position.z - ctx.player.position.z), pose: s.meleeCombat })),
     hud: ctx.hud.MeleeQteState(),
@@ -244,7 +303,13 @@ export function CreateMeleeLab(host) {
       if(WEAPONS[ctx.currentWeapon]?.bayonet && ctx.state.bayonetFixed)prompts.push({keys:"V",label:ctx.meleeStance?T("hud.prompt.meleeToFire"):T("hud.prompt.fireToMelee"),kind:"melee"});
       return prompts;
     },
-    // 面板与底部引导条每 2 帧刷新一次，保证压杆／咬肉／护枪进度条顺滑响应。
-    UpdatePanel(frame) { if (frame % 2 === 0) meleeLab?.Update(MeleeSnapshot()); },
+    // 面板与底部引导条每 2 帧刷新一次，并在进出游戏／菜单时立刻同步可见性。
+    UpdatePanel(frame) {
+      const active = IsPanelActive();
+      if (active !== lastPanelActive || frame % 2 === 0) {
+        lastPanelActive = active;
+        meleeLab?.Update(MeleeSnapshot());
+      }
+    },
   };
 }

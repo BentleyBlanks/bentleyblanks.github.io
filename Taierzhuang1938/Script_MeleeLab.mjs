@@ -53,6 +53,7 @@ export class MeleeLab {
     this.host=host;
     document.body.classList.add('meleeLabActive');
     this.root=document.createElement('section'); this.root.className='shellImpactLab meleeLab';
+    this.root.hidden=true;
     this.root.setAttribute('aria-label',T('range.melee.aria'));
     const controlButtons=MELEE_VARIANTS.control.map(id=>`<button type="button" class="siBtn mlControl" data-control="${id}">${ControlName(id)}</button>`).join('');
     const impactRows=[];
@@ -79,6 +80,7 @@ export class MeleeLab {
       </div>`;
     document.body.append(this.root);
     this.guide=document.createElement('aside'); this.guide.className='mlGuideHud';
+    this.guide.hidden=true;
     this.guide.innerHTML='<div class="mlGuideTop"><b class="mlGuideMode"></b><span class="mlGuideMeta"></span></div><div class="mlGuideStep"></div><div class="mlGuideBar" hidden><i></i></div>';
     document.body.append(this.guide);
     this.guideMode=this.guide.querySelector('.mlGuideMode');
@@ -115,8 +117,10 @@ export class MeleeLab {
   Flag(el,name,on){if(el&&el.classList.contains(name)!==!!on)el.classList.toggle(name,!!on);}
   Update(snapshot) {
     if(!snapshot)return;
-    this.root.hidden=!!snapshot.menu;
-    this.guide.hidden=!!snapshot.menu;
+    const hide=snapshot.panelVisible===false||!!snapshot.menu;
+    this.root.hidden=hide;
+    this.guide.hidden=hide;
+    if(hide)return;
     if(this.currentScenario!==snapshot.scenario && MELEE_LAB_SCENARIOS.some(s=>s.id===snapshot.scenario)){this.currentScenario=snapshot.scenario;this.select.value=snapshot.scenario;}
     const variant=snapshot.variant||{control:'classic',impact:'classic'};
     for(const el of this.root.querySelectorAll('.mlControl'))this.Flag(el,'active',el.dataset.control===variant.control);
@@ -157,7 +161,9 @@ export class MeleeLab {
     this.Put(this.guideMode,ImpactName(variant.impact));
     let step='',meta='',barPct=null,tone='';
     if(!enemy||!enemy.alive){
-      step=T('range.melee.guide.down');
+      step=Number.isFinite(snapshot.respawnIn)
+        ?T('range.melee.guide.downRespawn',{seconds:snapshot.respawnIn.toFixed(1)})
+        :T('range.melee.guide.down');
     }else if(snapshot.cleave){
       const pct=Math.round(snapshot.cleave.progress*100);
       step=T('range.melee.guide.cleave'); meta=T('range.melee.bar.cleave',{percent:pct}); barPct=pct; tone='hot';

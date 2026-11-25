@@ -227,6 +227,7 @@ export const TEXT = Object.freeze({
   "range.melee.desc.crush": "区别：正面劈砍会被敌军横枪架住爆火星，要震断护枪或绕侧劈肉。\n1. 正面连砍或重劈打空敌军护枪条 → 2. 破防后按 F 抢步处决（或侧步绕开）。",
   "range.melee.desc.pofeng": "区别：上面三种玩法全开——正面硬磕破防、右键磕枪压杆、砍肉拖刃拉豁。\n正面左键震断护枪（按 F 处决）· 右键磕住刺刀按 W 压杆 · 绕侧砍肉甩鼠拉豁。",
   "range.melee.guide.down": "对手已倒下 · 点左上角「开始／重开」或直接切换其他玩法",
+  "range.melee.guide.downRespawn": "对手已倒下 · {seconds} 秒后自动复活",
   "range.melee.guide.cleave": "刀刃咬进血肉！立刻【甩动鼠标】或再点【左键】拖刃拉豁",
   "range.melee.guide.slideReady": "已压进死角！立刻点【左键】顺杆劈杀！",
   "range.melee.guide.slide": "已磕住刺刀！按住【W】沿枪管前压擦出火星",

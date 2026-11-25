@@ -330,6 +330,49 @@ try {
   assert.equal(activeRestart.passive, true, "restarted enemy remains active when unpaused");
   console.log("PASS pause preserved across restart", JSON.stringify({ pausedRestart, activeRestart }));
 
+  // ── 未进游戏／暂停菜单时隐藏实验场 UI；敌军倒地后自动原地复活 ──
+  const uiHiddenWhilePaused = await page.evaluate(() => {
+    const T = Taierzhuang, prev = T.state.running;
+    T.state.running = false;
+    T.StepFrames(2, 1 / 60, false);
+    const hidden = document.querySelector(".meleeLab")?.hidden && document.querySelector(".mlGuideHud")?.hidden;
+    T.state.running = prev;
+    T.StepFrames(2, 1 / 60, false);
+    const shown = !document.querySelector(".meleeLab")?.hidden && !document.querySelector(".mlGuideHud")?.hidden;
+    return { hidden, shown };
+  });
+  assert.deepEqual(uiHiddenWhilePaused, { hidden: true, shown: true }, "melee lab UI hides before game starts / while menu paused");
+  await Setup("DadaoOne", 1.25);
+  await page.evaluate(() => {
+    const T = Taierzhuang, foe = T.ai.soldiers.find((e) => e.side === "ija");
+    foe.TakeHit(200, "torso", null, { kind: "blade" });
+    T.StepFrames(10, 1 / 60, false);
+  });
+  const downState = await page.evaluate(() => ({
+    alive: Taierzhuang.ai.soldiers[0].alive,
+    respawnIn: Taierzhuang.Debug.MeleeCombat.State().respawnIn,
+    playerX: +Taierzhuang.player.position.x.toFixed(2),
+    playerZ: +Taierzhuang.player.position.z.toFixed(2),
+  }));
+  assert.equal(downState.alive, false, "enemy is down after lethal hit");
+  assert(downState.respawnIn > 1.5 && downState.respawnIn <= 2.6, `auto-respawn countdown active (${downState.respawnIn})`);
+  await Step(180);
+  const revived = await page.evaluate(() => ({
+    alive: Taierzhuang.ai.soldiers[0].alive,
+    health: Taierzhuang.ai.soldiers[0].health,
+    paused: Taierzhuang.Debug.MeleeCombat.State().paused,
+    passive: Taierzhuang.ai.soldiers[0].meleeTraining?.passive,
+    playerX: +Taierzhuang.player.position.x.toFixed(2),
+    playerZ: +Taierzhuang.player.position.z.toFixed(2),
+  }));
+  assert.equal(revived.alive, true, "fallen enemy auto-revives after delay");
+  assert.equal(revived.health, 100, "auto-revived enemy restores full health");
+  assert.equal(revived.paused, true, "auto-revive preserves paused state");
+  assert.equal(revived.passive, true, "auto-revived enemy stays passive while paused");
+  assert.equal(revived.playerX, downState.playerX, "auto-revive does not teleport player");
+  assert.equal(revived.playerZ, downState.playerZ, "auto-revive does not teleport player");
+  console.log("PASS ui gate + auto-respawn", JSON.stringify({ uiHiddenWhilePaused, downState, revived }));
+
   assert.deepEqual(errors, []);
   console.log("PASS no page errors");
 } catch (error) { console.error("page errors:", errors.slice(0, 5)); throw error;
