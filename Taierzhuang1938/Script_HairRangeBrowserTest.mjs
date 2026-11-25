@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { LaunchBrowser } from '../PrairieFire1937/Script_BrowserTestKit.mjs';
 import { ServeRoot } from './Script_DevServer.mjs';
 import { XBOT_CHARACTERS } from './Data_XBotCharacters.mjs';
-import { HAIR_RANGE_ROWS } from './Data_HairRange.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(here, 'tmp', 'HairLab', 'Verified');
@@ -39,22 +38,31 @@ try {
   await page.waitForFunction(() => window.Taierzhuang?.state.ready && (window.Taierzhuang.Debug.HairRange?.State().ready || window.Taierzhuang.Debug.HairRange?.State().error), null, { timeout: 400000, polling: 1000 });
   result.lab = await State();
   assert.equal(result.lab.error, null);
-  assert.equal(result.lab.stations.length, HAIR_RANGE_ROWS.reduce((sum,row)=>sum+row.items.length,0));
-  assert.equal(result.lab.stations.filter(station=>station.row==='newCast').length,9);
+  const cast = Object.keys(XBOT_CHARACTERS).filter(character => character !== 'xbot');
+  assert.deepEqual(result.lab.stations.map(station => station.character).sort(), cast.sort());
+  assert.ok(result.lab.stations.every(station => station.fixedLod === null));
   assert.equal(result.lab.loaded, result.lab.total);
+  const indexFor = character => result.lab.stations.findIndex(station => station.character === character);
+  const heIndex = indexFor('heYoutian');
   await Shot('LabPanel');
   await page.evaluate(() => window.Taierzhuang.Debug.HairRange.ShowPanel(false));
-  for (const view of ['overview', 'compareShort', 'compareLong']) {
-    await page.evaluate((view) => window.Taierzhuang.Debug.HairRange.Camera(view), view);
-    await Shot(view);
+  await Shot('overview');
+  for (const character of ['shunzi', 'luo', 'heYoutian', 'ijaA', 'ijaJia', 'ijaYi', 'erya', 'tianSao']) {
+    await page.evaluate(index => window.Taierzhuang.Debug.HairRange.Focus(index, 'front'), indexFor(character));
+    await Shot(character);
   }
-  for (const [index, name] of [[7, 'Shunzi'], [8, 'Luo'], [9, 'HeYoutian'], [10, 'SoldierA'], [11, 'Jia'], [12, 'Yi'], [17, 'LongStraight'], [18, 'LongWavy'], [23, 'LongBeard']]) {
-    await page.evaluate((index) => window.Taierzhuang.Debug.HairRange.Focus(index, 'front'), index);
-    await Shot(name);
+  for (const character of ['erya', 'tianSao']) {
+    const station = result.lab.stations[indexFor(character)];
+    assert.equal(station.groom, null, character + ' uses the approved model appearance');
+    const head = await page.evaluate(station => {
+      const object = Taierzhuang.scene.getObjectByName('HairHead_' + station.row + '_' + station.character);
+      return { triangles: object.geometry.index.count / 3, height: object.geometry.boundingBox.max.y };
+    }, station);
+    assert.ok(head.triangles > 0 && head.height > .15 && head.height < .4, character + ' renders a head rather than a full body');
   }
-  result.newCast = {};
+  result.characterTiers = {};
   for (const [index,station] of result.lab.stations.entries()) {
-    if (station.row !== 'newCast') continue;
+    if (!['donggua','yaowa','liuWencai','oldGeng','nier','taniHisao','ijaC','azumaShiro','interpreter'].includes(station.character)) continue;
     const tiers = {};
     await page.evaluate(index=>Taierzhuang.Debug.HairRange.Focus(index,'front'),index);
     for (const lod of ['strands','cards','shell']) {
@@ -64,10 +72,10 @@ try {
       assert.ok(tiers[lod].triangles>0,`${station.groom}: ${lod} has active geometry`);
       await page.screenshot({path:path.join(out,`${station.groom}_${lod}.png`)});
     }
-    result.newCast[station.groom]=tiers;
+    result.characterTiers[station.groom]=tiers;
   }
   await page.evaluate(()=>Taierzhuang.Debug.HairRange.Lod('auto'));
-  await page.evaluate(() => { const a = window.Taierzhuang.Debug.HairRange; a.ShowPanel(true); a.Focus(9, 'front'); });
+  await page.evaluate(index => { const a = window.Taierzhuang.Debug.HairRange; a.ShowPanel(true); a.Focus(index, 'front'); }, heIndex);
   await page.locator('[data-toggle="hair"]').click(); await Step();
   const hairHidden = await page.evaluate(() => {
     const root = window.Taierzhuang.scene.getObjectByName('Hair_cast_HeYoutian_Cast');
@@ -87,21 +95,19 @@ try {
   await page.evaluate((value) => window.Taierzhuang.Debug.HairRange.Set('clump', value), initialClump);
   await page.evaluate(() => window.Taierzhuang.Debug.HairRange.ShowPanel(false));
 
-  for (const [index,name] of [[6,'LongStraightShellCrown'],[18,'LongWavyCrown']]) {
-    await page.evaluate(index=>{const api=Taierzhuang.Debug.HairRange;api.Focus(index,'top');api.Lod('shell');},index);
-    await Shot(name);
-  }
-  await page.evaluate(()=>Taierzhuang.Debug.HairRange.Lod('auto'));
+  await page.evaluate(index => { const a = Taierzhuang.Debug.HairRange; a.Focus(index,'top'); a.Lod('shell'); }, indexFor('nier'));
+  await Shot('NierShellCrown');
+  await page.evaluate(() => Taierzhuang.Debug.HairRange.Lod('auto'));
   console.log('--- Hair lab: forced tiers, automatic distance transitions and costs');
-  result.cost = await page.evaluate(() => {
+  result.cost = await page.evaluate((index) => {
     const t = window.Taierzhuang, a = t.Debug.HairRange;
     const heads = t.scene.getObjectByName('HairRangeSpecimens').children;
-    heads.forEach((head, i) => { head.visible = i === 9; });
-    a.Focus(9, 'front');
+    heads.forEach((head, i) => { head.visible = i === index; });
+    a.Focus(index, 'front');
     const costs = {};
     for (const mode of ['strands', 'cards', 'shell']) {
       a.Lod(mode); t.StepFrames(20, 1 / 60, true);
-      const mesh = heads[9].getObjectByName({ strands: 'HairStrands', cards: 'HairCards', shell: 'HairShell' }[mode]);
+      const mesh = heads[index].getObjectByName({ strands: 'HairStrands', cards: 'HairCards', shell: 'HairShell' }[mode]);
       const original = mesh.onBeforeRender; let draws = 0;
       mesh.onBeforeRender = function (...args) { original.apply(this, args); if (!args[4].userData.hairPrepass) draws++; };
       const times = [], beforeFrame = t.renderer.info.render.frame;
@@ -110,13 +116,13 @@ try {
       } finally { mesh.onBeforeRender = original; }
       if (draws < 12) throw new Error(`${mode}: measured frames must draw the selected hair (${draws}/12)`);
       times.sort((x, y) => x - y);
-      costs[mode] = { ...a.State().stations[9], mainDraws: draws, renderPasses: t.renderer.info.render.frame - beforeFrame, p50Ms: +times[6].toFixed(2), p95Ms: +times[11].toFixed(2) };
+      costs[mode] = { ...a.State().stations[index], mainDraws: draws, renderPasses: t.renderer.info.render.frame - beforeFrame, p50Ms: +times[6].toFixed(2), p95Ms: +times[11].toFixed(2) };
     }
     heads.forEach((head) => { head.visible = true; }); a.Lod('auto'); a.Camera('walk');
     const lods = new Set();
-    for (let i = 0; i < 48; i++) { t.StepFrames(1, 0.15, true); lods.add(a.State().stations[3].lod); }
+    for (let i = 0; i < 48; i++) { t.StepFrames(1, 0.15, true); lods.add(a.State().stations[index].lod); }
     a.Camera('overview'); return { costs, automaticLods: [...lods], canvas: [t.renderer.domElement.width, t.renderer.domElement.height], internal: [t.post.width, t.post.height], quality: t.post.quality, renderer: t.renderer.getContext().getParameter(t.renderer.getContext().RENDERER) };
-  });
+  }, heIndex);
   assert.ok(result.cost.costs.strands.triangles > result.cost.costs.cards.triangles);
   assert.ok(result.cost.costs.cards.triangles > result.cost.costs.shell.triangles);
   assert.ok(['strands', 'cards', 'shell'].every((mode) => result.cost.automaticLods.includes(mode)), 'distance walk reaches all three automatic tiers');

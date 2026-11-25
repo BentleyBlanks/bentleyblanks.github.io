@@ -12,8 +12,10 @@ const output = path.join(here, 'tmp/HairLab/ReferenceReview'); fs.mkdirSync(outp
 const references = JSON.parse(fs.readFileSync(path.join(here, 'Hair/Data_HairReferences.json'))).looks;
 const referenceRoot = process.env.HAIR_REFERENCE_ROOT || path.join(process.env.USERPROFILE, 'OneDrive/Sync/饮河/FPS/角色/Tripo');
 const stations = HAIR_RANGE_ROWS.flatMap(row=>row.items.map(item=>({...item,row:row.id})));
-const subjects = Object.fromEntries(stations.map((station,index)=>[station.groom.replace(/_Cast$/,''),index])
-  .filter(([key,index])=>stations[index].groom.endsWith('_Cast') && !stations[index].lod));
+const subjects = Object.fromEntries(stations.flatMap((station,index) =>
+  station.groom ? [[station.groom.replace(/_Cast$/,''), index]] : []));
+const focusIndex = subjects.Luo;
+const otherIndex = subjects.Shunzi;
 const only = process.env.HAIR_REF_SUBJECTS?.split(',');
 const detail = process.env.HAIR_REF_DETAIL === '1';
 const viewport = detail ? {width:1920,height:1080} : {width:1280,height:720};
@@ -78,7 +80,7 @@ try {
   await page.mouse.down({button:'right'});await page.keyboard.down('s');await Step(3);
   await page.evaluate(()=>window.dispatchEvent(new Event('blur')));const blurred=await Target();await Step(15);await page.keyboard.up('s');await page.mouse.up({button:'right'});
   assert.deepEqual(await Target(),blurred,'window blur releases the navigation gesture');
-  await page.evaluate(()=>Taierzhuang.Debug.HairRange.Focus(8,'front'));await Step(2);
+  await page.evaluate(index=>Taierzhuang.Debug.HairRange.Focus(index,'front'),focusIndex);await Step(2);
   const focused=await CameraState();await page.mouse.move(900,350);await page.mouse.down({button:'middle'});await page.mouse.move(940,380);await page.mouse.up({button:'middle'});await Step(2);
   const panned=await CameraState();assert.ok(Distance(panned.target,focused.target)>.01,'middle drag pans');assert.equal(panned.azimuth,focused.azimuth);
   await page.keyboard.press('f');await Step(2);assert.ok(Distance(await Target(),focused.target)<1e-5,'F frames the selected specimen');
@@ -87,17 +89,17 @@ try {
   await page.keyboard.down('Alt');await page.mouse.down({button:'right'});await page.mouse.move(1000,420);await page.mouse.up({button:'right'});await page.keyboard.up('Alt');await Step(2);
   const zoomed=await CameraState();assert.ok(zoomed.radius>orbited.radius,'Alt + right dollies');assert.equal(zoomed.azimuth,orbited.azimuth);
   // Ordinary scene clicks select the head under the cursor, without orbiting.
-  await page.evaluate(()=>{Taierzhuang.Debug.HairRange.Focus(8,'front');Taierzhuang.Debug.HairRange.Select(7);});await Step(2);
+  await page.evaluate(([focus,other])=>{Taierzhuang.Debug.HairRange.Focus(focus,'front');Taierzhuang.Debug.HairRange.Select(other);},[focusIndex,otherIndex]);await Step(2);
   const click=await page.evaluate(async()=>{const T=await import('three');const t=Taierzhuang,p=new T.Vector3(...t.Debug.HairRange.State().camera.target).project(t.camera);return {x:(p.x+1)*innerWidth/2,y:(1-p.y)*innerHeight/2};});
-  await page.mouse.click(click.x,click.y);assert.equal(await page.evaluate(()=>Taierzhuang.Debug.HairRange.State().selected),8,'left click selects the visible head');
+  await page.mouse.click(click.x,click.y);assert.equal(await page.evaluate(()=>Taierzhuang.Debug.HairRange.State().selected),focusIndex,'left click selects the visible head');
   assert.equal(await page.locator('#hair-range-panel input[type="range"]:visible').count(),0,'fine controls start collapsed');
   assert.equal(await page.locator('#hair-range-map [data-row]').count(),HAIR_RANGE_ROWS.length,'every row has a persistent purpose guide');
-  await page.locator('#hair-range-map [data-row="beard"]').click();
-  assert.equal(await page.locator('[data-sample] option').count(),5,'guide selects the beard row and its samples');
+  await page.locator('#hair-range-map [data-row="civilian"]').click();
+  assert.deepEqual(await page.locator('[data-sample] option').allTextContents(), ['妮儿', '二丫', '田嫂']);
+  await page.locator('#hair-range-panel [data-row="ija"]').click();
+  assert.equal(await page.locator('[data-sample] option').count(),7,'Japanese cast row lists the real game characters');
   await page.locator('#hair-range-panel [data-row="cast"]').click();
-  assert.equal(await page.locator('[data-sample] option').count(),6,'character category only lists six personal looks');
-  await page.locator('#hair-range-panel [data-row="newCast"]').click();
-  assert.equal(await page.locator('[data-sample] option').count(),9,'new character category lists all nine additions');
+  assert.equal(await page.locator('[data-sample] option').count(),7,'Sichuan cast row lists the real game characters');
   await page.locator('[data-fold="appearance"] summary').click();
   const slider=page.locator('[data-param="clump"]'),defaultClump=await slider.inputValue();
   await slider.focus();const guarded=await Target();await page.keyboard.down('w');await Step(15);await page.keyboard.up('w');assert.deepEqual(await Target(),guarded,'form editing never flies');

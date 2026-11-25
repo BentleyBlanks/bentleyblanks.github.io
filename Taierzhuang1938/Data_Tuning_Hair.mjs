@@ -45,4 +45,4 @@ export const HAIR_LOD = Object.freeze({
 export const HAIR_QUALITY = Object.freeze({ low: 'shell', medium: 'cards', high: 'strands', ultra: 'strands' });
 
 // Independent gallery camera, metres per second; used only by HairRange.
-export const HAIR_CAMERA = Object.freeze({ turn: 0.0055, zoom: 0.0011, min: 0.18, max: 40, moveSpeed: 1.8, boost: 3, flySpeedMin: .1, flySpeedMax: 20, overviewTarget: [0, 1.3, 1.4], overviewRadius: 10.4, overviewElevation: .55, portraitMagnification: 2.4 });
+export const HAIR_CAMERA = Object.freeze({ turn: 0.0055, zoom: 0.0011, min: 0.18, max: 40, moveSpeed: 1.8, boost: 3, flySpeedMin: .1, flySpeedMax: 20, overviewTarget: [0, 1.25, 0], overviewRadius: 8.4, overviewElevation: .52, portraitMagnification: 2.4 });

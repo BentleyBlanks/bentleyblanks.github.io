@@ -1,5 +1,5 @@
-// 头发胡子测试场（?hair=1，docs/Data_HairSystem.md §6）：五排台座，每个台座一个光头胸像 + 一套头发 / 胡子。
-// 头发与胡子的造型在 Hair/Data_HairStyles.json（grooms 的 id 对这里的 groom），这里只管摆在哪、哪一排、强制哪一档。
+// 头发胡子测试场（?hair=1，docs/Data_HairSystem.md §6）：每名游戏角色一个头部预览。
+// 头发与胡子的造型在 Hair/Data_HairStyles.json（grooms 的 id 对这里的 groom），没有单独毛发套装的角色从现行游戏模型读取头部。
 // 纯数据、零 import。
 
 export const HAIR_RANGE_ID = 'HairRange';
@@ -12,42 +12,39 @@ const ROW = (id, z, items) => Object.freeze({ id, z, items: Object.freeze(items.
 
 // 头朝 -Z：相机默认站在 -Z 一侧往 +Z 看，第一排在最前面（z 最小）。
 export const HAIR_RANGE_ROWS = Object.freeze([
-  ROW('lod', -3.0, [
-    { groom: 'HeYoutian_Cast', lod: 'strands' },
-    { groom: 'HeYoutian_Cast', lod: 'cards' },
-    { groom: 'HeYoutian_Cast', lod: 'shell' },
-    { groom: 'HeYoutian_Cast', lod: 'auto' },
-    { groom: 'Yi_LongStraight', lod: 'strands' },
-    { groom: 'Yi_LongStraight', lod: 'cards' },
-    { groom: 'Yi_LongStraight', lod: 'shell' },
+  ROW('cast', -2.4, [
+    { character: 'shunzi', groom: 'Shunzi_Cast' },
+    { character: 'luo', groom: 'Luo_Cast' },
+    { character: 'heYoutian', groom: 'HeYoutian_Cast' },
+    { character: 'donggua', groom: 'Donggua_Cast' },
+    { character: 'yaowa', groom: 'Yaowa_Cast' },
+    { character: 'liuWencai', groom: 'LiuWencai_Cast' },
+    { character: 'oldGeng', groom: 'OldGeng_Cast' },
   ]),
-  ROW('cast', -0.6, [
-    { groom: 'Shunzi_Cast' }, { groom: 'Luo_Cast' }, { groom: 'HeYoutian_Cast' },
-    { groom: 'SoldierA_Cast' }, { groom: 'Jia_Cast' }, { groom: 'Yi_Cast' },
+  ROW('civilian', 0, [
+    { character: 'nier', groom: 'Nier_Cast' },
+    { character: 'erya' },
+    { character: 'tianSao' },
   ]),
-  ROW('length', 1.8, [
-    { groom: 'Jia_Buzz' }, { groom: 'HeYoutian_Crew' }, { groom: 'Shunzi_SidePart' },
-    { groom: 'Luo_Messy' }, { groom: 'Yi_LongStraight' }, { groom: 'SoldierA_LongWavy' },
-  ]),
-  ROW('beard', 4.2, [
-    { groom: 'Shunzi_Stubble' }, { groom: 'Jia_Mustache' }, { groom: 'HeYoutian_Goatee' },
-    { groom: 'Luo_Boxed' }, { groom: 'SoldierA_FullLong' },
-  ]),
-  ROW('newCast', 6.6, [
-    { groom: 'Donggua_Cast' }, { groom: 'Yaowa_Cast' }, { groom: 'LiuWencai_Cast' },
-    { groom: 'OldGeng_Cast' }, { groom: 'Nier_Cast' }, { groom: 'TaniHisao_Cast' }, { groom: 'SoldierC_Cast' },
-    { groom: 'AzumaShiro_Cast' }, { groom: 'Interpreter_Cast' },
+  ROW('ija', 2.4, [
+    { character: 'ijaA', groom: 'SoldierA_Cast' },
+    { character: 'ijaJia', groom: 'Jia_Cast' },
+    { character: 'ijaYi', groom: 'Yi_Cast' },
+    { character: 'ijaC', groom: 'SoldierC_Cast' },
+    { character: 'taniHisao', groom: 'TaniHisao_Cast' },
+    { character: 'azumaShiro', groom: 'AzumaShiro_Cast' },
+    { character: 'interpreter', groom: 'Interpreter_Cast' },
   ]),
 ]);
 
 export const HAIR_RANGE_PHASE = Object.freeze({
   id: HAIR_RANGE_ID, sandbox: true, sandboxKey: 'hair', sandboxGlyph: '发',
-  date: '头发实验', label: '头发胡子测试场', place: '发丝 · 发片 · 头发壳 三档对比',
+  date: '头发实验', label: '头发胡子测试场', place: '游戏角色头部预览',
   sky: 'testSceneDay', ambience: 'overcast', music: null, minutes: 600,
   story: HAIR_RANGE_ID,
-  brief: ['十五个人物的光头胸像配上各自的头发胡子，另有不同长短、软硬的发型与胡子样本，以及同一套头发三档（发丝 / 发片 / 头发壳）的并排对比。',
-    '按住右键转向，配合 WASD 移动、Q/E 升降、Shift 加速；中键平移，Alt + 左键环绕，滚轮缩放，F 聚焦。场景右上角有五排展示的用途导览。'],
-  objectives: ['对比发丝、发片、头发壳三档与各种发型胡子'],
+  brief: ['按角色查看游戏人物的头部、发型和胡须。',
+    '按住右键转向，配合 WASD 移动、Q/E 升降、Shift 加速；中键平移，Alt + 左键环绕，滚轮缩放，F 聚焦。可从右上角切换角色分组。'],
+  objectives: ['查看游戏角色头部'],
   mechanic: '测试场：独立观察相机，玩家无敌，无敌军与武器。',
   nraPool: 9999, poolGain: 0, ijaPool: 9999, ijaPressure: 0, ijaSpawn: [], ijaSupport: [],
   ijaForce: { lmgEvery: 13, hmgTeams: 0, engineers: false, armor: 0, motorTransport: 'rearOnly' },

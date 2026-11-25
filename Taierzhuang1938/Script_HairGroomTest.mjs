@@ -75,7 +75,21 @@ for (const def of Object.values(XBOT_CHARACTERS)) if (def.groom) {
   Check(fs.existsSync(path.join(here, def.groom)), `${def.name} 游戏头发文件存在`);
   Check(gameByFile.get(def.groom)?.model === def.file.replace(/^\.\//, ''), `${def.name} 头发按本人游戏模型绑定`);
 }
-for (const row of HAIR_RANGE_ROWS) for (const item of row.items) Check(ids.has(item.groom), `测试场 ${row.id} 排的 ${item.groom} 在清单里`);
+const stations = HAIR_RANGE_ROWS.flatMap(row => row.items.map(item => ({ ...item, z: row.z })));
+const cast = Object.keys(XBOT_CHARACTERS).filter(character => character !== 'xbot');
+Check(stations.length === cast.length && cast.every(character => stations.filter(station => station.character === character).length === 1),
+  '测试场每名游戏角色恰好一个台座');
+const scene = JSON.parse(fs.readFileSync(path.join(here, 'Scenes/TestHair/Scene_TestHair.json'), 'utf8'));
+const columns = scene.objects.filter(object => object.tag === 'hairPedestal');
+Check(columns.length === cast.length && scene.objects.length === cast.length * 2, '场景恰好每人一座台柱和柱头');
+for (const station of stations) {
+  const def = XBOT_CHARACTERS[station.character];
+  const personalGroom = styles.grooms.find(entry => entry.id === station.groom);
+  Check(def?.groom ? !!personalGroom?.referenceLook && ids.has(station.groom)
+    && personalGroom.referenceLook === gameByFile.get(def.groom)?.referenceLook
+    : !!def && !station.groom && fs.existsSync(path.join(here, def.file)), station.character + ' 使用本人预览资产');
+  Check(columns.some(({ pos }) => Math.abs(pos[0] - station.x) < 1e-6 && pos[2] === station.z), station.character + ' 的头像与场景台座对齐');
+}
 
 function Open(file) {
   const buf = fs.readFileSync(file);

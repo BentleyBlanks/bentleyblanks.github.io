@@ -167,8 +167,14 @@ const SHOT_PRESETS = Object.freeze({
   hair: {
     query: "hair=1&shot=1&manual=1&quality=high&scale=small&audio=0",
     frames: 60,
+    Ready: () => {
+      const state = window.Taierzhuang?.Debug.HairRange?.State();
+      if (state?.error) throw new Error(state.error);
+      return state?.ready;
+    },
     Stage: () => {
       const T = window.Taierzhuang;
+      T.Debug.HairRange.ShowPanel(false);
       T.StepFrames(30, 1 / 60, true);
     },
   },
@@ -242,6 +248,7 @@ async function CaptureIds(ids) {
       console.log(`[cover] 打开 ${id} ...`);
       await page.goto(url, { waitUntil: "load", timeout: 120000 });
       await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
+      if (preset.Ready) await page.waitForFunction(preset.Ready, null, { timeout: 180000 });
       await page.evaluate((frames) => {
         const T = window.Taierzhuang;
         T.StepFrames(frames, 1 / 60, false);
