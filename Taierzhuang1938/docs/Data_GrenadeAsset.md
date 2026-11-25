@@ -13,10 +13,14 @@
 | [国图藏《保卫滕县血战记》1947 年初版](https://commons.wikimedia.org/wiki/File:NCL-004758353_保衛滕縣血戰記.pdf) | 核查封面及第 7 至 13 页照片。目录和图注把这批照片定位于国共内战，缴获装备图版属于该次滕县战斗的记录。 |
 | [布里斯托大学中国历史照片 Ro-n0107](https://hpcbristol.net/visual/ro-n0107)、[Ro-n0108](https://hpcbristol.net/visual/ro-n0108)、[Ro-n0438](https://hpcbristol.net/visual/ro-n0438)、[Ro-n0662](https://hpcbristol.net/visual/ro-n0662) | 同期中国军队装备影像。前两张属于同一组摆拍，单件被手遮挡或失去侧面，其他照片的物件范围较小。用于核对时代背景。 |
 | [同档案 JM04-082](https://hpcbristol.net/visual/jm04-082)、[JM02-098](https://hpcbristol.net/visual/jm02-098)、[JM03-049](https://hpcbristol.net/visual/jm03-049) | 1937 年上海影像。查阅原图后，单件过小或被遮挡，无法可靠区分具体厂型。 |
+| 国际摄影中心藏卡帕照片 [1906.1992](https://www.icp.org/browse/archive/objects/man-helping-female-with-grenades-attached-to-her-uniform-taierzhuang-xuzhou)、[2768.1992](https://www.icp.org/browse/archive/objects/man-decorating-female-student-volunteer-with-captured-japanese-grenades) | 1938 年 4 月 7 日台儿庄徐州前线，同一构图的两种馆藏裁幅。腰前露出木柄，弹体由携行套遮挡。编号 2768.1992 的图注将器材记为日军战利品，照片支持同期携行外观。 |
+| 地方文史图版“巩造手榴弹”外观裁图 | 图版照片可见长木柄和有环状凸起的收颈。图版未列原始摄期、厂号或批次，提供长柄形制的外观参照。裁图收录在本机源工程的 `References/PeriodArchive/Reference_GongxianLongHandleExterior.jpg`。 |
 | [黑水博物馆长柄模型](https://www.blackwater.tw/post/pair-of-models-of-republic-of-china-gongxian-arsenal-long-handled-stick-grenades)、[烟溪旧址陈列馆](https://www.yiyang.gov.cn/jgswglj/13937/13973/content_2092318.html) | 两处把展品标为模型。黑水件属于长柄外形，对照时保留本作短柄的轮廓。 |
 | [巩县旧址报道所述展室](https://www.sohu.com/a/936596460_121117083)、[抗日战争纪念网所载滕县战史](https://m.krzzjn.com/show-355-89383.html) | 分别支持巩式展陈与滕县守军用弹的背景，暂未提供可识别为滕县现场或同批次的单件外观照。 |
 
 展板转图用于校准侧面轮廓，馆藏照片用于比对可见外形。第二轮调整了木柄中段、收颈过渡和弹体朝端面的渐收。对齐展板左侧单件轮廓和 Blender 正交侧视后，以 256 个截面比较相对宽度。平均绝对宽度误差从上一稿的可见长度的 1.79% 降到 0.39%，轮廓交并比从 90.81% 提高到 97.95%。
+
+整张侧面剪影复核仅用一次整体平移、旋转和等比例缩放，遮罩交并比为 97.56%。`Preview_SidePhotoRegistration.png` 和 `Data_SidePhotoRegistration.json` 随本机源工程保存，可复核叠图、比较方法和模型文件校验值。
 
 上述数值只衡量这张照片的归一化侧面，透视、印刷和边缘可辨度均有限。1938 年滕县守军所用批次的多角度照片仍缺，木色、铁面和磨损属于美术复原。游戏原有的 0.22 米长度是动画包络，继续沿用。
 
