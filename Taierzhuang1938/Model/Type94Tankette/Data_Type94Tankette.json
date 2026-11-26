@@ -40,48 +40,45 @@
       "kind": "Secondary study, printed pp50-51 inspected; original JACAR scans unchecked; distinguishes surrounding fighting from city assault"
     }
   ],
-  "version": "20261030CurrentWearV106-43969e24",
-  "sha256": "43969e24dfd670ce1ea6a57b12076618cc821c034d5580ebf22cf7cd2c9f964f",
-  "bytes": 41734776,
+  "version": "20261126PhotoV107-1756ed44",
+  "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+  "bytes": 36114836,
   "acceptance": {
-    "status": "user-authorized published checkpoint",
+    "status": "Photographed exterior revision and verified game asset",
     "strictReferenceMatched": false,
     "complete": false,
     "technicalRuntimeAccepted": true,
-    "userAuthorizedRelease": true,
-    "releaseInstruction": "这一轮做完就收尾提交上去把",
     "remaining": [
-      "Whole fixed-body/casing/near-corner/track-envelope photographic acceptance",
-      "Reliable camera/crop and complete rear-body controls; separate trailer excluded",
-      "Unobserved profiles, internal details and demonstration stops remain inferred"
+      "Opposite-side camera registration residuals",
+      "Occluded rear detail and exact hidden casting sections"
     ]
   },
   "measuredBoundsGltfM": [
     [
-      -0.8098969459533691,
-      0.001229479251533848,
-      -1.4780973797237866
+      -0.8100000023841858,
+      9.06220682401343e-08,
+      -1.4788684900918465
     ],
     [
-      0.8099169731140137,
+      0.8100000023841858,
       1.617947074584663,
       1.604384422302246
     ]
   ],
   "measuredDimensionsWidthHeightLengthM": [
-    1.6198139190673828,
-    1.616717595333129,
-    3.0824818020260327
+    1.6200000047683716,
+    1.6179469839625946,
+    3.0832529123940926
   ],
-  "triangles": 78716,
+  "triangles": 78682,
   "meshNodes": 240,
   "poseNodes": 296,
-  "highSourceTriangles": 694476,
-  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\SurfaceV102\\Scene_Type94TanketteStableWearV102.blend",
-  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\GameWearV103\\Scene_Type94TanketteGamePbrV103.blend",
-  "sourceHighManifest": "Data_SurfaceStudyV102.json",
-  "sourceGameManifest": "Data_GameTrialV103.json",
-  "deliveryManifest": "Data_ReleaseV106.json",
+  "highSourceTriangles": 628440,
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Scene_Type94TanketteHighV107.blend",
+  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Scene_Type94TanketteGameV107.blend",
+  "sourceHighManifest": "Data_ReleaseV107.json",
+  "sourceGameManifest": "Data_ReleaseV107.json",
+  "deliveryManifest": "Data_ReleaseV107.json",
   "mechanisms": {
     "driver": "Script_Type94Mechanism.mjs",
     "linksPerSide": 80,
@@ -1566,57 +1563,172 @@
       }
     ],
     "channels": "BaseColor sRGB; tangent normal linear; ORM R=AO G=Roughness B=Metallic linear",
-    "method": "Actual current-high to game projection, geometric shader replay and exact lossless WebP packaging; no photographic light painted into albedo"
+    "method": "Fresh target UVs, high-source tangent normals and PBR channel projection, local geometry AO for reconstructed pieces, lossless embedded texture packaging.",
+    "images": [
+      {
+        "name": "Texture_Type94GamePaintNormalV107",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 4601498,
+        "mimeType": "image/webp",
+        "pixelSha256": "e8929c959aa92eec2013bf4a5d94ba377638b6c9092659f9e2b5976d3254a7e9"
+      },
+      {
+        "name": "Texture_Type94GamePaintOrmV107",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 10339736,
+        "mimeType": "image/webp",
+        "pixelSha256": "f646a830524679f5189860b9e760ca97d7a68e7ae82ddf5170fe79e90a20ec50"
+      },
+      {
+        "name": "Texture_Type94GamePaintBaseV107",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 6317288,
+        "mimeType": "image/webp",
+        "pixelSha256": "9f96349d4edc9ed102113fe61219100de73db505ae4b4a39c76a44676473baed"
+      },
+      {
+        "name": "Texture_Type94GameSteelNormalV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 1272388,
+        "mimeType": "image/webp",
+        "pixelSha256": "a00830a96c0d57feca4310e9f96751ffb386911321bbcd37ead117347eb21283"
+      },
+      {
+        "name": "Texture_Type94GameSteelOrmV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 1259360,
+        "mimeType": "image/webp",
+        "pixelSha256": "e2c6d91af2eeef8bf7b3e7979eab18ea46456360bd34687b0ce7e9a1e6bdc6a7"
+      },
+      {
+        "name": "Texture_Type94GameSteelBaseV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 896494,
+        "mimeType": "image/webp",
+        "pixelSha256": "91a00b49f03441afbc6eb7dd95f78721ca8df28deb0795fd287760357799fc18"
+      },
+      {
+        "name": "Texture_Type94GameRubberNormalV107",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 149692,
+        "mimeType": "image/webp",
+        "pixelSha256": "1df45bf9ae897e8009dcba0c3c18796711ba83336737e5beb7fce6f2ca25077e"
+      },
+      {
+        "name": "Texture_Type94GameRubberOrmV107",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 322114,
+        "mimeType": "image/webp",
+        "pixelSha256": "e0c0a644087529a117cfe01392c02dab95145cef5b37c98095579d0f1142ae24"
+      },
+      {
+        "name": "Texture_Type94GameRubberBaseV107",
+        "size": [
+          1024,
+          1024
+        ],
+        "bytes": 233678,
+        "mimeType": "image/webp",
+        "pixelSha256": "decdbfb7d20308d2310e404851bddd9d40a1e6f594aca4857b6fb07b8d5ef10c"
+      },
+      {
+        "name": "Texture_Type94GameTrackNormalV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 3219224,
+        "mimeType": "image/webp",
+        "pixelSha256": "af572301d8e47e696925f7d7378e81e0524d862ab33e16c8acdac39c6d1704ab"
+      },
+      {
+        "name": "Texture_Type94GameTrackOrmV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 1767098,
+        "mimeType": "image/webp",
+        "pixelSha256": "9472b7b7a6729cfb7d1c23725b56ef6727d34e3f9d76abe596b43fdd09e02cdc"
+      },
+      {
+        "name": "Texture_Type94GameTrackBaseV107",
+        "size": [
+          2048,
+          2048
+        ],
+        "bytes": 408638,
+        "mimeType": "image/webp",
+        "pixelSha256": "145a706cf6f90b2ce54e08d20867487b0ba6cba0ff8af88a051622f155128001"
+      }
+    ]
   },
   "reduction": {
-    "maximumContinuousTwoDirectionWorldBoundM": 0.0029979687999456923,
-    "sourceRetained": true,
-    "referenceSurface": "Actual same high/low pair bound to proven buffers and poses",
-    "proof": "6cdcf05f31990e8cd42677d6658c9fb6ac3cb6fb017da3f1e9abb66cb947b810"
+    "referenceSurface": "Saved V107 high source compared against the actual packaged game import",
+    "scope": "Named owners sampled at triangle vertices, edge midpoints and face centres",
+    "twoDirectionSampledSurfaceMaximumM": 0.0025087681133300066
   },
   "validation": {
-    "sourceGameBinaryChecks": 772,
-    "sourceHighTransferChecks": 251,
-    "sourceFullColdRebuildExact": true,
-    "sourceMotion": {
-      "highSurfaceTransferChecks": 251,
-      "actualBinaryChecks": 772,
-      "sectionChecks": 56,
-      "vehicleChecks": 38,
-      "gatePoses": 56,
-      "gateContactExclusionM": 0,
-      "roadWheelPoses": 128,
-      "beltPhases": 32,
-      "allAngleArmCoverChecks": 24,
-      "browserChecks": 17,
-      "finalBrowserRenders": 1,
-      "earlierHighLowComparisonRenders": 8,
-      "genericExportPassed": true
+    "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+    "exportChecks": 1172,
+    "browserChecks": 943,
+    "blenderMechanismChecks": 38,
+    "roadWheelPoses": 128,
+    "beltPhases": 32,
+    "towLatchPoses": 56,
+    "openingProbes": 22,
+    "prototypeAndRuntimePoseParity": {
+      "passed": true,
+      "baselineSha256": "43969e24dfd670ce1ea6a57b12076618cc821c034d5580ebf22cf7cd2c9f964f",
+      "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+      "nodes": 296,
+      "allParentsAndControlExtrasEqual": true,
+      "maximumRestTransformComponentDelta": 0
     },
-    "packagingChecks": 498,
-    "packagingPassed": true,
-    "independentPillowPixelsExact": true,
-    "actualGenericExportPassed": true,
-    "deliveryBrowser": "passed",
-    "allUseSha256": "43969e24dfd670ce1ea6a57b12076618cc821c034d5580ebf22cf7cd2c9f964f",
-    "deliveryBrowserChecks": 943,
-    "deliveryUiChecks": 17,
-    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\DeliveryV106\\Acceptance"
+    "weaponInspectionLoaded": true,
+    "preservedSceneryPreviewLoaded": true,
+    "renderedVehicleInstancesInScenery": 2,
+    "sceneryVehicleTriangles": 157364,
+    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Acceptance",
+    "passed": true
   },
   "reconstructionScope": [
-    "选取库宾卡2017年早期小诱导轮馆藏外观；橄榄色为馆藏重涂。",
-    "本车与独立挂车分别处理；尺寸与 Notion 的3.36m汇总存在资料差异，未获本车测绘图。",
-    "掉漆、磨损分布、隐藏截面、内构和机构行程属于制作推定。",
-    "技术源重开、机构运动及严格独立重建通过；整车摄影参考验收仍未完成。"
+    "2017 库宾卡小诱导轮馆藏橄榄漆外观，2014 同车及馆方 1–7 号补充。",
+    "前挡泥板、首板上缘、传动罩铸肩、固定耳、主动轮孔与履带开窗采用真实几何。",
+    "馆方 3 号存在可见投影余差，4–6 号对主车尾部的覆盖有限，车尾隐蔽断面和磨损分布沿用推定。"
   ],
   "runtimeIntegration": "Reusable asset and rigid mechanism module; this model release does not replace existing chapter placements or gameplay behavior",
   "historyCreationSync": "Existing Notion review snapshots retained; current publication merges the upstream history ledger without advancing external Notion cursors",
-  "activeGrayStudy": "Data_GrayTrialV98.json",
-  "activeSurfaceStudy": "Data_SurfaceStudyV102.json",
-  "activeCameraStudy": "Data_ReferenceAuditV105.json",
+  "activeGrayStudy": "Data_ReleaseV107.json",
+  "activeSurfaceStudy": "Data_ReleaseV107.json",
+  "activeCameraStudy": "Data_ReferenceViewsV107.json",
   "finalSourceVerification": {
-    "high": "Data_SurfaceStudyV102.json",
-    "game": "Data_GameTrialV103.json",
-    "delivery": "Data_ReleaseV106.json"
+    "high": "Data_ReleaseV107.json",
+    "game": "Data_ReleaseV107.json",
+    "delivery": "Data_ReleaseV107.json"
   }
 }

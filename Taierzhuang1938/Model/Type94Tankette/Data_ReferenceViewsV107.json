@@ -1,0 +1,635 @@
+{
+  "schema": "Type94ReferenceReviewV107",
+  "sourceCameraFamily": "ReferenceV93/Inputs/Data_ReferenceCamerasV93.json",
+  "sourceCameraFamilySha256": "b5d8d55eaf600edda50aaf7217c216243da10cfeae77c2479b9ab9037d52968b",
+  "photos": [
+    {
+      "id": "2017",
+      "file": "References/Reference_Kubinka.jpg",
+      "sha256": "bb91f650f0ddd9cc95d4493033707bbdfda69f47c65a729995eb82fa47da6d28",
+      "review": "Primary front-left view, olive enamel, front plate, casting, shoes and road wheels."
+    },
+    {
+      "id": "2014",
+      "file": "References/Reference_KubinkaOld.jpg",
+      "sha256": "a2842cfe2394259a70ab2bc7d5835696c944da040518b2c8870f9428f76ca136",
+      "review": "Same exhibit, different museum repaint. The rail and glass block the lower plate and part of the wheels."
+    },
+    {
+      "id": "1",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial1.jpg",
+      "sha256": "6dec2f24b09943e5853b9e2081f02f20c5ff0cd0e6b08e5acfd88319b3a57509",
+      "review": "Lower front-left view, front fittings, near-side wheel centres and track windows."
+    },
+    {
+      "id": "2",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial2.jpg",
+      "sha256": "71227a67ba14c9434c598a375789a835da055f4d784c8c82f13f225561ae78e4",
+      "review": "Left flanks, eight drive openings, four road wheels and raised small idler."
+    },
+    {
+      "id": "3",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial3.jpg",
+      "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b",
+      "review": "Opposite flank and drive openings. Foreground and background overlaps limit precise registration."
+    },
+    {
+      "id": "4",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial4.jpg",
+      "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba",
+      "review": "The separate trailer fills the foreground. Partial silhouette of the tankette behind it."
+    },
+    {
+      "id": "5",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial5.jpg",
+      "sha256": "17252acad0fd8b924c83a7fb919af18ed1226964728ba3e2a7904ce539706bc9",
+      "review": "Trailer identification; the vehicle contributes only a partial turret and farther flank."
+    },
+    {
+      "id": "6",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial6.jpg",
+      "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0",
+      "review": "Trailing armour, rear door and near running gear. The trailer occludes the far rear."
+    },
+    {
+      "id": "7",
+      "file": "References/PatriotOfficial/Reference_PatriotOfficial7.jpg",
+      "sha256": "f8d11457481fbdd4435ffb184aee2f178a5843ddb0336d88fb91590cf470bf34",
+      "review": "Low oblique corroboration of the inclined front and exposed wheel stations."
+    }
+  ],
+  "addedCameras": {
+    "1": {
+      "image": {
+        "size": [
+          1200,
+          780
+        ],
+        "sha256": "6dec2f24b09943e5853b9e2081f02f20c5ff0cd0e6b08e5acfd88319b3a57509",
+        "pathWithinSource": "References/PatriotOfficial/Reference_PatriotOfficial1.jpg"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            -0.7994004824008244,
+            -0.6005800417001226,
+            -0.016201303923095267
+          ],
+          [
+            0.0019607574740752587,
+            0.02435817757062291,
+            -0.9997013727186566
+          ],
+          [
+            0.6007953263528749,
+            -0.7991935264358172,
+            -0.018294347094816983
+          ]
+        ],
+        "translationCameraFromBlender": [
+          0.12252673783193188,
+          0.7784170423978679,
+          4.598959952757962
+        ],
+        "k": [
+          [
+            1299.5703692678173,
+            0.0,
+            600.0
+          ],
+          [
+            0.0,
+            1299.5703692678173,
+            390.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "turretYawRadians": -0.014862172380366245
+      },
+      "observations": [
+        {
+          "name": "DriveCap",
+          "fitFrameM": [
+            -0.7336211228370666,
+            1.1895627975463867,
+            0.5607415081039071
+          ],
+          "photoNative": [
+            597,
+            495
+          ],
+          "sigmaNative": 5,
+          "training": true,
+          "initialNative": [
+            391.41828263607147,
+            453.5289162184087
+          ],
+          "fittedNative": [
+            594.0946399496745,
+            489.7382989869418
+          ],
+          "initialErrorPx": 209.72289647132467,
+          "fittedErrorPx": 6.010541953338739
+        },
+        {
+          "name": "Road0Cap",
+          "fitFrameM": [
+            -0.7336211228370666,
+            0.7093522548675537,
+            0.2048198224082589
+          ],
+          "photoNative": [
+            701,
+            599
+          ],
+          "sigmaNative": 6,
+          "training": true,
+          "initialNative": [
+            537.5056360408371,
+            564.702666279494
+          ],
+          "fittedNative": [
+            701.2991089202176,
+            603.5427698939592
+          ],
+          "initialErrorPx": 167.0530279484541,
+          "fittedErrorPx": 4.552606336552251
+        },
+        {
+          "name": "Road1Cap",
+          "fitFrameM": [
+            -0.7336211228370666,
+            0.18676617741584778,
+            0.20642123530060053
+          ],
+          "photoNative": [
+            790,
+            580
+          ],
+          "sigmaNative": 5,
+          "training": true,
+          "initialNative": [
+            661.5316831567519,
+            539.8363437891147
+          ],
+          "fittedNative": [
+            792.5658315911782,
+            576.6269247663847
+          ],
+          "initialErrorPx": 134.60025153306128,
+          "fittedErrorPx": 4.238057135754142
+        },
+        {
+          "name": "Road2Cap",
+          "fitFrameM": [
+            -0.7336211228370666,
+            -0.21669377386569977,
+            0.2060899377837777
+          ],
+          "photoNative": [
+            858,
+            552
+          ],
+          "sigmaNative": 6,
+          "training": false,
+          "initialNative": [
+            741.2509083397406,
+            524.3108139417078
+          ],
+          "fittedNative": [
+            850.9844626231411,
+            559.8697052533548
+          ],
+          "initialErrorPx": 119.98767198369329,
+          "fittedErrorPx": 10.542771241983047
+        },
+        {
+          "name": "Road3Cap",
+          "fitFrameM": [
+            -0.7336211228370666,
+            -0.7306081056594849,
+            0.20445431182533502
+          ],
+          "photoNative": [
+            917,
+            540
+          ],
+          "sigmaNative": 7,
+          "training": true,
+          "initialNative": [
+            827.3774755029685,
+            507.8615022276415
+          ],
+          "fittedNative": [
+            913.8862659511567,
+            542.1596717699094
+          ],
+          "initialErrorPx": 95.2107133482619,
+          "fittedErrorPx": 3.789395978341382
+        },
+        {
+          "name": "TurretBall",
+          "fitFrameM": [
+            0.08317875862121582,
+            -0.12065613269805908,
+            1.3569110275283456
+          ],
+          "photoNative": [
+            626,
+            228
+          ],
+          "sigmaNative": 7,
+          "training": true,
+          "initialNative": [
+            552.0032789386602,
+            211.14019046943417
+          ],
+          "fittedNative": [
+            629.3233226861556,
+            230.08716488429147
+          ],
+          "initialErrorPx": 75.8931347701272,
+          "fittedErrorPx": 3.9243765021384003
+        },
+        {
+          "name": "Visor",
+          "fitFrameM": [
+            0.34979233145713806,
+            0.38238629698753357,
+            1.1519334555640817
+          ],
+          "photoNative": [
+            491,
+            289
+          ],
+          "sigmaNative": 9,
+          "training": true,
+          "initialNative": [
+            404.76689205730946,
+            264.74989780810415
+          ],
+          "fittedNative": [
+            482.46046665183815,
+            284.7073262424614
+          ],
+          "initialErrorPx": 89.57799038699802,
+          "fittedErrorPx": 9.557754851063548
+        },
+        {
+          "name": "GatePin",
+          "fitFrameM": [
+            0.0,
+            1.3504245281219482,
+            0.6883824110999703
+          ],
+          "photoNative": [
+            340,
+            449
+          ],
+          "sigmaNative": 8,
+          "training": true,
+          "initialNative": [
+            200.45998321225818,
+            402.91083856125636
+          ],
+          "fittedNative": [
+            340.737804524566,
+            435.62763481836527
+          ],
+          "initialErrorPx": 146.95450686266767,
+          "fittedErrorPx": 13.392703463732296
+        },
+        {
+          "name": "DisplayMark",
+          "fitFrameM": [
+            -0.3700000047683716,
+            1.3193199634552002,
+            0.6445602417960763
+          ],
+          "photoNative": [
+            448,
+            446
+          ],
+          "sigmaNative": 4,
+          "training": true,
+          "initialNative": [
+            273.2995922817001,
+            420.29628108952875
+          ],
+          "fittedNative": [
+            449.06174685229837,
+            454.953370423768
+          ],
+          "initialErrorPx": 176.5811813947589,
+          "fittedErrorPx": 9.016104941911928
+        },
+        {
+          "name": "NoseCenter",
+          "fitFrameM": [
+            -0.2039,
+            1.295,
+            0.8866885639205575
+          ],
+          "photoNative": [
+            423,
+            351
+          ],
+          "sigmaNative": 12,
+          "training": false,
+          "initialNative": [
+            249.2074504488213,
+            332.2788462865159
+          ],
+          "fittedNative": [
+            407.7961446279502,
+            360.83787238695766
+          ],
+          "initialErrorPx": 174.79797446155607,
+          "fittedErrorPx": 18.109139992729418
+        }
+      ],
+      "seed": "7",
+      "role": "Inspection camera estimate"
+    }
+  },
+  "rejectedPoseStudy": {
+    "3": {
+      "image": {
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b",
+        "pathWithinSource": "References/PatriotOfficial/Reference_PatriotOfficial3.jpg"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            -0.6884561581314187,
+            0.7238032323685096,
+            0.04622768806488303
+          ],
+          [
+            -0.07442050837270164,
+            -0.007097133862111735,
+            -0.9972016940541627
+          ],
+          [
+            -0.7214497253894241,
+            -0.6899699352173546,
+            0.058751870027123024
+          ]
+        ],
+        "translationCameraFromBlender": [
+          0.3155402088031265,
+          0.8858568324924703,
+          4.061671489700255
+        ],
+        "k": [
+          [
+            1362.4683869805453,
+            0.0,
+            720.0
+          ],
+          [
+            0.0,
+            1362.4683869805453,
+            480.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          -0.029707312552649193,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "observations": [
+        {
+          "name": "DriveCap",
+          "fitFrameM": [
+            0.7336211228370666,
+            1.1895627975463867,
+            0.5607415081039071
+          ],
+          "photoNative": [
+            1064,
+            608
+          ],
+          "sigmaNative": 5,
+          "training": true,
+          "initialNative": [
+            1081.1959330587401,
+            616.4413091436038
+          ],
+          "fittedNative": [
+            1065.4476767683389,
+            610.5922303308922
+          ],
+          "initialErrorPx": 19.156090776005453,
+          "fittedErrorPx": 2.9690783273577703
+        },
+        {
+          "name": "Road0Cap",
+          "fitFrameM": [
+            0.7336211228370666,
+            0.7093522548675537,
+            0.2048198224082589
+          ],
+          "photoNative": [
+            878,
+            763
+          ],
+          "sigmaNative": 7,
+          "training": true,
+          "initialNative": [
+            869.1876474212784,
+            755.1615554326368
+          ],
+          "fittedNative": [
+            868.442295382733,
+            756.9503063775463
+          ],
+          "initialErrorPx": 11.794014210917673,
+          "fittedErrorPx": 11.311432733145816
+        },
+        {
+          "name": "Road1Cap",
+          "fitFrameM": [
+            0.7336211228370666,
+            0.18676617741584778,
+            0.20642123530060053
+          ],
+          "photoNative": [
+            690,
+            729
+          ],
+          "sigmaNative": 7,
+          "training": true,
+          "initialNative": [
+            694.643140097536,
+            722.9307903261886
+          ],
+          "fittedNative": [
+            702.1470552142902,
+            728.6944393336972
+          ],
+          "initialErrorPx": 7.641600357911508,
+          "fittedErrorPx": 12.150897814556965
+        },
+        {
+          "name": "Road2Cap",
+          "fitFrameM": [
+            0.7336211228370666,
+            -0.21669377386569977,
+            0.2060899377837777
+          ],
+          "photoNative": [
+            599,
+            718
+          ],
+          "sigmaNative": 7,
+          "training": false,
+          "initialNative": [
+            580.6053794292247,
+            702.3581027334004
+          ],
+          "fittedNative": [
+            595.8993094007981,
+            711.1066413765569
+          ],
+          "initialErrorPx": 24.14603520335469,
+          "fittedErrorPx": 7.558615964803097
+        },
+        {
+          "name": "Road3Cap",
+          "fitFrameM": [
+            0.7336211228370666,
+            -0.7306081056594849,
+            0.20445431182533502
+          ],
+          "photoNative": [
+            485,
+            689
+          ],
+          "sigmaNative": 8,
+          "training": true,
+          "initialNative": [
+            455.9137088933715,
+            680.1862022922681
+          ],
+          "fittedNative": [
+            481.82322124568515,
+            692.5319017321126
+          ],
+          "initialErrorPx": 30.39235694006562,
+          "fittedErrorPx": 4.7503950466425655
+        },
+        {
+          "name": "TurretBall",
+          "fitFrameM": [
+            0.08317875862121582,
+            -0.12065613269805908,
+            1.3569110275283456
+          ],
+          "photoNative": [
+            791,
+            321
+          ],
+          "sigmaNative": 8,
+          "training": true,
+          "initialNative": [
+            803.5813378564828,
+            334.2365875840053
+          ],
+          "fittedNative": [
+            796.4095222144163,
+            325.46443591457415
+          ],
+          "initialErrorPx": 18.261908802970492,
+          "fittedErrorPx": 7.013851910583978
+        },
+        {
+          "name": "Visor",
+          "fitFrameM": [
+            0.34979233145713806,
+            0.38238629698753357,
+            1.1519334555640817
+          ],
+          "photoNative": [
+            884,
+            391
+          ],
+          "sigmaNative": 9,
+          "training": true,
+          "initialNative": [
+            886.9293800075683,
+            379.78376394535724
+          ],
+          "fittedNative": [
+            872.5377805045478,
+            370.10467492684916
+          ],
+          "initialErrorPx": 11.592463865037882,
+          "fittedErrorPx": 23.83268943435826
+        },
+        {
+          "name": "GatePin",
+          "fitFrameM": [
+            0.0,
+            1.3504245281219482,
+            0.6883824110999703
+          ],
+          "photoNative": [
+            1246,
+            585
+          ],
+          "sigmaNative": 12,
+          "training": false,
+          "initialNative": [
+            1284.4250069056534,
+            594.0497143933148
+          ],
+          "fittedNative": [
+            1286.3226511987832,
+            561.142128176565
+          ],
+          "initialErrorPx": 39.4763028448724,
+          "fittedErrorPx": 46.85204635490518
+        }
+      ],
+      "seed": "3",
+      "role": "Inspection camera estimate"
+    }
+  },
+  "comparisonScope": {
+    "solidOlive2017": true,
+    "pointFitIsConditional": true,
+    "threeCameraUse": "Retained given held-out native RMS 32.72 px versus 33.56 px for the trial.",
+    "fourAndFive": "Qualitative review of the small visible vehicle silhouette and object boundaries only.",
+    "inferred": [
+      "Hidden cross-sections and casting details",
+      "Exact local radii and fastening dimensions",
+      "2017 complete light field and camera calibration",
+      "Paint age and repair positions",
+      "Small camera/shape residuals on the opposite flank and partial rear"
+    ]
+  }
+}

@@ -1,18 +1,23 @@
-# 九四式轻装甲车 · 发布检查点 V106
+# 九四式轻装甲车 · 馆藏照片复原 V107
 
-当前交付为 **78,716 三角、240 个网格所有者、296 个节点、每侧 80 个独立履带片**，源于 [V102 高质量源](Data_SurfaceStudyV102.json) 和 [V103 当前磨损游戏派生](Data_GameTrialV103.json)。完整十二张 PBR 为 Paint 4K、Track／Steel 2K、Rubber 1K；同分辨率、像素完全一致的无损 WebP 包装约 41.7 MB。实际文件、版本与验证见 [交付合同](Data_Type94Tankette.json) 和 [包装记录](Data_ReleaseV106.json)。
+以 2017 库宾卡同车橄榄漆照片为主，参看 2014 同车照片及馆方 1–7 号。重新制作了前挡泥板的连续折弯、车首装甲上缘、圆弧传动罩的铸肩与固定耳、八孔主动轮和有实际开窗的履带片。低模保留独立轮履结构，重新展开 UV 并投射 BaseColor、切线空间法线和 ORM。整车实测、贴图尺寸、可动件和实际文件身份见 [资产合同](Data_Type94Tankette.json) 和 [V107 交付记录](Data_ReleaseV107.json)。
 
-用户于 2026-10-30 要求本轮收尾并提交发布。技术源重开、机构运动和完整独立重建已通过；**严格整车摄影参考验收仍未完成**。本次以可继续编辑的检查点发布，馆藏重涂、磨损位置、未见内构和演示行程仍属复原推定；独立挂车不属于本车。
+米制、glTF +Y 向上、-Z 车头。现有 `Type94Tankette`、`Prop/type94Tankette` 和 `mechanisms.path` 接入复用同一个模型。炮塔、枪座、十个盖板或门、前后锁闩以及左右轮履沿用原有枢轴和演示行程。[机构模块](Script_Type94Mechanism.mjs)
 
-[固定部位复核 V105](Data_ReferenceAuditV105.md) 从当前 GLB 重新绑定冠面与罩体外皮边缘，替换安装耳的过时条件前平面点。本轮没有修改几何或采用新相机。
+原照片、V102 高源和 V103 游戏源保存在原来的 OneDrive 目录。本次输出位于 `Type94Tankette/PhotoReconstructionV107/`，含 `Scene_Type94TanketteHighV107.blend`、`Scene_Type94TanketteGameV107.blend`、`Textures/`、`Exports/` 和 `Acceptance/`。主机位有原片、高模、实测游戏 GLB 三栏对照。馆方 3 号仍有侧向投影余差。4–6 号能确认挂车是独立物体，主车尾部部分被遮挡。准确的隐藏断面、倒角半径、掉漆位置和展厅灯场依据可见轮廓及既有模型推定。[参考和机位记录](Data_ReferenceViewsV107.json)
 
-## 当前使用与重建
+## 重建与验收
 
-米制、glTF +Y 向上、-Z 车头，场景原点在地面。[机构模块](Script_Type94Mechanism.mjs) 接收加载场景和合同中的 `mechanisms.path`。左右履带／轮组、炮塔、机枪、十个盖板／门及锁闩独立可动。当前拖钩本体固定，锁闩使用 `SetTowLatch`；旧 `SetTowShackle` 仅作旧资产兼容。各止挡与互锁属于模型演示净空约束，不是实车规程。本次不替换现有关卡排车、白盒形状或 AI。
+设置 `TYPE94_PHOTO_ROOT` 指向新的 OneDrive 输出子目录可独立重建。脚本使用保留的 V102 高源与 V103 游戏拓扑，先保存高模再派生低模，投射阶段核对高模文件的 SHA-256。包装脚本在指定输出目录生成可复制到运行入口的游戏 GLB。
 
-可编辑高源位于 OneDrive Blender 目录的 `Type94Tankette/SurfaceV102/Scene_Type94TanketteStableWearV102.blend`；游戏源为 `GameWearV103/Scene_Type94TanketteGamePbrV103.blend`。完成源自带全部贴图及作者切线，编辑位置／法线／UV 后须重建对应基底和烘焙。旧缓存会拒绝变化的表面。
+```powershell
+node Taierzhuang1938/_blender/Script_BuildType94PhotoV107.mjs
+node Taierzhuang1938/_import/Script_PackageType94PhotoV107.mjs
+node scripts/Script_BlenderMcp.mjs start --task Type94Tankette --batch Taierzhuang1938/_blender/Script_VerifyType94PhotoV107.py
+node scripts/Script_BlenderMcp.mjs stop
+```
 
-重建使用 `Script_Type94StableHighV102.py`、`Script_BuildType94GameV103.mjs`，包装为 `Script_PackageType94ReleaseV106.mjs`，独立核对为 `Script_VerifyType94ReleaseV106.py`。各入口在项目 `_blender/` 或 `_import/` 下。`TYPE94_STABLE_ROOT`、`TYPE94_GAME_ROOT` 指向新的外置输出，保留已验证生产输入。高源显式依赖 V101，游戏显式依赖 V102 高源、V100 低源及其证明／UV；具体命令见各版本文档，不声称无依赖生成或测绘复刻。
+照片与两套光照的渲染入口是 `_blender/Script_RenderType94PhotoV107.py`。合成对照使用 `_import/Script_ComposeType94EvidenceV107.py`，需要 NumPy、Pillow 与 SciPy。对照图与打开后的活动姿态截图保留在 OneDrive。历史发布资产见 [V106 包装记录](Data_ReleaseV106.json) 和 [V105 固定部位复核](Data_ReferenceAuditV105.md)。
 
 ## 历史制作记录
 

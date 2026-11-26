@@ -1,0 +1,531 @@
+{
+  "schema": "Type94ReleasePackagingV1",
+  "revision": "PhotoV107",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Exports\\Model_Type94TanketteGameV107.glb",
+  "sourceSha256": "128fdaa0b362af8300a6656cd4aafdb684f2197c685c43011b27be73025aa77b",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Scene_Type94TanketteGameV107.blend",
+  "sourceBlendSha256": "872f585eac51cef426e032e4b145d3894268319fc6c27234e3a84e67326d3908",
+  "output": {
+    "file": "Model/Type94Tankette/Model_Type94Tankette.glb",
+    "bytes": 36114836,
+    "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+    "geometry": "c2303d812efb30873882ff6e82432f7d916805a7b1a24cd93c7690d91ab8d62f",
+    "images": [
+      {
+        "index": 0,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 4601498,
+        "pixels": "e8929c959aa92eec2013bf4a5d94ba377638b6c9092659f9e2b5976d3254a7e9"
+      },
+      {
+        "index": 1,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 10339736,
+        "pixels": "f646a830524679f5189860b9e760ca97d7a68e7ae82ddf5170fe79e90a20ec50"
+      },
+      {
+        "index": 2,
+        "mime": "image/webp",
+        "width": 4096,
+        "height": 4096,
+        "bytes": 6317288,
+        "pixels": "9f96349d4edc9ed102113fe61219100de73db505ae4b4a39c76a44676473baed"
+      },
+      {
+        "index": 3,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1272388,
+        "pixels": "a00830a96c0d57feca4310e9f96751ffb386911321bbcd37ead117347eb21283"
+      },
+      {
+        "index": 4,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1259360,
+        "pixels": "e2c6d91af2eeef8bf7b3e7979eab18ea46456360bd34687b0ce7e9a1e6bdc6a7"
+      },
+      {
+        "index": 5,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 896494,
+        "pixels": "91a00b49f03441afbc6eb7dd95f78721ca8df28deb0795fd287760357799fc18"
+      },
+      {
+        "index": 6,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 149692,
+        "pixels": "1df45bf9ae897e8009dcba0c3c18796711ba83336737e5beb7fce6f2ca25077e"
+      },
+      {
+        "index": 7,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 322114,
+        "pixels": "e0c0a644087529a117cfe01392c02dab95145cef5b37c98095579d0f1142ae24"
+      },
+      {
+        "index": 8,
+        "mime": "image/webp",
+        "width": 1024,
+        "height": 1024,
+        "bytes": 233678,
+        "pixels": "decdbfb7d20308d2310e404851bddd9d40a1e6f594aca4857b6fb07b8d5ef10c"
+      },
+      {
+        "index": 9,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 3219224,
+        "pixels": "af572301d8e47e696925f7d7378e81e0524d862ab33e16c8acdac39c6d1704ab"
+      },
+      {
+        "index": 10,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 1767098,
+        "pixels": "9472b7b7a6729cfb7d1c23725b56ef6727d34e3f9d76abe596b43fdd09e02cdc"
+      },
+      {
+        "index": 11,
+        "mime": "image/webp",
+        "width": 2048,
+        "height": 2048,
+        "bytes": 408638,
+        "pixels": "145a706cf6f90b2ce54e08d20867487b0ba6cba0ff8af88a051622f155128001"
+      }
+    ]
+  },
+  "losslessPixelsAndOriginalResolution": true,
+  "nonImageBufferViewsExact": true,
+  "sceneGeometryMaterialAndControlsExact": true,
+  "triangles": 78682,
+  "meshOwners": 240,
+  "references": "Data_ReferenceViewsV107.json",
+  "high": {
+    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Scene_Type94TanketteHighV107.blend",
+    "sha256": "e150d466dc81135bdd98b23d9e344c86e1d3ea870b73ccd1595729787b73acc2",
+    "baselineSha256": "f2cd1706fc83fdf9ac29be10f7ffbfa09ca0be372866374701c07d78edf39458",
+    "triangles": 628440,
+    "changes": {
+      "fenderSheetsReplaced": 8,
+      "castShoulders": 2,
+      "driveWebs": 2,
+      "dishedRoadWheelFaces": 8,
+      "replacedTrackInstances": 160
+    },
+    "packedImages": 9
+  },
+  "game": {
+    "triangles": 78682,
+    "countStrategy": "Default GLB scene traversal, counting every mesh instance",
+    "measuredBoundsGltfM": [
+      [
+        -0.8100000023841858,
+        9.06220682401343e-08,
+        -1.4788684900918465
+      ],
+      [
+        0.8100000023841858,
+        1.617947074584663,
+        1.604384422302246
+      ]
+    ],
+    "dimensionsWidthHeightLengthM": [
+      1.6200000047683716,
+      1.6179469839625946,
+      3.0832529123940926
+    ],
+    "linksPerSide": 80,
+    "sourceToGame": [
+      {
+        "owner": "Geometry_Hull_Paint",
+        "highToGame": {
+          "samples": 175466,
+          "medianM": 0.0001793930059648119,
+          "percentile95M": 0.0011382967932149768,
+          "maximumM": 0.0023522325791418552,
+          "maximumAtOwnerLocalM": [
+            -0.7549999952316284,
+            -0.6499999761581421,
+            0.7948967218399048
+          ]
+        },
+        "gameToHigh": {
+          "samples": 36463,
+          "medianM": 0.00013935565948486328,
+          "percentile95M": 0.0009725858690217137,
+          "maximumM": 0.0019661933183670044,
+          "maximumAtOwnerLocalM": [
+            0.7951482534408569,
+            0.3499974310398102,
+            0.5043151378631592
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_NoseHousing_Paint",
+        "highToGame": {
+          "samples": 5632,
+          "medianM": 0.00036017732054460794,
+          "percentile95M": 0.0012376194063108414,
+          "maximumM": 0.0025087681133300066,
+          "maximumAtOwnerLocalM": [
+            0.29076507687568665,
+            -0.005347628146409988,
+            -0.0045209843665361404
+          ]
+        },
+        "gameToHigh": {
+          "samples": 909,
+          "medianM": 0.00042017377563752234,
+          "percentile95M": 0.0009884716710075736,
+          "maximumM": 0.0019057709723711014,
+          "maximumAtOwnerLocalM": [
+            0.288431853055954,
+            -0.005573248025029898,
+            -0.003229792695492506
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_FinalDriveRaisedEarRight_Paint",
+        "highToGame": {
+          "samples": 200,
+          "medianM": 5.582083213084843e-05,
+          "percentile95M": 0.0005976551154162705,
+          "maximumM": 0.0011632019886747003,
+          "maximumAtOwnerLocalM": [
+            -0.00951927900314331,
+            0.012095332145690918,
+            0.001901865005493164
+          ]
+        },
+        "gameToHigh": {
+          "samples": 174,
+          "medianM": 0.0001499950885772705,
+          "percentile95M": 0.0004374611016828567,
+          "maximumM": 0.0008066492155194283,
+          "maximumAtOwnerLocalM": [
+            -0.0031192898750305176,
+            0.01128868293017149,
+            -0.0006314715137705207
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_FinalDriveHousingLeft_Paint",
+        "highToGame": {
+          "samples": 12819,
+          "medianM": 0.00011980973795289174,
+          "percentile95M": 0.0008652964606881142,
+          "maximumM": 0.0017426850972697139,
+          "maximumAtOwnerLocalM": [
+            -0.5872933268547058,
+            1.3431404829025269,
+            0.7312754392623901
+          ]
+        },
+        "gameToHigh": {
+          "samples": 5653,
+          "medianM": 0.0001016285241348669,
+          "percentile95M": 0.0007544152904301882,
+          "maximumM": 0.0015987391816452146,
+          "maximumAtOwnerLocalM": [
+            -0.5861093997955322,
+            1.34171462059021,
+            0.7312774062156677
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_FinalDriveHousingRight_Paint",
+        "highToGame": {
+          "samples": 12819,
+          "medianM": 0.0001360931055387482,
+          "percentile95M": 0.0008739511831663545,
+          "maximumM": 0.0016943436348810792,
+          "maximumAtOwnerLocalM": [
+            0.5826210975646973,
+            1.254431128501892,
+            0.7818441987037659
+          ]
+        },
+        "gameToHigh": {
+          "samples": 5671,
+          "medianM": 0.00011939549585804343,
+          "percentile95M": 0.0007590592140331864,
+          "maximumM": 0.0015574302524328232,
+          "maximumAtOwnerLocalM": [
+            0.5865783095359802,
+            1.3401850461959839,
+            0.7325993776321411
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_Wheel_Left_Drive_Paint",
+        "highToGame": {
+          "samples": 14238,
+          "medianM": 0.00015091033128555864,
+          "percentile95M": 0.001044276636093855,
+          "maximumM": 0.0016871512634679675,
+          "maximumAtOwnerLocalM": [
+            0.0,
+            -0.14454258978366852,
+            0.18837156891822815
+          ]
+        },
+        "gameToHigh": {
+          "samples": 6970,
+          "medianM": 2.9164670195314102e-05,
+          "percentile95M": 0.0010497126495465636,
+          "maximumM": 0.0021522678434848785,
+          "maximumAtOwnerLocalM": [
+            -0.049000002443790436,
+            0.004323365166783333,
+            0.23499691486358643
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_Wheel_Right_Drive_Paint",
+        "highToGame": {
+          "samples": 14238,
+          "medianM": 0.00015091207023942843,
+          "percentile95M": 0.001044276636093855,
+          "maximumM": 0.0016871512634679675,
+          "maximumAtOwnerLocalM": [
+            0.0,
+            -0.14454258978366852,
+            0.18837156891822815
+          ]
+        },
+        "gameToHigh": {
+          "samples": 6970,
+          "medianM": 2.9164670195314102e-05,
+          "percentile95M": 0.0010497126495465636,
+          "maximumM": 0.0021522678434848785,
+          "maximumAtOwnerLocalM": [
+            -0.049000002443790436,
+            0.004323365166783333,
+            0.23499691486358643
+          ]
+        }
+      },
+      {
+        "owner": "Geometry_Wheel_Left_Road0_Paint",
+        "highToGame": {
+          "samples": 16766,
+          "medianM": 0.00032420620846096426,
+          "percentile95M": 0.0009615963936084881,
+          "maximumM": 0.0020285702776163816,
+          "maximumAtOwnerLocalM": [
+            -0.041999999433755875,
+            0.14804378151893616,
+            0.039668209850788116
+          ]
+        },
+        "gameToHigh": {
+          "samples": 4469,
+          "medianM": 0.00037556845927610993,
+          "percentile95M": 0.001033984706737101,
+          "maximumM": 0.0023680818267166615,
+          "maximumAtOwnerLocalM": [
+            -0.04698938876390457,
+            -0.12969756126403809,
+            0.04673977568745613
+          ]
+        }
+      },
+      {
+        "owner": "TrackLink_Left_000",
+        "highToGame": {
+          "samples": 9696,
+          "medianM": 0.0001938343048095703,
+          "percentile95M": 0.0008132468938129023,
+          "maximumM": 0.0009740186505950987,
+          "maximumAtOwnerLocalM": [
+            -0.0681999996304512,
+            0.036730192601680756,
+            0.0008045651484280825
+          ]
+        },
+        "gameToHigh": {
+          "samples": 962,
+          "medianM": 0.0005420400993898511,
+          "percentile95M": 0.001499999314546585,
+          "maximumM": 0.001843688660301268,
+          "maximumAtOwnerLocalM": [
+            -0.019999999552965164,
+            0.01652471162378788,
+            0.004000000189989805
+          ]
+        }
+      }
+    ],
+    "bakes": {
+      "Paint": {
+        "usedAtlasPixels": 6852331,
+        "resampledActualDonorTexels": 2223,
+        "maximumReplayDistanceM": 0.0021773644257336855,
+        "maps": {
+          "Base": {
+            "dimensions": [
+              4096,
+              4096
+            ],
+            "sha256": "e67b4c5b6d64d44c08f86a759a649b52175d8b6497c7c00df667fd736968abe1"
+          },
+          "Normal": {
+            "dimensions": [
+              4096,
+              4096
+            ],
+            "sha256": "da604f8116d330c3b8f26a7745a901135a238441ed060d6ee76c6c0ff9f752f3"
+          },
+          "Orm": {
+            "dimensions": [
+              4096,
+              4096
+            ],
+            "sha256": "bd50476dad1202054d377026230002418e7e207510c68203a069c46a647a27ad"
+          }
+        }
+      },
+      "Track": {
+        "usedAtlasPixels": 2982946,
+        "resampledActualDonorTexels": 14662,
+        "maximumReplayDistanceM": 0.0017918167868629098,
+        "maps": {
+          "Base": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "e03419e97b92a545e78ba9e15bfbefaa1e688a3ac2fcbd3932d936c0a70ccd89"
+          },
+          "Normal": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "2ae157745e6a2f8b81d3bf9f957762f4de8f391a9c5716571c11c96e47951408"
+          },
+          "Orm": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "6f77e8ee783cbdf06e441887c54457c36ddb81544dc292b4061753a026bc202d"
+          }
+        }
+      },
+      "Steel": {
+        "usedAtlasPixels": 2183579,
+        "resampledActualDonorTexels": 229,
+        "maximumReplayDistanceM": 0.0006497867871075869,
+        "maps": {
+          "Base": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "6c34b97ceb10ac0c9ee032f4d9c632f07f836837f686f50608c973b3a1009e85"
+          },
+          "Normal": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "f4d6bc5bb48d74ff246126e8ac91a328fd10623819a3c64a626e63ab1d4a232d"
+          },
+          "Orm": {
+            "dimensions": [
+              2048,
+              2048
+            ],
+            "sha256": "c6fbd5f9f39550ddeb97a743f880c74d4f30b9ffba2c98604183ed88b8585e95"
+          }
+        }
+      },
+      "Rubber": {
+        "usedAtlasPixels": 317750,
+        "resampledActualDonorTexels": 20,
+        "maximumReplayDistanceM": 0.0014919370878487825,
+        "maps": {
+          "Base": {
+            "dimensions": [
+              1024,
+              1024
+            ],
+            "sha256": "75e10b83f4716350c4782200f547a0542d8a9576b117414a407ea9418578850d"
+          },
+          "Normal": {
+            "dimensions": [
+              1024,
+              1024
+            ],
+            "sha256": "f24caf7b4ddafdac2620e3e0e35a1021e47daae4ed9a6acd88a40e2013430949"
+          },
+          "Orm": {
+            "dimensions": [
+              1024,
+              1024
+            ],
+            "sha256": "03798da4d794b4803b279cc2a0e06fa63adf052a7d40b9001358538a5d516707"
+          }
+        }
+      }
+    }
+  },
+  "viewReview": {
+    "scope": "2017 primary, 2014 same vehicle, official 1–3 and 6–7 rendered, official 4–5 qualitative visibility review",
+    "fit": "One added approximate optical pose for official 1. The previous pose is retained for official 3.",
+    "comparedUnder": [
+      "estimated 2017 exhibition lighting",
+      "neutral lighting"
+    ],
+    "visiblePriorityDetailsReviewed": true,
+    "strictWholeReferenceMatched": false,
+    "remaining": "Projection residuals in the opposite-side view and uncertainty at the partially occluded rear.",
+    "localDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Acceptance\\Comparison"
+  },
+  "validation": {
+    "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+    "exportChecks": 1172,
+    "browserChecks": 943,
+    "blenderMechanismChecks": 38,
+    "roadWheelPoses": 128,
+    "beltPhases": 32,
+    "towLatchPoses": 56,
+    "openingProbes": 22,
+    "prototypeAndRuntimePoseParity": {
+      "passed": true,
+      "baselineSha256": "43969e24dfd670ce1ea6a57b12076618cc821c034d5580ebf22cf7cd2c9f964f",
+      "sha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
+      "nodes": 296,
+      "allParentsAndControlExtrasEqual": true,
+      "maximumRestTransformComponentDelta": 0
+    },
+    "weaponInspectionLoaded": true,
+    "preservedSceneryPreviewLoaded": true,
+    "renderedVehicleInstancesInScenery": 2,
+    "sceneryVehicleTriangles": 157364,
+    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV107\\Acceptance",
+    "passed": true
+  }
+}
