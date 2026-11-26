@@ -73,7 +73,7 @@ const clip = data.clips[0], profile = data.profiles.RifleHoldRun;
 const T = clip.duration, N = Math.round(T / (clip.tracks.find(t => t.name === 'Bip001_Pelvis.position').times[1]));
 const catalog = JSON.parse(fs.readFileSync(path.join(here, 'Model/Character/Data_TengxianCharacterManifest.json'), 'utf8'));
 const record = catalog.models.find(r => r.id === 'TengxianNra02');
-const glb = LoadGlb(path.join(here, 'Model/Character/Model_TengxianNra02.glb'));
+const glb = LoadGlb(path.join(here, 'Model/Character/Model_HeYoutianHumanoid.glb'));
 const scene = new PoseScene(glb);
 const humanoid = JSON.parse(fs.readFileSync(path.join(here, 'Model/Character/Data_TengxianHumanoid.json'), 'utf8'));
 const boneNames = humanoid.bodyBones.map(b => b.name);
@@ -540,7 +540,7 @@ const flex = (rec, side, kind) => {
 {
   let tracks = 0;
   for (const rec of catalog.models) {
-    const g = LoadGlb(fs.readFileSync(path.join(here, `Model/Character/Model_${rec.id}.glb`)));
+    const g = LoadGlb(fs.readFileSync(path.join(here, rec.url)));
     const names = new Set(g.json.nodes.map(n => n.name.replace(/\s/g, '_')));
     for (const track of clip.tracks) { if (track.name.startsWith(data.weaponTrack + '.')) continue; assert.ok(names.has(track.name.split('.')[0]), `${rec.id} lacks ${track.name}`); tracks++; }
   }

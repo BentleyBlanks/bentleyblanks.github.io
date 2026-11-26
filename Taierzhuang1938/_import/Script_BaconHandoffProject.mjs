@@ -43,7 +43,7 @@ try{
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
 fs.writeFileSync(path.join(source,'Data_OriginalRigPerformance.json'),JSON.stringify(capture));
 const Normalize=name=>(name||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
-for(const [role,file] of [['giver','Model/Character/Model_LugouNra02.glb'],['receiver','Model/Model_FpsArmsNraSkeletal01.glb']]){
+for(const [role,file] of [['giver','Model/Character/Model_HeYoutianHumanoid.glb'],['receiver','Model/Model_HeYoutianViewArms.glb']]){
  const original=LoadGlb(path.join(project,file)),json=structuredClone(original.json),chunks=[original.bin];
  function Access(values,width){
    const bytes=Buffer.from(Float32Array.from(values).buffer),offset=chunks.reduce((sum,b)=>sum+b.length,0);

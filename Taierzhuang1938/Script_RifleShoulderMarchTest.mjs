@@ -1,5 +1,5 @@
 // RifleShoulderMarch gate: measures the SHIPPED clip (Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json)
-// on the real skinned mesh of Model_TengxianNra02.glb, independently of the Blender baker (nothing here reads the baker's own
+// on the real skinned mesh of Model_HeYoutianHumanoid.glb, independently of the Blender baker (nothing here reads the baker's own
 // numbers). Sampled at half the key rate (120 Hz for the 60 fps keys), through three.js-style linear/slerp channels.
 //   node Taierzhuang1938/Script_RifleShoulderMarchTest.mjs            # gate: exit 1 on any failed limit
 //   node Taierzhuang1938/Script_RifleShoulderMarchTest.mjs --table    # also print every measured number
@@ -21,7 +21,7 @@ import { ALLY_GAIT } from './Data_Tuning_AllyGait.mjs';
 const project = import.meta.dirname;
 const clipFile = 'Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json';
 const dataFile = 'Animation/RifleShoulderMarch/Data_RifleShoulderMarch.json';
-const modelFile = 'Model/Character/Model_TengxianNra02.glb';
+const modelFile = 'Model/Character/Model_HeYoutianHumanoid.glb';
 const ACTOR_SCALE = 1.66 / 1.817118;       // runtime scale of NRA02 (target height / bounds height of the manifest)
 const RIFLE_SCALE = 1 / ACTOR_SCALE;       // the weapon keeps real dimensions: model metres per mesh metre
 const RIFLE_MASS_KG = 4.0, BODY_MASS_KG = 60;   // Data_Weapons ZhongZheng massKg; the body mass only sets the rifle's share
@@ -806,7 +806,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
   if (process.argv.includes('--table')) console.log(JSON.stringify(result.metrics, null, 1));
   if (process.argv.includes('--write')) {
     const out = { schema: 1, revision: result.revision, clip: result.clipName, clipFile, clipSha256: result.sha256, clipBytes: result.bytes,
-      measuredBy: 'Script_RifleShoulderMarchTest.mjs (real skinned mesh of Model_TengxianNra02.glb, half-key-rate samples)',
+      measuredBy: 'Script_RifleShoulderMarchTest.mjs (real skinned mesh of Model_HeYoutianHumanoid.glb, half-key-rate samples)',
       actorScale: ACTOR_SCALE, limits: LIMITS, measured: result.metrics, allPass: failed.length === 0,
       checks: result.checks.map((c) => ({ id: c.id, label: c.label, value: c.value, limit: c.limit, pass: c.ok })) };
     fs.writeFileSync(path.join(project, dataFile), JSON.stringify(out, null, 1) + '\n');

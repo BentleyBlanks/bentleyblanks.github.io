@@ -40,7 +40,7 @@ const TEXTURES = {
   "Texture_Zb26VeteranSteelNormal.webp": { block: "4x4", vk: VK_FORMAT_ASTC_4x4_UNORM_BLOCK, linear: true },
   "Texture_GrenadeOrm.webp": { block: "6x6", vk: VK_FORMAT_ASTC_6x6_UNORM_BLOCK, linear: true },
 };
-const MODEL = "Model/Model_FirstPersonBody.glb";
+const MODEL = "Model/Character/Model_HeYoutian.glb";
 
 const temp = await fs.mkdtemp(path.join(os.tmpdir(), "TengxianMobilePublish-"));
 const out = path.join(temp, "Taierzhuang1938"), cache = path.join(temp, "cache");
@@ -80,7 +80,7 @@ let server = null, browser = null;
 try {
   // ---- 打包 ----
   await fs.mkdir(path.join(out, "Texture"), { recursive: true });
-  await fs.mkdir(path.join(out, "Model"), { recursive: true });
+  await fs.mkdir(path.dirname(path.join(out, MODEL)), { recursive: true });
   await fs.writeFile(path.join(out, "index.html"), '<script type="importmap">{"imports":{}}</script>');
   const report = await BuildPublishAssets(projectDir, out, { cacheDir: cache, textureFiles: Object.keys(TEXTURES), modelFiles: [],
     mobileModelFiles: [MODEL], log: () => {} });

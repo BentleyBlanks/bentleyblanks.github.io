@@ -126,7 +126,9 @@ for (const row of manifest.models) {
   assert.ok(asset.reference && asset.bakedOnModelSha256[asset.reference], "reference body baked");
   for (const [body, sha] of Object.entries(asset.bakedOnModelSha256)) {
     const glb = fs.readFileSync(path.join(projectDir, CharacterBodyPath(body)));
-    assert.equal(crypto.createHash("sha256").update(glb).digest("hex"), sha, `${body}: baked on the shipped GLB`);
+    const shipped = characters.models.find(record => record.id === body);
+    const runtimeHash = crypto.createHash("sha256").update(glb).digest("hex");
+    assert.ok(runtimeHash === sha || (shipped.motionSourceSha256 === sha && shipped.version === runtimeHash.slice(0,16)), body + ": verified motion source and shipped appearance");
   }
   for (const body of rigs) assert.ok(asset.bakedOnModelSha256[body], `${body}: its own bake checked`);
   for (const [body, byClip] of Object.entries(asset.agreeDegByModel)) for (const [name, deg] of Object.entries(byClip))

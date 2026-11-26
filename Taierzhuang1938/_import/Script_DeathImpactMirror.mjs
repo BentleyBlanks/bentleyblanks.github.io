@@ -27,7 +27,7 @@ const LETTERS = ['A', 'B', 'C', 'D'];
 
 const humanoid = JSON.parse(fs.readFileSync(path.join(project, 'Model/Character/Data_TengxianHumanoid.json'), 'utf8'));
 const names = humanoid.bodyBones.map(b => b.name);
-const target = new PoseScene(LoadGlb(path.join(project, 'Model/Character/Model_TengxianNra02.glb')));
+const target = new PoseScene(LoadGlb(path.join(project, 'Model/Character/Model_HeYoutianHumanoid.glb')));
 const library = new PoseScene(LoadGlb(path.join(project, 'Model/Character/Animation_TengxianNraDeathCollapse.glb')));
 const tIndex = new Map(names.map(n => [n, target.NodeIndex(n)]));
 const sIndex = new Map(names.map(n => [n, library.NodeIndex(n)]));

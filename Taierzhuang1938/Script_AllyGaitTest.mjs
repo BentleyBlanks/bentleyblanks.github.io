@@ -116,7 +116,7 @@ assert.equal(CrouchWalkBySpeed(.2,false),false);assert.equal(CrouchWalkBySpeed(1
 assert.equal(CrouchWalkBySpeed(.4,false),false,'no switch up inside the hysteresis band');
 assert.equal(CrouchWalkBySpeed(.4,true),true,'no switch down inside the hysteresis band');
 assert.ok(ALLY_GAIT.crouchSlowBelowMps<ALLY_GAIT.crouchFastAboveMps);
-const glb=LoadGlb(path.join(import.meta.dirname,'Model/Character/Model_TengxianNra02.glb'));
+const glb=LoadGlb(path.join(import.meta.dirname,'Model/Character/Model_HeYoutianHumanoid.glb'));
 const scene=new PoseScene(glb),skin=BuildSkin(glb);
 const index=new Map(scene.nodes.map((n,i)=>[n.name.replace(/\s/g,'_'),i]));
 let minFloor=Infinity,maxFloor=-Infinity,maxSeam=0;

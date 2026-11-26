@@ -34,8 +34,8 @@ try {
   Write("Model/Runtime.gltf", '{"images":[{"uri":"Texture_Finished.webp"}]}');
   assert.deepEqual(CheckRepo({ root, tracked }), [], "安全清单通过");
 
-  Write("index.html", '<a href="./Taierzhuang1938/Model/Character/Model_TengxianLuoReference.glb">reference</a>');
-  Write("Script_Game.mjs", 'const model = "./Model/Character/Model_TengxianCivilianWomanReference.glb";');
+  Write("index.html", '<a href="./Model/PatchedTimberBed/Texture_FixtureSource.png">reference</a>');
+  Write("Script_Game.mjs", 'const model = "./Model/Donkey/Texture_Fixture";');
   Write("Model/Runtime.gltf", '{"images":[{"uri":"Texture_FixtureSource.png"}]}');
   const problems = CheckRepo({ root, tracked });
   for (const file of ["index.html", "Script_Game.mjs", "Model/Runtime.gltf"]) {

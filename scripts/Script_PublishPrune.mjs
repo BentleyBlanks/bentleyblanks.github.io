@@ -37,8 +37,6 @@ export const PUBLISH_EXCLUDE = Object.freeze([
   { path: "TunnelLight1943/StyleConceptShots/", why: "地道里的光的风格概念图与两个 zip 包，没有页面引用" },
   { path: "Model/StrawSleepingMat/Source/", why: "随身草席的 Blender 源文件" },
   { path: "Taierzhuang1938/Model/TrainReference/Reference/", why: "火车参考图" },
-  { path: "Taierzhuang1938/Model/Character/Model_TengxianLuoReference.glb", why: "未接入运行时的旧罗班长参考模型；现用 Model_SquadLeaderLuo.glb 保留" },
-  { path: "Taierzhuang1938/Model/Character/Model_TengxianCivilianWomanReference.glb", why: "未接入运行时的独立村妇参考模型，保留在仓库供制作使用" },
   { path: "Model/PatchedTimberBed/Texture_*Source.png", why: "木床制作源图；运行时 GLB 已内嵌成品贴图，不读这些源图" },
   { path: "Taierzhuang1938/Model/SichuanBlanketPack/Texture_Sichuan*.png", why: "背包烘焙源图；运行时 glTF 只读 Texture_ProjectedV13_*.webp 成品" },
   { path: "Taierzhuang1938/Model/Donkey/Texture_*", why: "驴的制作贴图副本；运行时 GLB 已内嵌全部成品贴图，无外链图片" },

@@ -15,7 +15,7 @@ RIFLE_MARCH_SAVE=1 (also save the editable .blend), RIFLE_MARCH_PARAMS_FILE (JSO
 RIFLE_MARCH_DEBUG=1 (print the per-leg pelvis-height limits).
 
 Nothing is copied from another clip. Every channel is evaluated from the parameters in GAIT below, on the shared
-TengxianHumanoidV1 bind of Model_TengxianNra02.glb (imported by the production importer of
+TengxianHumanoidV1 bind of Model_HeYoutianHumanoid.glb (imported by the production importer of
 _import/Script_MachineGunCaptivesBake.py; its authoring factor is 1 for NRA02, so Blender metres are the shipped
 GLB's own metres, the actor is later scaled by 0.9135 to 1.66 m).
 
@@ -68,8 +68,8 @@ GAIT = dict(
     footHalfWidthM=0.075, toeOutRad=0.10, circumductionM=0.012, clearanceM=0.004,
     swingLiftM=0.065, swingLiftExp=0.8, landSpeedShare=0.15,
     # stance-leg knee flexion target (deg) by foot phase u: base + loading-response bump + pre-swing rise; the pelvis rides as high as these allow
-    kneeBaseDeg=11.0, hardMarginM=0.0004, kneeLoadingDeg=14.0, kneeLoadingU=0.11, kneeLoadingWidth=0.075, kneePreSwingDeg=20.0, kneePreSwingFrom=0.44,
-    pelvisDropM=0.0, softMinM=0.010, kneeSwingReleaseTau=0.3, kneeLateSwingExtraDeg=20.0, kneeLateSwingFrom=0.55, heightFilterFrames=1,
+    kneeBaseDeg=14.0, hardMarginM=0.0004, kneeLoadingDeg=14.0, kneeLoadingU=0.11, kneeLoadingWidth=0.075, kneePreSwingDeg=20.0, kneePreSwingFrom=0.44,
+    pelvisDropM=0.017, softMinM=0.010, kneeSwingReleaseTau=0.3, kneeLateSwingExtraDeg=20.0, kneeLateSwingFrom=0.55, heightFilterFrames=2,
     swayM=0.022, swayPeakPhase=0.31,
     pelvisYawRad=0.075, pelvisListRad=0.05, listPeakPhase=0.31,
     thoraxYawRad=0.09, thoraxYawLag=0.03,
@@ -85,8 +85,8 @@ GAIT = dict(
     elbowBaseRad=0.34, elbowSwingRad=0.22,
     fingerCurl=(0.8, 0.9, 0.55), thumbCurl=(0.25, 0.35, 0.25),
     # rifle on the right shoulder (character frame: +X left, +Y back, +Z up)
-    rifleCrossBackUp=(0.164, 0.27), rifleRollRad=0.0,   # where the rifle axis crosses the body's centre line, behind / above the Spine2 joint
-    gripFromChest=(-0.185, -0.151, 0.20),     # knuckle centroid relative to the Spine2 joint (rest axes)
+    rifleCrossBackUp=(0.175, 0.307), rifleCrossSideM=-0.040, rifleRollRad=0.0,   # where the rifle axis crosses the body's centre line, behind / above the Spine2 joint
+    gripFromChest=(-0.215, -0.175, 0.219),     # knuckle centroid relative to the Spine2 joint (rest axes)
     shrugRad=0.09, protractRad=0.12,
     gripSearchStepDeg=15, wristFlexLimitDeg=45.0, forearmTwistRangeDeg=(-20.0, 150.0),
     gripCurl=(1.2, 1.45, 0.9), gripThumb=(0.7, 0.8, 0.6),
@@ -399,7 +399,7 @@ class March:
         P = self.P
         origin = self.restHead[self.B('Spine2')]
         grip = origin + Vector(P['gripFromChest'])
-        cross = origin + Vector((0.0, P['rifleCrossBackUp'][0], P['rifleCrossBackUp'][1]))
+        cross = origin + Vector((P['rifleCrossSideM'], P['rifleCrossBackUp'][0], P['rifleCrossBackUp'][1]))
         a = (cross - grip).normalized()
         up = Perp(Vector((0, 0, 1)), a)
         up = Quaternion(a, P['rifleRollRad']) @ up
@@ -812,7 +812,7 @@ class March:
                    'strideM': round(self.stride, 5), 'stepM': P['stepM'], 'pelvisHeightM': round(height, 5),
                    'weapon': 'ZhongZheng', 'rifleTrack': 'AllyRifle'}
         clip = {'name': CLIP, 'uuid': CLIP, 'duration': duration, 'tracks': tracks, 'blendMode': 2500}
-        data = {'schema': 1, 'revision': REVISION, 'skeleton': 'TengxianHumanoidV1', 'sourceModel': 'Model/Character/Model_TengxianNra02.glb',
+        data = {'schema': 1, 'revision': REVISION, 'skeleton': 'TengxianHumanoidV1', 'sourceModel': 'Model/Character/Model_HeYoutianHumanoid.glb',
                 'clips': [clip], 'profiles': {CLIP: profile}}
         text = json.dumps(data, separators=(',', ':'))
         return text, profile

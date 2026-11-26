@@ -1,12 +1,6 @@
-// User-approved appearances, 2026-09-11. Indices are zero-based source numbers.
-// Retain source assets for animation provenance; only these appearances may spawn.
-// IJA slot numbers remain stable for saved scenes and authored motion libraries.
-// 2026-09-24: the user approved NRA06 (index 5), the interpreter built from NRA02 in
-// Blender (_import/Script_BuildLugouNra06.py): round face, wire spectacles, buck tooth,
-// star cap, open dark jacket over a white vest. It is not a soldier look: it only
-// spawns for a pinned speaking role (CHARACTER_CAST_VARIANTS_BY_KIND), never in the
-// kind lists, the anonymous pools or the actor editor's lineup.
-export const IJA_APPEARANCE_BY_RIG = Object.freeze({
+// Scene and animation slot IDs remain stable; each visible mesh is the current cast appearance.
+export const CHARACTER_APPEARANCE_BY_RIG = Object.freeze({
+  TengxianNra02: "HeYoutian", TengxianNra05: "SquadLeaderLuo", TengxianNra06: "Interpreter",
   TengxianIja01: "JapaneseSoldierYi", TengxianIja02: "JapaneseSoldierA",
   TengxianIja03: "JapaneseSoldierC", TengxianIja06: "JapaneseSoldierJia",
 });

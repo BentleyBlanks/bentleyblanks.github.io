@@ -1,10 +1,11 @@
-"""Bind the four adopted Japanese appearances to the campaign's metre-space skeleton.
+"""Bind the adopted soldier and interpreter appearances to the campaign's metre-space skeleton.
 Run with Python, numpy and scipy. The pinned Git objects supply motion, sockets
 and facial controls only. All visible body triangles and UVs come from the Tripo kits.
 """
 
 import copy
 import hashlib
+import gzip
 import json
 from pathlib import Path
 import struct
@@ -19,10 +20,13 @@ PROJECT = ROOT / "Taierzhuang1938"
 DIRECTORY = PROJECT / "Model" / "Character"
 RIG_REVISION = "025a54b4a9e67b3c8bdc90a01a91b4257051cb67"
 APPEARANCES = {
-    "01": "JapaneseSoldierYi",
-    "02": "JapaneseSoldierA",
-    "03": "JapaneseSoldierC",
-    "06": "JapaneseSoldierJia",
+    "TengxianIja01": "JapaneseSoldierYi",
+    "TengxianIja02": "JapaneseSoldierA",
+    "TengxianIja03": "JapaneseSoldierC",
+    "TengxianIja06": "JapaneseSoldierJia",
+    "TengxianNra02": "HeYoutian",
+    "TengxianNra05": "SquadLeaderLuo",
+    "TengxianNra06": "Interpreter",
 }
 TYPES = {5120: "i1", 5121: "u1", 5122: "<i2", 5123: "<u2", 5125: "<u4", 5126: "<f4"}
 WIDTHS = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
@@ -75,6 +79,7 @@ class Writer:
         self.doc = {
             key: copy.deepcopy(template.doc[key])
             for key in ("scenes", "scene", "nodes", "skins", "extras")
+            if key in template.doc
         }
         self.doc.update(
             asset={
@@ -199,7 +204,11 @@ def MeshOnRig(source, template):
     src = source.doc["skins"][0]["joints"]
     source_names, target_names = source.joints(), template.joints()
     mapping = BodyMap()
-    remap = [target_names.index(mapping[name]) for name in source_names]
+    prefix = next(name.split()[0] for name in target_names if name.endswith(" Pelvis"))
+    remap = [
+        target_names.index(mapping[name].replace("Bip001", prefix, 1))
+        for name in source_names
+    ]
     # Match corresponding bind joint positions and the direction of each limb.
     # Keep head shape and hand dimensions, and never scale the uniform or facial features independently.
     fitted = np.zeros_like(pos)
@@ -256,7 +265,95 @@ def MeshOnRig(source, template):
     )
 
 
-def FaceWeights(template, pos, joints, weights):
+# Eye centres (left/right in the reference front view) and closed lip seam,
+# ray-picked on each source and replacement surface in shared bind-space metres.
+FACE_LANDMARKS = {
+    "HeYoutian": (
+        [
+            [-0.037656, 1.680140, 0.121111],
+            [0.025506, 1.681029, 0.121080],
+            [-0.006520, 1.603696, 0.126227],
+        ],
+        [
+            [-0.039435, 1.651696, 0.069655],
+            [0.031733, 1.651696, 0.070191],
+            [-0.003851, 1.584140, 0.105083],
+        ],
+    ),
+    "SquadLeaderLuo": (
+        [
+            [-0.033798, 1.685474, 0.126247],
+            [0.032031, 1.685474, 0.126179],
+            [-0.000883, 1.612585, 0.141820],
+        ],
+        [
+            [-0.033798, 1.644585, 0.084954],
+            [0.026693, 1.643696, 0.085115],
+            [-0.005331, 1.583251, 0.108537],
+        ],
+    ),
+    "Interpreter": (
+        [
+            [-0.037948, 1.680140, 0.121098],
+            [0.026104, 1.681029, 0.120976],
+            [-0.007701, 1.602807, 0.124343],
+        ],
+        [
+            [-0.045954, 1.660585, 0.076669],
+            [0.027883, 1.661474, 0.076351],
+            [-0.009481, 1.586807, 0.104666],
+        ],
+    ),
+}
+
+
+def FaceTransform(name):
+    if name not in FACE_LANDMARKS:
+        return None
+
+    def frame(points):
+        left, right, mouth = np.asarray(points)
+        matrix = np.eye(4)
+        matrix[:3, 0] = right - left
+        matrix[:3, 1] = (right + left) / 2 - mouth
+        matrix[:3, 3] = mouth
+        return matrix
+
+    before, after = FACE_LANDMARKS[name]
+    return frame(after) @ np.linalg.inv(frame(before))
+
+
+def RelocateFace(template, writer, fit):
+    """Move the control pivots, inverse binds and keyed rest origins together."""
+    nodes = writer.doc["nodes"]
+    parents = {
+        child: i for i, node in enumerate(nodes) for child in node.get("children", [])
+    }
+    world = {i: matrix.copy() for i, matrix in template.world.items()}
+    for i, node in enumerate(nodes):
+        if node.get("name", "").startswith("Face_"):
+            world[i][:3, 3] = (fit @ template.world[i][:, 3])[:3]
+    for i, node in enumerate(nodes):
+        bone = node.get("name", "")
+        if not bone.startswith("Face_"):
+            continue
+        rest = (np.linalg.inv(world[parents[i]]) @ world[i])[:3, 3]
+        shift = rest - np.asarray(node.get("translation", [0, 0, 0]))
+        node["translation"] = rest.tolist()
+        for pose in writer.doc["extras"]["facialRig"]["poses"].values():
+            if bone in pose:
+                pose[bone]["translation"] = (
+                    np.asarray(pose[bone]["translation"]) + shift
+                ).tolist()
+    for source_skin, skin in zip(template.doc["skins"], writer.doc["skins"]):
+        binds = template.read(source_skin["inverseBindMatrices"]).reshape(-1, 4, 4)
+        for k, i in enumerate(skin["joints"]):
+            if nodes[i].get("name", "").startswith("Face_"):
+                binds[k] = (np.linalg.inv(world[i]) @ template.world[i] @ binds[k].T).T
+        skin["inverseBindMatrices"] = writer.add(binds, "MAT4")
+
+
+def FaceWeights(template, pos, joints, weights, fit=None):
     # Transfer only face-control weights from the previous speaking rig to the new head.
     # Mouth interior is a separate shared rig component. Clothing, silhouette and UVs come from the new mesh.
     face_start = template.joints().index("Face_Jaw")
@@ -281,6 +378,8 @@ def FaceWeights(template, pos, joints, weights):
             )
         )
     points, fields = np.concatenate(points), np.concatenate(fields)
+    if fit is not None:
+        points = points @ fit[:3, :3].T + fit[:3, 3]
     # Limit interpolation to actual neighbouring head surfaces; geometry outside that area retains the body bind.
     candidates = np.where(np.any((joints == head) & (weights > 0.3), axis=1))[0]
     distances, nearest = cKDTree(points).query(pos[candidates], k=4)
@@ -342,8 +441,22 @@ def Build(name, template, native, geometry, facial):
     )
     translate[1, 3] += sole_offset
     anchors = {}
-    for bone in ("Spine2", "Neck", "Head"):
-        target = "Bip001 " + bone
+    groom = (PROJECT / "Hair/Grooms" / ("Groom_Game_" + name + ".bin")).read_bytes()
+    if groom.startswith(b"\x1f\x8b"):
+        groom = gzip.decompress(groom)
+    header = json.loads(groom[12 : 12 + struct.unpack_from("<I", groom, 8)[0]])
+    anchor_bones = dict.fromkeys(("Spine2", "Neck", "Head"))
+    for layer in (
+        header.get("hair"),
+        header.get("beard"),
+        (header.get("hair") or {}).get("braid"),
+    ):
+        if layer:
+            anchor_bones.update(
+                dict.fromkeys((layer.get("skinning") or {}).get("bones", []))
+            )
+    for bone in anchor_bones:
+        target = BodyMap()[bone]
         transform = (
             np.linalg.inv(template.world[rig_by_name[target]])
             @ translate
@@ -357,8 +470,9 @@ def Build(name, template, native, geometry, facial):
         "file": "Groom_Game_" + name + ".bin",
         "anchors": anchors,
     }
+    fit = FaceTransform(name) if facial else None
     if facial:
-        js, ws = FaceWeights(template, pos, js.copy(), ws.copy())
+        js, ws = FaceWeights(template, pos, js.copy(), ws.copy(), fit)
     # Native atlases use [0,1] UVs. Keep normals float for standard glTF renderers.
     if uv.min() < -1e-6 or uv.max() > 1.000001:
         raise ValueError(f"{name}: unexpected atlas coordinates")
@@ -404,11 +518,26 @@ def Build(name, template, native, geometry, facial):
                 "material": 1,
             }
         )
+    if fit is not None:
+        oral_attributes = oral["attributes"]
+        oral_positions = (
+            template.read(oral_attributes["POSITION"]) @ fit[:3, :3].T + fit[:3, 3]
+        )
+        # Closed lips cover the interior of the mouth.
+        oral_positions[:, 2] -= 0.008
+        prims[-1]["attributes"]["POSITION"] = w.add(oral_positions, "VEC3", bounds=True)
+        if "NORMAL" in oral_attributes:
+            oral_normals = Normalise(
+                template.read(oral_attributes["NORMAL"]) @ np.linalg.inv(fit[:3, :3])
+            )
+            prims[-1]["attributes"]["NORMAL"] = w.add(oral_normals, "VEC3")
     doc["meshes"] = [{"name": name, "primitives": prims}]
     for skin in doc["skins"]:
         skin["inverseBindMatrices"] = w.copy_accessor(
             template, skin["inverseBindMatrices"]
         )
+    if fit is not None:
+        RelocateFace(template, w, fit)
     if "animations" in template.doc:
         doc["animations"] = copy.deepcopy(template.doc["animations"])
         for clip in doc["animations"]:
@@ -418,11 +547,54 @@ def Build(name, template, native, geometry, facial):
     return w.encode()
 
 
+def ShareFacialGeometry(data, body, filename):
+    """Reference identical body attribute slices with standard glTF external buffers."""
+    face = Model(data)
+    base = Model(body)
+    base_offset = len(body) - len(base.data)
+    targets = {}
+    for view in base.doc["bufferViews"]:
+        start = view.get("byteOffset", 0)
+        block = base.data[start : start + view["byteLength"]]
+        targets[(len(block), hashlib.sha256(block).digest())] = base_offset + start
+    binary = bytearray()
+    for view in face.doc["bufferViews"]:
+        start = view.get("byteOffset", 0)
+        block = face.data[start : start + view["byteLength"]]
+        match = targets.get((len(block), hashlib.sha256(block).digest()))
+        if match is not None:
+            view.update(buffer=1, byteOffset=match)
+        else:
+            binary.extend(bytes(-len(binary) % 4))
+            view.update(buffer=0, byteOffset=len(binary))
+            binary.extend(block)
+    binary.extend(bytes(-len(binary) % 4))
+    version = hashlib.sha256(body).hexdigest()[:16]
+    face.doc["buffers"] = [
+        {"byteLength": len(binary)},
+        {"byteLength": len(body), "uri": filename + "?v=" + version},
+    ]
+    metadata = json.dumps(face.doc, separators=(",", ":"), ensure_ascii=False).encode()
+    metadata += b" " * (-len(metadata) % 4)
+    return (
+        struct.pack(
+            "<5I",
+            0x46546C67,
+            2,
+            28 + len(metadata) + len(binary),
+            len(metadata),
+            0x4E4F534A,
+        )
+        + metadata
+        + struct.pack("<2I", len(binary), 0x004E4942)
+        + binary
+    )
+
+
 def Main():
     path = DIRECTORY / "Data_TengxianCharacterManifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    for slot, name in APPEARANCES.items():
-        old = "TengxianIja" + slot
+    for old, name in APPEARANCES.items():
         record = next(r for r in manifest["models"] if r["id"] == old)
         native_path = DIRECTORY / ("Model_" + name + ".glb")
         native = Model(native_path.read_bytes())
@@ -442,6 +614,11 @@ def Main():
             template = Template(old + "Facial") if facial else base
             filename = "Model_" + name + ("Facial" if facial else "Humanoid") + ".glb"
             data = Build(name, template, native, geo, facial)
+            if facial and record["faction"] == "nra":
+                body_name = "Model_" + name + "Humanoid.glb"
+                data = ShareFacialGeometry(
+                    data, (DIRECTORY / body_name).read_bytes(), body_name
+                )
             (DIRECTORY / filename).write_bytes(data)
             record["facialUrl" if facial else "url"] = "./Model/Character/" + filename
             record["facialVersion" if facial else "version"] = hashlib.sha256(
@@ -470,13 +647,13 @@ def Main():
     )
     path.write_bytes(formatted)
     subprocess.run(
-        ["node", str(PROJECT / "_import/Script_FitIjaInfantry.mjs")], check=True
+        ["node", str(PROJECT / "_import/Script_FitCampaignInfantry.mjs")], check=True
     )
     subprocess.run(
         [
             "node",
             str(PROJECT / "_import/Script_StandardCharacterAudit.mjs"),
-            "--formal-ija",
+            "--formal-appearances",
         ],
         check=True,
     )

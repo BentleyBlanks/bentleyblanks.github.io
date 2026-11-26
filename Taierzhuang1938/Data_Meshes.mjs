@@ -77,27 +77,6 @@ export const MERGE_PROFILES = {
  *   span：根空间包围盒尺寸（米），用来确认没建错比例
  */
 export const MESHES = {
-  SoldierNra: {
-    file: "Model_SoldierNra.tzm.json", category: "soldier",
-    triangles: 1800, meshBlocks: 23, nodes: 29, joints: 13,
-    materials: ["accentA", "accentB", "accessory", "shoe", "skin", "uniform"],
-    mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.5187, 1.6747, 0.3484], height: 1.66,
-    draws: { high: 21, medium: 19, low: 18 },
-    note: "川军第 22 集团军第 122 师步兵。布军帽 + 青天白日帽徽、灰蓝土布军装、"
-      + "斜挎布子弹带（只有靠身三格鼓着）、层叠绑腿、露趾草鞋。**无钢盔。**",
-  },
-  SoldierIja: {
-    file: "Model_SoldierIja.tzm.json", category: "soldier",
-    triangles: 1776, meshBlocks: 23, nodes: 32, joints: 13,
-    materials: ["accentA", "accentB", "helmet", "leather", "shoe", "skin", "uniform"],
-    mounts: SOLDIER_MOUNTS, joinNames: SOLDIER_JOINTS,
-    span: [0.501, 1.631, 0.348], height: 1.62,
-    draws: { high: 19, medium: 18, low: 17 },
-    note: "濑谷支队步兵。立领昭五式 + 步兵红领章、九〇式钢盔（外翻盔沿 + 正面五角星）、"
-      + "皮弹药盒三只、编上靴 + 脚绊。**1938 年 3—4 月无屁帘。**",
-  },
-
   // 百姓。两个模型是**同一个 kind 的两个分身**（男/女由 seed 定，见 Script_Actor
   // 的 KIND_SPEC.civilian.variants）。两个都建在 1.60 m 上，女性矮的那 4.5% 走
   // 运行时的整体缩放 —— 加载器的 scale = KIND_SPEC.height / MESHES.height 会把
@@ -381,8 +360,6 @@ export const BAYONET_MESH_BY_WEAPON = {
 
 /** 人物 kind（Script_Actor 的 KIND_SPEC 键）→ 模型 id。 */
 export const SOLDIER_MESH_BY_KIND = {
-  nra: "SoldierNra", nraDare: "SoldierNra", nraOfficer: "SoldierNra",
-  ija: "SoldierIja", ijaOfficer: "SoldierIja",
   civilian: "CivilianMale",
 };
 

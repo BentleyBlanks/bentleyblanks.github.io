@@ -29,7 +29,7 @@ const sourceWeaponHash=sha(path.join(root,config.sourceWeapon));
 const approvedWeaponHashes=[config.sourceWeaponSha256,'8df097cdb820ab7f53561d8ccb66c9b9b1f7a1b450cce4f0f1b7d6be0b286532'];
 assert.ok(approvedWeaponHashes.includes(sourceWeaponHash),'Production rifle matches the original or audited mechanism revision');
 function ReadGlb(file){const data=fs.readFileSync(file);assert.equal(data.readUInt32LE(0),0x46546c67);const length=data.readUInt32LE(12);const json=JSON.parse(data.toString('utf8',20,20+length));return {json,bin:data.subarray(28+length)};}
-const {json,bin}=ReadGlb(path.join(assetDir,'Animation_TengxianNraBackRifleRun.glb'));
+const {json,bin}=ReadGlb(path.join(assetDir,'Animation_BackRifleRunMotion.glb'));
 const original=ReadGlb(path.join(root,config.sourceModel)).json;
 const sourcePose=new PoseScene(LoadGlb(path.join(root,config.sourceModel)));
 sourcePose.animations.push({channels:[]});sourcePose.Apply(sourcePose.animations.length-1,0);
@@ -37,6 +37,8 @@ const BindPoint=(name)=>Array.from(sourcePose.world[sourcePose.NodeIndex(name)].
 const Distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
 assert.equal(json.animations.length,1);assert.equal(json.animations[0].name,config.clip);
 assert.equal(json.scenes.length,1);assert.equal(json.skins.length,1);
+assert.ok(json.nodes.every(node => node.mesh === undefined || node.name.startsWith('Model_BackRifle')), 'the archive contains only the weapon and sling meshes');
+assert.ok(json.meshes.every(mesh => mesh.primitives.every(p => !('JOINTS_0' in p.attributes))), 'the actor mesh comes from the current appearance');
 const originalNames=original.skins[0].joints.map(i=>original.nodes[i].name).sort();
 assert.deepEqual(json.skins[0].joints.map(i=>json.nodes[i].name).sort(),originalNames,'Same source bone names');
 assert(json.nodes.some(n=>n.name===config.socket));

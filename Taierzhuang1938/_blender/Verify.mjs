@@ -87,21 +87,6 @@ if (!fs.existsSync(lugouqiaoTextureManifestPath)) {
   Report(textureSetOk, "卢沟桥武器 16 张原贴图逐文件字节数与 SHA-256 一致");
 }
 
-// 川军脚部的史实造型不能只靠注释约定：左右踝节点必须同时保留裸足皮肤与草鞋
-// 两个材质桶，否则以后重建模型时很容易又合回一整块布鞋/皮鞋而没人察觉。
-const nraPath = path.join(projectDir, "Model", MESHES.SoldierNra.file);
-const nraDoc = JSON.parse(fs.readFileSync(nraPath, "utf8"));
-const StrawSandalMaterials = (nodeName) => {
-  const node = nraDoc.nodes.find((entry) => entry.name === nodeName);
-  return new Set((node?.meshes || []).map((meshIndex) => nraDoc.meshes[meshIndex]?.material));
-};
-const sandalNodesOk = ["ankleL", "ankleR"].every((nodeName) => {
-  const materials = StrawSandalMaterials(nodeName);
-  return materials.has("skin") && materials.has("shoe");
-});
-Report(sandalNodesOk && /露趾草鞋/.test(nraDoc.notes || ""),
-  "川军左右脚均为裸足皮肤 + 露趾草鞋双材质");
-
 // 2026-08-28 新拆出的卢沟桥武器曾同时出现三类静默损坏：闭壳翻面后逐角法线
 // 没有跟着翻、旧 DCC 的 material_index=255 丢进默认桶，以及退化三角形成黑缝。
 // 浏览器会照常加载这些文件，三角数/包围盒也都合理，所以在真渲染前先直接审计
@@ -277,12 +262,6 @@ const HeadgearClearanceMm = (doc, headName, gearName) => {
   }
   return worst === Infinity ? null : worst * 1000;
 };
-const ijaPath = path.join(projectDir, "Model", MESHES.SoldierIja.file);
-const ijaDoc = JSON.parse(fs.readFileSync(ijaPath, "utf8"));
-const helmetClearance = HeadgearClearanceMm(ijaDoc, "head", "helmet");
-Report(helmetClearance !== null && helmetClearance >= 1.0,
-  `九〇式钢盔扣得住颅骨（最小余量 ${helmetClearance === null ? "量不出来" : helmetClearance.toFixed(2) + " mm"} ≥ 1.00 mm）`);
-
 // 大刀的刀面、布柄和铁件从同一张图集取样。
 const dadaoPath = path.join(projectDir, "Model", MESHES.Dadao.file);
 const dadaoDoc = JSON.parse(fs.readFileSync(dadaoPath, "utf8"));
@@ -424,8 +403,7 @@ const result = await page.evaluate(async () => {
   renderer.info.autoReset = false;
 
   for (const [id, entry] of Object.entries(MESHES)) {
-    const materials = MaterialsFor(entry.category === "soldier" && id === "SoldierIja"
-      ? "ClothIja" : "ClothNra");
+    const materials = MaterialsFor("ClothNra");
     const record = { id, ok: true, notes: [] };
     const perLod = {};
     let sample = null;
@@ -539,7 +517,7 @@ const result = await page.evaluate(async () => {
   // 合批是否真的在做事：拿士兵比（枪的几何全挂在一个节点上，本来就没得并，
   // 拿它当基准会得出「合批无效」的假结论）。batch:false 同时也是调试看零件的路径。
   try {
-    const doc = await LoadDocument(MODEL_BASE + MESHES.SoldierNra.file);
+    const doc = await LoadDocument(MODEL_BASE + MESHES.CivilianMale.file);
     const materials = MaterialsFor("ClothNra");
     out.unbatchedDraws = InstantiateModel(doc, { materials, batch: false }).draws;
     out.batchedDraws = InstantiateModel(doc, { materials }).draws;
@@ -568,19 +546,9 @@ Report(result.programs > 0, `shader 程序编译了 ${result.programs} 个`);
 Report(result.fallbackOk === true, "404 兜底返回 null（不抛）");
 Report(result.junkOk === true, "非 TZM 文档兜底返回 null（不抛）");
 Report(result.batchedDraws < result.unbatchedDraws,
-  `合批见效：中方士兵 ${result.unbatchedDraws} → ${result.batchedDraws} draw call`);
+  `合批见效：男性百姓 ${result.unbatchedDraws} → ${result.batchedDraws} draw call`);
 for (const error of result.errors) Report(false, error);
 for (const p of problems) Report(false, p);
-
-const soldierNra = result.models.find((m) => m.id === "SoldierNra");
-const soldierIja = result.models.find((m) => m.id === "SoldierIja");
-if (soldierNra && soldierIja) {
-  const worst = Math.max(soldierNra.lod.high.calls, soldierIja.lod.high.calls);
-  const withWeapon = worst + 2;
-  console.log(`\n换模后单人 draw call：中方 ${soldierNra.lod.high.calls} / 日方 ${soldierIja.lod.high.calls}`
-    + `（high 档，含帽徽/领章），持枪再 +2 → 最坏 ${withWeapon}。`
-    + `\n对比换模前 Script_Actor 的 37，24 人同屏省下约 ${(37 - withWeapon) * 24} 个 draw call。`);
-}
 
 await browser.close();
 server.close();

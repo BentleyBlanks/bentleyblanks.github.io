@@ -40,7 +40,7 @@ export function LoadRelaxedGait() {
   return libraryPromise ||= Promise.all([
     fetch(`./Animation/RelaxedGait/Animation_TengxianHumanoidV1RelaxedGait.json?v=${VERSION}`).then(r => r.json()),
     fetch(`./Animation/RelaxedGait/Data_RelaxedGait.json?v=${VERSION}`).then(r => r.json()),
-    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb?v=20260926HumanoidV1"),
+    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_BackRifleRunMotion.glb?v=20261126FormalCast"),
   ]).then(([clips, manifest, back]) => {
     library = {
       clips: new Map(clips.clips.map(json => [json.name, AnimationClip.parse(json)])),

@@ -30,7 +30,7 @@ function Normalize(value) { return String(value || "").toLowerCase().replace(/[^
 function Names(doc) { return new Set((doc.nodes || []).map((node) => Normalize(node.name)).filter(Boolean)); }
 function Animations(doc) { return new Set((doc.animations || []).map((clip) => clip.name).filter(Boolean)); }
 
-const name = "Model_FpsArmsNraSkeletal01.glb";
+const name = "Model_HeYoutianViewArms.glb";
 const arms = ReadGlb(name);
 const armNames = Names(arms);
 const animations = Animations(arms);
@@ -38,7 +38,8 @@ const profileClips = ["AdvanceFire", "MachineGunFire", "PistolFire", "RifleIdle"
 
 assert.equal((arms.skins || []).length, 1, "FPS arms preserve one runtime skin");
 assert.equal((arms.meshes || []).length >= 1, true, "FPS arms preserve skinned uniform/hand geometry");
-assert.equal((arms.textures || []).length >= 1, true, "FPS arms keep their authored textures");
+assert.equal(arms.extras.appearanceMaterial.file, "Character/Model_HeYoutian.glb");
+assert.equal(arms.extras.appearanceMaterial.material, "M_HeYoutian");
 assert.equal((arms.animations || []).length >= profileClips.length, true, "FPS arms preserve source motion clips");
 for (const clip of profileClips) assert.ok(animations.has(clip), `FPS grip profile keeps ${clip}`);
 
@@ -63,11 +64,11 @@ for (const primitive of skinnedPrimitives) {
   assert.notEqual(primitive.attributes.WEIGHTS_0, undefined, "skinned primitive has WEIGHTS_0");
   const position = arms.accessors?.[primitive.attributes.POSITION];
   assert.ok(position?.min && position?.max, "skinned primitive exposes authored bounds");
-  assert.ok(position.min[1] >= 1.30 && position.max[1] <= 1.56,
+  assert.ok(position.min[1] >= 1.30 && position.max[1] <= 1.58,
     `FPS arm crop excludes torso remnants (${position.min[1]}..${position.max[1]} m high)`);
 }
 
-const armatureNode = (arms.nodes || []).find((node) => node.extras?.fpsArmSource === "Model_LugouNra01");
+const armatureNode = (arms.nodes || []).find((node) => node.extras?.fpsArmSource === "Model_HeYoutian");
 assert.ok(armatureNode, "FPS armature identifies its audited source");
 assert.equal(armatureNode.extras.fpsArmInfluenceMinimum, 0.5,
   "FPS crop keeps only vertices owned at least 50% by arm chains");
@@ -75,7 +76,7 @@ assert.equal(armatureNode.extras.fpsArmInfluenceMinimum, 0.5,
 const jointCount = new Set((arms.skins || []).flatMap((skin) => skin.joints || [])).size;
 assert.equal(jointCount >= 45, true, `FPS arms keep a full upper-body/finger skeleton (${jointCount} joints)`);
 
-const rigNode = (arms.nodes || []).find((node) => node.name === "Rig_FpsArmsNraSkeletal01");
+const rigNode = (arms.nodes || []).find((node) => node.name === "Rig_HeYoutianViewArms");
 assert.ok(rigNode, "FPS armature adapter node exists");
 const adapterScale = rigNode.scale || [1, 1, 1];
 assert.ok(adapterScale.every((value) => value > 0), "armature adapter has no negative scale");

@@ -6,7 +6,7 @@ const project=path.resolve(import.meta.dirname,'..');
 const file=path.join(project,'Model/Character/Data_TengxianCharacterManifest.json');
 const manifest=JSON.parse(fs.readFileSync(file));
 for(const model of manifest.models){
- if(process.argv.includes("--formal-ija") && !model.appearance)continue;
+ if(process.argv.includes("--formal-appearances") && !model.appearance)continue;
  const glb=LoadGlb(path.join(project,model.url));
  const measured=MeasurePose(glb,{samples:121,ground:true,pelvisName:model.boneRoles.pelvis,headName:model.boneRoles.head});
  for(const [id,pose] of Object.entries(measured.byClip)){

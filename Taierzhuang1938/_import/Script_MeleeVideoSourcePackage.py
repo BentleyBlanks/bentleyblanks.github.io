@@ -3,7 +3,7 @@ from pathlib import Path
 import bpy,sys,json,runpy
 project=Path(__file__).resolve().parents[1];root=Path(r'C:\Users\Bentl\OneDrive\Sync\饮河\FPS\视频转骨骼')
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=str(project/'Model/Model_FpsArmsNraSkeletal01.glb'))
+bpy.ops.import_scene.gltf(filepath=str(project/'Model/Model_HeYoutianViewArms.glb'))
 arm=next(o for o in bpy.context.scene.objects if o.type=='ARMATURE');arm.name='MeleeFirstPerson'
 path=root/'Blender/MeleeVideoV1/Scene_MeleeVideoFirstPerson.blend'
 bpy.ops.wm.save_as_mainfile(filepath=str(path),compress=True)

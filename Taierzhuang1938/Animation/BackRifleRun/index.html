@@ -14,26 +14,28 @@
 <div class="controls"><button id="play">暂停</button><label>速度 <input id="speed" type="range" min="1.8" max="4.2" step="0.1" value="2.6"> <output id="speedValue">2.6 m/s</output></label><label><input id="slow" type="checkbox"> 半速审查</label><button id="angle">斜前视角</button><label class="scrub">帧 <input id="phase" type="range" min="0" max="88" step="1" value="0"> <output id="frameValue">01 / 88</output></label><label><input id="travel" type="checkbox" checked> 地面位移参照</label></div>
 <div class="facts"><div><span>动作 / 骨架</span><strong>BackRifleRun · TengxianNra02</strong></div><div><span>循环 / 步频</span><strong id="timing">正在读取资产…</strong></div><div><span>步枪 / 挂点</span><strong>中正式 · Socket_BackRifle</strong></div><div><span>根运动</span><strong>原地循环 · 位移由游戏提供</strong></div></div>
 <p id="status" role="status">正在加载独立 GLB…</p>
-<div class="downloads"><a class="download" href="Animation_TengxianNraBackRifleRun.glb?v=20260926HumanoidV1" download>独立 GLB 动画</a><a class="download" href="Animation_BackRifleRunSide.webp?v=NaturalRunV2" download>历史侧面 WebP</a><a class="download" href="Animation_BackRifleRunBack.webp?v=NaturalRunV2" download>历史背面 WebP</a><a class="download" href="Data_BackRifleRun.json?v=20260926HumanoidV1">动作参数</a></div>
-<details><summary>导入与审查约定</summary><p>采用 TengxianHumanoidV1 共用身体骨架与 NRA02 外观，使用胸椎 <code>Bip001 Spine2</code> 的独立背枪挂点。枪和连续跨肩绑带随胸椎约束。GLB 源朝 +Z；游戏沿用 <code>MODEL_FORWARD_YAW</code>，只翻转一次。播放倍率为真实移动速度除以资产基准速度；若导入时做了整体缩放，还需再除以缩放倍率。规范步幅在基准速度下验收，高低速度用于兼容检查。</p><p>本页不载入游戏逻辑，不替换现有 <code>RifleRun</code>。可编辑 Blender 源工程按项目规范保存在本地；此处 WebP 为规范前的历史记录，以实时 GLB 为准。</p></details>
-<footer>BlenderMCP 规范 · NRA02 与中正式几何 · 原有背枪跑步</footer>
+<div class="downloads"><a class="download" href="Animation_BackRifleRunMotion.glb?v=20261126FormalCast" download>独立 GLB 动画</a><a class="download" href="Data_BackRifleRun.json?v=20261126FormalCast">动作参数</a></div>
+<details><summary>导入与审查约定</summary><p>采用 TengxianHumanoidV1 共用身体骨架与何有田外观，使用胸椎 <code>Bip001 Spine2</code> 的独立背枪挂点。枪和连续跨肩绑带随胸椎约束。GLB 源朝 +Z；游戏沿用 <code>MODEL_FORWARD_YAW</code>，只翻转一次。播放倍率为真实移动速度除以资产基准速度；若导入时做了整体缩放，还需再除以缩放倍率。规范步幅在基准速度下验收，高低速度用于兼容检查。</p><p>本页不载入游戏逻辑，不替换现有 <code>RifleRun</code>。可编辑 Blender 源工程按项目规范保存在本地；动作文件只保存骨架曲线与背负道具。</p></details>
+<footer>BlenderMCP 规范 · 何有田与中正式几何 · 原有背枪跑步</footer>
 <script type="module">
 import * as THREE from 'three';
 import {ManagedGLTFLoader as GLTFLoader} from '../../Script_ModelImports.mjs';
 import {clone as CloneSkeleton} from '../../vendor/three/examples/jsm/utils/SkeletonUtils.js';
 let playing=true,phaseSeconds=0,previous=performance.now(),rate=1,travelMeters=0;
-const assetRevision='20260926HumanoidV1';
+const assetRevision='20261126FormalCast';
 const views=[];const scratch=new THREE.Vector3();
 const Get=(id)=>document.getElementById(id);
 try {
-const [asset,config]=await Promise.all([new GLTFLoader().loadAsync('./Animation_TengxianNraBackRifleRun.glb?v='+assetRevision),fetch('./Data_BackRifleRun.json?v='+assetRevision).then(r=>r.json())]);
+const [asset, body,config]=await Promise.all([new GLTFLoader().loadAsync('./Animation_BackRifleRunMotion.glb?v='+assetRevision),new GLTFLoader().loadAsync('../../Model/Character/Model_HeYoutianHumanoid.glb?v='+assetRevision),fetch('./Data_BackRifleRun.json?v='+assetRevision).then(r=>r.json())]);
 const clip=asset.animations.find(a=>a.name===config.clip);if(!clip)throw new Error('Missing BackRifleRun clip');
 function MakeView(id,position){
  const renderer=new THREE.WebGLRenderer({canvas:Get(id),antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(640,640,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
  const scene=new THREE.Scene();scene.background=new THREE.Color(0x27323b);scene.add(new THREE.HemisphereLight(0xe0e9f3,0x58626a,2.4));
  const light=new THREE.DirectionalLight(0xffead0,3.1);light.position.set(-3,5,4);light.castShadow=true;light.shadow.mapSize.set(1024,1024);light.shadow.camera.left=-2;light.shadow.camera.right=2;light.shadow.camera.top=3;light.shadow.camera.bottom=-2;light.shadow.bias=-0.0004;scene.add(light);
  const fill=new THREE.DirectionalLight(0xb8d5ff,1.1);fill.position.set(3,3,-3);scene.add(fill);
- const character=CloneSkeleton(asset.scene);scene.add(character);character.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
+ const character=CloneSkeleton(body.scene);
+ const mount=asset.scene.getObjectByName(config.socket).clone(true);
+ character.getObjectByName('Bip001_Spine2').add(mount);scene.add(character);character.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;o.frustumCulled=false;}});
  const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x37444d,roughness:1}));floor.rotation.x=-Math.PI/2;floor.position.y=-0.002;floor.receiveShadow=true;scene.add(floor);
  const grid=new THREE.GridHelper(config.strideMeters*6,24,0x46515a,0x46515a);grid.position.y=0.001;scene.add(grid);
  const camera=new THREE.OrthographicCamera(-1.12,1.12,1.12,-1.12,0.01,40);camera.position.set(...position);camera.lookAt(0,0.94,0);

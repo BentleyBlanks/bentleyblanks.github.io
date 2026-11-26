@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { LoadGlb, PoseScene } from './Script_LugouGlbPose.mjs';
 const project = path.resolve(import.meta.dirname, '..');
-const model = 'Model/Character/Model_TengxianNra02.glb';
+const model = 'Model/Character/Model_HeYoutianHumanoid.glb';
 const scene = new PoseScene(LoadGlb(path.join(project, model)));
 const names = JSON.parse(fs.readFileSync(path.join(project, 'Model/Character/Data_TengxianHumanoid.json'))).bodyBones.map(b => b.name);
 const index = new Map(scene.nodes.map((n, i) => [n.name, i]));

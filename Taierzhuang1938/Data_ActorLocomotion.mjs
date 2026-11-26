@@ -158,7 +158,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianNra02.glb",
+      "source": "Model/Character/Model_HeYoutianHumanoid.glb",
       "sha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de"
     },
     "RifleCrouchAdvance": {
@@ -181,7 +181,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb",
+      "source": "Animation/BackRifleRun/Animation_BackRifleRunMotion.glb",
       "sha256": "9a81b95623f6228d3162fc1fe72bbac162c5a0ed05ed72bc4eb5c7c5a782efd8"
     }
   },
@@ -211,7 +211,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianNra05.glb",
+      "source": "Model/Character/Model_SquadLeaderLuoHumanoid.glb",
       "sha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72"
     },
     "RifleCrouchAdvance": {
@@ -234,7 +234,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb",
+      "source": "Animation/BackRifleRun/Animation_BackRifleRunMotion.glb",
       "sha256": "9a81b95623f6228d3162fc1fe72bbac162c5a0ed05ed72bc4eb5c7c5a782efd8"
     }
   },
@@ -264,7 +264,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Model/Character/Model_TengxianNra06.glb",
+      "source": "Model/Character/Model_InterpreterHumanoid.glb",
       "sha256": "7d3dcde8195b3070178b31fc5184ef45808acc8306ee9bf806252d680b6ed961"
     },
     "RifleCrouchAdvance": {
@@ -287,7 +287,7 @@ export const ACTOR_LOCOMOTION_PROFILES = {
           ]
         ]
       },
-      "source": "Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb",
+      "source": "Animation/BackRifleRun/Animation_BackRifleRunMotion.glb",
       "sha256": "9a81b95623f6228d3162fc1fe72bbac162c5a0ed05ed72bc4eb5c7c5a782efd8"
     }
   }

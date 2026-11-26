@@ -4,7 +4,7 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { IJA_APPEARANCE_BY_RIG, CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_APPEARANCE_BY_RIG, CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { CharacterClipModelId, IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { TagCharacterSurface } from "./Script_CharacterSurface.mjs";
@@ -178,7 +178,7 @@ export function GetLugouCharacterVariantEntries(kind) {
     modelVariant,
     role: profile?.role || "soldier",
     modelNumber: modelVariant + 1,
-    modelId: IJA_APPEARANCE_BY_RIG[LugouCharacterModelId(kind, modelVariant)] || LugouCharacterModelId(kind, modelVariant),
+    modelId: CHARACTER_APPEARANCE_BY_RIG[LugouCharacterModelId(kind, modelVariant)] || LugouCharacterModelId(kind, modelVariant),
   }));
 }
 
@@ -323,7 +323,7 @@ const MODEL_FORWARD_YAW = Math.PI;
 // and every dependent GLB together after the offline normalization bake (_import/Script_StandardizeCharacters.py).
 // 2026-09-27: CarryStretcherRear / WoundedLimp foot tracks flipped back sole-down and re-grounded
 // in all seven model GLBs (_import/Script_FixMocapFootRoll.mjs); manifest audit rewritten with them.
-const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20261126FormalIja";
+const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20261126FormalCast";
 const ASSET_VERSION = "20260927MocapFootRoll";
 const DEATH_COLLAPSE_ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;

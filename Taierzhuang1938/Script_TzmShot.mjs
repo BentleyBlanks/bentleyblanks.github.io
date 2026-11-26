@@ -109,7 +109,7 @@ const result = await page.evaluate(async ({ id, outDir }) => {
     const entry = MESHES[modelId];
     if (!entry) { out.push({ id: modelId, error: "no entry" }); continue; }
     const model = await LoadModel(MODEL_BASE + entry.file, {
-      materials: MaterialsFor("ClothNra", modelId === "SoldierNra" ? 0x9E875A : 0x2B2B2E),
+      materials: MaterialsFor("ClothNra", 0x2B2B2E),
       mergeMap: MERGE_PROFILES.high,
     });
     if (!model) { out.push({ id: modelId, error: "load null" }); continue; }
@@ -148,11 +148,6 @@ const result = await page.evaluate(async ({ id, outDir }) => {
       const head = new THREE.Vector3(center.x, box.max.y - 0.13, 0);
       await Shot("headRearTop", [0.16, 0.9, 1], head, 0.30);
       await Shot("headRear34", [0.95, 0.45, 1], head, 0.30);
-    }
-    if (modelId === "SoldierNra") {
-      const feet = new THREE.Vector3(center.x, box.min.y + 0.10, center.z - 0.05);
-      await Shot("feetFront", [-1, 0.18, -1], feet, 0.42);
-      await Shot("feetSide", [1, 0.14, 0.05], feet, 0.40);
     }
     scene.remove(model.root);
     for (const mesh of model.meshes) mesh.geometry.dispose();

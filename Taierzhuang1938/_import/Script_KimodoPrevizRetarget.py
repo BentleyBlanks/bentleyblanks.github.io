@@ -37,7 +37,7 @@ parser.add_argument("--version", default="20261020PrevizKimodoV1")
 args = parser.parse_args()
 
 FPS = 24
-GLB = ROOT / "Model/Character/Model_TengxianNra02.glb"
+GLB = ROOT / "Model/Character/Model_HeYoutianHumanoid.glb"
 
 # ---------------------------------------------------------------- quaternions (x, y, z, w) and matrices
 

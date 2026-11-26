@@ -663,116 +663,20 @@ def WriteShoulderAudit(outputs):
     (PROJECT / '_blender/Data_TengxianShoulderReference.json').write_text(json.dumps(result, separators=(',', ':')) + '\n', encoding='utf8')
 
 def AdoptBackRifleAppearance():
-    """The historical preview embedded rejected NRA01; use the adopted body."""
-    file = PROJECT / 'Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb'
-    library = Glb(file.read_bytes())
-    base = Glb((PROJECT / 'Model/Character/Model_TengxianNra02.glb').read_bytes())
-    socket = library.byName['Socket_BackRifle']; extra = []
-    def Visit(index):
-        extra.append(index)
-        for child in library.nodes[index].get('children', []): Visit(child)
-    Visit(socket)
-    meshes = sorted({library.nodes[i]['mesh'] for i in extra if 'mesh' in library.nodes[i]})
-    materials = sorted({p['material'] for i in meshes for p in library.g['meshes'][i]['primitives'] if 'material' in p})
-    textures = set()
-    def FindTextures(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key.endswith('Texture') and isinstance(child, dict) and 'index' in child: textures.add(child['index'])
-                else: FindTextures(child)
-        elif isinstance(value, list):
-            for child in value: FindTextures(child)
-    for i in materials: FindTextures(library.g['materials'][i])
-    textures = sorted(textures); images = set()
-    for i in textures:
-        texture = library.g['textures'][i]
-        if 'source' in texture: images.add(texture['source'])
-        for ext in texture.get('extensions', {}).values():
-            if 'source' in ext: images.add(ext['source'])
-    images = sorted(images)
-    base.bin.extend(b'\0' * (-len(base.bin) % 4)); binaryOffset = len(base.bin); base.bin.extend(library.bin)
-    viewOffset = len(base.g['bufferViews']); accessorOffset = len(base.g['accessors'])
-    for view in library.g['bufferViews']:
-        value = copy.deepcopy(view); value['byteOffset'] = value.get('byteOffset', 0) + binaryOffset; base.g['bufferViews'].append(value)
-    for accessor in library.g['accessors']:
-        value = copy.deepcopy(accessor); value['bufferView'] += viewOffset; base.g['accessors'].append(value)
-    imageMap = {i: len(base.g.get('images', [])) + n for n, i in enumerate(images)}
-    for i in images:
-        value = copy.deepcopy(library.g['images'][i]); value['bufferView'] += viewOffset; base.g.setdefault('images', []).append(value)
-    samplerOffset = len(base.g.get('samplers', [])); base.g.setdefault('samplers', []).extend(copy.deepcopy(library.g.get('samplers', [])))
-    textureMap = {i: len(base.g.get('textures', [])) + n for n, i in enumerate(textures)}
-    for i in textures:
-        value = copy.deepcopy(library.g['textures'][i])
-        if 'source' in value: value['source'] = imageMap[value['source']]
-        if 'sampler' in value: value['sampler'] += samplerOffset
-        for ext in value.get('extensions', {}).values():
-            if 'source' in ext: ext['source'] = imageMap[ext['source']]
-        base.g.setdefault('textures', []).append(value)
-    def RemapTextures(value):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key.endswith('Texture') and isinstance(child, dict) and 'index' in child: child['index'] = textureMap[child['index']]
-                else: RemapTextures(child)
-        elif isinstance(value, list):
-            for child in value: RemapTextures(child)
-    materialMap = {i: len(base.g.get('materials', [])) + n for n, i in enumerate(materials)}
-    for i in materials:
-        value = copy.deepcopy(library.g['materials'][i]); RemapTextures(value); base.g.setdefault('materials', []).append(value)
-    meshMap = {i: len(base.g['meshes']) + n for n, i in enumerate(meshes)}
-    for i in meshes:
-        value = copy.deepcopy(library.g['meshes'][i])
-        for primitive in value['primitives']:
-            primitive['attributes'] = {key: index + accessorOffset for key, index in primitive['attributes'].items()}
-            if 'indices' in primitive: primitive['indices'] += accessorOffset
-            if 'material' in primitive: primitive['material'] = materialMap[primitive['material']]
-        base.g['meshes'].append(value)
-    nodeMap = {i: base.byName[Name(node.get('name', ''))] for i, node in enumerate(library.nodes) if Name(node.get('name', '')) in base.byName}
-    nodeMap.update({i: len(base.nodes) + n for n, i in enumerate(extra)})
-    for i in extra:
-        node = copy.deepcopy(library.nodes[i])
-        if 'children' in node: node['children'] = [nodeMap[j] for j in node['children']]
-        if 'mesh' in node: node['mesh'] = meshMap[node['mesh']]
-        base.nodes.append(node)
-    base.nodes[nodeMap[library.parent[socket]]].setdefault('children', []).append(nodeMap[socket])
-    base.g['animations'] = copy.deepcopy(library.g['animations'])
-    for animation in base.g['animations']:
-        for channel in animation['channels']: channel['target']['node'] = nodeMap[channel['target']['node']]
-        for sampler in animation['samplers']: sampler['input'] += accessorOffset; sampler['output'] += accessorOffset
-    base.g['asset']['extras']['animationSource'] = library.g['asset']['extras']['sourceAsset']
-    base.Save(file)
-    config = json.loads(Source('Animation/BackRifleRun/Data_BackRifleRun.json').decode('utf-8-sig'))
-    config['legacySourceModel'] = config['sourceModel']; config['legacySourceModelSha256'] = config['sourceModelSha256']
-    config['sourceModel'] = 'Taierzhuang1938/Model/Character/Model_TengxianNra02.glb'
-    config['sourceModelSha256'] = hashlib.sha256((REPO / config['sourceModel']).read_bytes()).hexdigest()
-    config['armature'] = 'Rig_TengxianCharacter'; config['socketBone'] = 'Bip001 Spine2'; config['skeleton'] = 'TengxianHumanoidV1'
-    config['revision'] = 'HumanoidV1'
-    config['legacySocketMatrixBlenderLocal'] = config.pop('socketMatrixBlenderLocal')
-    socketNode = base.nodes[nodeMap[socket]]
-    config['socketTransformGltfMetres'] = {key: socketNode[key] for key in ('translation', 'rotation', 'scale')}
-    (PROJECT / 'Animation/BackRifleRun/Data_BackRifleRun.json').write_text(json.dumps(config, indent=2) + '\n', encoding='utf8')
+    subprocess.run(['python', str(PROJECT / '_import/Script_PackBackRifleMotion.py')], check=True)
 
-def Main(skipBodies=False):
+def Main():
     assert bpy.context.scene.get('BlenderMcpTask') == 'CharacterStandardization', 'Use the isolated task BlenderMCP instance'
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     outputs = {}
     for identifier in (*ADOPTED, *DERIVED, *FACIAL):
         revision = REVISION if identifier in ADOPTED else STORYBOARD_REVISION
-        if skipBodies or identifier.startswith('Ija'):
-            body = CharacterBodyPath(PROJECT, 'Tengxian' + identifier)
-            outputs[identifier] = (Glb(body.read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb', revision)), None)
-        else:
-            outputs[identifier] = BakeModel(identifier, revision=revision)
-        print('Baked', identifier, flush=True)
-    for identifier in ('Nra02',):
-        source = 'Model/Character/Animation_Lugou' + identifier + 'Infantry.glb'
-        BakeModel(identifier, source, PROJECT / Name(source))
-        print('Retargeted infantry', identifier, flush=True)
+        body = CharacterBodyPath(PROJECT, 'Tengxian' + identifier)
+        outputs[identifier] = (Glb(body.read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb', revision)), None)
     for faction in ('Nra', 'Ija'):
         source = 'Model/Character/Animation_Lugou' + faction + 'DeathCollapse.glb'
         BakeModel(faction, source, PROJECT / Name(source))
         print('Retargeted death', faction, flush=True)
-    source = 'Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb'
-    BakeModel('NraBackRifleRun', source, PROJECT / Name(source))
     AdoptBackRifleAppearance()
     BakeStoryLibraries(outputs)
     WriteManifest(outputs)
@@ -793,8 +697,6 @@ def RebakeBodyHashRecords():
     back-rifle GLB come out byte-identical and only the recorded hashes move. Needs no scene:
     STANDARDIZE_PASS=libraries blender --background --factory-startup --python-exit-code 1 --python <this file>
     """
-    source = 'Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb'
-    BakeModel('NraBackRifleRun', source, PROJECT / Name(source))
     AdoptBackRifleAppearance()
     BakeStoryLibraries({identifier: (Glb(CharacterBodyPath(PROJECT, 'Tengxian' + identifier).read_bytes()),
                                      Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb')), None) for identifier in ADOPTED})

@@ -1,5 +1,7 @@
 # 罗班长参考图模型
 
+2026-11-26 已退役。以下为历史制作记录，对应资产和制作脚本可在 Git 提交 7adbd9a35 中查看。
+
 2026-09-29，按用户提供的罗茂才正面、左侧、背面三视图制作的独立角色资产。2026-09-30 第二版重做军服和装具，修复第一版领口、口袋、帽形及肩臂结构问题。
 文件为 `Model/Character/Model_TengxianLuoReference.glb`，可编辑工程保存在
 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\LuoReference_20260929\`。

@@ -16,8 +16,8 @@
   "slingWidthMeters": 0.027,
   "durationSeconds": 0.7333333333333333,
   "strideMeters": 1.9066666666666665,
-  "sourceModel": "Taierzhuang1938/Model/Character/Model_TengxianNra02.glb",
-  "sourceModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+  "sourceModel": "Taierzhuang1938/Model/Character/Model_HeYoutianHumanoid.glb",
+  "sourceModelSha256": "21ef08a49b606b8c01345cd3f43a37b8dd2092ae53de292dee2b6c69e8439d39",
   "sourceWeapon": "Taierzhuang1938/Model/Model_ZhongZheng.tzm.json",
   "sourceWeaponSha256": "0d18aaf93c0451cc2ebb0e8266648874798bd100d3a372aad920edcd027c199e",
   "armature": "Rig_TengxianCharacter",
@@ -1236,5 +1236,6 @@
       0.9999999403953552,
       0.9999999403953552
     ]
-  }
+  },
+  "assetRevision": "3d175d911c351cde"
 }

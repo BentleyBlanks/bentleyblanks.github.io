@@ -28,7 +28,7 @@ for(const clip of relaxed.clips){
   clips[clip.name]=Sample(clip.name,clip.duration);
 }
 // BackRifleRun: glTF channels of its own GLB, matched to IJA01 by node name (identical bind, see Adapt in Script_RelaxedGait).
-const back=new PoseScene(LoadGlb(path.join(project,'Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb')));
+const back=new PoseScene(LoadGlb(path.join(project,'Animation/BackRifleRun/Animation_BackRifleRunMotion.glb')));
 const run=back.animations[back.AnimationIndex('BackRifleRun')];
 scene.animations.push({name:'BackRifleRun',duration:run.duration,channels:run.channels
   .filter(c=>c.path!=='scale'&&names.includes(back.nodes[c.node].name))

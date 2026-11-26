@@ -3,9 +3,9 @@
   "revision": "RelaxedGaitV1",
   "skeleton": "TengxianHumanoidV1",
   "file": "Animation_TengxianHumanoidV1RelaxedGait.json",
-  "sourceModel": "Model/Character/Model_TengxianNra02.glb",
-  "sourceSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
-  "clipSha256": "73aec174661a573b1e53fddb15a401e2b532195bd50e0264ec55c2132e2de35a",
+  "sourceModel": "Model/Character/Model_HeYoutianHumanoid.glb",
+  "sourceSha256": "21ef08a49b606b8c01345cd3f43a37b8dd2092ae53de292dee2b6c69e8439d39",
+  "clipSha256": "3141a839e2979f74597507460e87fe8db40f1e65d89288b1bd5ea833bcb20d31",
   "gait": {
     "revision": "RelaxedGaitV1",
     "walk": {
@@ -82,7 +82,7 @@
         ]
       ]
     },
-    "pelvisHeightM": 0.9095,
+    "pelvisHeightM": 0.9035,
     "legReachClampedFrames": 0,
     "stanceSoleM": {
       "L": [
@@ -95,7 +95,7 @@
       ]
     },
     "swingSoleMinM": {
-      "L": 0.004,
+      "L": 0.0066,
       "R": 0.004
     }
   },

@@ -1,4 +1,4 @@
-// Owner-only jacket, legs and feet, authored in Animation_FirstPerson.blend.
+// He Youtian owner-only jacket, legs and feet on the calibrated first-person animation rig.
 // World-space body follows feet/yaw, never camera pitch or weapon FOV compression.
 //
 // 2026-10-22：下半身改成 3A 第一人称全身的做法（规划在 Script_FirstPersonGait，数值在

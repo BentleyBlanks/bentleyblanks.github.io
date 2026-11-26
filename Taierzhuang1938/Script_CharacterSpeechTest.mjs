@@ -56,13 +56,17 @@ const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_Teng
 function Glb(file) {
   const b = fs.readFileSync(new URL(file.replace(/^\.\//, './'), import.meta.url));
   const length = b.readUInt32LE(12);
-  return {bytes: b, doc: JSON.parse(b.subarray(20, 20 + length)), bin: b.subarray(28 + length)};
+  const doc = JSON.parse(b.subarray(20, 20 + length));
+  const buffers = doc.buffers.map(buffer => buffer.uri
+    ? fs.readFileSync(new URL(buffer.uri, new URL(file, import.meta.url))) : b.subarray(28 + length));
+  return {bytes: b, doc, buffers, bin: buffers[0]};
 }
 function Read(glb, index) {
   const a = glb.doc.accessors[index], v = glb.doc.bufferViews[a.bufferView];
   const n = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16}[a.type], ctor = {5126: Float32Array, 5123: Uint16Array, 5125: Uint32Array, 5121: Uint8Array}[a.componentType];
   const stride = v.byteStride || ctor.BYTES_PER_ELEMENT * n, out = new Float64Array(a.count * n);
-  const view = new DataView(glb.bin.buffer, glb.bin.byteOffset + (v.byteOffset || 0) + (a.byteOffset || 0));
+  const bytes=glb.buffers[v.buffer];
+  const view = new DataView(bytes.buffer, bytes.byteOffset + (v.byteOffset || 0) + (a.byteOffset || 0));
   const scale = a.normalized ? {5121: 255, 5123: 65535}[a.componentType] : 1;
   for (let i = 0; i < a.count; i++) for (let c = 0; c < n; c++) {
     const o = i * stride + c * ctor.BYTES_PER_ELEMENT;

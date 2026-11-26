@@ -1,4 +1,4 @@
-// Refit the existing skeleton-only clips to the soles of each adopted IJA appearance.
+// Refit the existing skeleton-only clips to the soles of each adopted campaign appearance.
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -26,7 +26,8 @@ function AppendFloats(doc, chunks, data, type) {
   return doc.accessors.push(accessor) - 1;
 }
 for (const record of manifest.models.filter(row => row.appearance)) {
-  const sourceId = record.id === "TengxianIja06" ? "TengxianIja02" : record.id;
+  const sourceId = record.faction === "nra" ? "TengxianNra02"
+    : record.id === "TengxianIja06" ? "TengxianIja02" : record.id;
   const sourceFile = "Animation_" + sourceId + "Infantry.glb";
   const bytes = execFileSync("git", ["show", sourceRevision + ":Taierzhuang1938/Model/Character/" + sourceFile], {cwd: project, maxBuffer: 8e6});
   const library = LoadGlb(bytes);

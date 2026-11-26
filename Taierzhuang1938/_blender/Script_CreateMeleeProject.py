@@ -11,7 +11,7 @@ projectPath.parent.mkdir(parents=True,exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scene=bpy.context.scene;scene.name='Scene_MeleeCombat';scene.unit_settings.system='METRIC'
 for role in ['Nra','Ija','FirstPerson']:
- source=root/'Model'/('Model_FpsArmsNraSkeletal01.glb' if role=='FirstPerson' else 'Character/Model_Lugou'+role+'01.glb')
+ source=root/'Model'/('Model_HeYoutianViewArms.glb' if role=='FirstPerson' else 'Character/Model_Lugou'+role+'01.glb')
  before=set(bpy.data.objects);bpy.ops.import_scene.gltf(filepath=str(source))
  rigs=[obj for obj in set(bpy.data.objects)-before if obj.type=='ARMATURE']
  if len(rigs)!=1:raise RuntimeError('Expected one source skeleton: '+str(source))

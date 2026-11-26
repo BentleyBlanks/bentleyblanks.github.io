@@ -331,6 +331,138 @@
           ]
         }
       ]
+    },
+    {
+      "id": "TengxianNra05",
+      "file": "Animation_SquadLeaderLuoInfantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000022926596019712253,
+          "uncorrectedFloorRange": [
+            -0.0060917365530563615,
+            -0.005972609601516698
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002124621163451801,
+          "uncorrectedFloorRange": [
+            -0.057941615435186,
+            -0.006056975332726612
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002020372347968924,
+          "uncorrectedFloorRange": [
+            -0.05528171723829189,
+            -0.05380953525591508
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020940627704468806,
+          "uncorrectedFloorRange": [
+            -0.05539762034342306,
+            -0.006057057749554122
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000012813034882486196,
+          "uncorrectedFloorRange": [
+            -0.0062158026636431165,
+            -0.005287344519976539
+          ]
+        }
+      ]
+    },
+    {
+      "id": "TengxianNra06",
+      "file": "Animation_InterpreterInfantry.glb",
+      "clips": [
+        {
+          "id": "RifleCrouchAdvance",
+          "duration": 3.5,
+          "loop": true,
+          "referenceSpeedMps": 0.2554529916490837,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000022926596019712253,
+          "uncorrectedFloorRange": [
+            -0.0060917365530563615,
+            -0.005972609601516698
+          ]
+        },
+        {
+          "id": "StandToKneel",
+          "duration": 1.7333333333333334,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002124621163451801,
+          "uncorrectedFloorRange": [
+            -0.057941615435186,
+            -0.006056975332726612
+          ]
+        },
+        {
+          "id": "KneelHold",
+          "duration": 0.8666666666666667,
+          "loop": true,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.00002020372347968924,
+          "uncorrectedFloorRange": [
+            -0.05528171723829189,
+            -0.05380953525591508
+          ]
+        },
+        {
+          "id": "KneelToStand",
+          "duration": 1.5666666666666667,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": null,
+          "maxSegmentErrorMeters": 0.000020940627704468806,
+          "uncorrectedFloorRange": [
+            -0.05539762034342306,
+            -0.006057057749554122
+          ]
+        },
+        {
+          "id": "GrenadeThrow",
+          "duration": 4.233333333333333,
+          "loop": false,
+          "referenceSpeedMps": 0,
+          "releaseTimeSeconds": 2.15,
+          "maxSegmentErrorMeters": 0.000012813034882486196,
+          "uncorrectedFloorRange": [
+            -0.0062158026636431165,
+            -0.005287344519976539
+          ]
+        }
+      ]
     }
   ],
   "skeleton": "TengxianHumanoidV1"

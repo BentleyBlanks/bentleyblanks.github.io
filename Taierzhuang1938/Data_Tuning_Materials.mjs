@@ -126,25 +126,18 @@ export const CHARACTER_SURFACE_PARTS = Object.freeze({
   TengxianIja02: Object.freeze({ M_JapaneseSoldierA: NOT_SKIN }),
   TengxianIja03: Object.freeze({ M_JapaneseSoldierC: NOT_SKIN }),
   TengxianIja06: Object.freeze({ M_JapaneseSoldierJia: NOT_SKIN }),
-  // NRA02 的毛巾与枪套（Material #1721585343 / #29）不打部件：它们与帽徽、眼球是同一种平铺着色，
-  // 尸体层 / 任务人物按着色签名合成一只图集网格；单独打成装具就多一个 draw（第一关 CPU 提交瓶颈）。
-  TengxianNra02: Object.freeze({
-    "Material #9": SkinPart(0.502), "John_All Body": SkinPart(1.879, HANDS), "Material #1721585337": NraClothPart(),
-  }),
-  TengxianNra05: Object.freeze({
-    "Material #26": SkinPart(0.486), "John_All Body": SkinPart(1.879, HANDS), "战士1_头部": NOT_SKIN,
-    "Material #1721585337": NraClothPart(),
-  }),
-  TengxianNra06: Object.freeze({ "Material #9": SkinPart(0.508), "John_All Body": SkinPart(1.879, HANDS) }),
+  TengxianNra02: Object.freeze({ M_HeYoutian: NOT_SKIN }),
+  TengxianNra05: Object.freeze({ M_SquadLeaderLuo: NOT_SKIN }),
+  TengxianNra06: Object.freeze({ M_Interpreter: NOT_SKIN }),
   // 第一人称：默认骨骼双臂、汉阳造双手（第一关全程用它）、低头看见的身体。
   // 默认双臂沿用身体图集；扫描双手使用独立的手／腕／前臂图集密度。
-  FpsArms: Object.freeze({ "John_All Body": SkinPart(1.93, HANDS), "Material #1721585337": NraClothPart() }),
+  FpsArms: Object.freeze({ M_HeYoutian: NOT_SKIN }),
   FpsHanYang: Object.freeze({
     // One continuous hand/wrist/forearm atlas; the source wrist patch is gone.
     "Material_HanYangScanSkin": SkinPart(0.45, { ...HANDS, firstPersonSkin: true, normalScale: 0.85 }),
     "Material #1721585337": NraClothPart({ elbowX: 0.555, cuffX: 0.92 }),
   }),
-  FirstPersonBody: Object.freeze({ "Material #1721585337": NraClothPart() }),
+  FirstPersonBody: Object.freeze({ M_HeYoutian: NOT_SKIN }),
 });
 
 /** 这些模型的 COLOR_0 全白：打标时关掉表里各材质的 vertexColors（逐像素无差，少一个编译参数 = 与国军共用程序）。 */

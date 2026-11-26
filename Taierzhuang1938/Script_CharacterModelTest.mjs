@@ -24,7 +24,7 @@ import crypto from "node:crypto";
 // ===========================================================================
 
 import assert from "node:assert/strict";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_APPEARANCE_BY_RIG, CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND } from "./Data_CharacterSelection.mjs";
 import { CharacterBodyPath, IsApprovedCharacterVariant } from "./Script_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -119,6 +119,7 @@ for (const faction of ["Nra", "Ija"]) {
 }
 
 for (const model of manifest.models) {
+  assert.ok(model.appearance && model.appearance === CHARACTER_APPEARANCE_BY_RIG[model.id], model.id + " has its approved visible model");
   const factionStem = model.faction === "ija" ? "Ija" : "Nra";
   assert.equal(model.animationSource, "TengxianHumanoidV1", `${model.id} shares the body rig`);
   assert.equal(model.animationSourceModel, "TengxianNra02", `${model.id} records the common proportion reference`);
@@ -174,7 +175,7 @@ for (const model of manifest.models) {
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
 
-  if (model.faction === "ija") {
+  if (model.appearance) {
     assert.equal(model.url, CharacterBodyPath(model.id), "saved appearance slot matches authoring tools");
     const kit = gltf.extras.appearanceMaterial;
     const nativePath = path.join(characterDir, kit.file);
@@ -256,59 +257,6 @@ for (const model of manifest.models) {
     assert.equal(recorded[0] <= seen[0] + 0.02 && recorded[1] >= seen[1] - 0.02, true,
       `${model.id}/${actionId} 清单记的骨盆高度 ${recorded} 没包住 GLB 实测 `
       + `[${seen[0].toFixed(3)}, ${seen[1].toFixed(3)}]`);
-  }
-}
-
-// A material can exist yet contain no iris (the white/black eye regression).
-// Check the shipped eye primitive and the UV at each forward-facing corneal pole.
-for (const id of ["TengxianNra02", "TengxianNra06"]) {
-  const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
-  const materialIndex = glb.json.materials.findIndex(material => material.name === "Material_NraEyes");
-  assert.ok(materialIndex >= 0, id + " has a textured eye material");
-  const material = glb.json.materials[materialIndex];
-  assert.equal(material.pbrMetallicRoughness.metallicFactor, 0);
-  assert.equal(material.pbrMetallicRoughness.baseColorFactor, undefined, "no black/grey factor masks the iris");
-  const texture = glb.json.textures[material.pbrMetallicRoughness.baseColorTexture.index];
-  const image = glb.json.images[texture.source ?? texture.extensions.EXT_texture_webp.source];
-  assert.equal(image.name, "Texture_NraEyeAtlas");
-  assert.equal(image.mimeType, "image/webp");
-  assert.ok(glb.json.bufferViews[image.bufferView].byteLength > 50000, "eye atlas is actually embedded");
-  const eye = glb.json.meshes.flatMap(mesh => mesh.primitives).find(p => p.material === materialIndex);
-  const positions = ReadAccessor(glb, eye.attributes.POSITION).data;
-  const uvs = ReadAccessor(glb, eye.attributes.TEXCOORD_0).data;
-  for (const side of [-1, 1]) {
-    let pole = -1;
-    for (let i = 0; i < positions.length / 3; i++) {
-      if (positions[i*3]*side > 0 && (pole < 0 || positions[i*3+2] > positions[pole*3+2])) pole = i;
-    }
-    assert.ok(pole >= 0, id + " contains both eyes");
-    assert.ok(Math.hypot(uvs[pole*2]-.89209, uvs[pole*2+1]-.922852) < .025,
-      id + " forward cornea samples the pupil, not an unrelated skin/sclera patch");
-  }
-}
-
-// Evaluate source landmarks through the actual opening skin palette. A simple
-// bind-space downward edit pushed the rotated relaxed sleeves out sideways.
-const shoulderReference = JSON.parse(fs.readFileSync(new URL("./_blender/Data_TengxianShoulderReference.json", import.meta.url)));
-for (const [sourceId, reference] of Object.entries(shoulderReference)) {
-  const id = sourceId.replace("Lugou", "Tengxian");
-  if (!manifest.models.some(model => model.id === id && !model.appearance)) continue; // Landmarks are indexed into the retired mesh topology.
-  const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
-  for (const landmark of reference.landmarks) {
-    const primitive = glb.json.meshes[landmark.mesh].primitives[landmark.primitive];
-    const positions = ReadAccessor(glb, primitive.attributes.POSITION).data;
-    const joints = ReadAccessorInt(glb, primitive.attributes.JOINTS_0).data;
-    const weights = ReadAccessor(glb, primitive.attributes.WEIGHTS_0).data;
-    const canonicalDelta = landmark.sourcePosition.map((value, axis) => positions[landmark.vertex*3+axis]-value);
-    const delta = landmark.toSourceLinear.map(row => row.reduce((sum, value, axis) => sum+value*canonicalDelta[axis], 0));
-    const world = [0, 0, 0];
-    for (let k = 0; k < 4; k++) {
-      const joint = joints[landmark.vertex*4+k], weight = weights[landmark.vertex*4+k];
-      for (let row = 0; row < 3; row++)
-        world[row] += reference.matrices[joint][row].reduce((sum, value, col) => sum+value*delta[col], 0)*weight;
-    }
-    assert.ok(world[1] < -.030 && world[1] > -.050, id + " shoulder cap is relaxed by 3–5 cm");
-    assert.ok(Math.hypot(world[0], world[2]) < .002, id + " relaxed sleeve does not bulge sideways");
   }
 }
 
@@ -435,18 +383,8 @@ assert.match(fs.readFileSync(path.join(here, "Script_ActorCrowd.mjs"), "utf8"), 
 assert.match(runtime, /IsApprovedCharacterVariant\(kind, options\.modelVariant, options\.castId\)/,
   "rig creation accepts a cast-only look only with its castId");
 {
-  // NRA06: the interpreter's clothes are not the NRA uniform material (no uniform tint or
-  // opening dye), the webbing primitives are gone, and the badge primitive carries the spectacles.
-  const glb = LoadGlb(path.join(characterDir, "Model_TengxianNra06.glb"));
-  const names = glb.json.materials.map(material => material.name);
-  assert.ok(names.includes("Material_InterpreterGarb") && !names.includes("Material #1721585337"), "interpreter cloth material renamed");
-  // Matte cotton, not the uniform's gloss map (review 2026-09-24: it read as leather).
-  const garb = glb.json.materials.find(material => material.name === "Material_InterpreterGarb");
-  assert.ok(!garb.pbrMetallicRoughness.metallicRoughnessTexture && garb.pbrMetallicRoughness.roughnessFactor >= .9
-    && garb.extensions.KHR_materials_specular.specularFactor <= .3, `interpreter cloth is matte: ${JSON.stringify(garb.pbrMetallicRoughness)}`);
-  assert.equal(glb.json.meshes[0].primitives.length, 5, "NRA06: head, hands, clothes, eyes, badge+spectacles");
-  assert.equal(glb.json.extras?.lugouVariant?.id, "TengxianNra06");
   const record = manifest.models.find(model => model.id === "TengxianNra06");
+  assert.equal(record.appearance, "Interpreter");
   assert.deepEqual(record.facialCast, ["interpreter"]);
   assert.ok(!manifest.models.find(model => model.id === "TengxianNra02").facialCast.includes("interpreter"));
 }

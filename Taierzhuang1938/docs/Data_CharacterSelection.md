@@ -1,5 +1,7 @@
 # Approved character appearances
 
+As of 2026-11-26, the NRA02/05/06 slots use He Youtian, Squad Leader Luo and Interpreter. The former IJA01/02/03/06 slots use Yi, A, C and Jia. The following 2026-09 selection records describe archived source models.
+
 User selection, 2026-09-11: NRA02 and NRA05 only; IJA01, IJA02 and IJA03 only.
 User approval, 2026-09-24: IJA06 (source index 5) joins the IJA list as the standard rifleman,
 and NRA06 (source index 5) is approved as the interpreter's cast-only look.

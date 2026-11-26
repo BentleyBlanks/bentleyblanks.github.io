@@ -1,7 +1,7 @@
 {
  "schema": 1,
  "revision": "20261021RifleHoldRunV2",
- "clipSha256": "13e14c9f5fa790cddc11f2264c12785dbdf8cc6bc912bdada84c05e51e86e15a",
+ "clipSha256": "6a9de92b8ba6a7cc4100112592beabf2661b1f9097a4d6f406576010590fd7e4",
  "units": "runtime metres (1.66 m NRA actor), seconds, degrees",
  "samplesPerKey": 4,
  "gait": {
@@ -80,20 +80,20 @@
  },
  "contact": {
   "thresholdM": 0.035,
-  "flightFraction": 0.2,
-  "stanceS": 0.288,
-  "flightS": 0.072,
+  "flightFraction": 0.2167,
+  "stanceS": 0.282,
+  "flightS": 0.078,
   "contacts": {
    "L": [
     [
      0.975,
-     0.375
+     0.3667
     ]
    ],
    "R": [
     [
      0.475,
-     0.875
+     0.8667
     ]
    ]
   }
@@ -108,50 +108,50 @@
     "side": "L",
     "anchor": "heel",
     "from": 0.975,
-    "to": 0.375,
-    "travel35cm": 0.0034,
-    "travelPlantedCm": 0.0009,
-    "samples35": 31
+    "to": 0.367,
+    "travel35cm": 0.0082,
+    "travelPlantedCm": 0,
+    "samples35": 23
    },
    {
     "side": "L",
     "anchor": "ball",
     "from": 0.975,
-    "to": 0.375,
-    "travel35cm": 0.0024,
+    "to": 0.367,
+    "travel35cm": 0.0022,
     "travelPlantedCm": 0,
-    "samples35": 43
+    "samples35": 41
    },
    {
     "side": "R",
     "anchor": "heel",
     "from": 0.475,
-    "to": 0.875,
-    "travel35cm": 0.0033,
-    "travelPlantedCm": 0.0009,
-    "samples35": 31
+    "to": 0.867,
+    "travel35cm": 0.0057,
+    "travelPlantedCm": 0,
+    "samples35": 24
    },
    {
     "side": "R",
     "anchor": "ball",
     "from": 0.475,
-    "to": 0.875,
-    "travel35cm": 0.0024,
+    "to": 0.867,
+    "travel35cm": 0.0022,
     "travelPlantedCm": 0,
-    "samples35": 43
+    "samples35": 41
    }
   ],
-  "maxTravel35M": 0.0034,
-  "maxTravelPlantedM": 0.0009
+  "maxTravel35M": 0.0082,
+  "maxTravelPlantedM": 0
  },
  "ground": {
   "stanceSoleM": [
-   0.0006,
-   0.003
+   0.0007,
+   0.0104
   ],
-  "swingSoleMinM": 0.003,
-  "flightFraction": 0.2,
-  "flightMaxClearanceM": 0.1123,
+  "swingSoleMinM": 0.0088,
+  "flightFraction": 0.2167,
+  "flightMaxClearanceM": 0.1015,
   "footLocalAngleDeg": {
    "mean": 10.2,
    "max": 22
@@ -346,23 +346,23 @@
  "com": {
   "flightParabola": [
    {
-    "from": 0.375,
+    "from": 0.367,
     "to": 0.475,
-    "samples": 12,
-    "accelMps2": -9.665,
-    "residualRmsMm": 0.313
+    "samples": 13,
+    "accelMps2": -9.321,
+    "residualRmsMm": 0.32
    },
    {
-    "from": 0.875,
+    "from": 0.867,
     "to": 0.975,
-    "samples": 12,
-    "accelMps2": -9.652,
-    "residualRmsMm": 0.313
+    "samples": 13,
+    "accelMps2": -9.308,
+    "residualRmsMm": 0.32
    }
   ],
   "flightAccelWithRifleMps2": [
-   -9.258,
-   -9.246
+   -8.901,
+   -8.891
   ],
   "comDefinition": "de Leva 1996 male segment masses, joint-centre segments, trunk = neck base to pelvis joint (COM 51.38 % from the neck end)",
   "stance": [
@@ -393,10 +393,10 @@
   "stepLengthM": 1.152,
   "strideM": 2.304,
   "stepLengthPerHeight": 0.694,
-  "stanceS": 0.288,
-  "flightS": 0.072,
+  "stanceS": 0.282,
+  "flightS": 0.078,
   "dutyFactorDesign": 0.667,
-  "dutyFactorUnder3p5cm": 0.8,
+  "dutyFactorUnder3p5cm": 0.783,
   "froude": 1.2
  },
  "upperBody": {
@@ -502,7 +502,7 @@
    "atKey": -1,
    "bodyPart": "",
    "rifleLocalPoint": null,
-   "nearestSignedMm": 32.32
+   "nearestSignedMm": 38.79
   }
  },
  "secondary": {
@@ -545,13 +545,13 @@
    "id": 2,
    "name": "no slip",
    "pass": true,
-   "value": "anchor travel in the ground frame: 0.34 cm while under 3.5 cm, 0.09 cm while under 1.2 cm"
+   "value": "anchor travel in the ground frame: 0.82 cm while under 3.5 cm, 0 cm while under 1.2 cm"
   },
   {
    "id": 3,
    "name": "ground/flight",
    "pass": true,
-   "value": "stance sole 0.6,3 mm, swing min 3 mm, flight 20 %, clearance 11.2 cm, foot angle mean 10 max 22"
+   "value": "stance sole 0.7,10.4 mm, swing min 8.8 mm, flight 21.7 %, clearance 10.2 cm, foot angle mean 10 max 22"
   },
   {
    "id": 4,
@@ -563,7 +563,7 @@
    "id": 5,
    "name": "center of mass",
    "pass": true,
-   "value": "flight a -9.665,-9.652 (-9.81 +-15%), bob 8.09 cm, GRF peak 2.33,2.33 BW, brake/push -1.43/2.09,-1.44/2.09, 167 steps/min, 3.2 m/s"
+   "value": "flight a -9.321,-9.308 (-9.81 +-15%), bob 8.09 cm, GRF peak 2.33,2.33 BW, brake/push -1.43/2.09,-1.44/2.09, 167 steps/min, 3.2 m/s"
   },
   {
    "id": 6,

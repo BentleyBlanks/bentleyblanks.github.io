@@ -20,7 +20,6 @@ if HERE not in sys.path:
 
 from TzmCore import FLIPPED, ResetScene, WriteTzm      # noqa: E402
 import BuildCivilians                # noqa: E402
-import BuildSoldiers                 # noqa: E402
 import BuildWeapons                  # noqa: E402
 import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
@@ -62,7 +61,6 @@ LENGTH_TOLERANCE = 0.020
 # （Script_Actor 的 KIND_SPEC.civilian.variants）—— 加载器的
 # scale = KIND_SPEC.height / MESHES.height 会把烘死在模型里的身高差直接除回去。
 SOLDIER_HEIGHT = {
-    "SoldierNra": 1.66, "SoldierIja": 1.62,
     "CivilianMale": 1.60, "CivilianFemale": 1.60,
 }
 
@@ -115,12 +113,6 @@ def main():
     failures = []
 
     jobs = []
-    jobs.append(("SoldierNra", "soldier", BuildSoldiers.BuildNraSoldier,
-                 "川军第 22 集团军第 122 师步兵：布军帽 + 青天白日帽徽、灰蓝土布军装、"
-                 "斜挎布子弹带（大部分格子瘪着）、绑腿、露趾草鞋。无钢盔。"))
-    jobs.append(("SoldierIja", "soldier", BuildSoldiers.BuildIjaSoldier,
-                 "日军濑谷支队步兵：立领昭五式 + 步兵红领章、九〇式钢盔（正面五角星）、"
-                 "皮弹药盒三只、编上靴 + 脚绊。1938 年 3—4 月无屁帘。"))
     jobs.append(("CivilianMale", "soldier", BuildCivilians.BuildCivilianMale,
                  "鲁南男性平民：对襟夹袄 + 中式小立领 + 布盘扣、腰里一条布带、"
                  "裤脚扎腿带（不是绑腿）、千层底黑布鞋、包头布。身上没有任何军用装具。"))

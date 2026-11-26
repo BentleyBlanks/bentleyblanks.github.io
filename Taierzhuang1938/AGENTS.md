@@ -77,7 +77,7 @@
 
 人物外观必须遵循[用户确认的选模清单](docs/Data_CharacterSelection.md)，运行时与编辑器共用 `Data_CharacterSelection.mjs`；保留的源模型或动作参考不等于允许重新启用其人物外观。
 
-士兵资产采用 [Tengxian 共用身体骨架与重建契约](docs/Data_CharacterStandard.md)：53 根共同身体骨骼、米制与相同绑定。日军旧动作槽 IJA01/02/03/06 分别使用乙、A、C、甲的正式外观，编辑器、测试场和远景共用此映射。历史资料从 Git 读取。
+士兵资产采用 [Tengxian 共用身体骨架与重建契约](docs/Data_CharacterStandard.md)：53 根共同身体骨骼、米制与相同绑定。国军动作槽 NRA02/05/06 使用何有田、罗班长和翻译的正式外观。日军旧动作槽 IJA01/02/03/06 分别使用乙、A、C、甲的正式外观，编辑器、测试场和远景共用此映射。历史资料从 Git 读取。
 
 ## 调查与工具
 

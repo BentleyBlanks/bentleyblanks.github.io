@@ -1,10 +1,12 @@
 # 滕县角色资产与共用身体骨架
 
-## 现行日军外观（2026-11-26）
+## 现行角色外观（2026-11-26）
+
+国军动作槽 NRA02、NRA05、NRA06 分别使用何有田、罗班长与翻译。存档和分镜继续使用原槽位。背枪跑文件保存动作、枪具和背带，预览通过角色清单装配何有田。第一人称身体和基础双臂由何有田的网格裁出，沿用玩家骨架和持握动作。
 
 游戏、远景人群和测试场沿用数值槽位与分镜动作 ID。IJA01、02、03、06 分别显示日兵乙、日军士兵 A、日军士兵 C、日兵甲。白盒 Mixamo 与战役共用正式 GLB 的材质、图集和毛发。战役的 Humanoid 文件保存新网格在共用骨架上的蒙皮与动作，三个 Facial 文件保存说话用的蒙皮及口腔。
 
-在仓库根目录运行 `python Taierzhuang1938/_import/Script_BakeIjaAppearances.py` 可以从正式原件重建这些派生资产和贴地动作。需要 NumPy、SciPy、Node.js 和脚本注明的 Git 历史对象。下文的 9 月日军外观及制作记录属于历史版本。
+在仓库根目录运行 `python Taierzhuang1938/_import/Script_BakeCampaignAppearances.py` 可以从正式原件重建这些派生资产和贴地动作。第一人称身体和基础双臂通过 `python Taierzhuang1938/_import/Script_BakeFormalViewBody.py` 重建，背枪跑通过 `python Taierzhuang1938/_import/Script_PackBackRifleMotion.py` 打包。需要 NumPy、SciPy、Node.js 和脚本注明的 Git 历史对象。下文的 9 月人物外观及制作记录属于历史版本。
 
 2026-09-26：采用五款士兵外观，共用 `TengxianHumanoidV1`。机器可读契约为
 `Model/Character/Data_TengxianHumanoid.json`，运行时清单为

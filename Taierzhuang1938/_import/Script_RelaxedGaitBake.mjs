@@ -18,7 +18,7 @@ const project = path.resolve(import.meta.dirname, '..');
 const outputDir = path.join(project, 'Animation/RelaxedGait');
 const clipFile = 'Animation_TengxianHumanoidV1RelaxedGait.json';
 const manifestFile = 'Data_RelaxedGait.json';
-const referenceModel = 'Model/Character/Model_TengxianNra02.glb';
+const referenceModel = 'Model/Character/Model_HeYoutianHumanoid.glb';
 
 export const GAIT = Object.freeze({
   revision: 'RelaxedGaitV1',
@@ -330,7 +330,7 @@ function Bake(kind) {
     if (ok) break;
   }
   const clearance = 0.004;
-  for (let f = 0; f <= frames; f++) {
+  function Sample(f) {
     const phase = (f % frames) / frames;
     const corrections = { L: 0, R: 0 };
     let result;
@@ -344,7 +344,15 @@ function Bake(kind) {
         corrections[side] += want - sole;
       }
     }
-    samples.push({ phase, result, soles: { L: result.pose.SoleMin('L') - floor, R: result.pose.SoleMin('R') - floor } });
+    return { phase, result, soles: { L: result.pose.SoleMin('L') - floor, R: result.pose.SoleMin('R') - floor } };
+  }
+  // A curved boot sole can lower the planted ankle after the initial reach estimate.
+  while (true) {
+    samples.length = 0;
+    for (let frame = 0; frame <= frames; frame++) samples.push(Sample(frame));
+    if (kind !== "walk" || samples.every(sample => !sample.result.clamped)) break;
+    pelvisHeight -= 0.002;
+    if (pelvisHeight < 0.7) throw Error("Cannot fit relaxed gait to the approved body");
   }
   const tracks = [];
   const times = samples.map((_, f) => Round(f / frames * spec.cycleS));

@@ -1,5 +1,7 @@
 # BackRifleRun 独立资产交付
 
+当前动作库是 `Animation_BackRifleRunMotion.glb`，只带骨架、动作和背负道具。预览另行装配现役何有田，以下旧版资产记录可在 Git 历史中查阅。
+
 此目录保留国军背枪跑步源包。2026-09-06 按用户要求，由 `Script_FirstLevelP012BackRifle.mjs` 接入 P012 领械后的行军；正式 `RifleRun` 与角色源资产保持独立。
 
 ## 文件

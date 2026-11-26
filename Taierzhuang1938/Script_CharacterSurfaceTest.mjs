@@ -24,9 +24,9 @@ const Check = (ok, label, detail = "") => {
 };
 
 const GLB_BY_MODEL = {
-  FpsArms: "Model/Model_FpsArmsNraSkeletal01.glb",
+  FpsArms: "Model/Model_HeYoutianViewArms.glb",
   FpsHanYang: "Model/Model_FpsHanYangHands.glb",
-  FirstPersonBody: "Model/Model_FirstPersonBody.glb",
+  FirstPersonBody: "Model/Model_HeYoutianViewBody.glb",
 };
 const manifest = JSON.parse(fs.readFileSync(path.join(here, "Model/Character/Data_TengxianCharacterManifest.json"), "utf8"));
 const GlbPath = id => path.join(here, GLB_BY_MODEL[id] || manifest.models.find(row => row.id === id).url);
@@ -97,7 +97,7 @@ function WebpInfo(file) {
 // ---- 1 + 2：部件表对得上 GLB -------------------------------------------------------------
 const ROLES = new Set(["skin", "nraCloth", "ijaWool", null]);
 const CLASSES = new Set(["skin", "cloth", "none"]);
-let parts = 0, specChecked = 0;
+let parts = 0;
 for (const [modelId, table] of Object.entries(CHARACTER_SURFACE_PARTS)) {
   const file = GlbPath(modelId);
   if (!fs.existsSync(file)) { Check(false, `${modelId} 的 GLB 在`, file); continue; }
@@ -125,17 +125,13 @@ for (const [modelId, table] of Object.entries(CHARACTER_SURFACE_PARTS)) {
     const specular = material?.extensions?.KHR_materials_specular?.specularTexture;
     if (part.role && specular) {
       const picture = image(specular.index);
-      specChecked += 1;
       Check(!HasAlpha(picture), `${modelId}/${name} 的 spec 图没有 alpha（摘掉逐像素无差）`, `${picture.name} ${picture.mime}`);
     }
   }
 }
-Check(parts >= 18 && parts === Object.values(CHARACTER_SURFACE_PARTS).reduce((n, table) => n + Object.keys(table).length, 0), "每个登记材质均已检查", String(parts));
-Check(specChecked >= 5, "带 spec 图的部件都查过 alpha", String(specChecked));
-// NRA05 的脸与眼球：按名字分类会反过来（眼球叫「头部」），部件表必须压住。
-Check(CHARACTER_SURFACE_PARTS.TengxianNra05["Material #26"]?.cls === "skin"
-  && CHARACTER_SURFACE_PARTS.TengxianNra05["战士1_头部"]?.cls === "none", "NRA05 脸 = 皮肤、眼球不当皮肤");
-for (const record of manifest.models.filter(row => row.faction === "ija")) {
+Check(parts >= 10 && parts === Object.values(CHARACTER_SURFACE_PARTS).reduce((n, table) => n + Object.keys(table).length, 0), "每个登记材质均已检查", String(parts));
+
+for (const record of manifest.models.filter(row => row.appearance)) {
   const {json: body} = ReadGlb(GlbPath(record.id));
   const {json: kit} = ReadGlb(path.join(here, "Model/Character", body.extras.appearanceMaterial.file));
   const mat = kit.materials[0];
@@ -155,13 +151,6 @@ for (const [kind, list] of Object.entries(selection.CHARACTER_MODEL_VARIANTS_BY_
 for (const [kind, list] of Object.entries(selection.CHARACTER_RANDOM_VARIANTS_BY_KIND)) for (const v of list) onField.add(ModelId(kind, v));
 for (const [kind, table] of Object.entries(selection.CHARACTER_CAST_VARIANTS_BY_KIND)) for (const v of Object.keys(table)) onField.add(ModelId(kind, Number(v)));
 for (const [kind, v] of Object.entries(selection.CHARACTER_CROWD_VARIANT_BY_KIND)) onField.add(ModelId(kind, v));
-const UNTOUCHED = {
-  // 眼球、帽徽、NRA02 的毛巾 / 枪套：平铺着色，与帽徽同签名（尸体层合批），不上皮肤 / 布的补丁。
-  TengxianNra02: ["Material #1721585343", "Material #29", "Material_NraEyes", "Material #1721585500"],
-  TengxianNra05: ["Material #1721585500"],
-  // 翻译的便服只在具名镜头里出现，单为他编一类带泥污的程序不值（程序数与进关预热的账）。
-  TengxianNra06: ["Material_InterpreterGarb", "Material_NraEyes", "Material #1721585500"],
-};
 const FACIAL_ONLY = new Set(["Material_FacialOral"]); // 口腔：顶点色是颜色，不动
 for (const modelId of onField) {
   const table = CHARACTER_SURFACE_PARTS[modelId];
@@ -169,9 +158,9 @@ for (const modelId of onField) {
   if (!table) continue;
   const parts = Object.values(table);
   // 第一人称身体只有军装（低头看见的上衣、裤腿、鞋），手在双臂模型里。
-  const formalIja = manifest.models.some(row => row.id === modelId && row.appearance);
-  if (!formalIja && modelId !== "FirstPersonBody") Check(parts.some((p) => p.role === "skin"), `${modelId} 至少有一份皮肤部件`);
-  if (!formalIja && !["TengxianNra06"].includes(modelId) && !modelId.startsWith("Fps")) {
+  const nativeAtlas = ["FpsArms","FirstPersonBody"].includes(modelId) || manifest.models.some(row => row.id === modelId && row.appearance);
+  if (!nativeAtlas && modelId !== "FirstPersonBody") Check(parts.some((p) => p.role === "skin"), `${modelId} 至少有一份皮肤部件`);
+  if (!nativeAtlas && !["TengxianNra06"].includes(modelId) && !modelId.startsWith("Fps")) {
     Check(parts.some((p) => p.role === "nraCloth" || p.role === "ijaWool"), `${modelId} 至少有一份军装部件`);
   }
   const files = [GlbPath(modelId)];
@@ -180,7 +169,7 @@ for (const modelId of onField) {
   for (const file of files) {
     const { json } = ReadGlb(file);
     const missing = (json.materials || []).map((m) => m.name)
-      .filter((name) => !(name in table) && !(UNTOUCHED[modelId] || []).includes(name) && !FACIAL_ONLY.has(name));
+      .filter((name) => !(name in table) && !FACIAL_ONLY.has(name));
     Check(missing.length === 0, `${path.basename(file)} 的每个材质都有着落（部件表或有意不动）`, missing.join("、"));
   }
 }

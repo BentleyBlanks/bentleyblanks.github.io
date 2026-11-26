@@ -68,7 +68,7 @@ function StripTextures(bytes) {
   const out = Buffer.concat([header, text, binChunk]);
   return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength);
 }
-const glb = StripTextures(fs.readFileSync(new URL("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb", import.meta.url)));
+const glb = StripTextures(fs.readFileSync(new URL("./Animation/BackRifleRun/Animation_BackRifleRunMotion.glb", import.meta.url)));
 const Load = () => new Promise((resolve, reject) => new GLTFLoader().parse(glb, "", resolve, reject));
 const flatBytes = StripTextures(fs.readFileSync(new URL("./Model/RifleSlingV3/Model_RifleSlingFlatV3.glb", import.meta.url)));
 const flatSource = await new GLTFLoader().parseAsync(flatBytes, "");

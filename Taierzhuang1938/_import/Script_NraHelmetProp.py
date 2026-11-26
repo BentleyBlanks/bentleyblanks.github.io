@@ -25,7 +25,11 @@ from mathutils import Vector, Matrix
 argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 project = Path(argv[0])
 review = Path(argv[1]) if len(argv) > 1 else None
-SOURCE = project / 'Model/Character/Model_TengxianNra02.glb'
+import tempfile, subprocess
+# The standalone cap came from the retired mesh and uses its original material slots.
+source_cache = tempfile.TemporaryDirectory()
+SOURCE = Path(source_cache.name) / 'HistoricalCapSource.glb'
+SOURCE.write_bytes(subprocess.check_output(['git','-C',str(project),'show','025a54b4a9e67b3c8bdc90a01a91b4257051cb67:Taierzhuang1938/Model/Character/Model_TengxianNra02.glb']))
 OUT = project / 'Model/Model_NraHelmet.glb'
 CLOTH, BADGE = 'Material #1721585337', 'Material #1721585500'
 HEAD_WEIGHT = .9              # a cap triangle: all three vertices ride the head bone at least this much

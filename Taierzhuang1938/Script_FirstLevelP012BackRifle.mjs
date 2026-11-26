@@ -16,7 +16,7 @@ function MarkMountVelocity(root) {
 }
 export function LoadP012BackRifle() {
   return libraryPromise ||= Promise.all([
-    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb?v=20260926HumanoidV1"),
+    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_BackRifleRunMotion.glb?v=20261126FormalCast"),
     fetch("./Animation/BackRifleRun/Data_BackRifleRun.json?v=20260926HumanoidV1").then(response=>response.json()),
   ]);
 }

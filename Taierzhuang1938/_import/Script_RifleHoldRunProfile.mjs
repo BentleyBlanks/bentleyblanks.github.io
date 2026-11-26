@@ -18,7 +18,7 @@ const Median = values => values.slice().sort((a, b) => a - b)[Math.floor(values.
 /** { duration, referenceMps, contacts } for the clip of `data` (a parsed Animation_TengxianRifleHoldRun.json). */
 export function MeasureProfile(data) {
   const clip = data.clips[0];
-  const scene = new PoseScene(LoadGlb(path.join(project, 'Model/Character/Model_TengxianNra02.glb')));
+  const scene = new PoseScene(LoadGlb(path.join(project, 'Model/Character/Model_HeYoutianHumanoid.glb')));
   const index = new Map(scene.nodes.map((n, i) => [n.name.replace(/\s/g, '_'), i]));
   scene.animations.push({
     name: clip.name, duration: clip.duration,

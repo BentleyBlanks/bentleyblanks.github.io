@@ -84,8 +84,10 @@ try {
     for (const [kind, variants] of [['nra', [1, 4]], ['ija', [0, 1, 2, 5]]]) for (const modelVariant of variants) {
       const actor = factory.Create(kind, { seed: 41938, modelVariant }); const rig = actor.characterRig;
       check(rig?.asset.infantry, `${kind}/${modelVariant}: missing library`);
-      if (kind === 'ija') {
-        const name = ({0:'JapaneseSoldierYi',1:'JapaneseSoldierA',2:'JapaneseSoldierC',5:'JapaneseSoldierJia'})[modelVariant];
+      {
+        const name = (kind === 'ija'
+          ? {0:'JapaneseSoldierYi',1:'JapaneseSoldierA',2:'JapaneseSoldierC',5:'JapaneseSoldierJia'}
+          : {1:'HeYoutian',4:'SquadLeaderLuo'})[modelVariant];
         let textured = false;
         rig.root.traverse(node => {
           if (node.isSkinnedMesh && node.material.name === 'M_' + name

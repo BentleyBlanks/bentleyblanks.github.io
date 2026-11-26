@@ -3,9 +3,9 @@
  "revision": "20261021RifleShoulderMarchV1",
  "clip": "RifleShoulderMarch",
  "clipFile": "Animation/RifleShoulderMarch/Animation_TengxianRifleShoulderMarch.json",
- "clipSha256": "cbcdb06019e44a59e8c17cdce75d993c812942c2647a407380316d65515b60ed",
- "clipBytes": 65950,
- "measuredBy": "Script_RifleShoulderMarchTest.mjs (real skinned mesh of Model_TengxianNra02.glb, half-key-rate samples)",
+ "clipSha256": "e9c3e48e988faa9c5f8ec3d64384d5ba5efc8fc9fd8c5d6cee438a381386ff4f",
+ "clipBytes": 65879,
+ "measuredBy": "Script_RifleShoulderMarchTest.mjs (real skinned mesh of Model_HeYoutianHumanoid.glb, half-key-rate samples)",
  "actorScale": 0.91353450904124,
  "limits": {
   "loop": {
@@ -102,55 +102,55 @@
    "fps": 60,
    "durationS": 1,
    "samplesPerCycle": 120,
-   "referenceMps": 1.329774
+   "referenceMps": 1.329636
   },
   "loop": {
    "durationS": 1,
    "keyDiffMax": 0,
    "pelvisSeamJumpM": 0,
-   "seamSecondDiffM": 0.003561,
-   "innerSecondDiffMaxM": 0.009693,
-   "seamAccelRatio": 0.367
+   "seamSecondDiffM": 0.003895,
+   "innerSecondDiffMaxM": 0.009824,
+   "seamAccelRatio": 0.396
   },
   "slide": {
-   "worstM": 0.00504,
+   "worstM": 0.004,
    "runs": [
     {
      "foot": "L",
      "pivot": "heel",
      "fromPhase": 0.5083,
-     "samples": 53,
-     "slideM": 0.00504
+     "samples": 51,
+     "slideM": 0.004
     },
     {
      "foot": "L",
      "pivot": "ball",
-     "fromPhase": 0.5917,
-     "samples": 65,
-     "slideM": 0.00218
+     "fromPhase": 0.6,
+     "samples": 64,
+     "slideM": 0.00381
     },
     {
      "foot": "R",
      "pivot": "heel",
      "fromPhase": 0.0083,
      "samples": 53,
-     "slideM": 0.00504
+     "slideM": 0.00351
     },
     {
      "foot": "R",
      "pivot": "ball",
-     "fromPhase": 0.0917,
-     "samples": 65,
-     "slideM": 0.00215
+     "fromPhase": 0.1,
+     "samples": 64,
+     "slideM": 0.00396
     }
    ]
   },
   "floor": {
    "stanceSoleMM": [
-    3.58,
-    4.34
+    3.63,
+    4.64
    ],
-   "swingSoleMinMM": 4,
+   "swingSoleMinMM": 3.68,
    "flightSamples": 0,
    "doubleSupportFraction": 0.25,
    "singleSupportFraction": 0.75,
@@ -160,12 +160,12 @@
   "joints": {
    "kneeFlexionDeg": {
     "L": [
-     13,
-     65.1
+     27,
+     69.1
     ],
     "R": [
-     13,
-     65.1
+     26,
+     69.4
     ]
    },
    "elbowFlexionDeg": {
@@ -174,96 +174,96 @@
      32.1
     ],
     "R": [
-     142.6,
-     143.7
+     139.5,
+     140.4
     ]
    },
    "hipSagittalDeg": {
     "L": [
-     -14,
-     37.5
+     -11.7,
+     40.6
     ],
     "R": [
-     -14.5,
-     37.5
+     -12.5,
+     40.6
     ]
    },
    "ankleAngleDeg": {
     "L": [
-     50.4,
-     101.1
+     55.4,
+     104.1
     ],
     "R": [
-     50.4,
-     101.1
+     55.9,
+     104.4
     ]
    },
    "maxSecondDiffDeg": {
-    "kneeL": 3.028,
-    "kneeR": 3.338,
-    "hipL": 2.053,
-    "hipR": 1.936,
-    "ankleL": 3.37,
-    "ankleR": 3.266
+    "kneeL": 3.326,
+    "kneeR": 3.557,
+    "hipL": 2.064,
+    "hipR": 1.878,
+    "ankleL": 3.182,
+    "ankleR": 3.204
    },
    "maxSecondDiffPhase": {
-    "kneeR": 0.983,
+    "kneeR": 0.967,
     "hipR": 0.65,
-    "ankleR": 0.633
+    "ankleR": 0.8
    },
    "boneLengthErrM": 0.000007,
    "singleFrameGlitchDeg": {
-    "kneeL": 0.348,
-    "kneeR": 0.336,
-    "hipL": 0.233,
-    "hipR": 0.225,
-    "ankleL": 0.262,
-    "ankleR": 0.277
+    "kneeL": 0.413,
+    "kneeR": 0.444,
+    "hipL": 0.23,
+    "hipR": 0.246,
+    "ankleL": 0.189,
+    "ankleR": 0.197
    }
   },
   "gait": {
    "cadenceStepsPerMin": 120,
-   "referenceSpeedModelMps": 1.329774,
+   "referenceSpeedModelMps": 1.329636,
    "worldSpeedMps": 1.215,
-   "measuredPivotSpeedModelMps": 1.3296,
-   "strideModelM": 1.3298,
-   "stepModelM": 0.6649,
-   "stepWorldM": 0.6074,
+   "measuredPivotSpeedModelMps": 1.3391,
+   "strideModelM": 1.3296,
+   "stepModelM": 0.6648,
+   "stepWorldM": 0.6073,
    "legLengthWorldM": 0.8692,
    "froude": 0.173,
    "relativeStep": 0.699,
    "comVerticalPPWorldM": {
-    "bodyAndRifle": 0.0317,
-    "bodyOnly": 0.031
+    "bodyAndRifle": 0.032,
+    "bodyOnly": 0.0314
    },
-   "comMaxPhase": 0.767,
+   "comMaxPhase": 0.25,
    "comMinPhase": 0.467,
    "comPeakInSingleSupportMiddle": true,
    "comTroughNearDoubleSupport": true,
    "brakingThenPropulsion": [
     {
      "foot": "L",
-     "firstHalfMps2": -0.36,
-     "secondHalfMps2": 0.877,
+     "firstHalfMps2": -0.364,
+     "secondHalfMps2": 0.924,
      "ok": true
     },
     {
      "foot": "R",
-     "firstHalfMps2": -0.36,
-     "secondHalfMps2": 0.876,
+     "firstHalfMps2": -0.358,
+     "secondHalfMps2": 0.92,
      "ok": true
     }
    ],
    "slowestInSingleSupportMiddle": true,
    "fastestNearDoubleSupport": true,
    "comAccelerationMps2": {
-    "min": -1.243,
-    "max": 1.222
+    "min": -1.258,
+    "max": 1.299
    },
    "comForwardSpeedVariationMps": {
     "min": -0.098,
-    "max": 0.098,
-    "minPhase": 0.25,
+    "max": 0.104,
+    "minPhase": 0.75,
     "maxPhase": 0
    },
    "doubleSupportPhases": [
@@ -311,77 +311,50 @@
   },
   "rifle": {
    "gripSlipM": 0.000014,
-   "gripTurnDeg": 0.0004,
-   "originToKnuckleM": 0.000026,
-   "bobPitchPPDeg": 1.285,
-   "bobRollPPDeg": 0.802,
+   "gripTurnDeg": 0.0005,
+   "originToKnuckleM": 0.000024,
+   "bobPitchPPDeg": 1.286,
+   "bobRollPPDeg": 0.803,
    "bobLiftPPM": 0.0059,
    "rifleScaleModelPerMesh": 1.0946,
    "nearestSignedDistanceByRegionM": {
-    "handR": -0.0168,
-    "torso": -0.0074,
-    "head": 0.0041,
-    "upperArmR": -0.0157,
-    "forearmR": 0.1065,
-    "arms L": 0.1441
+    "handR": -0.0161,
+    "head": -0.0114,
+    "upperArmR": -0.0184
    },
    "deepestPoints": {
     "handR": {
-     "phase": 0.183,
+     "phase": 0.45,
      "rifleLocal": [
-      0.007,
-      -0.023,
-      -0.007
-     ]
-    },
-    "torso": {
-     "phase": 0.642,
-     "rifleLocal": [
-      -0.006,
-      -0.04,
-      -0.119
+      -0.011,
+      -0.02,
+      0.019
      ]
     },
     "head": {
-     "phase": 0.667,
+     "phase": 0.433,
      "rifleLocal": [
-      0.019,
-      0.037,
-      -0.209
+      -0.004,
+      0.05,
+      -0.305
      ]
     },
     "upperArmR": {
-     "phase": 0.342,
+     "phase": 0.417,
      "rifleLocal": [
       -0.007,
-      -0.045,
-      -0.16
-     ]
-    },
-    "forearmR": {
-     "phase": 0.058,
-     "rifleLocal": [
-      -0.003,
-      -0.074,
-      0.13
-     ]
-    },
-    "arms L": {
-     "phase": 0.45,
-     "rifleLocal": [
-      0.003,
-      0.003,
-      -0.37
+      -0.044,
+      -0.169
      ]
     }
    },
    "shoulderSeatGapM": [
-    -0.0157,
-    -0.0102
+    -0.0184,
+    -0.011
    ]
   },
   "runtimeProfile": {
-   "referenceMpsModelUnits": 1.329774,
+   "referenceMpsModelUnits": 1.329636,
    "referenceMpsRuntime": 1.215,
    "contacts": {
     "L": [
@@ -390,13 +363,13 @@
       0.15
      ],
      [
-      0.541667,
+      0.55,
       1
      ]
     ],
     "R": [
      [
-      0.041667,
+      0.05,
       0.65
      ]
     ]
@@ -423,7 +396,7 @@
   {
    "id": "G1",
    "label": "seam second difference / interior max",
-   "value": 0.3673611503233694,
+   "value": 0.39649803937893446,
    "limit": 1.5,
    "pass": true
   },
@@ -437,7 +410,7 @@
   {
    "id": "G2",
    "label": "support-pivot slide, worst (m)",
-   "value": 0.005042252671572655,
+   "value": 0.004004305994586984,
    "limit": 0.01,
    "pass": true
   },
@@ -445,8 +418,8 @@
    "id": "G3",
    "label": "stance sole lowest point (mm)",
    "value": [
-    3.58,
-    4.34
+    3.63,
+    4.64
    ],
    "limit": [
     -2,
@@ -457,7 +430,7 @@
   {
    "id": "G3",
    "label": "swing sole never below floor (mm)",
-   "value": 4,
+   "value": 3.68,
    "limit": -2,
    "pass": true
   },
@@ -488,21 +461,21 @@
   {
    "id": "G4",
    "label": "knee/elbow never hyperextended (min deg)",
-   "value": 13.015372125805419,
+   "value": 19.480634031103396,
    "limit": -0.5,
    "pass": true
   },
   {
    "id": "G4",
    "label": "knee flexion max (deg)",
-   "value": 65.09707507336603,
+   "value": 69.39373404194714,
    "limit": 140,
    "pass": true
   },
   {
    "id": "G4",
    "label": "elbow flexion max (deg)",
-   "value": 143.65220703367547,
+   "value": 140.37317493174362,
    "limit": 150,
    "pass": true
   },
@@ -516,14 +489,14 @@
   {
    "id": "G4",
    "label": "hip/knee/ankle single-frame spike (deg from the local quadratic)",
-   "value": 0.34796879883886334,
+   "value": 0.4444469387507617,
    "limit": 1.5,
    "pass": true
   },
   {
    "id": "G4",
    "label": "hip/knee/ankle curvature, second difference per key (deg)",
-   "value": 3.37040760037182,
+   "value": 3.556886672456244,
    "limit": 4.5,
    "pass": true
   },
@@ -540,7 +513,7 @@
   {
    "id": "G5",
    "label": "world speed (m/s)",
-   "value": 1.2147944382258058,
+   "value": 1.2146683704635581,
    "limit": [
     1.2,
     1.5
@@ -550,7 +523,7 @@
   {
    "id": "G5",
    "label": "Froude number",
-   "value": 0.17305861635022293,
+   "value": 0.17302269919460078,
    "limit": [
     0.12,
     0.3
@@ -560,14 +533,14 @@
   {
    "id": "G5",
    "label": "planted-pivot speed matches reference",
-   "value": -0.00013605348325229638,
+   "value": 0.0071283935862866965,
    "limit": 0.03,
    "pass": true
   },
   {
    "id": "G5",
    "label": "COM vertical peak-to-peak, body+rifle (m)",
-   "value": 0.03170797398499925,
+   "value": 0.032018519412009394,
    "limit": [
     0.02,
     0.06
@@ -577,7 +550,7 @@
   {
    "id": "G5",
    "label": "COM highest inside the middle of single support",
-   "value": 0.7666666666666667,
+   "value": 0.25,
    "limit": "middle 50%",
    "pass": true
   },
@@ -593,12 +566,12 @@
    "label": "braking in the first half, propulsion in the second half of each single support",
    "value": [
     [
-     -0.36,
-     0.877
+     -0.364,
+     0.924
     ],
     [
-     -0.36,
-     0.876
+     -0.358,
+     0.92
     ]
    ],
    "limit": "|a| >= 0.05 m/s2",
@@ -608,7 +581,7 @@
    "id": "G5",
    "label": "COM forward speed lowest in single-support middle, highest at double support",
    "value": [
-    0.25,
+    0.75,
     0
    ],
    "limit": "timing",
@@ -658,21 +631,21 @@
   {
    "id": "G6",
    "label": "left hand swings with the right leg (corr)",
-   "value": 0.9439818497677328,
+   "value": 0.9435946074409409,
    "limit": 0.8,
    "pass": true
   },
   {
    "id": "G6",
    "label": "left hand against the left leg (corr)",
-   "value": -0.9307802738778479,
+   "value": -0.9306139573310198,
    "limit": -0.8,
    "pass": true
   },
   {
    "id": "G6",
    "label": "right hand fixed to the chest (max range m)",
-   "value": 0.005967434534403725,
+   "value": 0.0059678424956531445,
    "limit": 0.015,
    "pass": true
   },
@@ -706,49 +679,49 @@
   {
    "id": "G7",
    "label": "rifle rigid in the hand: origin slip (m)",
-   "value": 0.000014173384351333883,
+   "value": 0.000013965403620709235,
    "limit": 0.001,
    "pass": true
   },
   {
    "id": "G7",
    "label": "rifle rigid in the hand: axis turn (deg)",
-   "value": 0.00044945486236032064,
+   "value": 0.0004608804264286092,
    "limit": 1,
    "pass": true
   },
   {
    "id": "G7",
    "label": "rifle origin at the knuckle centroid (m)",
-   "value": 0.000026018411831105934,
+   "value": 0.000024114997920529065,
    "limit": 0.002,
    "pass": true
   },
   {
    "id": "G7",
    "label": "rifle bob vs chest: pitch/roll peak-to-peak (deg)",
-   "value": 1.2845101961736187,
+   "value": 1.2858388071524107,
    "limit": 2,
    "pass": true
   },
   {
    "id": "G7",
    "label": "rifle bob vs chest: lift peak-to-peak (m)",
-   "value": 0.005926142175996241,
+   "value": 0.005928409668807116,
    "limit": 0.01,
    "pass": true
   },
   {
    "id": "G7",
    "label": "no penetration into head/cap/neck/torso/left arm/right forearm (deepest, m)",
-   "value": -0.0073624915080660065,
+   "value": -0.01143873210300133,
    "limit": -0.012,
    "pass": true
   },
   {
    "id": "G7",
    "label": "right shoulder under the rifle sinks at most (m)",
-   "value": -0.01572544454967132,
+   "value": -0.018350635468873343,
    "limit": -0.02,
    "pass": true
   },
@@ -756,8 +729,8 @@
    "id": "G7",
    "label": "rifle rests on the right shoulder: closest approach range over the cycle (m)",
    "value": [
-    -0.01572544454967132,
-    -0.010209621513972096
+    -0.018350635468873343,
+    -0.011029292613866202
    ],
    "limit": [
     -0.02,
@@ -802,7 +775,7 @@
   {
    "id": "P",
    "label": "the march speed band brackets the clip speed at actor scale (m/s)",
-   "value": 1.2147944382258058,
+   "value": 1.2146683704635581,
    "limit": [
     0.85,
     1.9
@@ -812,7 +785,7 @@
   {
    "id": "P",
    "label": "measured toe speed vs design speed (relative)",
-   "value": 0.00016992481203028403,
+   "value": 0.0002736842105265001,
    "limit": 0.03,
    "pass": true
   },

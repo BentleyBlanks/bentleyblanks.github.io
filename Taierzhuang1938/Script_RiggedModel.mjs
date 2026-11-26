@@ -1,7 +1,6 @@
 // 第一人称国军蒙皮双臂桥。
 //
-// Model_FpsArmsNraSkeletal01.glb 从正式 Model_LugouNra01 派生：保留军装袖、双臂、
-// 完整十指、53 骨蒙皮和动作轨。武器仍由 Script_Viewmodel 驱动；这里把每把武器的
+// 默认双臂截取何有田的现役网格，保留第一人称骨架、十指和动作轨。武器仍由 Script_Viewmodel 驱动；这里把每把武器的
 // 右/左握持目标转换成真实 Hand 骨的世界目标，再用解析两骨 IK 解 UpperArm →
 // Forearm → Hand。手指不再烘成一块死网格，而是按步枪/机枪/手枪/近战/投掷物
 // 从 Blender 检查过的 bind pose 构造解剖坐标系，手指绕真实屈曲轴弯曲。
@@ -20,7 +19,7 @@ import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Scr
 import { StepElbowArc } from "./Script_FpsElbowArc.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
 
-const URLS = Object.freeze({ fpsArms: "./Model/Model_FpsArmsNraSkeletal01.glb?v=6", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261021134500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261105180000", fpsBody: "./Model/Model_FirstPersonBody.glb?v=1" });
+const URLS = Object.freeze({ fpsArms: "./Model/Model_HeYoutianViewArms.glb?v=20261126", fpsHanYang: "./Model/Model_FpsHanYangHands.glb?v=20261021134500", fpsHanYangRepaired: "./Model/Model_FpsHanYangHandsRepaired.glb?v=20261105180000", fpsBody: "./Model/Model_HeYoutianViewBody.glb?v=20261126" });
 const PROFILE_CLIPS = Object.freeze({
   rifle: "RifleIdle",
   lmg: "MachineGunFire",
@@ -236,7 +235,7 @@ export async function LoadRiggedAssets() {
 }
 
 /**
- * 正式国军 01 蒙皮双臂，由 Viewmodel 每把武器的两个完整握持目标驱动。
+ * 第一人称蒙皮双臂，由 Viewmodel 每把武器的两个完整握持目标驱动。
  */
 export class FpsArmRig {
   /**
@@ -249,7 +248,7 @@ export class FpsArmRig {
     this.root = CloneSkinnedRig(gltf.scene);
     this.fixedRestLengths=false;
     this.root.traverse(object=>{if(object.userData.fpsFixedRestLengths)this.fixedRestLengths=true;});
-    this.root.name = "RiggedFpsArmsNra01";
+    this.root.name = "RiggedFpsArmsHeYoutian";
     this.mesh = FirstSkinnedMesh(this.root);
     this.gripCorrectives = [];
     this.gripCorrectiveMeshes = [];
