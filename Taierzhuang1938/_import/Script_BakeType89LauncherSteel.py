@@ -292,7 +292,7 @@ def BakeRegion(name, sample, size, index, reference):
         top = np.interp(texelU[0], u, upper)
         tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, texelU, (texelV - bottom) / (top - bottom))
         tabDetail = tabTone * tabCoverage
-        photoGain = 80 if name == "Tab" else 103
+        photoGain = 67 if name == "Tab" else 103
         tonalDelta += photoGain * tabDetail - (2.7 * detail + 1.0 * medium) * tabCoverage
         warmth += .28 * tabWarmth * tabCoverage
     if name == "Saddle":
@@ -601,11 +601,11 @@ def BakeRegion(name, sample, size, index, reference):
             polished = np.maximum(.74 * wear, scratches)
             tint, gloss, metalFinish = (191, 180, 167), .325, .86
         else:
-            polished = .77 * wear
+            polished = .925 * wear
             tint, gloss, metalFinish = (204, 194, 178), .31, .87
             relative = ReferenceField(closeup, xx, sampledV, "relativeLuminance")
             oxideShade = np.clip((-relative - 6) / 24, 0, 1) * (1 - rubbedSteel)
-            linear *= (1 - .25 * oxideShade)[..., None]
+            linear *= (1 - .276 * oxideShade)[..., None]
         exposed = SrgbToLinear(np.asarray(tint, dtype=np.float32) / 255)
         linear += (exposed - linear) * polished[..., None]
         rough += (gloss - rough) * polished
@@ -614,7 +614,7 @@ def BakeRegion(name, sample, size, index, reference):
             # The oxidized steel has a softer, dimmer reflection between the rub marks.
             matteFinish = tabCoverage * (1 - wear)
             rough += .08 * matteFinish
-            metal += .065 * matteFinish
+            metal += .080 * matteFinish
     if name == "RearEye":
         front, reverse = EyeWear(reference["ringFinish"], xx, vv)
         front *= (1 - .31 * darkPits)
@@ -636,7 +636,7 @@ def BakeRegion(name, sample, size, index, reference):
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     if name in ("Tab", "TabBack"):
-        coolTab = .017 if name == "Tab" else .009
+        coolTab = .015 if name == "Tab" else .009
         base -= coolTab * tabCoverage[..., None] * LUMA_NEUTRAL_WARMTH
         if name == "Tab":
             brightWear = np.clip((measuredTone - 4) / 24, 0, 1) * tabCoverage
@@ -687,7 +687,7 @@ def BakeRegion(name, sample, size, index, reference):
     return tuple(np.rint(255 * np.clip(arr, 0, 1)).astype(np.uint8) for arr in (base, normal, orm))
 
 
-def ResizeSharedCollar(maps, width, height):
+def ResizeChart(maps, width, height):
     pad = ATLAS["padding"]
     inner = (width - 2 * pad, height - 2 * pad)
     border = ((pad, pad), (pad, pad), (0, 0))
@@ -796,9 +796,13 @@ def BuildAtlas(reference):
             # Resample the legacy finish into the smaller shared chart.
             legacyHeight = height + ATLAS["regions"]["Shoulder"][3]
             sourceHeight = legacyHeight + ATLAS["regions"]["CollarRing"][3]
-            legacy = ResizeSharedCollar(BakeRegion(name, quadrants, (width, sourceHeight), index, reference),
-                                        width, legacyHeight)
-            tile = ResizeSharedCollar(legacy, width, height)
+            legacy = ResizeChart(BakeRegion(name, quadrants, (width, sourceHeight), index, reference),
+                                 width, legacyHeight)
+            tile = ResizeChart(legacy, width, height)
+        elif name == "SaddleBack":
+            # Preserve the underside's existing steel sample at the new allocation.
+            sourceSize = (width, ATLAS["saddleBackSourceHeight"])
+            tile = ResizeChart(BakeRegion(name, quadrants, sourceSize, index, reference), width, height)
         elif name == "Knurl":
             tile = BakeKnurl(quadrants, width, height, index, reference)
         elif name == "Shoulder":
@@ -817,7 +821,7 @@ def Bake():
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
     maps = BuildAtlas(reference)
     size = ATLAS["size"]
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 87)):
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 86)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)

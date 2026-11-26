@@ -8,6 +8,7 @@ import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy.ndimage import gaussian_filter
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
@@ -20,6 +21,11 @@ NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
+TAB_FRONT_PAIR_PROJECTION = [
+    [0.27025285843021063, -0.006591860418187142, 1028.448752789885],
+    [-0.011732769701317706, 0.28119255144826527, 475.2094623617538],
+    [-1.4645408783465048e-05, -1.0538823106249734e-05, 1.0],
+]
 
 
 def Photo(folder, number):
@@ -118,7 +124,7 @@ def PhotoResiduals(image, envelopeRadius=8.0):
     return tone, warmth, lightness
 
 
-def SaveDetailPlate(tone, warmth, confidence, xs, ys, path, *, halfSize=True):
+def SaveDetailPlate(tone, warmth, confidence, xs, ys, path, *, halfSize=True, adjustment=None):
     height, width = xs.shape
     us, vs = np.meshgrid(np.linspace(0, 1, width), np.linspace(0, 1, height))
     edge = np.clip(14 * np.minimum(np.minimum(us, 1 - us), np.minimum(vs, 1 - vs)), 0, 1)
@@ -127,6 +133,8 @@ def SaveDetailPlate(tone, warmth, confidence, xs, ys, path, *, halfSize=True):
                 128 + warmthScale * SampleBilinear(warmth, xs, ys),
                 255 * edge * SampleBilinear(confidence, xs, ys)]
     encoded = np.rint(np.clip(np.stack(channels, axis=-1), 0, 255)).astype(np.uint8)
+    if adjustment is not None:
+        encoded = adjustment(encoded, toneScale, warmthScale)
     detail = Image.fromarray(encoded)
     if halfSize:
         detail = detail.resize((width // 2, height // 2), Image.Resampling.LANCZOS)
@@ -433,7 +441,34 @@ def NeckFinish(folder):
     return field
 
 
-def TabDetail(image, number, uAnchors, strips):
+def BlendTabDetail(encoded, photos, toneScale, warmthScale):
+    tone, warmth, coverage = np.asarray(encoded, dtype=np.float32).transpose(2, 0, 1)
+    confidence = coverage / 255
+
+    def LocalAverage(values, sigma):
+        weighted = gaussian_filter(values * confidence, sigma, mode="nearest")
+        weights = gaussian_filter(confidence, sigma, mode="nearest")
+        return weighted / np.maximum(weights, .03)
+
+    mediumBands, chromaBands = [], []
+    for pixels in photos:
+        lightness = pixels @ LUMA
+        chroma = (pixels[..., 0] - pixels[..., 2]) / np.maximum(lightness, 25)
+        surrounding = LocalAverage(lightness, (16, 10))
+        medium = LocalAverage(lightness, (3.4, 2.25))
+        mediumBands.append((medium - surrounding) / np.maximum(surrounding, 35))
+        chromaBands.append(LocalAverage(chroma, (3.4, 2.25)) - LocalAverage(chroma, (16, 10)))
+
+    # Strong lighting changes between photographs have less influence on the wear layer.
+    agreement = np.clip(1 - np.abs(mediumBands[0] - mediumBands[1]) / .24, .25, 1)
+    alternateShare = .59
+    blend = .48 * agreement
+    tone += toneScale * blend * ((1 - alternateShare) * mediumBands[0] + alternateShare * mediumBands[1])
+    warmth += warmthScale * .28 * blend * ((1 - alternateShare) * chromaBands[0] + alternateShare * chromaBands[1])
+    return np.rint(np.clip(np.stack((tone, warmth, coverage), axis=-1), 0, 255)).astype(np.uint8)
+
+
+def TabDetail(image, number, uAnchors, strips, alternate=None):
     radius = 5.8 if number == 5 else 4.6
     tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=radius)
     columns = np.arange(image.shape[1])
@@ -445,9 +480,22 @@ def TabDetail(image, number, uAnchors, strips):
     confidence *= np.clip((lightness - 22) / 22, 0, 1) * np.clip((246 - lightness) / 30, 0, 1)
     uu, vv = np.meshgrid(np.linspace(uAnchors[0], uAnchors[-1], 480), np.linspace(0, 1, 144))
     xs, start, end = (np.interp(uu, uAnchors, values) for values in (photoX, first, last))
+    ys = start + vv * (end - start)
+    adjustment = None
+    if alternate is not None:
+        projected = np.stack((xs, ys, np.ones_like(xs)), axis=-1) @ np.asarray(TAB_FRONT_PAIR_PROJECTION).T
+        pairedX, pairedY = (projected[..., :2] / projected[..., 2:3]).transpose(2, 0, 1)
+        samples = tuple(np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
+                        for photo, x, y in ((image, xs, ys), (alternate, pairedX, pairedY)))
+
+        def Adjust(encoded, toneScale, warmthScale):
+            return BlendTabDetail(encoded, samples, toneScale, warmthScale)
+
+        adjustment = Adjust
+
     name = "Tab" if number == 5 else "TabBack"
     path = RECORD.with_name(f"Texture_Type89Launcher{name}Detail.png")
-    return SaveDetailPlate(tone, warmth, confidence, xs, start + vv * (end - start), path, halfSize=False)
+    return SaveDetailPlate(tone, warmth, confidence, xs, ys, path, halfSize=False, adjustment=adjustment)
 
 
 def TabFinish(folder, number):
@@ -472,7 +520,12 @@ def TabFinish(folder, number):
     source["sampleStrips"] = strips
     field = FinishMap(samples, source, {"uCenter": (first+last)/2, "uHalfSpan": (last-first)/2, "vRange": [0, 1]})
     field["outlineUV"] = outline
-    field["detail"] = TabDetail(image, number, uAnchors, strips)
+    alternate = None
+    if number == 5:
+        alternate, alternateSource = Photo(folder, 4)
+        source["pairedPhoto"] = {**alternateSource, "matchedPoints": 94, "medianErrorPixels": .524,
+                                 "projectionFromPrimary": TAB_FRONT_PAIR_PROJECTION}
+    field["detail"] = TabDetail(image, number, uAnchors, strips, alternate)
     lightness = samples @ LUMA
     # Reflective rubbed edges are paired with the remainder of each strip.
     # Restrict the bright-metal estimate to the less saturated areas.

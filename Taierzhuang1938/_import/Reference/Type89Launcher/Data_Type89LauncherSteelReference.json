@@ -1152,7 +1152,23 @@
           [1122, 467, 583],
           [1269, 449, 532],
           [1370, 384, 459]
-        ]
+        ],
+        "pairedPhoto": {
+          "file": "Mariners4.jpg",
+          "sha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+          "rotatedCounterclockwise": true,
+          "matchedPoints": 94,
+          "medianErrorPixels": 0.524,
+          "projectionFromPrimary": [
+            [0.27025285843021063, -0.006591860418187142, 1028.448752789885],
+            [-0.011732769701317706, 0.28119255144826527, 475.2094623617538],
+            [
+              -1.4645408783465048e-05,
+              -1.0538823106249734e-05,
+              1.0
+            ]
+          ]
+        }
       },
       "footprint": {
         "uCenter": 0.5005,
@@ -1242,7 +1258,7 @@
       ],
       "detail": {
         "file": "Texture_Type89LauncherTabDetail.png",
-        "sha256": "f3b29bc03afeba184321b413da25bccf4407f58d1199d29e51eab8aff6a40be9",
+        "sha256": "0954492a4f053485abe498c38afb29ddb37317a90a721069b70a225ed3766662",
         "toneScale": 300,
         "warmthScale": 520
       },
