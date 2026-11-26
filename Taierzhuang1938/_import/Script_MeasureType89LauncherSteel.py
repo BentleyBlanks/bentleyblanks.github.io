@@ -782,7 +782,22 @@ def SleeveResponseCalibration(photo, sleeve, evidence):
             "contrast": np.rint(contrast * 1000).astype(int).tolist(), **color}
 
 
-def SleeveFinish(folder, previous, *, evidence=None, responseEvidence=None):
+def SleeveHorizonCalibration(photo, sleeve, evidence):
+    names = ("V44RuntimeSleeveNeutral", "V44RuntimeSleeveDefault", "V44RuntimeSleeveRake")
+    direct, default, oblique = [RegisteredSleeveRefinement(photo, sleeve, evidence / name, (49, 185)) for name in names]
+    support = np.clip(np.minimum.reduce((direct[2], default[2], oblique[2])) / .91, 0, 1)
+    agreement = np.exp(-.5 * ((direct[0] - oblique[0]) / .14)**2)
+    contrast = np.clip(.51 * direct[0] + .32 * default[0] + .17 * oblique[0], -.16, .16) * support * agreement
+    chroma = np.clip(.45 * direct[1] + .40 * default[1] + .15 * oblique[1], -.13, .13)
+    chroma *= support[..., None] * np.exp(-.5 * ((direct[1] - default[1]) / .082)**2)
+    chroma -= (chroma @ REGISTERED_LUMA)[..., None]
+    color = {name: np.rint(chroma[..., index] * 1000).astype(int).tolist()
+             for index, name in enumerate(("red", "green", "blue"))}
+    return {**SleeveCalibrationIdentity(sleeve), "frameSha256": dict(zip(names, (direct[3], default[3], oblique[3]))),
+            "contrast": np.rint(contrast * 1000).astype(int).tolist(), **color}
+
+
+def SleeveFinish(folder, previous, *, evidence=None, responseEvidence=None, horizonEvidence=None):
     image, source = Photo(folder, 1)
     rails = [[1149, 593, 642], [1164, 593, 648], [1183, 593, 640],
              [1260, 594, 639], [1334, 594, 639], [1354, 595, 641]]
@@ -833,7 +848,8 @@ def SleeveFinish(folder, previous, *, evidence=None, responseEvidence=None):
                                      SLEEVE_DETAIL, halfSize=False)
     identity = SleeveCalibrationIdentity(field)
     for name, frames, measure in (("registeredCalibration", evidence, SleeveCalibration),
-                                  ("responseCalibration", responseEvidence, SleeveResponseCalibration)):
+                                  ("responseCalibration", responseEvidence, SleeveResponseCalibration),
+                                  ("horizonCalibration", horizonEvidence, SleeveHorizonCalibration)):
         prior = previous.get(name)
         if frames is not None:
             field[name] = measure(image, field, frames)
@@ -1320,13 +1336,14 @@ def Main():
     options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
+    options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
-                          responseEvidence=args.sleeve_response_evidence)
+                          responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": sleeve,

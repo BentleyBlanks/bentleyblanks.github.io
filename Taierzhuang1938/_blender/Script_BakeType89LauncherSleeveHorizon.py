@@ -1,0 +1,108 @@
+"""Bake the existing game prop's visible sleeve self-shadowing into a UV lookup."""
+
+from base64 import b64encode
+from hashlib import sha256
+import json
+from pathlib import Path
+
+import bpy
+import numpy as np
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+
+
+ROWS, COLUMNS = 72, 217
+
+
+def SurfaceSamples(mesh, corner, span):
+    cross, along = (np.linspace(.00001, .99999, count) for count in (ROWS, COLUMNS))
+    positions, normals, shellNormals = (np.zeros((ROWS, COLUMNS, 3)) for _ in range(3))
+    covered = np.zeros((ROWS, COLUMNS), dtype=bool)
+    uv = mesh.uv_layers.active.data
+
+    for triangle in mesh.loop_triangles:
+        a, b, c = [(np.asarray(tuple(uv[index].uv)) - corner) / span for index in triangle.loops]
+        lower = np.minimum.reduce((a, b, c))
+        upper = np.maximum.reduce((a, b, c))
+        firstRow, lastRow = np.searchsorted(cross, [lower[0] - 1e-5, upper[0] + 1e-5])
+        firstCol, lastCol = np.searchsorted(along, [lower[1] - 1e-5, upper[1] + 1e-5])
+        if firstRow == lastRow or firstCol == lastCol:
+            continue
+        first, second = b - a, c - a
+        determinant = first[0] * second[1] - first[1] * second[0]
+        if abs(determinant) < 1e-12:
+            continue
+        u, v = np.meshgrid(cross[firstRow:lastRow], along[firstCol:lastCol], indexing="ij")
+        x, y = u - a[0], v - a[1]
+        w1 = (x * second[1] - y * second[0]) / determinant
+        w2 = (first[0] * y - first[1] * x) / determinant
+        weights = np.stack((1 - w1 - w2, w1, w2), axis=-1)
+        region = np.s_[firstRow:lastRow, firstCol:lastCol]
+        inside = (np.min(weights, axis=-1) >= -1e-5) & ~covered[region]
+        face = np.array([tuple(mesh.vertices[index].co) for index in triangle.vertices])
+        smooth = np.array([tuple(mesh.corner_normals[index].vector) for index in triangle.loops])
+        positions[region][inside] = (weights @ face)[inside]
+        normals[region][inside] = (weights @ smooth)[inside]
+        shellNormals[region][inside] = tuple(triangle.normal)
+        covered[region] |= inside
+
+    if not covered.all():
+        raise ValueError(f"Sleeve UV chart is incomplete ({covered.mean():.2%} coverage)")
+    return positions, normals, shellNormals
+
+
+def MeasureHorizons(mesh, corner, span):
+    mesh.calc_loop_triangles()
+    vertices = [vertex.co.copy() for vertex in mesh.vertices]
+    triangles = [tuple(triangle.vertices) for triangle in mesh.loop_triangles]
+    tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True)
+    extent = np.asarray([tuple(vertex) for vertex in vertices])
+    scale = float(np.linalg.norm(np.ptp(extent, axis=0)))
+    positions, normals, shellNormals = SurfaceSamples(mesh, corner, span)
+    slopes = np.r_[np.linspace(.05, .55, 11), np.linspace(.65, 1.85, 13)]
+    horizon = np.zeros((ROWS, COLUMNS), dtype=np.uint8)
+
+    for i, j in np.ndindex(horizon.shape):
+        normal = Vector(normals[i, j]).normalized()
+        origin = Vector(positions[i, j]) + (2e-5 * scale) * Vector(shellNormals[i, j])
+        along = Vector(positions[i, min(j + 1, COLUMNS - 1)] - positions[i, max(j - 1, 0)])
+        along = (along - normal * along.dot(normal)).normalized()
+        highest = []
+        for sign in (1, -1):
+            axial = sign * along
+            for slope in reversed(slopes):
+                direction = (axial + float(slope) * normal).normalized()
+                _, _, _, distance = tree.ray_cast(origin, direction, .08 * scale)
+                if distance is not None:
+                    highest.append(float(slope))
+                    break
+        # A shared horizon leaves light paths open wherever either side of the groove is clear.
+        if len(highest) == 2:
+            horizon[i, j] = round(min(highest) * 255 / 2)
+    return horizon
+
+
+def Main():
+    project = Path(__file__).resolve().parents[1]
+    atlas = json.loads((project / "_blender/Data_Type89LauncherSteelAtlas.json").read_bytes())
+    left, top, width, height = atlas["regions"]["Sleeve"]
+    size, padding = atlas["size"], atlas["padding"]
+    corner = np.array([left + padding, size - (top + height - padding)]) / size
+    span = np.array([width - 2 * padding, height - 2 * padding]) / size
+    sleeve = bpy.data.objects.get("RibbedLowerSleeve")
+    if sleeve is None or sleeve.type != "MESH":
+        raise ValueError("Open the launcher art project with its authored sleeve before baking")
+    horizon = MeasureHorizons(sleeve.data, corner, span)
+    model = project / "Model/Model_Type89Launcher.tzm.json"
+    record = {"modelSha256": sha256(model.read_bytes()).hexdigest(), "rows": ROWS, "columns": COLUMNS,
+              "rect": [*corner.tolist(), *span.tolist()], "slopeScale": 2,
+              "visibilityR8": b64encode(horizon.tobytes()).decode("ascii")}
+    output = project / "Data_Type89LauncherSleeveHorizon.mjs"
+    header = "// Generated by _blender/Script_BakeType89LauncherSleeveHorizon.py from the authored game sleeve.\n"
+    output.write_text(header + "export const TYPE89_LAUNCHER_SLEEVE_HORIZON = "
+                      + json.dumps(record, indent=2) + ";\n", encoding="utf-8")
+    print(f"Baked {ROWS}×{COLUMNS} sleeve horizon texels to {output.name}")
+
+
+if __name__ == "__main__":
+    Main()

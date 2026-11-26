@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 559604,
-      "sha256": "d11d32f0f9d72142d35850f01580e652b99787e0f1662a75d35ef22fa37c27c9"
+      "bytes": 559868,
+      "sha256": "e924a58ad537793083a92dc8c393c8891ab1d2dbb5407d7604ce89b60991e2ac"
     },
     {
       "channel": "Normal",
@@ -39,7 +39,7 @@
       "sha256": "fb171e017b345c0bf1846b8f36348e6ae9651e8ebabccacdaec0b6a86eb69a69"
     }
   ],
-  "totalBytes": 1010434,
+  "totalBytes": 1010698,
   "metrics": {
     "meanSrgb": [
       0.4345,
@@ -52,17 +52,17 @@
     "clipLow": 0.0001,
     "clipHigh": 0.0,
     "lowFreq": 0.1054,
-    "seam": 0.1243,
-    "interior": 0.0234,
-    "seamRatio": 5.323,
+    "seam": 0.1244,
+    "interior": 0.0256,
+    "seamRatio": 4.858,
     "border": 0.743,
-    "swing": 0.0837,
+    "swing": 0.0838,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "a54dd5a14c9b01e27cc748e7a8f8666d65b00c8d2ae03d49be943d1cde9989c5",
+    "sha256": "530b612c7bf93645f90d465783e9d739398921414d59d9406cc9a18496a7c650",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"

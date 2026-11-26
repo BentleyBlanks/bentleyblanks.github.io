@@ -794,6 +794,14 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             color = np.stack([ReferenceField(response, xx, vv, channel) / 1000
                               for channel in ("red", "green", "blue")], axis=-1)
             base += .74 * (base @ np.array([.2126, .7152, .0722]))[..., None] * color
+        horizon = closeup.get("horizonCalibration")
+        if horizon is not None:
+            CheckSleeveRegistration(horizon, closeup)
+            fine = ReferenceField(horizon, xx, vv, "contrast") / 1000
+            base = ApplyBaseLogGain(base, 1.78 * fine)
+            tint = np.stack([ReferenceField(horizon, xx, vv, channel) / 1000
+                             for channel in ("red", "green", "blue")], axis=-1)
+            base += .65 * (base @ np.array([.2126, .7152, .0722]))[..., None] * tint
     if name == "Shoulder":
         # Shift hue with near-zero luma change in the photographed flank.
         base += shoulderTint[..., None] * LUMA_NEUTRAL_WARMTH

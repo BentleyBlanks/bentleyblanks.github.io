@@ -62,6 +62,7 @@ export const DATA_SOURCE_RULES = Object.freeze([
   RULE("Data_ActorLocomotion.mjs", "generated", ["_import/Script_LocomotionProfileBake.mjs"], "人物步态曲线（从 GLB 采样）"),
   RULE("Data_BurntTimberPile.mjs", "generated", ["_blender/Script_BuildBurntTimberPile.py"], "焦木堆几何"),
   RULE("Data_HanYang173RGrips.mjs", "generated", ["_blender/Script_ApplyHanYang173RGrips.mjs"], "汉阳造握把蒙皮"),
+  RULE("Data_Type89LauncherSleeveHorizon.mjs", "generated", ["_blender/Script_BakeType89LauncherSleeveHorizon.py"], "八九式掷弹筒外套筒的纹沟遮挡采样"),
   RULE("Data_RifleSlingMounts.mjs", "source", [], "BlenderMCP 实测原枪背带环与捆扎截面的游戏米制坐标；原枪几何保持不变"),
   RULE("Data_MeleeVideoAnimations.mjs", "generated", ["_import/Script_MeleeVideoPrepare.py"], "白刃视频转出的动作"),
   RULE("Data_*.mjs", "source", [], "数据模块（数值 Data_Tuning_*、文本 Data_Text_*、关卡与资产表……）：手写"),

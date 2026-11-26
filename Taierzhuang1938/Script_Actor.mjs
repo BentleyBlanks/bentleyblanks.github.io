@@ -33,6 +33,7 @@ import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
 import { LoadHanYang173R, ConfigureHanYang173R, InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
 import { LoadType38_511, ConfigureType38_511, InstantiateType38_511 } from "./Script_Type38_511.mjs";
+import { AttachType89LauncherSleeveHorizon } from "./Script_Type89LauncherSleeveHorizon.mjs";
 import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
@@ -4305,9 +4306,12 @@ export class ActorFactory {
       grenade: this.Material("grenade", () => lib.Get("GrenadePbr", {
         roughness: 1, metalness: 1, normalScale: 0.85,
       })),
-      type89LauncherSteel: this.Material("type89LauncherSteel",
-        () => lib.Get(lib.baked?.has("Type89LauncherSteel") ? "Type89LauncherSteel" : "Steel",
-          { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
+      type89LauncherSteel: this.Material("type89LauncherSteel", () => {
+        const authored = lib.baked?.has("Type89LauncherSteel");
+        const material = lib.Get(authored ? "Type89LauncherSteel" : "Steel",
+          { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 });
+        return authored ? AttachType89LauncherSleeveHorizon(material) : material;
+      }),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",
         { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
       zb26Wood: this.Material("zb26Wood", () => lib.Get(lib.baked?.has("Zb26VeteranWood") ? "Zb26VeteranWood" : "WoodStock",
