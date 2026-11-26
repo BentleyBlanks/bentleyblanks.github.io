@@ -1,4 +1,4 @@
-"""Bake the approved three views and the Image 2.6 surface swatches to PBR."""
+"""Bake the approved three views, surface swatches and blade steel to PBR."""
 
 import argparse
 import hashlib
@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIT = ROOT / "_blender" / "Data_SichuanDadaoThreeViewFit.json"
 DIFFUSE_FIT = ROOT / "_import" / "Reference" / "SichuanDadao" / "Texture_DadaoDiffuseFit.png"
 SIDE_DIFFUSE_FIT = DIFFUSE_FIT.with_name("Texture_DadaoSideDiffuseFit.png")
+FIELD_STEEL = DIFFUSE_FIT.with_name("Texture_DadaoFieldSteelSource.webp")
 BASE_SIZE = 2048
 DATA_SIZE = 1024
 # Diffuse gains measured against the approved sheet in the neutral comparison studio.
@@ -107,13 +108,77 @@ def ApplyDiffuseFit(color, source):
     return EncodeSrgb(LinearSrgb(color) * factor)
 
 
+def Smoothstep(start, end, value):
+    t = np.clip((value - start) / (end - start), 0, 1)
+    return t * t * (3 - 2 * t)
+
+
+def BladeZones(fit, size, strip):
+    atlas = fit["atlas"]
+    factor = size // 1024
+    along = np.linspace(atlas["left"], atlas["right"], 992 * factor, dtype=np.float32)
+    along = np.pad(along, (16 * factor, 16 * factor), mode="edge")
+    # Leave the blade-to-guard junction in the darker original finish.
+    blend = 1 - Smoothstep(1390, 1450, along)[None, :]
+    # The third and fourth strips are the spine and edge, respectively.
+    if strip >= 2:
+        return blend, float(strip == 3), float(strip == 2)
+    frame = np.asarray(fit["blade"])
+    top = np.interp(along, frame[:, 0], frame[:, 1])
+    bottom = np.interp(along, frame[:, 0], frame[:, 2])
+    across = np.linspace(atlas["top"], atlas["bottom"], 216 * factor, dtype=np.float32)
+    across = np.pad(across, (20 * factor, 20 * factor), mode="edge")
+    position = (across[:, None] - top) / np.maximum(bottom - top, 1)
+    rim = Smoothstep(.86, .98, position)
+    spine = 1 - Smoothstep(.015, .18, position)
+    return blend, rim, spine
+
+
+def SteelGrain(image, size):
+    factor = size // 1024
+    shape = (992 * factor, 216 * factor)
+    value = np.asarray(image.resize(shape, Image.Resampling.LANCZOS), dtype=np.float32) / 255
+    haze = gaussian_filter(value, (8 * factor, 26 * factor))
+    grain = value - haze
+    padding = ((20 * factor, 20 * factor), (16 * factor, 16 * factor))
+    return np.pad(grain, padding, mode="edge"), np.pad(haze - np.median(haze), padding, mode="edge")
+
+
+def ApplyFieldSteel(fit, source, base, normal, orm):
+    with Image.open(source) as image:
+        steelSwatch = image.convert("L")
+    largeGrain, largeHaze = SteelGrain(steelSwatch, BASE_SIZE)
+    grain, haze = SteelGrain(steelSwatch, DATA_SIZE)
+    for strip in range(4):
+        color = base[strip * BASE_SIZE // 4:(strip + 1) * BASE_SIZE // 4]
+        relief = normal[strip * DATA_SIZE // 4:(strip + 1) * DATA_SIZE // 4]
+        surface = orm[strip * DATA_SIZE // 4:(strip + 1) * DATA_SIZE // 4]
+        mask, rim, spine = BladeZones(fit, BASE_SIZE, strip)
+        fine = largeGrain if strip % 2 == 0 else largeGrain[::-1]
+        tint = .492 + .143 * rim - .048 * spine + .73 * fine * (1 - .55 * rim) + .57 * largeHaze
+        steel = tint[..., None] * np.array([.976, .994, 1.015], dtype=np.float32)
+        color += (steel - color) * mask[..., None]
+
+        mask, rim, spine = BladeZones(fit, DATA_SIZE, strip)
+        fine = grain if strip % 2 == 0 else grain[::-1]
+        dy, dx = np.gradient(fine * (.33 - .17 * rim))
+        reliefShape = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
+        reliefShape /= np.linalg.norm(reliefShape, axis=2, keepdims=True)
+        relief += (.5 + .5 * reliefShape - relief) * mask[..., None]
+        rough = .53 + .075 * spine - .235 * rim - .17 * fine + .12 * haze
+        metal = .945 + .046 * rim - .115 * spine
+        surface[..., 1] += (rough - surface[..., 1]) * mask
+        surface[..., 2] += (metal - surface[..., 2]) * mask
+
+
 def Save(color, path, quality):
     rgb = np.uint8(np.clip(np.rint(color * 255), 0, 255))
     Image.fromarray(rgb).save(path, "WEBP", quality=quality, method=6)
     print(f"{path.name} {rgb.shape[1]}×{rgb.shape[0]}, {path.stat().st_size:,} bytes")
 
 
-def Bake(source, swatches, output, diffuseFit=DIFFUSE_FIT, sideDiffuseFit=SIDE_DIFFUSE_FIT):
+def Bake(source, swatches, output, diffuseFit=DIFFUSE_FIT, sideDiffuseFit=SIDE_DIFFUSE_FIT,
+         fieldSteel=FIELD_STEEL):
     fit = json.loads(FIT.read_text(encoding="utf-8"))
     if hashlib.sha256(source.read_bytes()).hexdigest() != fit["referenceSha256"]:
         raise ValueError("Retrace the contours before baking from a different reference sheet")
@@ -137,9 +202,12 @@ def Bake(source, swatches, output, diffuseFit=DIFFUSE_FIT, sideDiffuseFit=SIDE_D
     packedBase = ApplyDiffuseFit(PackStrips(base, BASE_SIZE), diffuseFit)
     side = slice(BASE_SIZE // 2, BASE_SIZE * 3 // 4)
     packedBase[side] = ApplyDiffuseFit(packedBase[side], sideDiffuseFit)
+    packedNormal = PackStrips([normal for normal, _ in surfaces], DATA_SIZE)
+    packedOrm = PackStrips([orm for _, orm in surfaces], DATA_SIZE)
+    ApplyFieldSteel(fit, fieldSteel, packedBase, packedNormal, packedOrm)
     Save(packedBase, output / "Texture_DadaoBase.webp", 91)
-    Save(PackStrips([normal for normal, _ in surfaces], DATA_SIZE), output / "Texture_DadaoNormal.webp", 88)
-    Save(PackStrips([orm for _, orm in surfaces], DATA_SIZE), output / "Texture_DadaoOrm.webp", 87)
+    Save(packedNormal, output / "Texture_DadaoNormal.webp", 88)
+    Save(packedOrm, output / "Texture_DadaoOrm.webp", 87)
 
 
 if __name__ == "__main__":
@@ -150,5 +218,6 @@ if __name__ == "__main__":
     parser.add_argument("--diffuse-fit", type=Path, default=DIFFUSE_FIT, help="Observed local diffuse gain atlas")
     parser.add_argument("--side-diffuse-fit", type=Path, default=SIDE_DIFFUSE_FIT,
                         help="Measured diffuse correction on the narrow atlas strip")
+    parser.add_argument("--field-steel", type=Path, default=FIELD_STEEL, help="Neutral steel grain swatch")
     args = parser.parse_args()
-    Bake(args.source, args.swatches, args.out, args.diffuse_fit, args.side_diffuse_fit)
+    Bake(args.source, args.swatches, args.out, args.diffuse_fit, args.side_diffuse_fit, args.field_steel)
