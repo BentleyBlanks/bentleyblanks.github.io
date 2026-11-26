@@ -17,6 +17,7 @@ REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
+BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
@@ -710,28 +711,36 @@ def FitBarrelMarkGain(photo, barrel, folders, distances):
     return field, {folder.name: row[-1] for folder, row in zip(folders, (first, second))}
 
 
-def BarrelMarkCalibration(photo, barrel, evidence):
+def BarrelMarkCalibration(photo, barrel, evidence, *, small=False):
+    if small:
+        strokes = barrel["stampTrace"]["smallStrokes"]
+        prefix, plate = "V47Stamp", BARREL_SMALL_MARKS
+        firstScale, firstLimits, settle, limits = 108, (3, 252), .91, (3, 252)
+    else:
+        strokes = barrel["stampTrace"]["strokes"]
+        prefix, plate = "V46Mark", BARREL_MARKS
+        firstScale, firstLimits, settle, limits = 150, (0, 255), .88, (4, 252)
     trace = Image.new("L", (photo.shape[1], photo.shape[0]))
     draw = ImageDraw.Draw(trace)
-    for width, points in barrel["stampTrace"]["strokes"]:
+    for width, points in strokes:
         draw.line([tuple(point) for point in points], fill=255, width=width, joint="curve")
     distances = distance_transform_edt(np.asarray(trace) == 0)
-    study = [evidence / ("V46MarkStudy" + view) for view in ("Direct", "Default")]
-    settled = [evidence / ("V46MarkResolve" + view) for view in ("Direct", "Default")]
+    study = [evidence / (prefix + "Study" + view) for view in ("Direct", "Default")]
+    settled = [evidence / (prefix + "Resolve" + view) for view in ("Direct", "Default")]
     first, studyHashes = FitBarrelMarkGain(photo, barrel, study, distances)
     remaining, settledHashes = FitBarrelMarkGain(photo, barrel, settled, distances)
     # The second capture was made with the first field quantized and baked.
-    first = (np.clip(np.rint(128 + 150 * 1.2 * first), 0, 255) - 128) / 150
-    gain = np.clip(first + .88 * remaining, -1.15, 1.15)
+    first = (np.clip(np.rint(128 + firstScale * 1.2 * first), *firstLimits) - 128) / firstScale
+    gain = first + settle * remaining
     gainScale = 108
-    Image.fromarray(np.rint(128 + gainScale * gain).astype(np.uint8)).save(BARREL_MARKS)
-    return {**BarrelCalibrationIdentity(barrel), "file": BARREL_MARKS.name,
-            "sha256": sha256(BARREL_MARKS.read_bytes()).hexdigest(), "gainScale": gainScale,
+    Image.fromarray(np.clip(np.rint(128 + gainScale * gain), *limits).astype(np.uint8)).save(plate)
+    return {**BarrelCalibrationIdentity(barrel), "file": plate.name,
+            "sha256": sha256(plate.read_bytes()).hexdigest(), "gainScale": gainScale,
             "frameSha256": {**studyHashes, **settledHashes}}
 
 
 def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None,
-                 materialEvidence=None, markEvidence=None):
+                 materialEvidence=None, markEvidence=None, smallMarkEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -769,6 +778,15 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
                  [684, 343], [693, 334], [695, 321], [687, 309], [678, 304], [671, 303]]],
             [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
         ],
+        "smallStrokes": [
+            [4, [[162, 307], [169, 308], [170, 321], [172, 340], [165, 339], [163, 322], [162, 307]]],
+            [4, [[163, 324], [171, 325]]],
+            [3, [[176, 309], [182, 309], [181, 316], [179, 321]]],
+            [3, [[175, 328], [183, 328], [187, 332], [187, 340], [178, 340], [176, 337], [175, 328]]],
+            [4, [[783, 302], [778, 305], [775, 311], [775, 321], [777, 328], [780, 331], [785, 331]]],
+            [3, [[784, 302], [789, 304], [791, 310], [791, 318], [788, 326]]],
+            [3, [[780, 311], [784, 312], [786, 317], [781, 321], [781, 325]]],
+        ],
     }
     result["detail"] = BarrelDetail(image, projection, halfSpan, result["stampTrace"])
     result["exposedSteelIslands"] = BarrelSteelIslands(image, projection, halfSpan)
@@ -783,6 +801,11 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
             result[name] = measure(image, result, frames)
         elif prior is not None and all(prior.get(key) == value for key, value in identity.items()):
             result[name] = prior
+    priorSmall = previous.get("smallMarkCalibration")
+    if smallMarkEvidence is not None:
+        result["smallMarkCalibration"] = BarrelMarkCalibration(image, result, smallMarkEvidence, small=True)
+    elif priorSmall is not None and all(priorSmall.get(key) == value for key, value in identity.items()):
+        result["smallMarkCalibration"] = priorSmall
     return result
 
 
@@ -1619,6 +1642,7 @@ def Main():
     options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
     options.add_argument("--barrel-material-evidence", type=Path, help="V44 Evidence directory with barrel material and highlight-response captures")
     options.add_argument("--barrel-mark-evidence", type=Path, help="V46 Evidence directory with barrel stamp response captures")
+    options.add_argument("--barrel-small-mark-evidence", type=Path, help="V47 Evidence directory with the small barrel stamp response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1627,7 +1651,8 @@ def Main():
     prior = record.get("closeups", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
-                          materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence)
+                          materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
+                          smallMarkEvidence=args.barrel_small_mark_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

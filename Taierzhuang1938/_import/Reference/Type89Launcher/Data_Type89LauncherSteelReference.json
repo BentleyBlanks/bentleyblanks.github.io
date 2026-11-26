@@ -340,6 +340,80 @@
               [678, 332]
             ]
           ]
+        ],
+        "smallStrokes": [
+          [
+            4,
+            [
+              [162, 307],
+              [169, 308],
+              [170, 321],
+              [172, 340],
+              [165, 339],
+              [163, 322],
+              [162, 307]
+            ]
+          ],
+          [
+            4,
+            [
+              [163, 324],
+              [171, 325]
+            ]
+          ],
+          [
+            3,
+            [
+              [176, 309],
+              [182, 309],
+              [181, 316],
+              [179, 321]
+            ]
+          ],
+          [
+            3,
+            [
+              [175, 328],
+              [183, 328],
+              [187, 332],
+              [187, 340],
+              [178, 340],
+              [176, 337],
+              [175, 328]
+            ]
+          ],
+          [
+            4,
+            [
+              [783, 302],
+              [778, 305],
+              [775, 311],
+              [775, 321],
+              [777, 328],
+              [780, 331],
+              [785, 331]
+            ]
+          ],
+          [
+            3,
+            [
+              [784, 302],
+              [789, 304],
+              [791, 310],
+              [791, 318],
+              [788, 326]
+            ]
+          ],
+          [
+            3,
+            [
+              [780, 311],
+              [784, 312],
+              [786, 317],
+              [781, 321],
+              [781, 325]
+            ]
+          ]
         ]
       },
       "detail": {
@@ -3613,6 +3687,48 @@
             "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
             "MarkBaseLight.png": "c7bc0b030a6adfb15ce6dc72e1f168d544ac5728642d4a080afddf4a123e9503",
             "MarkBaseDark.png": "f6f32782e4113b3eacf72260faec9cac5a5f0b469df77cf095bb050f03f325a5"
+          }
+        }
+      },
+      "smallMarkCalibration": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "projection": [509, 540, 23, 400],
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.722, 0.849]
+        },
+        "file": "Texture_Type89LauncherSmallBarrelMarks.png",
+        "sha256": "25205c3003cc65efb51dbb07636e17306531714a72d1ccf9e53c6d3b1fe78603",
+        "gainScale": 108,
+        "frameSha256": {
+          "V47StampStudyDirect": {
+            "beauty.png": "755a0c43405b6319337ed85e7aa48263dd6dfcca890c052dd9d66a0819646457",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "e6f825fcd0ade58ddb0dd0e0dd70f74a4795d7777541ca6dd9030bd234d16100",
+            "MarkBaseDark.png": "b892c1922d8d43740dbcc85158e188795a836c0690a70642263d8a8bb2acb760"
+          },
+          "V47StampStudyDefault": {
+            "beauty.png": "d01b7acee95a82dd47bec886248837dc01205a71a3936b9e8af252b9d93ac545",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "32b2b9647761e24ab324c2d12aaab411f4d92b6dd7b4ede24d26badee1b7af48",
+            "MarkBaseDark.png": "40dc4b9d59e1985beb3a049e943321a346d63c952f627f979e7cd307b0ce92d4"
+          },
+          "V47StampResolveDirect": {
+            "beauty.png": "4d5cbfb865d2f4a0bcf011f5dc3242ba739ade72cb3a81420ef6e58c395462ef",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "7219bb37743a65bee0db1fb6add103e1f7df5b242bb0c67a9a30b264551ddcb6",
+            "MarkBaseDark.png": "6c6bc4d71774e11da389f1c9895999be7665a9401f606b007ffd4345b4b76569"
+          },
+          "V47StampResolveDefault": {
+            "beauty.png": "f7cbce096e6e1ff939ec2cc1efd5908105cf2f16c9ec46ebfe12c084b4e07b53",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "66b22c81eae1c82491290bd74405c9bded7a8a55be4af718ea912ca2043057dc",
+            "MarkBaseDark.png": "9c83104dacfd642fe8292e81a88ab55e27bc32a9c9028df4b19b20b016a935ce"
           }
         }
       }
