@@ -485,12 +485,12 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "Grenade", kind: "material", tier: "boot",
     toneClass: null,
-    toneReason: "木柄与发黑铁面共用作者 UV 图集，各自定色与烘焙",
+    toneReason: "参照展板校准木柄沁色与发黑铁面，两种材质单独烘焙后共用 UV 图集",
     metersPerTile: null,
     bake: "_import/Script_BakeGrenadeTexture.py",
     bakeRecord: "_import/TextureBakes/Texture_Grenade.json",
     source: {
-      provider: "imagegen", date: "2026-11-26", ref: "OpenAI Images API / gpt-image-2",
+      provider: "imagegen", date: "2026-11-26", ref: "OpenAI Images API / gpt-image-2 edit",
       prompt: "_import/Prompts/Texture_Grenade.txt",
     },
     consumers: [{ file: "Script_Main.mjs", token: "Texture_Grenade" }],

@@ -28,6 +28,7 @@
 
 - `Model/Model_Type24Grenade.glb` 用于第一人称和投掷，模型原点在包围盒中心。`Model/Model_Grenade.tzm.json` 用于角色持握与使用 TZM 的展示，原点在项目已有握点。两路弹头均朝游戏局部 -Z。
 - 两份文件各 **7,872 个三角面、1 个材质**。两种格式来自同一份闭合外表网格，现有动画挂点位置保留。
-- OpenAI Images API 的 `gpt-image-2` 生成木与铁的底色源图。[_import/Prompts/Texture_Grenade.txt](../_import/Prompts/Texture_Grenade.txt) 是实际提示词。[_import/Script_BakeGrenadeTexture.py](../_import/Script_BakeGrenadeTexture.py) 用源图重烘并组装共享图集，底色 1024²、法线 512²、ORM 256²。图片输入是美术材质。
+- 材质修订用 OpenAI Images API 的 `gpt-image-2` 编辑旧底图，以展板裁图作色泽和磨损参照。[_import/Prompts/Texture_Grenade.txt](../_import/Prompts/Texture_Grenade.txt) 是实际提示词。[_import/Script_BakeGrenadeTexture.py](../_import/Script_BakeGrenadeTexture.py) 烘焙色泽、法线和 ORM，再按同一 UV 布局组装，底色 1024²、法线 512²、ORM 256²。生成底图随源工程保存为 `Source_GongxianPatina.png`。
+- 做旧按部位分布。木柄握持区呈暖蜜色，木颈有不规则的红褐沁色，尾部接缝有局部积色。铁面底色较暗，保留细小磨点与滚动的窄高光，端面采用单独的深色缎面参数。Blender 同光侧视中，木颈与握持区亮度比由约 0.95 降至 0.60，展板照片约 0.61。整面质感与局部反光也在武器检视和第一人称实际加载后复核，展板的拍摄光照和曝光待考。
 - 在专用空场景经 BlenderMCP 运行 [_blender/Script_GrenadeDetail.py](../_blender/Script_GrenadeDetail.py)，从仓库已交付的贴图重建两种模型格式，无需再生成图片。`BuildWeapons.BuildGrenade` 复用同一几何入口。
 - Blender 原工程、高清材质源图、参考原图和预览保存在本机 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GongxianGrenadeReference_20261126/`。2026-09-06 的创作三视图及旧源工程保留在原目录。
