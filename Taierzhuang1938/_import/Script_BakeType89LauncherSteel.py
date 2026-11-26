@@ -29,14 +29,14 @@ FINISHES = {
     "Knurl": (3, (145, 140, 135), (86, 79, 74), .49, (.392, .622), (.947, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
-    "Tab": (2, (158, 149, 136), (86, 73, 60), .51, (.35, .68), (.95, .41), .73),
+    "Tab": (2, (141, 129, 114), (70, 53, 39), .51, (.35, .68), (.95, .41), .73),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
     "Neck": (2, (142, 138, 125), (60, 51, 43), .55, (.385, .70), (.94, .34), .77),
     "Recess": (1, (41, 39, 36), (24, 22, 20), .61, (.67, .85), (.32, .16), .28),
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
-    "TabBack": (2, (169, 163, 153), (80, 74, 66), .47, (.348, .65), (.96, .43), .71),
+    "TabBack": (2, (174, 162, 148), (85, 73, 61), .47, (.348, .65), (.96, .43), .71),
     "RearEye": (2, (162, 150, 136), (67, 53, 43), .52, (.40, .71), (.95, .44), .67),
     "Wheel": (2, (151, 136, 120), (56, 37, 28), .66, (.45, .76), (.95, .38), .77),
     "CollarRing": (0, (172, 171, 164), (66, 59, 52), .56, (.309, .61), (.95, .49), .56),
@@ -277,6 +277,11 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += 119 * stemDetail - (2.5 * detail + 1.25 * medium) * stemCoverage
         warmth += .38 * stemWarmth * stemCoverage
         oxidation += (.024 * medium - .016 * pits) * stemCoverage
+    if name in ("Tab", "TabBack"):
+        tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, xx, sampledV)
+        tabDetail = tabTone * tabCoverage
+        tonalDelta += 107 * tabDetail - (2.7 * detail + 1.0 * medium) * tabCoverage
+        warmth += .28 * tabWarmth * tabCoverage
     if name == "Saddle":
         # Trade the generic grain for the photographed pits and rub marks.
         finePhoto, warmPhoto, shoeCoverage = PhotographicGrain(closeup, xx, vv)
@@ -327,6 +332,10 @@ def BakeRegion(name, sample, size, index, reference):
         heightField += .33 * stemDetail
         roughnessDelta -= (.016 * medium + .013 * pits) * stemCoverage
         roughnessDelta += .11 * np.maximum(-stemDetail, 0) - .089 * np.maximum(stemDetail, 0)
+    if name in ("Tab", "TabBack"):
+        heightField *= 1 - .56 * tabCoverage
+        heightField += .27 * tabDetail
+        roughnessDelta += .12 * np.maximum(-tabDetail, 0) - .073 * np.maximum(tabDetail, 0)
     if name == "Saddle":
         heightField *= 1 - .76 * shoeCoverage
         heightField += .29 * shoeDetail
@@ -670,6 +679,8 @@ def Bake():
                "stemDetail": reference["closeups"]["Stem"]["detail"],
                "saddleDetail": reference["closeups"]["Saddle"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
+               "tabDetail": reference["closeups"]["Tab"]["detail"],
+               "tabBackDetail": reference["closeups"]["TabBack"]["detail"],
                "knurlWear": reference["knurl"]["wear"]["detail"],
                "knurlFlank": reference["knurl"]["flankWear"]["detail"],
                "shoulderDirect": reference["shoulder"]["Direct"]["detail"],

@@ -1058,6 +1058,12 @@
         [0.902, 0.0019, 0.4542],
         [0.946, 0.0218, 0.3694]
       ],
+      "detail": {
+        "file": "Texture_Type89LauncherTabDetail.png",
+        "sha256": "f3b29bc03afeba184321b413da25bccf4407f58d1199d29e51eab8aff6a40be9",
+        "toneScale": 300,
+        "warmthScale": 520
+      },
       "rubbedCoverage": [
         [100, 100, 100, 97, 6, 0, 0, 0, 4, 0, 0, 0, 0, 27, 100, 31, 0],
         [100, 100, 94, 0, 0, 0, 0, 0, 0, 0, 18, 3, 0, 0, 0, 20, 100],
@@ -1197,6 +1203,12 @@
         [0.902, 0.0019, 0.4542],
         [0.946, 0.0218, 0.3694]
       ],
+      "detail": {
+        "file": "Texture_Type89LauncherTabBackDetail.png",
+        "sha256": "181c6d42470ac82a7f01adcb0bc1b5a21289576288e14e0d5348bcaafa12ed8b",
+        "toneScale": 300,
+        "warmthScale": 520
+      },
       "rubbedCoverage": [
         [0, 17, 95, 100, 100, 100, 100, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [3, 7, 0, 0, 0, 0, 0, 0, 0, 4, 16, 0, 0, 0, 0, 0, 0],

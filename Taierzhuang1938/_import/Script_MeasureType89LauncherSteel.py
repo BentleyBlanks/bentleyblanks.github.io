@@ -354,6 +354,23 @@ def NeckFinish(folder):
     return field
 
 
+def TabDetail(image, number, uAnchors, strips):
+    radius = 5.8 if number == 5 else 4.6
+    tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=radius)
+    columns = np.arange(image.shape[1])
+    rows = np.arange(image.shape[0])[:, None]
+    photoX, first, last = np.asarray(strips).T
+    edgeA, edgeB = (np.interp(columns, photoX, edge) for edge in (first, last))
+    clearance = np.minimum(rows - np.minimum(edgeA, edgeB), np.maximum(edgeA, edgeB) - rows)
+    confidence = np.clip((clearance - radius) / (radius + 1), 0, 1)
+    confidence *= np.clip((lightness - 22) / 22, 0, 1) * np.clip((246 - lightness) / 30, 0, 1)
+    uu, vv = np.meshgrid(np.linspace(uAnchors[0], uAnchors[-1], 480), np.linspace(0, 1, 144))
+    xs, start, end = (np.interp(uu, uAnchors, values) for values in (photoX, first, last))
+    name = "Tab" if number == 5 else "TabBack"
+    path = RECORD.with_name(f"Texture_Type89Launcher{name}Detail.png")
+    return SaveDetailPlate(tone, warmth, confidence, xs, start + vv * (end - start), path, halfSize=False)
+
+
 def TabFinish(folder, number):
     image, source = Photo(folder, number)
     # UV bounds sampled through the artwork's curved face. Each photograph
@@ -367,14 +384,16 @@ def TabFinish(folder, number):
               [[895, 283, 246], [935, 307, 258], [1005, 346, 257],
                [1100, 344, 270], [1200, 344, 268], [1280, 345, 257],
                [1360, 347, 240], [1425, 354, 313], [1461, 351, 322]])
-    first, last = outline[0][0], outline[-1][0]
+    uAnchors = np.asarray(outline)[:, 0]
+    first, last = uAnchors[0], uAnchors[-1]
     u = np.linspace(first, last, 33)
-    xs, starts, ends = (np.interp(u, np.asarray(outline)[:, 0], column) for column in np.asarray(strips).T)
+    xs, starts, ends = (np.interp(u, uAnchors, column) for column in np.asarray(strips).T)
     samples = np.array([[Sample(image, x, y, radius=3) for y in np.linspace(start, end, 17)]
                         for x, start, end in zip(xs, starts, ends)])
     source["sampleStrips"] = strips
     field = FinishMap(samples, source, {"uCenter": (first+last)/2, "uHalfSpan": (last-first)/2, "vRange": [0, 1]})
     field["outlineUV"] = outline
+    field["detail"] = TabDetail(image, number, uAnchors, strips)
     lightness = samples @ LUMA
     # Reflective rubbed edges are paired with the remainder of each strip.
     # Restrict the bright-metal estimate to the less saturated areas.
