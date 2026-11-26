@@ -192,6 +192,12 @@ The steel uses overlapping scan patches with locally selected offsets and orient
 
 The reference comparison and the Albedo, Roughness and Reflection screenshots from the actual inspection bench are in the archive's `Review` folder.
 
+### R30 band fit, rounded edges and worn finish
+
+The front band uses a closed oval loft with rounded outer lips and eased inner returns. Removing redundant strips leaves room for the denser rear-band crest and the Blender bevels on the collar, sight, handle shoulder, band strip and guard. The forearm seats further inside the bowed rear lip of the front band. The rear loop's display pose shows the opening in profile. The asset test checks both band shells for open edges and sweeps oblique sections at the timber joints. [Steven Lu, side photograph](https://armsofchina.com/wp-content/uploads/2026/04/143.jpg) · [Chinese National Geography, front band](https://www.dili360.com/ch/mag/detail/62.htm)
+
+The walnut bake adds fine grain along the carved volume and varies the worn oil across all three pieces. The steel bake separates neutral oxide, localized pits and satin machining marks from polished edges. The stock flanks are clear of lettering. The runtime retains 44 meshes at 79,584 triangles. The archive contains matched R29 and R30 views from the weapon inspection bench and captures of Albedo, Roughness, Reflection and Normal. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
@@ -214,7 +220,7 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Before promotion, an optional temporary `ReviewInput.glb` in the revision directory enables matched before/after shots; without it the review renders the finished asset only. The review includes neutral studio and narrow grazing light and saves the packed final `.blend` in the external revision directory. Promote only `Model_HanYang173R.glb` and `Data_GameGeometry.json` from that directory to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
+The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Set `HANYANG_BAKE_GEOMETRY_DIR` for staged bevel and contact fields. Set `HANYANG_BAKE_OUTPUT_DIR` for the staged GLB, report and packed Blender review. Before promotion, an optional temporary `ReviewInput.glb` in the revision directory enables matched before/after shots; without it the review renders the finished asset only. The review includes neutral studio and narrow grazing light and saves the packed final `.blend` in the external revision directory. Promote only `Model_HanYang173R.glb` and `Data_GameGeometry.json` from that directory to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
 
 ## Historical photo-reference material revision R2, 2026-11-13
 

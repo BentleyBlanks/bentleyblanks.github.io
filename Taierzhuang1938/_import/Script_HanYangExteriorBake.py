@@ -7,7 +7,7 @@ import struct
 from pathlib import Path
 import moderngl
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
-from Script_HanYangBandProfiles import FormRearBandRib, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBandProfiles import FormInspectionBand, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
 import numpy as np
 from PIL import Image
@@ -23,7 +23,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261126R29'
+version = '173R-20261126R30'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -38,7 +38,7 @@ stockProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragment
 steelDetails = {
     'HandledCylinder': 1,
     'HandleNeck': 2,
-    'HandleRoot': 2,
+    'HandleRoot': 5,
     'RearSmallCover': 2,
     'RearSmallPin': 2,
     'RearCockingExterior': 3,
@@ -160,9 +160,7 @@ for node in doc['nodes']:
             streams.update(TEXCOORD_0=uv[firstCorner],TANGENT=tangents[firstCorner])
             faceIndices=remap.astype(faceIndices.dtype).reshape(-1,1)
         if name in ('FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown'):
-            streams=ShapeBandProfile(name,streams)
-            if name == 'RearBand_ControlledCrown':
-                streams, faceIndices = FormRearBandRib(streams, faceIndices)
+            streams, faceIndices = FormInspectionBand(name, streams, faceIndices)
             bandProfiles[name]=(streams['POSITION'],faceIndices)
         streams=SmoothRingFrames(name,streams,faceIndices)
         previousFaceCount=faceIndices.size//3
@@ -204,6 +202,8 @@ for node in doc['nodes']:
     handling=timberHandling[name] if wood else visibility
     handlingBuffer=context.buffer(handling.astype('<f4',copy=False).tobytes());resources.append(handlingBuffer);bind.append((handlingBuffer,'1f','handling'))
     rounded=bevels[name+'_EDGE_WEAR'] if bevelChart else np.zeros(vertexCount,'<f4')
+    if name in bandProfiles:
+        rounded=streams['EDGE_WEAR']
     assert rounded.shape == (vertexCount,), name
     roundedBuffer=context.buffer(rounded.tobytes());resources.append(roundedBuffer);bind.append((roundedBuffer,'1f','rounded'))
     indexBuffer=context.buffer(ind);vao=context.vertex_array(program,bind,indexBuffer,index_element_size={5125:4,5123:2}[indices['componentType']]);resources.extend([vao,indexBuffer]);
@@ -297,7 +297,7 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R29: non-periodic scan patches, shaped walnut growth rings, worn oil and differentiated steel reflectance.'
+report['rebake']='R30: rolled band edges, rounded exposed steel, aged walnut fibres and localized satin steel wear.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
 report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)

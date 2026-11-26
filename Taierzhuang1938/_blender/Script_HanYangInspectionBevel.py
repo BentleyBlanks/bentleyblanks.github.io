@@ -53,16 +53,37 @@ def ExposedEdge(name, edge, width):
     if name == 'ReceiverOuterCollar':
         # Ring edges on the two front steps and the rear of the raised shell.
         step = any(abs(midpoint.z - centre) < halfWidth for centre, halfWidth in
-                   ((-.265, .002), (-.25855, .00025), (-.25467, .00035), (-.22125, .00045)))
-        return (step and midpoint.y > .039 and abs(first.z - second.z) < .00080
-                and math.radians(19) < turn < math.radians(115))
+                   ((-.265, .002), (-.25855, .00044), (-.25467, .00052), (-.22125, .00063)))
+        return (step and midpoint.y > .039 and abs(first.z - second.z) < .00099
+                and math.radians(17) < turn < math.radians(122))
     if name == 'HandleRoot':
         return midpoint.x > .0075 and length > 1. and turn > math.radians(21.8)
+    if name.startswith('LowerPlateGuard_'):
+        return abs(midpoint.x) > .0074 and length > .62 and math.radians(32) < turn < math.radians(111)
     return turn > math.radians(25)
+
+
+def BroadenSightReturn(points):
+    """Open up the narrow lip already present around the visible sight block."""
+    points = points.copy()
+    low, high = points.min(axis=0), points.max(axis=0)
+    fromTop = high[1]-points[:, 1]
+    upper = fromTop < .00014
+    perimeter = np.zeros(len(points), dtype=bool)
+    for axis in (0, 2):
+        atLow = upper & (points[:, axis]-low[axis] < .00013)
+        atHigh = upper & (high[axis]-points[:, axis] < .00013)
+        points[atLow, axis] += 1.25*(points[atLow, axis]-low[axis])
+        points[atHigh, axis] -= 1.25*(high[axis]-points[atHigh, axis])
+        perimeter |= atLow | atHigh
+    points[perimeter, 1] -= 1.25*fromTop[perimeter]
+    return points
 
 
 def RoundedMesh(name, source, width):
     positions, triangles = source(name)
+    if name == 'Sight_LowCrossPiece':
+        positions = BroadenSightReturn(positions)
     points, remap = np.unique(np.round(positions, 6), axis=0, return_inverse=True)
     faces = remap.reshape(-1)[triangles]
     keys = np.sort(faces, axis=1)
@@ -83,7 +104,7 @@ def RoundedMesh(name, source, width):
         edit.normal_update()
         edges = [edge for edge in edit.edges if ExposedEdge(name, edge, width*1000)]
         assert edges, name
-        bevel = bmesh.ops.bevel(edit, geom=edges, offset=width*1000, segments=3, profile=.5,
+        bevel = bmesh.ops.bevel(edit, geom=edges, offset=width*1000, segments=4, profile=.5,
                                 affect='EDGES', clamp_overlap=False, loop_slide=False)
         assert bevel['faces'], name
         for face in bevel['faces']:
@@ -217,11 +238,13 @@ def Atlas(name, source, width):
 
 base = Sources('Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
 approved = Sources('Input_ExteriorGeometry.glb', 'e125056b12391f022f7e22969bb3acdf192295be711995b6ac43b958b31f47ec')
-plans = [('ReceiverOuterCollar', approved, .00029),
-         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00030),
-         ('Sight_LowCrossPiece', base, .00033),
-         ('Sight_ShallowRoundSeat', base, .00027),
-         ('HandleRoot', approved, .00017)]
+plans = [('ReceiverOuterCollar', approved, .00036),
+         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00037),
+         ('Sight_LowCrossPiece', base, .00040),
+         ('Sight_ShallowRoundSeat', base, .00033),
+         ('HandleRoot', approved, .00021),
+         ('LowerPlateGuard_FlatSideNarrowReturn', approved, .00025),
+         ('FrontBandSideStrip', approved, .00023)]
 selection = list(bpy.context.selected_objects)
 active = bpy.context.view_layer.objects.active
 output = {}

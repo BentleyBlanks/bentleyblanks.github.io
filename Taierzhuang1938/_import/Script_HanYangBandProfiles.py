@@ -144,10 +144,11 @@ def SeatFrontBandTimber(streams, indices, bounds):
     lower, lowerSlope = SmoothWeight((.033-y)/.009)
     side, sideSlope = SmoothWeight((abs(x)-.005)/.006)
     flank = .18+.82*side
-    scale = 1.-.083*entry*exit*lower*flank
-    dx = -.083*entry*exit*lower*.82*sideSlope*np.sign(x)/.006
-    dy = .083*entry*exit*lowerSlope*flank/.009
-    dz = -.083*lower*flank*(entrySlope*exit/.012-entry*exitSlope/.016)
+    shoulderInset = .095
+    scale = 1.-shoulderInset*entry*exit*lower*flank
+    dx = -shoulderInset*entry*exit*lower*.82*sideSlope*np.sign(x)/.006
+    dy = shoulderInset*entry*exit*lowerSlope*flank/.009
+    dz = -shoulderInset*lower*flank*(entrySlope*exit/.012-entry*exitSlope/.016)
     height = y-.027
     jacobian = np.broadcast_to(np.eye(3), (len(points), 3, 3)).copy()
     jacobian[:, 0, 0] = scale+x*dx
@@ -309,6 +310,44 @@ def SampleBandSection(triangles, depth, center, rays):
     return inner, outer
 
 
+def FormFrontBand(streams, indices):
+    """Resample the visible oval with rolled outer edges and eased inside returns."""
+    points = streams['POSITION'].astype(np.float64)
+    low, high = points.min(axis=0), points.max(axis=0)
+    center = (low[:2]+high[:2])/2.
+    angle = np.arange(64) * (2.*np.pi/64)
+    rays = np.column_stack((np.cos(angle), np.sin(angle)))
+    middle = .5*(low[2]+high[2])
+    inner, outer = SampleBandSection(points[indices.reshape(-1, 3)], middle, center, rays)
+    angles = np.linspace(0., np.pi/2, 4)
+
+    def Ring(radial, depth):
+        return np.column_stack((center+radial[:, None]*rays, np.full(len(rays), depth)))
+
+    def Lip(radial, depth, normal, inward, radius):
+        rings = [Ring(radial + normal*radius*(np.sin(theta)-1.),
+                      depth + inward*radius*(1.-np.cos(theta))) for theta in angles]
+        return rings
+
+    frontOuter = Lip(outer, low[2], 1., 1., .00053)
+    rearOuter = Lip(outer, high[2], 1., -1., .00053)
+    rearInner = Lip(inner, high[2], -1., -1., .00029)
+    frontInner = Lip(inner, low[2], -1., 1., .00029)
+    grid = [*frontOuter, Ring(outer, middle), *rearOuter[::-1],
+            *rearInner, Ring(inner, middle), *frontInner[::-1]]
+    outerWear = [1., .84, .47, 0.]
+    innerWear = [.46, .39, .22, 0.]
+    wear = [*outerWear, 0., *outerWear[::-1], *innerWear, 0., *innerWear[::-1]]
+    return PackBandLoft(streams, np.asarray(grid), np.asarray(wear), indices.dtype)
+
+
+def FormInspectionBand(name, streams, indices):
+    if name == 'FrontBand_ContinuousEnvelopeContact':
+        streams, indices = FormFrontBand(streams, indices)
+        return ShapeBandProfile(name, streams), indices
+    return FormRearBandRib(ShapeBandProfile(name, streams), indices)
+
+
 def FormRearBandRib(streams, indices):
     """Loft the existing band contour and add the raised exterior rib."""
     positions = streams['POSITION'].astype(np.float64)
@@ -318,9 +357,9 @@ def FormRearBandRib(streams, indices):
     angle = np.arange(64) * (2.*np.pi/64)
     rays = np.column_stack((np.cos(angle), np.sin(angle)))
     center = (low[:2] + high[:2]) / 2.
-    outside = (.004, .064, .25, .38, .51, .63, .75, .936, .996)
-    inside = (.996, .83, .17, .004)
-    grid = []
+    outside = (.004, .028, .064, .14, .25, .38, .45, .51, .57, .63, .75, .86, .936, .972, .996)
+    inside = (.996, .96, .83, .17, .04, .004)
+    grid, wear = [], []
     for surface, fractions in ((1, outside), (0, inside)):
         for fraction in fractions:
             depth = low[2] + fraction * (high[2] - low[2])
@@ -333,22 +372,29 @@ def FormRearBandRib(streams, indices):
                 crest = max(1. - ((fraction - .51)/.235)**2, 0.)**2
                 xy[:, 0] *= 1. + .043 * crest * rise * fall
             grid.append(np.column_stack((xy, np.full(len(rays), depth))))
-    grid = np.asarray(grid)
+            wear.append((1. if surface else .43) * (1. - SmoothWeight(min(fraction, 1.-fraction)/.094)[0]))
+    return PackBandLoft(streams, np.asarray(grid), np.asarray(wear), indexType)
 
+
+def PackBandLoft(streams, grid, wear, indexType):
     # Give the broad faces and the returns a continuous normal along the loft.
     tangent = np.roll(grid, -1, axis=1) - np.roll(grid, 1, axis=1)
-    acrossProfile = np.roll(grid, -1, axis=0) - np.roll(grid, 1, axis=0)
+    incoming = grid - np.roll(grid, 1, axis=0)
+    outgoing = np.roll(grid, -1, axis=0) - grid
+    acrossProfile = incoming / np.linalg.norm(incoming, axis=2)[..., None]
+    acrossProfile += outgoing / np.linalg.norm(outgoing, axis=2)[..., None]
     normal = np.cross(tangent, acrossProfile)
-    normal /= np.linalg.norm(normal, axis=2)[:, :, None]
-    tangent /= np.linalg.norm(tangent, axis=2)[:, :, None]
+    normal /= np.linalg.norm(normal, axis=2)[..., None]
+    tangent /= np.linalg.norm(tangent, axis=2)[..., None]
+    sectors = grid.shape[1]
     # Four near-square islands keep the density similar across and around the band.
     row = np.arange(len(grid) + 1) % len(grid)
     sectorCount = 4
-    sectorWidth = len(rays) // sectorCount
+    sectorWidth = sectors // sectorCount
     patchWidth = sectorWidth + 1
-    positions, normals, tangents, coordinates, indices = [], [], [], [], []
+    positions, normals, tangents, coordinates, indices, wearValues = [], [], [], [], [], []
     for sector in range(sectorCount):
-        col = (sector*sectorWidth + np.arange(patchWidth)) % len(rays)
+        col = (sector*sectorWidth + np.arange(patchWidth)) % sectors
         patch = grid[row[:, None], col[None, :]]
         curved = np.linalg.norm(np.diff(patch, axis=1), axis=2).mean(axis=0)
         profile = np.linalg.norm(np.diff(patch, axis=0), axis=2).mean(axis=1)
@@ -361,11 +407,13 @@ def FormRearBandRib(streams, indices):
         faces = np.stack((corner, corner+1, corner+patchWidth,
                           corner+1, corner+patchWidth+1, corner+patchWidth), axis=-1)
         positions.append(patch.reshape(-1, 3))
+        wearValues.append(np.repeat(wear[row], patchWidth))
         normals.append(normal[row[:, None], col[None, :]].reshape(-1, 3))
         tangents.append(tangent[row[:, None], col[None, :]].reshape(-1, 3))
         coordinates.append(coordinate.reshape(-1, 2))
         indices.append(faces.reshape(-1, 1))
     result = {'POSITION': np.concatenate(positions).astype('<f4'), 'NORMAL': np.concatenate(normals).astype('<f4')}
+    result['EDGE_WEAR'] = np.concatenate(wearValues).astype('<f4')
     if 'TEXCOORD_0' in streams:
         result['TEXCOORD_0'] = np.concatenate(coordinates).astype('<f4')
     if 'TANGENT' in streams:

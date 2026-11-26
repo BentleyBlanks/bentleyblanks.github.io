@@ -5,7 +5,7 @@ from scipy.spatial import ConvexHull
 
 
 DisplayPoses = {
-    'RearBand_ExternalAttachmentLoop': ((0., .0110, -.582), 0., 63., 46., 0.),
+    'RearBand_ExternalAttachmentLoop': ((0., .0110, -.582), 0., 53., 46., 0.),
     'RearStock_ExternalAttachmentLoop': ((0., -.0327, .0438), 18., 76., 67., -.00148),
 }
 
@@ -26,7 +26,7 @@ def PoseRingNode(name, node, positions, rearBandBounds=None):
         if axis[0]<0:axis=-axis
         roll=Rotation.from_rotvec(np.radians(16.)*np.array([0.,axis[1],-axis[0]]))
         centre=posed.mean(axis=0)
-        shift=(rearBandBounds[1]-rearBandBounds[0])*np.array([.09,-.080,-.17])
+        shift=(rearBandBounds[1]-rearBandBounds[0])*np.array([.065,-.073,-.132])
         translation=centre+roll.apply(translation-centre)+shift
         turn=roll*turn
     node.update(translation=translation.tolist(), rotation=turn.as_quat().tolist())

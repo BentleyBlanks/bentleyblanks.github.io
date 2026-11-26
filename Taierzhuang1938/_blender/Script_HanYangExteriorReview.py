@@ -8,10 +8,11 @@ from mathutils import Vector
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
 revision = archive/'ExteriorFinish_20261122'
-output = revision/'Review'
+bakeDirectory = Path(os.environ.get('HANYANG_BAKE_OUTPUT_DIR', revision))
+output = bakeDirectory/'Review'
 output.mkdir(exist_ok=True)
 saveOnly = os.environ.get('HANYANG_REVIEW_SAVE_ONLY') == '1'
-assert not bpy.data.filepath or Path(bpy.data.filepath).parent == revision
+assert not bpy.data.filepath or Path(bpy.data.filepath).resolve().parent in (revision.resolve(), bakeDirectory.resolve())
 poses = {'Side':((0,.37,-.02),(1,0,.04),1.36), 'Receiver':((0,.163,.015),(1,-.09,.20),.328),'Band':((0,.584,.035),(1,-.13,.27),.073),'GuardRaking':((0,.129,-.003),(.78,-.50,-.44),.216),'BandRaking':((0,.584,.035),(1,-.13,.27),.073)}
 sources=[('After','Model_HanYang173R.glb')]
 poses.update(ForeWood=((0,.408,.034),(1,-.06,.12),.415),UnderWood=((0,.033,-.016),(.83,-.30,-.49),.180))
@@ -55,9 +56,10 @@ for label, source in sources:
     for obj in list(bpy.context.scene.objects):
         bpy.data.objects.remove(obj,do_unlink=True)
     bpy.data.orphans_purge(do_recursive=True)
-    bpy.ops.import_scene.gltf(filepath=str(revision/source), merge_vertices=False)
+    modelPath = bakeDirectory/source if label == 'After' else revision/source
+    bpy.ops.import_scene.gltf(filepath=str(modelPath), merge_vertices=False)
     scene=bpy.context.scene
-    with (revision/source).open('rb') as glb:
+    with modelPath.open('rb') as glb:
         header=glb.read(20)
         metadata=json.loads(glb.read(int.from_bytes(header[12:16],'little')))['asset']
     if not metadata.get('extras',{}).get('calibratedBaseColor'):
@@ -92,14 +94,14 @@ for label, source in sources:
             if target!=camera:
                 target.data=camera.data.copy();target.name='Review_'+view;scene.collection.objects.link(target)
             FrameReviewCamera(target,view)
-        scene.camera=bpy.data.objects['Review_Band'];scene['gameAssetSha256']=hashlib.sha256((revision/source).read_bytes()).hexdigest()
-        scene.render.filepath=str(output/'Review_Render.png')
+        scene.camera=bpy.data.objects['Review_Band'];scene['gameAssetSha256']=hashlib.sha256(modelPath.read_bytes()).hexdigest()
+        scene.render.filepath='//Review/Review_Render.png'
         for area in bpy.context.screen.areas:
             if area.type=='VIEW_3D':
                 area.spaces.active.region_3d.view_perspective='CAMERA';area.spaces.active.overlay.show_overlays=False
                 shading=area.spaces.active.shading;shading.type='MATERIAL';shading.use_scene_lights=True;shading.use_scene_world=True
         bpy.context.preferences.filepaths.save_version=0
-        bpy.ops.file.pack_all();bpy.ops.wm.save_as_mainfile(filepath=str(revision/'Scene_HanYangExterior.blend'))
+        bpy.ops.file.pack_all();bpy.ops.wm.save_as_mainfile(filepath=str(bakeDirectory/'Scene_HanYangExterior.blend'))
         if saveOnly:
             break
         scene.camera=camera
@@ -137,7 +139,7 @@ for label, source in sources:
         for light,position,energy,length,width,rotation in originalLights:
             light.location=position;light.rotation_euler=rotation;light.data.energy=energy;light.data.size=length;light.data.size_y=width
         FrameReviewCamera(camera,'Side');scene.camera=bpy.data.objects['Review_Band']
-        scene.render.filepath=str(output/'Review_Render.png')
+        scene.render.filepath='//Review/Review_Render.png'
         receipt={'gameAssetSha256':scene['gameAssetSha256'],'views':{
             view:hashlib.sha256((output/('After_'+view+'.png')).read_bytes()).hexdigest() for view in poses}}
         (output/'Data_RenderReceipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
