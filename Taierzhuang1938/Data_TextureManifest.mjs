@@ -118,6 +118,8 @@ const EAST_TRACK_TERRAIN_BYTES = 640 * 1024;
 const AIRCRAFT_DITCH_TERRAIN_BYTES = 650 * 1024;
 // Special pull-cord cookable stick grenade (ExplosionRange): 512² spark/smoke VFX atlases + 512²/256² tactical wrap/cord PBR (243 KiB total, lazy/fx only).
 const TIMED_GRENADE_ASSETS_BYTES = 256 * 1024;
+// The direct-hit PNG and its source note add less than 20 KiB to a full texture directory.
+const HUD_DAMAGE_ARC_BYTES = 20 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -144,7 +146,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
   totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES
     + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
     + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
-    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES,
+    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES + HUD_DAMAGE_ARC_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1371,6 +1373,15 @@ export const TEXTURE_MANIFEST = Object.freeze([
     files: [
       ["Texture_BloodSplatterCc0.webp", "Mask", 1600, 1200],
     ],
+  },
+  {
+    id: "HudDamageArc", kind: "hud", tier: "ui", assetBudgetBytes: 18 * 1024,
+    source: {
+      provider: "imagegen", date: "2026-11-27", ref: "OpenAI Image API, gpt-image-2, high",
+      prompt: "Texture/Hud/Data_HudDamageArtwork.md",
+    },
+    consumers: [{ file: "Data_Tuning_Hud.mjs", token: "Texture_HudDamageArc_DryBrush" }],
+    files: [["Hud/Texture_HudDamageArc_DryBrush.png", "Image", 640, 248]],
   },
   {
     id: "HudPeripheralBlood", kind: "hud", tier: "ui",

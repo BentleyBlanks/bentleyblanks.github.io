@@ -6,6 +6,10 @@
 > 这份文档把那句话拆成三件独立的事，各自记清楚改了什么、为什么、怎么复测。
 > 回归口：`node Taierzhuang1938/Script_DamageTest.mjs`（退出码即成败）。
 
+## 2026-11-27 红色命中弧改用干刷贴图
+
+直接命中使用 `Texture_HudDamageArc_DryBrush.png`。沿用准心为圆心的摆放和旋转逻辑，红弧边缘用不等长的干刷缺口，中央尖端清晰。白色近失弧继续使用原来的程序光栅，方向、合并规则和消退沿用来弹指示器的现有逻辑。生成记录见[受击 HUD 素材](../Texture/Hud/Data_HudDamageArtwork.md)，渲染回归入口为 `Script_IncomingFireBrowserTest.mjs`。
+
 ## 2026-09-15：来弹弧改成 COD 式、以准心为圆心
 
 玩家实机截图里红弧斜着扫过准心旁边，读不出方向。量了 09-13 那张生成图：弧的曲率中心

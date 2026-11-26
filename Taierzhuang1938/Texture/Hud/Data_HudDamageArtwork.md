@@ -1,4 +1,12 @@
-# 低血量素材
+# 受击 HUD 素材
+
+## 2026-11-27 红色命中干刷弧
+
+用户选定 B 干刷版并要求缺口更明显。以 B 的灰度图为输入，通过 OpenAI Image API 编辑，模型为 `gpt-image-2`、画质档为 `high`，输出 `1280 × 512` 灰度图。按原来弹弧的准心坐标对齐轮廓、转为透明度，沿用命中红色，缩成 `640 × 248` RGBA PNG。HUD 按 `(-40, -78, 80, 31)` 放置贴图并随来弹方向旋转，白色近失弧仍用原程序光栅。
+
+```text
+Use case: precise-object-edit. This is the approved grayscale dry-brush opacity matte for an original first-person game HUD hit-direction indicator. Black is transparent, white is the most opaque. Edit this existing matte, keeping the single shallow circular arc, canvas 1280 x 512, registration, top central outward-pointed peak, thin tapered tips and center spine closely aligned. Increase the visible dry-brush erosion of the existing B version by one step. Carve about 5 to 7 asymmetric shallow bite-shaped notches of different lengths and depths into its two long edges, with roughly 4 to 9 pixels of local depth and at least a few 14 to 28 pixels long along the curve. Concentrate on the left mid-arc and right upper shoulder, with irregular clusters and smoother intervals; keep the center point clear. Make the ragged spots and short brush fibers slightly more pronounced, broad enough to survive miniaturization, with a very few bristles barely extending from the core. Edges feel like dry pigment dragged in the direction of the arc, rather than serrations. Preserve a continuous untouched bright inner spine throughout. Geometry, peak direction, overall length and normal body thickness stay consistent. Retain restrained ink grain and keep the darkest areas uniformly solid black. No isolated flecks, hollow holes, splits across the spine, text, vignette, glow, background grain, other shapes, frames, color, or layout shifts. One arc only.
+```
 
 ## 2026-10-13：用户选定 B / D HUD
 

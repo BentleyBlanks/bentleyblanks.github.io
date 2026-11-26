@@ -957,43 +957,54 @@ export class Hud {
    * 为什么非要有：这一版之前玩家挨枪只有两件事会发生 —— 血掉了、暗角亮一点点
    *（而暗角是 health<70 才开始的，70 到 0 只隔两发）。也就是说在"还有得救"的
    * 那段血量里，屏幕上**什么都没发生**，玩家既不知道自己在挨打，更不知道朝哪边躲。
-   * 五个方位共用同一条以准心为圆心的弧（HitDirArcPath）；转身只改 rotate。
-   * 颜色走两套渐变：实际命中血红、近失弹白色，两头都沿弧长渐隐。
+   * 红色命中贴图与白色近失弧共用相对准心的坐标，转身只改 rotate。
    */
   BuildHitDirs() {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("class", "hudHitDirs");
     svg.setAttribute("viewBox", "-100 -100 200 200");
     svg.setAttribute("aria-hidden", "true");
-    // Rasterize the two fixed indicators once. Live SVG blur/gradients used to
-    // compile several Skia programs together on the very first near miss.
     const edge = HITDIR.radius * Math.sin(HITDIR.spanDeg * Math.PI / 360);
     const pad = Math.ceil(HITDIR.glowBlur * 4 + HITDIR.halfWidth);
-    const x = -Math.ceil(edge)-pad, y = -Math.ceil(HITDIR.radius+HITDIR.tipHeight+HITDIR.halfWidth)-pad;
-    const w = -2*x, h = Math.ceil(-HITDIR.radius*Math.cos(HITDIR.spanDeg*Math.PI/360))+pad-y;
-    const path = new Path2D(HitDirArcPath(HITDIR)), scale = 8;
-    const Bake = near => {
-      const canvas = document.createElement("canvas"); canvas.width=w*scale; canvas.height=h*scale;
-      const c=canvas.getContext("2d", {willReadFrequently:true});
-      c.setTransform(scale,0,0,scale,-x*scale,-y*scale);
-      const gradient=c.createLinearGradient(-edge,0,edge,0), shade=c.createLinearGradient(-edge,0,edge,0);
-      const colors=near?["rgba(255,255,255,0)","rgba(242,238,230,.65)","white"]
-        :["rgba(122,11,22,0)","rgba(168,28,38,.7)","rgb(227,38,48)"];
-      [0,.2,.5,.8,1].forEach((t,i)=>gradient.addColorStop(t,colors[Math.min(i,4-i)]));
-      shade.addColorStop(0,"transparent");shade.addColorStop(.5,"black");shade.addColorStop(1,"transparent");
-      c.filter=`blur(${HITDIR.glowBlur*scale}px)`;c.globalAlpha=near ? .45 : .4;c.fillStyle=near?shade:gradient;c.fill(path);
-      c.filter="none";c.globalAlpha=1;c.fillStyle=gradient;c.fill(path);
-      return canvas.toDataURL();
-    };
-    const hitImage=Bake(false), nearImage=Bake(true);
+    const x = -Math.ceil(edge) - pad;
+    const y = -Math.ceil(HITDIR.radius + HITDIR.tipHeight + HITDIR.halfWidth) - pad;
+    const width = -2 * x;
+    const height = Math.ceil(-HITDIR.radius * Math.cos(HITDIR.spanDeg * Math.PI / 360)) + pad - y;
+    const hitImage = new URL(HITDIR.hitTexture, import.meta.url).href;
+
+    // Bake the near-miss glow at HUD construction instead of on the first alert.
+    const scale = 8;
+    const canvas = document.createElement("canvas");
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.setTransform(scale, 0, 0, scale, -x * scale, -y * scale);
+    const path = new Path2D(HitDirArcPath(HITDIR));
+    const ink = context.createLinearGradient(-edge, 0, edge, 0);
+    const shade = context.createLinearGradient(-edge, 0, edge, 0);
+    const colors = ["rgba(255,255,255,0)", "rgba(242,238,230,.65)", "white"];
+    [0, .2, .5, .8, 1].forEach((stop, i) => ink.addColorStop(stop, colors[Math.min(i, 4 - i)]));
+    shade.addColorStop(0, "transparent");
+    shade.addColorStop(.5, "black");
+    shade.addColorStop(1, "transparent");
+    context.filter = `blur(${HITDIR.glowBlur * scale}px)`;
+    context.globalAlpha = .45;
+    context.fillStyle = shade;
+    context.fill(path);
+    context.filter = "none";
+    context.globalAlpha = 1;
+    context.fillStyle = ink;
+    context.fill(path);
+    const nearImage = canvas.toDataURL();
     this.hitDirNodes = [];
     for (let i = 0; i < HIT_FEEDBACK.markMax; i += 1) {
       const node = document.createElementNS(NS, "g");
       node.setAttribute("class", "hudHitDir");
       node.style.opacity = "0";
-      for(const [kind,href] of [["hit",hitImage],["near",nearImage]]){
-        const image=document.createElementNS(NS,"image");image.setAttribute("class",`hudArcImage ${kind}`);
-        for(const [key,v] of Object.entries({x,y,width:w,height:h,href}))image.setAttribute(key,v);
+      for (const [kind, href] of [["hit", hitImage], ["near", nearImage]]) {
+        const image = document.createElementNS(NS, "image");
+        image.setAttribute("class", `hudArcImage ${kind}`);
+        for (const [key, value] of Object.entries({ x, y, width, height, href })) image.setAttribute(key, value);
         node.appendChild(image);
       }
       svg.appendChild(node);

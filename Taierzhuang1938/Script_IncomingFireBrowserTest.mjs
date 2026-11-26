@@ -61,9 +61,16 @@ try {
         const r=Math.hypot(x,y),a=Math.atan2(x,-y)*180/Math.PI;minR=Math.min(minR,r);maxR=Math.max(maxR,r);minDeg=Math.min(minDeg,a);maxDeg=Math.max(maxDeg,a);
         if(el.classList.contains("hit")?data[i]>data[i+1]*3:data[i+1]>210)bright++;
       }
-      sprites[el.classList.contains("hit")?"hit":"near"]={minR,maxR,minDeg,maxDeg,bright};
+      const src = img.src.startsWith("data:") ? img.src.split(",", 1)[0] : img.src;
+      sprites[el.classList.contains("hit")?"hit":"near"]={
+        minR,maxR,minDeg,maxDeg,bright,src,width:img.width,height:img.height
+      };
     }return sprites;
   });
+  const hitTextureUrl = new URL(HITDIR.hitTexture, `${base}/Taierzhuang1938/`);
+  assert.equal(arcShape.hit?.src, hitTextureUrl.href, "Direct hits load the versioned dry-brush texture");
+  assert.deepEqual([arcShape.hit.width, arcShape.hit.height], [640, 248], "Dry-brush image fits the HUD raster");
+  assert.ok(arcShape.near?.src.startsWith("data:image/png"), "Near misses still use the baked white arc");
   for(const kind of ["hit","near"]){const arc=arcShape[kind];assert.ok(arc?.bright>1000,`${kind} has the correct bright ink`);
     assert.ok(arc.minR>=HITDIR.radius-HITDIR.halfWidth-.35&&arc.minR<HITDIR.radius,"arc inner edge stays on the sight-centred ring");
     assert.ok(arc.maxR<=HITDIR.radius+HITDIR.halfWidth+HITDIR.tipHeight+.35&&arc.maxR>HITDIR.radius+HITDIR.tipHeight-.5,"central tip points outwards");

@@ -96,6 +96,8 @@ export const MELEE_KILL_BLOOD = Object.freeze({
  * 两端 67，跨 110°），旋转后像一根弯棍斜扫过准心，而不是绕着准心的一圈。
  */
 export const HITDIR = Object.freeze({
+  /** 命中干刷图的 640×248 画布对应 SVG 中的 (-40, -78, 80, 31)。 */
+  hitTexture: "./Texture/Hud/Texture_HudDamageArc_DryBrush.png?v=20261127DryBrush",
   /** 弧的中线半径。离准心太近会压住瞄准，太远余光看不到。 */
   radius: 64,
   /** 弧的总张角（度）。 */
