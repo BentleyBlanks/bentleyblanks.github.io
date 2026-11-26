@@ -14,6 +14,7 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
+SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
 
@@ -101,10 +102,10 @@ def OverallBarrelPatina(folder, footprint):
     return {"source": source, "footprint": footprint, **PatinaMap(samples)}
 
 
-def PhotoResiduals(image):
+def PhotoResiduals(image, envelopeRadius=8.0):
     photo = Image.fromarray(image.astype(np.uint8))
     fine = np.asarray(photo.filter(ImageFilter.GaussianBlur(.58)), dtype=np.float32)
-    surround = np.asarray(photo.filter(ImageFilter.GaussianBlur(8.0)), dtype=np.float32)
+    surround = np.asarray(photo.filter(ImageFilter.GaussianBlur(envelopeRadius)), dtype=np.float32)
     lightness = fine @ LUMA
     envelope = surround @ LUMA
     tone = (lightness - envelope) / np.maximum(envelope, 35)
@@ -240,6 +241,30 @@ def StemFinish(folder):
     return field
 
 
+def ShoeDetail(image, strips):
+    guide, left, right = np.asarray(strips, dtype=float).T
+    x0, y0 = int(left.min()), int(guide[0])
+    x1, y1 = int(right.max()) + 2, int(guide[-1]) + 2
+    rows = np.arange(y0, y1)
+    lo = np.interp(rows, guide, left)
+    hi = np.interp(rows, guide, right)
+    columns = np.arange(x0, x1)[None, :]
+    sourceX = np.clip(columns, np.ceil(lo[:, None] + 1), np.floor(hi[:, None] - 1)).astype(int)
+    # Extend the nearest steel pixels before blurring so the background
+    # and curled edge do not get interpreted as wear on the face.
+    padded = image[rows[:, None], sourceX]
+    tone, warmth, lightness = PhotoResiduals(padded, envelopeRadius=4.65)
+    margin = np.minimum(columns - lo[:, None], hi[:, None] - columns)
+    confidence = np.clip(margin / 5, 0, 1) * np.clip((hi - lo - 19) / 26, 0, 1)[:, None]
+    confidence *= np.clip((245 - lightness) / 30, 0, 1)
+    u, v = np.meshgrid(np.linspace(0, 1, 336), np.linspace(0, 1, 152))
+    y = guide[0] + (guide[-1] - guide[0]) * u
+    a = np.interp(y, guide, left)
+    b = np.interp(y, guide, right)
+    x = b + v * (a - b)
+    return SaveDetailPlate(tone, warmth, confidence, x - x0, y - y0, SADDLE_DETAIL, halfSize=False)
+
+
 def ShoeFinish(folder):
     image, source = Photo(folder, 1)
     # On the photographed convex face U increases downward and V toward the
@@ -261,6 +286,7 @@ def ShoeFinish(folder):
     # Chroma distinguishes brown oxidation from a dark unlit blue-gray spot.
     residue = np.clip((warmth - .035) / .255, 0, 1)
     field["oxideCoverage"] = np.rint(100 * residue).astype(int).tolist()
+    field["detail"] = ShoeDetail(image, strips)
     return field
 
 

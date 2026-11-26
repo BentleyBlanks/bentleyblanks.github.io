@@ -17,6 +17,7 @@ SOURCE = HERE / "Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp"
 REFERENCE = HERE / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 ATLAS = json.loads((HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json").read_text(encoding="utf-8"))
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
+LUMA_NEUTRAL_WARMTH = np.array([.48, -.101, -.414])
 
 # API sample quadrant, polished sRGB, oxidized sRGB, oxide coverage,
 # polished / oxidized roughness, polished / oxidized metalness, relief strength.
@@ -270,6 +271,13 @@ def BakeRegion(name, sample, size, index, reference):
         blue = np.exp(-(((xx - .397) / .14) ** 2 + ((vv - .46) / .47) ** 2))
         oxidation += .090 * blue
         warmth -= .021 * blue
+    if name == "Saddle":
+        # Trade the generic grain for the photographed pits and rub marks.
+        finePhoto, warmPhoto, shoeCoverage = PhotographicGrain(closeup, xx, vv)
+        shoeDetail = finePhoto * shoeCoverage
+        tonalDelta += 94 * shoeDetail - (3.0 * detail + 1.2 * medium) * shoeCoverage
+        warmth += .36 * warmPhoto * shoeCoverage
+        oxidation += (.037 * medium - .023 * pits) * shoeCoverage
     if name == "CollarRing":
         photoPits, photoWarmth, photoCoverage = PhotographicGrain(closeup, xx, vv)
         apiPits = UnitVariation(luminance, .42, 2.15) * (1 - .75 * photoCoverage)
@@ -308,6 +316,11 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "CollarRing":
         heightField = strength * (.14 * detail + .031 * medium - .12 * pits) + .123 * apiPits + .41 * photoPits
         roughnessDelta += .029 * np.maximum(-apiPits, 0) + .14 * np.maximum(-photoPits, 0)
+    if name == "Saddle":
+        heightField *= 1 - .76 * shoeCoverage
+        heightField += .29 * shoeDetail
+        roughnessDelta -= (.022 * medium + .014 * pits) * shoeCoverage
+        roughnessDelta += .11 * np.maximum(-shoeDetail, 0) - .067 * np.maximum(shoeDetail, 0)
     if name == "SaddleRim":
         # A few exposed contact marks interrupt the dark forged edge.
         exposed = np.exp(-((xx - .088) / .071) ** 2) + .7 * np.exp(-((xx - .581) / .091) ** 2)
@@ -530,7 +543,9 @@ def BakeRegion(name, sample, size, index, reference):
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     if name == "Shoulder":
         # Shift hue with near-zero luma change in the photographed flank.
-        base += shoulderTint[..., None] * np.array([.48, -.101, -.414])
+        base += shoulderTint[..., None] * LUMA_NEUTRAL_WARMTH
+    if name == "Saddle":
+        base += .035 * shoeCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     if name == "Knurl":
         ao *= 1 - .31 * grooves
@@ -639,6 +654,7 @@ def Bake():
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
+               "saddleDetail": reference["closeups"]["Saddle"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
                "knurlWear": reference["knurl"]["wear"]["detail"],
                "knurlFlank": reference["knurl"]["flankWear"]["detail"],
