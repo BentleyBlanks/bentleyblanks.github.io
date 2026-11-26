@@ -33,11 +33,39 @@ def NativePoint(point):
     return (x * LENGTH, -(FRONT + along * LENGTH), y * LENGTH)
 
 
-def AtlasUv(tile, u, v):
-    x, y, width, height = ATLAS["regions"][tile]
+def RectUv(rect, u, v):
+    x, y, width, height = rect
     size, padding = ATLAS["size"], ATLAS["padding"]
     return ((x + padding + u * (width - 2 * padding)) / size,
             (size - y - height + padding + v * (height - 2 * padding)) / size)
+
+
+def AtlasUv(tile, u, v):
+    return RectUv(ATLAS["regions"][tile], u, v)
+
+
+def RemapUv(value, knots):
+    for (first, start), (last, end) in zip(knots, knots[1:]):
+        if value <= last:
+            return start + (end - start) * min(1, max(0, (value - first) / (last - first)))
+    return knots[-1][1]
+
+
+def ShoulderUvs(u0, u1, v0, v1):
+    # Each angular side stays on one island. The flank's axial breakpoints
+    # are on the existing loops, so interpolation stays linear on each face.
+    layout = ATLAS["shoulderFlank"]
+    first, last = layout["uRange"]
+    split = layout["splitX"]
+    x, y, width, height = ATLAS["regions"]["Shoulder"]
+    if first <= (u0 + u1) / 2 < last:
+        rect = (x + split, y, width - split, height)
+        u0, u1 = ((u - first) / (last - first) for u in (u0, u1))
+        v0, v1 = (RemapUv(v, layout["flankV"]) for v in (v0, v1))
+    else:
+        rect = (x, y, split, height)
+        u0, u1 = (RemapUv(u if u >= last - 1e-7 else u + 1, layout["mainU"]) for u in (u0, u1))
+    return [RectUv(rect, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
 
 
 def MeshObject(collection, name, vertices, faces, uvFaces, smooth=None):
@@ -100,9 +128,12 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
             if band == "Stripe":
                 u0, u1 = ((a - pi / 2 + .032) / .064 for a in (angle, stopAngle))
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
-            uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
+            if band == "Shoulder":
+                uvFaces.append(ShoulderUvs(u0, u1, v0, v1))
+            else:
+                uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
             smooth.append(not toothed)
-    endTile = "Edge" if toothed else tile
+    endTile = {"Shoulder": "Collar"}.get(tile, "Edge" if toothed else tile)
     for ring, capTile in ((0, (bandTiles or {}).get(0, endTile)), (len(profile) - 1, endTile)):
         order = list(range(count)) if ring else list(reversed(range(count)))
         faces.append(tuple(ring * count + i for i in order))

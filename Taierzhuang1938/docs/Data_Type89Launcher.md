@@ -46,9 +46,10 @@
 - 外套筒端部按第 1 张馆藏照加密取样，分别记录暗锈、较暖的氧化斑和裸露钢面。近似馆藏布光下，接触斑亮度中值从 51.6 降至 37.0，照片为 32.6。端部可见暖色像素占比从 68.4% 降至 56.3%，照片为 53.9%。斜视、中性灯、默认灯与中段对照均已复测。 [端部采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身按第 1 张馆藏照校正磨损发蓝层的中间调和深氧化的暗部，收敛非露钢区域的反光。沿钢面柔化暗斑边缘，并同步重采样相邻窄条。固定中性灯下，整段中间调从 101.8 升至 110.1 个灰阶，照片为 109.7。正视和斜视的亮度分布均更接近整段照片，并复核第 7 张对应的冲压区近景、默认灯和相邻外套筒。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 支柱按第 4 张近照的磨亮区域校准露钢的亮度、粗糙度和金属度，再按已配准的照片区域修正暖色。把中间调对齐到近照后，固定补光下正视亮度第 90 百分位从 144.7 升到 166.1，近照为 167.0。斜视从 144.7 升到 165.8，近照为 165.4。另核对细纹对比度、较弱补光、默认灯光和相邻筒身。 [支柱采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 筒尾肩部在原 2K 图集块内使用两片 UV，按现有网格环提高侧面轴向采样，从 8.0 行纹素增至 19.4 行。端盖采用共用箍圈钢面。侧面在新坐标重新采样第 4 张近照的细纹与氧化，固定布光下的细纹对比度从 0.0633 升至 0.0861，近照为 0.0861。侧面亮度中值为 115.3，近照为 116.1，正面中值为 69.9，近照为 69.5。检查两片 UV 的接缝与游戏网格实际三角面数。 [肩部采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV30/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV31/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

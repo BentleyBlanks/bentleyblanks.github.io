@@ -675,6 +675,61 @@ def BakeKnurl(quadrants, width, height, index, reference):
     return output
 
 
+def SampleShoulder(pixels, u, v):
+    pad = ATLAS["padding"]
+    cols = pad + u * (pixels.shape[1] - 2 * pad)
+    rows = pad + (1 - v) * (pixels.shape[0] - 2 * pad)
+    left, top = cols.astype(np.int32), rows.astype(np.int32)
+    du, dv = (cols - left)[None, :, None], (rows - top)[:, None, None]
+    vertical = (1 - dv) * pixels[top] + dv * pixels[top + 1]
+    return (1 - du) * vertical[:, left] + du * vertical[:, left + 1]
+
+
+def BakeShoulder(quadrants, width, height, index, reference):
+    layout = ATLAS["shoulderFlank"]
+    pad = ATLAS["padding"]
+    mainWidth = layout["splitX"]
+    flankWidth = width - mainWidth
+    uStart, uEnd = layout["uRange"]
+    sourceU, packedU = np.asarray(layout["mainU"]).T
+    sourceV, packedV = np.asarray(layout["flankV"]).T
+
+    def Fraction(length):
+        return np.clip((np.arange(length) - pad) / (length - 2 * pad), 0, 1)
+
+    mainU = np.interp(Fraction(mainWidth), packedU, sourceU) % 1
+    flankU = uStart + Fraction(flankWidth) * (uEnd - uStart)
+    mainV = 1 - Fraction(height)
+    flankV = np.interp(mainV, packedV, sourceV)
+    maps = BakeRegion("Shoulder", quadrants, (width, height), index, reference)
+    photo = reference["shoulder"]["Flank"]
+
+    def PhotoColor(u, v, gain):
+        xx, vv = np.meshgrid(u, v)
+        tone, warmth, coverage = PhotographicGrain(photo, xx, vv)
+        color = gain * tone[..., None] + (255 * .43 * warmth)[..., None] * np.array([.39, .055, -.27])
+        return color * coverage[..., None]
+
+    # Bake the measured grain at its new coordinates. The coarse finish and
+    # the packed surface channels come from the existing material recipe.
+    vStart, vEnd = photo["footprint"]["vRange"]
+    fadeU = np.clip(np.minimum(flankU - uStart, uEnd - flankU) / .026, 0, 1)
+    fadeV = np.clip(np.minimum(flankV - vStart + .045, vEnd + .045 - flankV) / .045, 0, 1)
+    blend = (fadeV[:, None] * fadeU[None, :])[..., None]
+    main = [SampleShoulder(pixels, mainU, mainV) for pixels in maps]
+    flank = [SampleShoulder(pixels, flankU, flankV) for pixels in maps]
+    previous = PhotoColor(Fraction(width), mainV, 122)
+    grain = PhotoColor(flankU, flankV, 166) - SampleShoulder(previous, flankU, flankV)
+    xx, vv = np.meshgrid(flankU, flankV)
+    oxide = ReferenceField(photo, xx, vv, "oxideCoverage") / 100
+    exposed = ReferenceField(photo, xx, vv, "exposedSteelCoverage") / 100
+    tone = 22 * exposed - 18 * oxide + 4
+    warmth = 9 * (1 - .6 * exposed)
+    flank[0] += blend * (grain + tone[..., None] + warmth[..., None] * LUMA_NEUTRAL_WARMTH)
+    return [np.rint(np.clip(np.concatenate((left, right), axis=1), 0, 255)).astype(np.uint8)
+            for left, right in zip(main, flank)]
+
+
 def BuildAtlas(reference):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -699,6 +754,8 @@ def BuildAtlas(reference):
             tile = ResizeSharedCollar(legacy, width, height)
         elif name == "Knurl":
             tile = BakeKnurl(quadrants, width, height, index, reference)
+        elif name == "Shoulder":
+            tile = BakeShoulder(quadrants, width, height, index, reference)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
