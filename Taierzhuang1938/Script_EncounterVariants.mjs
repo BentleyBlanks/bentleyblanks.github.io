@@ -24,7 +24,7 @@ import { Clamp, Distance, SampleBeatRoute } from "./Scenes/FirstLevelEncounter/S
 import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import {
   MERGED_SOURCE, MERGED_STAGES, MERGED_BEATS, MERGED_WAVES, MERGED_DIALOGUE,
-  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_STEALTH, MERGED_CINEMATICS, MERGED_MUSIC,
+  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_STEALTH, MERGED_CINEMATICS, MERGED_MISSION_AREAS, MERGED_MUSIC,
 } from "./Scenes/FirstLevelMerged/Data_LevelFlowMerged.mjs";
 import {
   MergedActors, ApplyMergedSurfaces, MergedEffects, MergedSignals, MergedSurfaceAt,
@@ -124,6 +124,10 @@ function CompileMergedVariant(spec) {
       ...MERGED_PLAY_GATES,
       ...(spec.overrides?.playGates || {}),
     },
+    missionAreas: {
+      ...MERGED_MISSION_AREAS,
+      ...(spec.overrides?.missionAreas || {}),
+    },
     signals: [...frontSignals, ...mergedPlaySignals],
     music: {
       ...Object.fromEntries(Object.entries(BASE_PLAY_CONFIG.music).filter(([st]) => Number(st) <= 7)),
@@ -211,7 +215,9 @@ function CompileMergedVariant(spec) {
     return {
       time, beat, stage, progress, player, actors, effects, dialogue,
       spawns: encounter.groups, groups: encounter.groups, triggers: encounter.triggers,
-      zone, nearest, stretchersPassed: null, defenseWarning: null, stealth, signals, customSignals: !inFront, nightBlend,
+      zone, nearest, stretchersPassed: null, defenseWarning: null, stealth,
+      missionArea: playConfig.missionAreas?.[beat.id] || null,
+      signals, customSignals: !inFront, nightBlend,
     };
   };
 

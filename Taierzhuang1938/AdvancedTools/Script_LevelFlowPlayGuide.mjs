@@ -7,6 +7,7 @@ import { CompileEncounters } from "./Script_LevelFlowEncounter.mjs";
 import { Clamp, Distance } from "./Script_LevelFlowGeometry.mjs";
 import { FlowMapView, Line, Circle, Label, FLOW_COLORS } from "./Script_LevelFlowView.mjs";
 import { FLOW_DUSK } from "../Data_Tuning_LevelFlow.mjs";
+import { ResolveEncounterMissionArea } from "../Script_EncounterPlayPlan.mjs";
 import {
   BuildPlayObjectiveGuide,
   PlayDialogueHistory,
@@ -169,6 +170,17 @@ class PlayGuideMapView extends FlowMapView {
     }
 
     const pulse = 0.5 + 0.5 * Math.sin(nowMs * 0.005);
+
+    // 0. Soft mission-area boundary (dashed amber outline; pulses red while out-of-area warning is active)
+    if (showAirWalls && options.softBoundary?.authored && options.softBoundary.polygons?.length) {
+      for (const poly of options.softBoundary.polygons) {
+        if (!poly.points?.length) continue;
+        const pts = poly.points.map((pt) => Screen([pt.x, pt.z]));
+        pts.push(pts[0]);
+        Line(context, pts, "#1a140958", 3.6, [8, 6]);
+        Line(context, pts, options.areaWarning ? "#e44c32ee" : "#db9b24cc", options.areaWarning ? 2.2 : 1.7, [8, 6]);
+      }
+    }
 
     // 1. Authored planned route for current beat (high-contrast cased dashed trail)
     if (options.showRoutes && guide.plannedRoute?.length >= 2) {
@@ -987,10 +999,13 @@ export class LevelFlowPlayGuide {
         customSignals: true,
         nightBlend: authoredFrame.nightBlend,
       };
+      const softBoundary = ResolveEncounterMissionArea(authoredFrame.beat, variant, this.compiled);
       this.mapView.DrawPlayFrame(guide, baseFrame, {
         showRoutes: this.showRoutes,
         showLandmarks: this.showLandmarks,
         showAirWalls: this.showAirWalls,
+        softBoundary,
+        areaWarning: !!state.missionArea?.warning,
       }, nowMs);
     }
   }

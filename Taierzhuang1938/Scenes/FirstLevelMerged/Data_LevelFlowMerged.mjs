@@ -559,6 +559,32 @@ export const MERGED_GUIDANCE = {
 
 export const MERGED_CINEMATICS = ["13e"];
 
+// 08–13 开阔地软边界（Script_MissionAreaGuard）：优先让玩家自由主动迎敌与绕侧，
+// 走出局部物理路标示意的作战区外沿时触发「离开战场区域 · 返回 · N 秒」倒计时，而非在平地撞隐形空气墙。
+export const MERGED_MISSION_AREAS = {
+  "08a": {
+    polygons: [
+      { id: "NorthApproachField", points: [[54, 334], [158, 334], [158, 462], [136, 462], [136, 496], [76, 496], [76, 466], [54, 466]] },
+    ],
+  },
+  "08b": {
+    polygons: [
+      { id: "NorthDitchCombatField", points: [[58, 378], [158, 378], [158, 462], [136, 462], [136, 498], [76, 498], [76, 466], [58, 466]] },
+    ],
+  },
+  "08c": {
+    polygons: [
+      { id: "NorthDitchCombatField", points: [[58, 378], [158, 378], [158, 462], [136, 462], [136, 498], [76, 498], [76, 466], [58, 466]] },
+    ],
+  },
+  "08d": {
+    polygons: [
+      { id: "NorthDitchCombatField", points: [[58, 378], [158, 378], [158, 462], [136, 462], [136, 498], [76, 498], [76, 466], [58, 466]] },
+    ],
+  },
+  "13e": { exempt: true },
+};
+
 export const MERGED_MUSIC = {
   "08": "firstLevelDusk",
   "09": "firstLevelCloseQuartersPressure",

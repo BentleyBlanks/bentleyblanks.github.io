@@ -36,6 +36,8 @@ Play 默认单视口。双视口左侧操作顺子，右侧观察同一局游戏
 
 2026-11-24：Play 与白盒编辑器里的九四式（`kind: "tank"` + `shape: "tankette"`）只用正式模型 `Model/Type94Tankette/Model_Type94Tankette.glb`（ExternalProps `type94Tankette`，`BlockoutPuppets.LoadTankette` 在 Play 加载阶段预读），白盒体块画法已删；编排的 `turret` 经 `EncounterActorSpec` 的 `arc.yawDeg` 转到模型的 `TurretYaw`。合并版 08 的 `tank3` 改为过土地庙后离开官道，从架桥组与沟北火力组之间南下，碾过板桥以东的铁丝网，停在反坦克沟北沿 (115, 465.8)，不再停在板桥北头 (99, 465) 与老乡、架桥组重叠；门禁 `Script_EncounterPlayTest`。
 
+2026-11-27：EncounterPlay 接入 `Script_MissionAreaGuard` 软边界（`ResolveEncounterMissionArea`，数据位于变体 `playConfig.missionAreas` 如 `MERGED_MISSION_AREAS`，未声明节拍按路线与交战敌军生成安全包络，受控演出与 `noCollision` 调试开关豁免），出界经宽限与 10 秒倒计时触发顶部 HUD「离开战场区域 · 返回 · N 秒」并在超时后判脱战重开检查点；合并版 08 沟北麦田贴身空气墙（原 `x=82 / 120`）外推至外围兜底（`x=42 / 178`）并沿村口铁丝网收束，完整包住东翼 `MergedRifles` 与西侧绕行空间，东西软边界沿线辅以局部可见物理路障（`Merged_Block_NorthField*`，`noClimb: true`）示意边界形状，2D 战术图与编辑视口同步以琥珀色虚线绘出软边界。
+
 自 2026-11-17 起，Play 沿用菜单「设置 → 调试选项」保存的五项开关，包括穿墙、快速移动、无敌、无限子弹与无限手雷。首次播放、复用宿主重开及阵亡重试都在恢复装备与检查点后重新读取并应用设置。存储不可用时保留当前宿主中的开关。
 
 `Data_Play.gates` 是阶段完成条件的唯一表。进区、指定目标死亡、清敌、交互结果、队伍实际离开或担架实际通过才推进；手雷交互等待真实爆炸，放置炸药还需撤回。没有满足条件时，经过多少时间都不进入下一阶段。时间只驱动段内动作、对白和定时生成。底部时间线显示当前关键帧位置，条件满足才跳到下一关键帧。

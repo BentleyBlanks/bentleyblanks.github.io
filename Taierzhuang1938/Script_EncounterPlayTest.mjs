@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,EncounterPuppetYaw,EncounterInitialActorYaw,EncounterOrderYaw,ResolveEncounterStageStart,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {EncounterPlayPlan,EncounterCanPlay,EncounterFirstPlayable,EncounterActorSpec,EncounterPuppetYaw,EncounterInitialActorYaw,EncounterOrderYaw,ResolveEncounterStageStart,ResolveEncounterMissionArea,ENCOUNTER_PLAY_CONFIG as C} from "./Script_EncounterPlayPlan.mjs";
+import {MissionAreaGuard,DistanceToArea} from "./Script_MissionAreaGuard.mjs";
+import {MISSION_AREA_GUARD} from "./Data_Tuning_MissionArea.mjs";
 import {FLOW_TIMELINE,DEFAULT_ENCOUNTER_DOCUMENT,BeatById} from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
 import {FIRST_LEVEL_MUSIC_CUES} from "./Data_FirstLevelMissionMusic.mjs";
 import {WEAPONS} from "./Data_Weapons.mjs";
@@ -395,6 +397,58 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
   assert.doesNotMatch(playCss,/\.encounterGame\s+\.hudActions\b/,"Encounter Play must keep .hudActions visible so reload/interact prompts render");
   assert.match(playCss,/\.encounterDual\s+#hud\{[^}]*z-index:\s*2/,"Dual-viewport Encounter Play must layer #hud above .encounterPrimary");
   assert.match(playRuntimeSrc,/hud\.ClearStaging\?\.\(\)/,"Encounter Play must clear hidden brief/title staging timers so ammo and reload prompts are not suppressed");
+  assert.match(playRuntimeSrc,/UpdateMissionArea\(frame,dt\)/,"Encounter Play must update soft mission-area boundary each frame");
+  assert.match(playRuntimeSrc,/hud\.SetMissionArea\?\.\(/,"Encounter Play must drive the HUD mission-area countdown");
+ }
+
+ // Soft mission-area boundary (Option A): covers every playable beat route and 08c northern active combat (including eastern MergedRifles),
+ // while triggering grace -> countdown -> reset / failure when straying beyond the localized edge markers.
+ {
+  for (const vid of ["L1_BeishaheMerged", "L1_Original"]) {
+   const v = CompileEncounterVariant(vid);
+   const compiled = CompileEncounters(v.defaultDocument, v.timeline);
+   for (const beat of v.timeline.filter((b) => EncounterCanPlay(b.start, v))) {
+    const area = ResolveEncounterMissionArea(beat, v, compiled);
+    assert.ok(area && !area.exempt, `${vid} ${beat.id} has an active soft boundary`);
+    for (const pt of beat.p) {
+     const d = DistanceToArea({ x: pt[0], z: pt[1] }, area);
+     assert.ok(d <= 0, `${vid} ${beat.id} player route point ${JSON.stringify(pt)} must stay inside soft boundary (dist=${d.toFixed(2)}m)`);
+    }
+   }
+  }
+  const merged = CompileEncounterVariant("L1_BeishaheMerged");
+  const compiledMerged = CompileEncounters(merged.defaultDocument, merged.timeline);
+  const area08c = ResolveEncounterMissionArea("08c", merged, compiledMerged);
+  assert.equal(area08c.authored, true, "08c uses explicit authored open-field soft boundary");
+  for (const [label, pt] of [
+   ["south trench", [104, 478]],
+   ["road flare", [100, 428]],
+   ["west flanking field", [66, 420]],
+   ["MergedBoards", [96, 434]],
+   ["MergedRifles spawn", [134, 390]],
+   ["MergedRifles east cover", [145, 412]],
+   ["east flank behind rifles", [153, 415]],
+  ]) {
+   const d = DistanceToArea({ x: pt[0], z: pt[1] }, area08c);
+   assert.ok(d <= -2, `08c soft boundary must enclose ${label} ${JSON.stringify(pt)} (dist=${d.toFixed(2)}m)`);
+  }
+  for (const [label, pt] of [
+   ["far west field", [50, 420]],
+   ["far east field", [166, 415]],
+   ["far north retreat", [100, 366]],
+  ]) {
+   const d = DistanceToArea({ x: pt[0], z: pt[1] }, area08c);
+   assert.ok(d > 0, `08c soft boundary must warn at ${label} ${JSON.stringify(pt)} (dist=${d.toFixed(2)}m)`);
+  }
+  const guard = new MissionAreaGuard(MISSION_AREA_GUARD);
+  assert.equal(guard.Update(MISSION_AREA_GUARD.stepGraceS + 0.1, { step: "08c", point: { x: 100, z: 428 }, area: area08c }).warning, false);
+  assert.equal(guard.Update(MISSION_AREA_GUARD.graceS * 0.5, { step: "08c", point: { x: 166, z: 415 }, area: area08c }).warning, false, "brief step outside stays in grace");
+  const warned = guard.Update(MISSION_AREA_GUARD.graceS, { step: "08c", point: { x: 166, z: 415 }, area: area08c });
+  assert.equal(warned.warning, true, "straying east past localized markers raises out-of-area countdown");
+  const backIn = guard.Update(0.5, { step: "08c", point: { x: 150, z: 415 }, area: area08c });
+  assert.equal(backIn.warning, false, "returning inside combat area immediately clears warning");
+  const failed = guard.Update(MISSION_AREA_GUARD.countdownS + 1, { step: "08c", point: { x: 166, z: 415 }, area: area08c });
+  assert.equal(failed.failed, true, "ignoring countdown triggers out-of-area failure");
  }
 }
 console.log("ok  Encounter Play: keyframe starts, real arrival and survival, reinforcement caps, interaction gates, immutable drafts, valid models/music, campaign sync, playtest 2D guide and independent scene");

@@ -716,6 +716,14 @@ export class FlowMapView {
     this.BeginOverlay?.(context);
     cpu?.Begin("路线与区域");
     const Screen=(point)=>this.ToScreen(point),relevant=(item)=>item.beat.slice(0,2)===frame.stage.id||item.endBeat.slice(0,2)===frame.stage.id;
+    if(layers.airWalls!==false&&frame.missionArea?.polygons?.length) {
+      for(const poly of frame.missionArea.polygons) {
+        if(!poly.points?.length) continue;
+        const closed=[...poly.points,poly.points[0]];
+        this.DrawPath(context,closed,"#1c150955",3.4,[8,6]);
+        this.DrawPath(context,closed,"#d88c1ecc",1.8,[8,6]);
+      }
+    }
     if(layers.routes) {
       this.DrawPath(context,frame.stage.beats.flatMap((beat)=>beat.p),"#9c731b9c",2,[6,5]);
       if(Number(frame.stage.id)>=3&&Number(frame.stage.id)<=6) this.DrawPath(context,FLOW_GROUND.road,"#ad453499",2,[7,5]);

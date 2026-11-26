@@ -1,6 +1,8 @@
 import * as THREE from "three";
-import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterPuppetYaw, EncounterInitialActorYaw, EncounterOrderYaw, EncounterSceneSignals, ResolveEncounterStageStart, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
+import { EncounterPlayPlan, EncounterCanPlay, EncounterFirstPlayable, EncounterActorSpec, EncounterPlayerYaw, EncounterPuppetYaw, EncounterInitialActorYaw, EncounterOrderYaw, EncounterSceneSignals, ResolveEncounterStageStart, ResolveEncounterMissionArea, ENCOUNTER_PLAY_CONFIG as CONFIG } from "./Script_EncounterPlayPlan.mjs";
 export { ResolveEncounterStageStart };
+import { MissionAreaGuard } from "./Script_MissionAreaGuard.mjs";
+import { MISSION_AREA_GUARD } from "./Data_Tuning_MissionArea.mjs";
 import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
 import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
 import { FirstLevelOpeningTimeline } from "./Script_FirstLevelOpeningTimeline.mjs";
@@ -130,6 +132,8 @@ export class EncounterPlay {
     this.combatStarted=!this.pendingOpening;
     this.plan=new EncounterPlayPlan(this.isCampaign?this.variant.defaultDocument:(payload?.document||this.variant.defaultDocument),startPlan.time,this.variant);
     this.stealth=this.variant.stealthPlan?new VillageStealthPlay(host,new VillageStealthRules(this.variant.timeline)):null;
+    this.areaGuard=new MissionAreaGuard(MISSION_AREA_GUARD);
+    this.areaFailure=null;
     this.noFireShots=0;this.noFireGrenades=0;this.noFireFailure=null;
     this.checkpointInventory=payload?.checkpointInventory||null;
     this.checkpointTime=null;
@@ -279,6 +283,7 @@ export class EncounterPlay {
     this.noFireShots=this.host.state.playerShots;
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
+    this.areaGuard.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);
     if(this.pendingOpening&&this.opening?.loaded){
       this.combatStarted=false;
       const frame=this.variant.evaluate(this.plan.time,this.plan.document);
@@ -349,6 +354,7 @@ export class EncounterPlay {
     this.noFireShots=this.host.state.playerShots;
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
+    this.areaGuard.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     if(this.isCampaign&&this.host.ctx.hudRoot&&!this.host.state.menu)this.host.ctx.hudRoot.style.display="";
     if(this.host.viewmodel)this.host.viewmodel.root.visible=true;
@@ -376,7 +382,7 @@ export class EncounterPlay {
     this.plan=new EncounterPlayPlan(this.isCampaign?this.variant.defaultDocument:payload.document,payload.time,this.variant);
     this.templeEnteredAt=this.stealth&&this.plan.beat.id==="09b"?0:null;
     this.checkpointInventory=payload.checkpointInventory||null;this.checkpointTime=null;this.alarmAnnounced=false;
-    this.failed=false;this.noFireFailure=null;this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
+    this.failed=false;this.noFireFailure=null;this.areaFailure=null;this.areaGuard.Reset();this.host.hud.SetMissionArea?.(null);this.error=null;this.hudKey=null;this.signalKey=null;this.lastBeat=null;this.lastStateSent=0;this.orderClock=0;this.music=null;
     this.host.ctx.RespawnPlayer(true);
     this.host.state.deathTimer=0;this.host.state.playerShots=0;this.host.state.lastShot=null;
     this.host.hud.HideDeathCard?.();this.host.viewmodel.ResetDeath?.();
@@ -430,7 +436,7 @@ export class EncounterPlay {
       this.puppets.Clear();this.host.vfx.ClearParticles();this.host.battlefield.deformation?.Reset();
     });
     this.view.SetLayout(1);this.host.post.NotifyCameraCut();this.view.post?.NotifyCameraCut();
-    this.speech.Clear();this.stealth?.Reset();this.noFireFailure=null;this.failureCard.hidden=true;
+    this.speech.Clear();this.stealth?.Reset();this.areaGuard?.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);this.noFireFailure=null;this.failureCard.hidden=true;
   }
   IsSoldier(a){return a.id!=="player"&&a.kind==="person"&&["friend","enemy"].includes(a.side);}
   SyncEnvironment(frame,snap=false) {
@@ -792,6 +798,21 @@ export class EncounterPlay {
   NoFireArmed(frame) {
     return !!frame.stealth?.noFire&&this.host.player.position.z>=(frame.stealth.armMinZ??-Infinity);
   }
+  UpdateMissionArea(frame,dt) {
+    const {player}=this.host;
+    if(!this.areaGuard||!player)return false;
+    const area=ResolveEncounterMissionArea(frame.beat,this.variant,this.plan.compiled);
+    const controlled=!player.Alive||!!player.debug?.noCollision||!!this.stealth?.CapturesInput()||!!frame.beat?.cinematic||this.plan.completed;
+    const view=this.areaGuard.Update(dt,{step:frame.beat.id,point:player.position,area,controlled});
+    this.host.hud.SetMissionArea?.(view.warning?view:null);
+    if(view.failed){
+      this.areaFailure=T("firstLevel.return.boundary");
+      this.host.hud.SetMissionArea?.(null);
+      this.Fail();
+      return true;
+    }
+    return false;
+  }
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
     if(this.openingActive){
@@ -843,6 +864,7 @@ export class EncounterPlay {
     const frame=this.plan.Frame();
     this.SyncEnvironment(frame);
     this.SaveCheckpoint();
+    if(this.UpdateMissionArea(frame,dt))return;
     if(this.stealth&&previousBeat!==frame.beat.id&&frame.beat.id==="09b") {
       this.templeEnteredAt=this.plan.elapsed;
       for(const entry of this.entries.values())if(entry.actor.groupId==="TempleSearch") {
@@ -990,7 +1012,8 @@ export class EncounterPlay {
     const currentTask=this.stealth&&frame.beat.id==="09b"&&this.stealth.exitStartedElapsed!==null?ui.templeExit:this.plan.beat.task;
     const task=stealthState?.active||this.NoFireArmed(frame)?`${currentTask} · ${ui.stealthNoFire}`:frame.stealth?.noFire?`${currentTask} · ${ui.stealthNoFireAhead}`:currentTask;
     const title=this.plan.beat.id.toUpperCase()+" · "+this.plan.beat.title;
-    const status=this.failed&&this.noFireFailure?this.noFireFailure
+    const status=this.failed&&this.areaFailure?this.areaFailure
+      :this.failed&&this.noFireFailure?this.noFireFailure
       :this.failed&&stealthState?.active?(stealthState.failure||ui.dead)
       :this.failed?ui.dead:stealthState?.alarm?ui.stealthAlarm:stealthState?.suspicion>0?ui.stealthSuspicion:this.plan.completed?ui.complete:task;
     const p=this.host.player.position,end=this.plan.gate.retreat&&this.plan.interacted.has(this.plan.beat.id)?this.plan.beat.p.at(-1):this.plan.Area().center,distance=Math.hypot(p.x-end[0],p.z-end[1]);
@@ -1040,9 +1063,10 @@ export class EncounterPlay {
       elapsed:this.plan.elapsed,waiting:this.plan.waiting,completed:this.plan.completed,failed:this.failed,
       objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],
       dead:[...this.plan.dead],triggers:[...this.plan.triggers.keys()],signals:this.sceneSignals||[],
+      missionArea:this.areaGuard?.State()??null,
     };
   }
-  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],signals:this.sceneSignals||[]};}
+  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),missionArea:this.areaGuard?.State()??null,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],signals:this.sceneSignals||[]};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.openingActive || !this.combatStarted || this.failed || !!this.stealth?.CapturesInput()
       || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
@@ -1051,6 +1075,7 @@ export class EncounterPlay {
   Fail() {
     if(this.failed)return true;
     this.failed=true;
+    this.host.hud.SetMissionArea?.(null);
     this.host.audio.Music(null,{fadeOut:0.2});
     this.RenderHud();this.Send("state",{state:this.State()});
     if(this.isCampaign)this.onFail?.(this.MissionState());
@@ -1113,9 +1138,10 @@ export class EncounterPlay {
     for(const source of this.smoke.values())vfx.RemoveSmokeSource(source);
     this.smoke.clear();
     Object.assign(this,{
-      plan,failed:false,completedHandled:false,combatStarted:true,noFireFailure:null,paused:false,alarmAnnounced:false,templeEnteredAt:this.stealth&&plan.beat.id==="09b"?0:null,
+      plan,failed:false,completedHandled:false,combatStarted:true,noFireFailure:null,areaFailure:null,paused:false,alarmAnnounced:false,templeEnteredAt:this.stealth&&plan.beat.id==="09b"?0:null,
       orderClock:0,lastBeat:null,lastStateSent:-1,hudKey:null,signalKey:null,music:null
     });
+    this.areaGuard?.Reset();this.host.hud.SetMissionArea?.(null);
     ctx.RespawnPlayer(true);
     const p=plan.Frame().player;
     player.Spawn(...p,EncounterPlayerYaw(plan.beat));
@@ -1153,6 +1179,7 @@ export class EncounterPlay {
     for(const id of this.smoke.values())this.host.vfx.RemoveSmokeSource(id);
     this.entries.clear();this.puppets.Dispose();if(this.onMessage)window.removeEventListener("message",this.onMessage);
     this.retiredMaterials.Flush();
+    this.areaGuard?.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);
     this.speech.Dispose();this.failureCard.remove();this.style.remove();
     document.body.classList.remove("encounterGame","encounterCampaign","encounterOpening");
   }

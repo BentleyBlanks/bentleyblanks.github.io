@@ -9,6 +9,69 @@ function ResolveVariant(variant = DEFAULT_VARIANT) {
   return variant?.timeline && variant?.evaluate ? variant : CompileEncounterVariant(variant);
 }
 
+const ToXZ = (pt) => (Array.isArray(pt) ? { x: pt[0], z: pt[1] } : { x: pt.x, z: pt.z });
+
+/**
+ * 解析当前遭遇节拍的软边界（供 Script_MissionAreaGuard.DistanceToArea 与 2D 战术地图共用）。
+ * 优先采用变体 playConfig.missionAreas 中声明的显式区域；未声明时按本拍玩家主线与周边交战敌军生成宽松安全包络。
+ */
+export function ResolveEncounterMissionArea(beat, variant = DEFAULT_VARIANT, compiled = null) {
+  const v = ResolveVariant(variant);
+  const beatObj = typeof beat === "string" ? v.BeatById(beat) : beat;
+  if (!beatObj || beatObj.cinematic || v.cinematics?.includes(beatObj.id)) {
+    return Object.freeze({ id: beatObj?.id ?? "?", exempt: true, authored: false, capsules: [], discs: [], polygons: [] });
+  }
+  const spec = v.playConfig?.missionAreas?.[beatObj.id];
+  if (spec) {
+    if (spec.exempt) {
+      return Object.freeze({ id: beatObj.id, exempt: true, authored: true, capsules: [], discs: [], polygons: [] });
+    }
+    const capsules = (spec.capsules || []).map((entry) => Object.freeze({
+      key: entry.key || beatObj.id,
+      points: Object.freeze((entry.points || []).map(ToXZ)),
+      halfWidthM: entry.halfWidthM,
+    }));
+    const discs = (spec.discs || []).map((disc) => Object.freeze({
+      x: Array.isArray(disc.center) ? disc.center[0] : disc.x,
+      z: Array.isArray(disc.center) ? disc.center[1] : disc.z,
+      r: disc.r,
+    }));
+    const polygons = (spec.polygons || []).map((polygon) => Object.freeze({
+      id: polygon.id || beatObj.id,
+      points: Object.freeze((polygon.points || []).map(ToXZ)),
+    }));
+    return Object.freeze({
+      id: beatObj.id,
+      exempt: false,
+      authored: true,
+      capsules: Object.freeze(capsules),
+      discs: Object.freeze(discs),
+      polygons: Object.freeze(polygons),
+    });
+  }
+  const route = (beatObj.p || []).map(ToXZ);
+  const capsules = route.length ? [Object.freeze({ key: beatObj.id, points: Object.freeze(route), halfWidthM: 48 })] : [];
+  const discs = [];
+  if (compiled?.groups && route.length) {
+    for (const group of compiled.groups) {
+      if (!group.enabled || group.side !== "enemy") continue;
+      if (group.beat !== beatObj.id && group.endBeat !== beatObj.id) continue;
+      const anchor = group.route?.at(-1) || group.area?.center;
+      if (!anchor) continue;
+      const near = route.some((pt) => Math.hypot(pt.x - anchor[0], pt.z - anchor[1]) <= 95);
+      if (near) discs.push(Object.freeze({ x: anchor[0], z: anchor[1], r: 24 }));
+    }
+  }
+  return Object.freeze({
+    id: beatObj.id,
+    exempt: !capsules.length && !discs.length,
+    authored: false,
+    capsules: Object.freeze(capsules),
+    discs: Object.freeze(discs),
+    polygons: Object.freeze([]),
+  });
+}
+
 export { CONFIG as ENCOUNTER_PLAY_CONFIG };
 
 export function EncounterSceneSignals(frame, facts = [], variant = DEFAULT_VARIANT) {

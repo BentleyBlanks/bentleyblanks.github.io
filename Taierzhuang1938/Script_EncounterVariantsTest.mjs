@@ -304,6 +304,29 @@ for (const chk of stageGateChecks) {
   assert.ok(RayHitsOrientedBox([chk.from[0], 1, chk.from[1]], [chk.to[0], 1, chk.to[1]], { ...gate, tag: undefined, showOn: undefined }, keepInCheckGround),
     `${chk.id} 的包围盒须实际拦截越界路径 ${JSON.stringify(chk.from)}->${JSON.stringify(chk.to)}`);
 }
+// 核对 08 沟北开阔麦田：外推空气墙不再在平地 x=82 / x=120 卡住玩家，且完整包住东翼日军火力组与西侧绕行空间；
+// 局部可见物理路障（Merged_Block_NorthField*）示意战场外沿形状且不阻断玩家或敌军行动路线。
+{
+  const openFieldFlankChecks = [
+    { label: "官道西侧绕行", from: [100, 428], to: [66, 422] },
+    { label: "官道直扑东翼 MergedRifles 阵地", from: [100, 428], to: [134, 412] },
+    { label: "东翼外侧绕后包抄", from: [134, 412], to: [152, 415] },
+    { label: "MergedRifles 出生点至前沿掩体", from: [134, 390], to: [130, 437.3] },
+  ];
+  for (const probe of openFieldFlankChecks) {
+    const a = [probe.from[0], 1.0, probe.from[1]];
+    const b = [probe.to[0], 1.0, probe.to[1]];
+    for (const aw of mergedKeepIn) {
+      assert.ok(!RayHitsOrientedBox(a, b, { ...aw, tag: undefined, showOn: undefined }, keepInCheckGround),
+        `08 沟北 ${probe.label} 不得被平地空气墙 ${aw.id} 阻断`);
+    }
+  }
+  const northFieldMarkers = mergedBlocks.filter((o) => o.id.startsWith("Merged_Block_NorthField"));
+  assert.ok(northFieldMarkers.length >= 8, `08 沟北东西外沿配置局部可见物理路障示意形状（实测 ${northFieldMarkers.length} 块）`);
+  for (const wire of resolved.doc.objects.filter((o) => /^BshWireOuter[WE]_\d+$/.test(o.id))) {
+    assert.equal(wire.noClimb, true, `外圈铁丝网 ${wire.id} 禁止翻越`);
+  }
+}
 const mergedBlockout = BlockoutDocFromScene(resolved.doc, resolved.heights, { level: "FirstLevelMerged" });
 for (const gate of mergedStageGates) {
   const bg = (mergedBlockout.gates || []).find((g) => g.id === gate.id);
