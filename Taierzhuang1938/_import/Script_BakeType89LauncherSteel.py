@@ -496,6 +496,18 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (steelColor - linear) * exposed[..., None]
         rough += (.348 - rough) * exposed
         metal += (.918 - metal) * exposed
+        # The overall photo shows brighter worn film and darker deep oxide
+        # across the visible arc. Keep the close-up's own finish near the stamp.
+        overall = {"footprint": reference["barrelPatina"]["footprint"], "coverage": [[1, 1], [1, 1]]}
+        broad = ReferenceField(overall, xx, vv, "coverage") * (1 - near)
+        partlyWorn = np.clip((oxideCoverage - .04) / .36, 0, 1)
+        partlyWorn *= np.clip((.67 - oxideCoverage) / .22, 0, 1) * (1 - .7 * exposedSteel)
+        deepOxide = np.clip((oxideCoverage - .49) / .43, 0, 1)
+        toneCorrection = GaussianPeriodic(.47 * partlyWorn - .24 * deepOxide, 11)
+        linear *= (1 + broad * toneCorrection)[..., None]
+        unpolished = broad * (1 - exposedSteel) * (1 - .8 * oxideCoverage)
+        rough += .110 * unpolished
+        metal -= .078 * unpolished
         # The worn steel and the oxide beside the stamp scatter light differently.
         # Soften the hot steel glints and keep the oxide's diffuse response.
         rough += near * (.115 + .20 * exposedSteel) * (1 - .62 * oxideCoverage)
