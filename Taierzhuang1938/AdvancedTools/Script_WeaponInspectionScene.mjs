@@ -380,7 +380,7 @@ export class WeaponInspectionScene {
     const glbUrl = external?.url ?? glb?.url;
     const file = glbUrl?.slice("./Model/".length).split("?")[0] ?? MESHES[meshId]?.file ?? "程序化模型";
     return {
-      group, body, pose, blade, muzzle, grip, nodes, size, file, triangles, ownedGeometry,
+      id, variant, glbAsset, group, body, pose, blade, muzzle, grip, nodes, size, file, triangles, ownedGeometry,
       textureFallback: textureFallbacks > 0,
       missingBlade: !!bayonetId && !blade,
     };
@@ -393,6 +393,7 @@ export class WeaponInspectionScene {
   }
 
   Show(model) {
+    this.firstPerson = null;
     this.SelectPart(null);
     this.materialPreview.Set(null, null);
     this.Release(this.model);
@@ -445,6 +446,11 @@ export class WeaponInspectionScene {
     this.yaw = yaw;
     this.pitch = pitch;
     this.Fit();
+  }
+
+  SetFirstPerson(preview) {
+    this.firstPerson = preview;
+    this.RequestDraw();
   }
 
   SetChannel(name) {
@@ -519,10 +525,17 @@ export class WeaponInspectionScene {
 
   Draw() {
     if (!this.width || !this.height) return;
-    if (this.materialPreview.pending) {
+    if (this.materialPreview.pending || this.firstPerson) {
       const channel = this.channel.value;
       this.channel.value = CHANNELS.beauty;
-      try { this.materialPreview.Draw(this.renderer); } finally { this.channel.value = channel; }
+      try {
+        if (this.materialPreview.pending) this.materialPreview.Draw(this.renderer);
+        this.firstPerson?.Draw(this.renderer, this.width, this.height);
+      } finally { this.channel.value = channel; }
+      if (this.firstPerson) {
+        this.onDraw?.();
+        return;
+      }
     }
     const { camera } = this;
     const halfHeight = this.span / this.zoom / 2;

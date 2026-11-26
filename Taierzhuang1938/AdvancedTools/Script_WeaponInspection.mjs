@@ -12,6 +12,7 @@ const KIND = {
   boltRifle: "栓动步枪", lmg: "轻机枪", hmg: "重机枪", pistol: "手枪",
   throwable: "投掷物", melee: "刀具", mortar: "架设武器", vehicle: "战车",
 };
+const HELD_FIREARM_KINDS = new Set(["boltRifle", "lmg", "pistol"]);
 const SIDE = { nra: "中方", ija: "日方", neutral: "待考" };
 const SCALE_METERS = [.001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
 const MIN_SCALE_WIDTH = 56;
@@ -42,6 +43,10 @@ const gridButton = ById("gridToggle");
 const wireframeButton = ById("wireframeToggle");
 const mountButton = ById("mountToggle");
 const bladeButton = ById("bayonetToggle");
+const orbitPreset = ById("orbitPreset");
+const firstPersonPreset = ById("firstPersonPreset");
+const firstPersonInfo = ById("firstPersonInfo");
+const viewHint = ById("viewHint");
 const scale = ById("viewScale");
 const channelButtons = [...document.querySelectorAll("[data-channel]")];
 const viewButtons = [...channelButtons, gridButton, wireframeButton, mountButton, bladeButton];
@@ -51,11 +56,15 @@ const mountLabels = [
   { key: "grip", label: ById("gripLabel") },
 ];
 const projected = new THREE.Vector3();
+const orbitLabel = canvas.getAttribute("aria-label");
 
 let stage;
 let selected = "ZhongZheng";
 let selectionVersion = 0;
 let showMounts = false;
+let firstPersonRequested = false;
+let firstPersonRevision = 0;
+let firstPersonLoad = null;
 
 function SyncSelection() {
   for (const item of list.querySelectorAll("[data-model]")) {
@@ -93,8 +102,8 @@ function FilterCatalog() {
 
 function DrawOverlays() {
   const model = stage.model;
-  scale.hidden = !model;
-  if (model) {
+  scale.hidden = !model || firstPersonRequested;
+  if (!scale.hidden) {
     const pixelsPerMeter = stage.height * stage.zoom / stage.span;
     const length = SCALE_METERS.find((value) => value * pixelsPerMeter >= MIN_SCALE_WIDTH) ?? SCALE_METERS.at(-1);
     scale.style.width = `${length * pixelsPerMeter}px`;
@@ -102,7 +111,7 @@ function DrawOverlays() {
   }
   for (const { key, label } of mountLabels) {
     label.hidden = true;
-    if (!showMounts || !model?.[key]) continue;
+    if (firstPersonRequested || !showMounts || !model?.[key]) continue;
     projected.copy(model[key]);
     model.pose.localToWorld(projected).project(stage.camera);
     if (Math.abs(projected.x) > .95 || Math.abs(projected.y) > .88 || Math.abs(projected.z) > 1) continue;
@@ -112,12 +121,62 @@ function DrawOverlays() {
   }
 }
 
+function CanPreviewFirstPerson() {
+  return HELD_FIREARM_KINDS.has(INSPECTION_MODELS[selected]?.kind);
+}
+
+function SyncViewControls() {
+  const ready = canvas.dataset.state === "ready";
+  SetPressed(orbitPreset, !firstPersonRequested);
+  SetPressed(firstPersonPreset, firstPersonRequested);
+  firstPersonPreset.disabled = !ready || !CanPreviewFirstPerson();
+  firstPersonPreset.title = CanPreviewFirstPerson() ? "站立持枪的游戏视角" : "当前模型没有手持枪械视角";
+  for (const button of viewButtons) button.disabled = !ready || firstPersonRequested;
+  viewHint.hidden = firstPersonRequested;
+  canvas.setAttribute("aria-label", firstPersonRequested ? "第一人称站立持枪预览" : orbitLabel);
+}
+
+function ShowOrbit() {
+  firstPersonRequested = false;
+  firstPersonRevision += 1;
+  firstPersonInfo.hidden = true;
+  stage?.SetFirstPerson(null);
+  SyncViewControls();
+}
+
+async function ShowFirstPerson() {
+  const { model } = stage;
+  if (!model || !CanPreviewFirstPerson()) return;
+  const revision = ++firstPersonRevision;
+  firstPersonRequested = true;
+  firstPersonInfo.hidden = false;
+  Text("firstPersonInfo", "正在读取持枪姿势…");
+  SyncViewControls();
+  stage.RequestDraw();
+  try {
+    firstPersonLoad ??= import("./Script_WeaponInspectionFirstPerson.mjs")
+      .then(({ WeaponInspectionFirstPerson }) => WeaponInspectionFirstPerson.Create(stage))
+      .catch((error) => { firstPersonLoad = null; throw error; });
+    const preview = await firstPersonLoad;
+    if (revision !== firstPersonRevision || model !== stage.model) return;
+    preview.Equip(model);
+    stage.SetFirstPerson(preview);
+    Text("firstPersonInfo", `FOV ${number.format(preview.camera.fov)}° · 16:9`);
+  } catch (error) {
+    if (revision !== firstPersonRevision || model !== stage.model) return;
+    console.warn("[WeaponInspection]", error);
+    ShowOrbit();
+    firstPersonInfo.hidden = false;
+    Text("firstPersonInfo", "持枪预览载入失败");
+  }
+}
+
 function SetStatus(state, message = "", canRetry = false) {
   canvas.dataset.state = state;
   status.hidden = state === "ready";
   retry.hidden = !canRetry;
   Text("loadMessage", message);
-  for (const button of viewButtons) button.disabled = state !== "ready";
+  SyncViewControls();
 }
 
 async function Select(id, variant = 0) {
@@ -125,6 +184,8 @@ async function Select(id, variant = 0) {
   const version = ++selectionVersion;
   const weapon = INSPECTION_MODELS[id];
   selected = id;
+  if (firstPersonRequested && !CanPreviewFirstPerson()) ShowOrbit();
+  firstPersonInfo.hidden = true;
   SyncSelection();
   Text("modelName", weapon.name);
   Text("modelFullName", weapon.fullName === weapon.name ? "" : weapon.fullName);
@@ -159,10 +220,12 @@ async function Select(id, variant = 0) {
     ].filter(Boolean);
     Text("resourceNote", notes.join(" "));
     ById("resourceNote").hidden = !notes.length;
+    if (firstPersonRequested) void ShowFirstPerson();
     return model;
   } catch (error) {
     if (selectionVersion === version) {
       console.warn("[WeaponInspection]", error);
+      if (firstPersonRequested) ShowOrbit();
       SetStatus("error", "模型载入失败", true);
     }
     return null;
@@ -194,6 +257,8 @@ function BindViewport() {
     stage.center.addScaledVector(panAxis.setFromMatrixColumn(stage.camera.matrixWorld, 1), dy * metersPerPixel);
     stage.RequestDraw();
   };
+  orbitPreset.addEventListener("click", ShowOrbit);
+  firstPersonPreset.addEventListener("click", () => { if (!firstPersonRequested) void ShowFirstPerson(); });
   for (const button of channelButtons) {
     button.addEventListener("click", () => {
       stage.SetChannel(button.dataset.channel);
@@ -273,7 +338,7 @@ function BindViewport() {
     tap = null;
   };
   canvas.addEventListener("pointerdown", (event) => {
-    if (!stage.model) return;
+    if (!stage.model || firstPersonRequested) return;
     if (event.pointerType === "touch") {
       TouchStart(event);
       return;
@@ -285,6 +350,7 @@ function BindViewport() {
   canvas.addEventListener("pointerup", TouchEnd);
   canvas.addEventListener("pointercancel", TouchEnd);
   canvas.addEventListener("pointermove", (event) => {
+    if (firstPersonRequested) return;
     if (event.pointerType === "touch") {
       TouchMove(event);
       return;
@@ -302,7 +368,7 @@ function BindViewport() {
   });
   canvas.addEventListener("contextmenu", (event) => { if (stage.model) event.preventDefault(); });
   canvas.addEventListener("wheel", (event) => {
-    if (!stage.model) return;
+    if (!stage.model || firstPersonRequested) return;
     event.preventDefault();
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? stage.height : 1);
     const rect = canvas.getBoundingClientRect();
@@ -310,7 +376,7 @@ function BindViewport() {
   }, { passive: false });
   const arrows = { ArrowLeft: [-13, 0], ArrowRight: [13, 0], ArrowUp: [0, -13], ArrowDown: [0, 13] };
   canvas.addEventListener("keydown", (event) => {
-    if (!stage.model || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!stage.model || firstPersonRequested || event.ctrlKey || event.metaKey || event.altKey) return;
     if (Object.hasOwn(arrows, event.key)) (event.shiftKey ? Pan : Rotate)(...arrows[event.key]);
     else if (event.key === "+" || event.key === "=") Zoom(1.25);
     else if (event.key === "-") Zoom(.8);

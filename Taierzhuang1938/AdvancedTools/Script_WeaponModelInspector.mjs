@@ -164,6 +164,7 @@ function DrawMaterial(parent, material, stage) {
     ["清漆", "clearcoatMap", "clearcoat", "R", material.clearcoat > 0],
     ["清漆粗糙度", "clearcoatRoughnessMap", "clearcoatRoughness", "G", material.clearcoat > 0],
   ];
+  const parameters = Element(parent, "dl", "", "inspector-metrics material-metrics");
   const properties = Element(parent, "dl", "", "material-properties");
   const orm = material.userData.ormUniforms;
   const packedOrm = (orm?.ao || orm?.metalness) && material.roughnessMap;
@@ -173,7 +174,9 @@ function DrawMaterial(parent, material, stage) {
     if (mapKey === "aoMap" && !texture && !orm?.ao) continue;
     if (!texture && material[valueKey] == null) continue;
     const value = mapKey === "aoMap" && orm?.ao ? orm.aoIntensity.value : material[valueKey];
-    DrawProperty(properties, label, texture, value, mapKey, valueKey, channel);
+    const scalar = typeof value === "number";
+    if (scalar) Field(parameters, label, number.format(value));
+    if (texture || !scalar) DrawProperty(properties, label, texture, scalar ? null : value, mapKey, valueKey, channel);
   }
   if (packedOrm) {
     const channels = [orm.ao && "R 遮蔽", "G 粗糙度", orm.metalness && "B 金属度"].filter(Boolean).join(" · ");
@@ -222,7 +225,7 @@ export function ShowWeaponModelInspector(container, model, stage) {
     meshPanel.replaceChildren();
     const mesh = meshes[meshPicker.value];
     meshPicker.title = mesh.name;
-    const fields = Element(meshPanel, "dl", "", "facts inspector-facts");
+    const fields = Element(meshPanel, "dl", "", "inspector-metrics mesh-metrics");
     Field(fields, "顶点", number.format(mesh.vertices));
     Field(fields, "三角面", number.format(mesh.parts.reduce((sum, part) => sum + part.count / 3, 0)));
     const heading = Element(meshPanel, "h4", "", "texture-heading");

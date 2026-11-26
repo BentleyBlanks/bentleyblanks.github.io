@@ -461,11 +461,14 @@ try {
     const materialPicker = page.getByRole("combobox", { name: "材质", exact: true });
     Check("检查器显示真实网格与贴图缩略图", await page.evaluate(() => {
       const inspector = document.querySelector("#modelInspector");
+      const details = inspector.closest(".details");
       const count = window.WeaponInspection.scene.model.body.children[0].children.filter((child) => child.isMesh).length;
       return inspector.querySelector('[aria-label="网格"]').options.length === count
+        && details.scrollWidth === details.clientWidth && inspector.querySelectorAll(".material-metrics dd").length === 3
         && inspector.querySelectorAll(".material-properties img").length >= 3
         && !!inspector.querySelector(".texture-metadata").textContent.match(/\d+ × \d+ · (sRGB|线性) · UV\d/);
     }));
+    if (shots) await page.locator(".details").screenshot({ path: path.join(shotDir, "WeaponInspectorHierarchy.png") });
     const MaterialPixels = () => page.locator(".material-preview canvas").evaluate((canvas) => {
       const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
       let pixels = 0, hash = 0;
@@ -549,6 +552,43 @@ try {
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionSplit.png") });
     await single.click();
 
+    const firstPersonPreset = page.locator("#firstPersonPreset");
+    const orbitPreset = page.locator("#orbitPreset");
+    const WaitFirstPerson = (id) => page.waitForFunction((key) => window.WeaponInspection.scene.firstPerson?.viewmodel.weaponId === key
+      && document.querySelector("#viewScale").hidden, id, { timeout: 60000 });
+    Check("第一人称资源在启用预设前不加载", !requests.some(({ url }) => url.includes("/Script_WeaponInspectionFirstPerson.mjs")));
+    await canvas.press("=");
+    const orbitBeforeFirstPerson = await CameraState();
+    await page.evaluate(() => localStorage.setItem("tengxian1938_graphics_v1", JSON.stringify({ fov: 67 })));
+    await firstPersonPreset.click();
+    await WaitFirstPerson("HanYang");
+    const held = await page.evaluate(() => {
+      const stage = window.WeaponInspection.scene;
+      const { viewmodel, camera } = stage.firstPerson;
+      const muzzle = viewmodel.rig.group.localToWorld(viewmodel.rig.muzzle.clone()).project(camera);
+      return { fov: camera.fov, aspect: camera.aspect, forearms: viewmodel.riggedArms?.root.visible,
+        muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera };
+    });
+    Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面",
+      held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent
+      && held.muzzle[0] > .05 && held.muzzle.every((coordinate) => Math.abs(coordinate) < 1)
+      && await page.locator("#firstPersonInfo").textContent() === "FOV 67° · 16:9", JSON.stringify(held));
+    if (shots) await page.locator(".stage").screenshot({ path: path.join(shotDir, "WeaponInspectionFirstPerson.png") });
+    await orbitPreset.click();
+    await page.waitForFunction(() => !document.querySelector("#viewScale").hidden);
+    Check("切回外观恢复原来的缩放、位置和通道",
+      (await CameraState()).join() === orbitBeforeFirstPerson.join() && await activeChannel.getAttribute("data-channel") === "beauty"
+      && await page.locator("#gridToggle").isEnabled());
+    await firstPersonPreset.click();
+    await WaitFirstPerson("HanYang");
+    await Inspect("ServicePistol");
+    await WaitFirstPerson("ServicePistol");
+    await Inspect("Type94Tankette");
+    Check("换手持枪械保留第一人称，换载具自动回到外观",
+      await firstPersonPreset.isDisabled() && await orbitPreset.getAttribute("aria-pressed") === "true"
+      && await page.evaluate(() => !window.WeaponInspection.scene.firstPerson));
+    await page.evaluate(() => localStorage.removeItem("tengxian1938_graphics_v1"));
+
     const search = page.locator("#modelSearch");
     await search.fill("zb26");
     Check("可按编号搜索，过滤仅影响模型列表", await page.locator("[data-model]").count() === 1
@@ -596,8 +636,11 @@ try {
     await page.setViewportSize({ width: 390, height: 844 });
     await Inspect("ZhongZheng");
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspectionMobile.png") });
-    Check("窄窗口视口和控制可达、没有横向溢出", await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth
-      && document.querySelector("#view").clientWidth > 280 && document.querySelector("#view").clientHeight > 220));
+    Check("窄窗口视口和控制可达、没有横向溢出", await page.evaluate(() => {
+      const details = document.querySelector(".details");
+      return document.documentElement.scrollWidth <= innerWidth && details.scrollWidth === details.clientWidth
+        && document.querySelector("#view").clientWidth > 280 && document.querySelector("#view").clientHeight > 220;
+    }));
     await split.click();
     Check("窄窗口原画与模型上下排列，两个视口都可用", await page.evaluate(() => {
       const ref = document.querySelector("#referenceView").getBoundingClientRect();
