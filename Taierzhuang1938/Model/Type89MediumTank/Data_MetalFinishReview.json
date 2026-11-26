@@ -1,0 +1,160 @@
+{
+  "schema": "Type89MuseumMetalReviewV16",
+  "materialRevision": "SurfaceV16",
+  "geometryVersion": "20261126GeometryV55",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV16",
+  "referenceIds": [
+    2,
+    31,
+    32,
+    34,
+    39,
+    41
+  ],
+  "referenceSha256": "b202694fd5daaa0abae01f5eac61e25c98a5eaecf0d2e3a1118adedff03b5321",
+  "runtimeSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+  "baselineRuntimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+  "materialRecipeSha256": "00d6ac32cd9f16cb92ec9513bde20b6d79e9095721564d3eb98fc3fbf410f293",
+  "geometryAndMotionExact": true,
+  "aoAndGuardOpacityExact": true,
+  "paintAndOxideMeanDeltaE76": {
+    "baseline": 13.768,
+    "candidate": 3.265
+  },
+  "paintPhotographicComparison": {
+    "RolledSide": {
+      "baseline": 10.246,
+      "candidate": 1.522
+    },
+    "SlopedSuspensionCover": {
+      "baseline": 14.376,
+      "candidate": 5.18
+    },
+    "TurretFlank": {
+      "baseline": 12.002,
+      "candidate": 4.305
+    },
+    "LowerSkirt": {
+      "baseline": 8.522,
+      "candidate": 1.373
+    },
+    "PressedCover": {
+      "baseline": 10.837,
+      "candidate": 1.939
+    },
+    "IdlerCastFace": {
+      "baseline": 13.06,
+      "candidate": 2.915
+    },
+    "OxideGunJacket": {
+      "baseline": 27.33,
+      "candidate": 5.619
+    }
+  },
+  "fourLeadingLandMeanLumaError": {
+    "baseline": 22.733,
+    "candidate": 9.538
+  },
+  "surfaceWitnesses": {
+    "TrackLeadingLand": {
+      "before": {
+        "roughnessP50": 0.25882352941176473,
+        "metallicP50": 0.9686274509803922
+      },
+      "after": {
+        "roughnessP50": 0.3803921568627451,
+        "metallicP50": 0.8392156862745098
+      }
+    },
+    "TrackOuterWeb": {
+      "before": {
+        "roughnessP50": 0.38823529411764707,
+        "metallicP50": 0.8705882352941177
+      },
+      "after": {
+        "roughnessP50": 0.6941176470588235,
+        "metallicP50": 0.5411764705882353
+      }
+    },
+    "TurretRace": {
+      "before": {
+        "roughnessP50": 0.3686274509803922,
+        "metallicP50": 0.9490196078431372
+      },
+      "after": {
+        "roughnessP50": 0.6509803921568628,
+        "metallicP50": 0.6784313725490196
+      }
+    },
+    "RolledHull": {
+      "before": {
+        "roughnessP50": 0.5686274509803921,
+        "metallicP50": 0
+      },
+      "after": {
+        "roughnessP50": 0.5568627450980392,
+        "metallicP50": 0
+      }
+    },
+    "CastIdler": {
+      "before": {
+        "roughnessP50": 0.6509803921568628,
+        "metallicP50": 0
+      },
+      "after": {
+        "roughnessP50": 0.6431372549019608,
+        "metallicP50": 0
+      }
+    }
+  },
+  "editableSources": {
+    "High": {
+      "geometryAndRigSha256": "fe2427fd2f27fcb8794aca526f18ee8b7712a78b88484df7b25f80966ccc7410",
+      "triangles": 1465474,
+      "images": 25,
+      "blendSha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e"
+    },
+    "Game": {
+      "geometryAndRigSha256": "5240cd60ef37fe6d2b8e312b22ca9d62a1240be53b75de3873110171a1242fad",
+      "triangles": 79933,
+      "images": 9,
+      "blendSha256": "42b31ea4ec4ce22aa5ea1de3797072b13e93aae7f44d72aebd33c24b3d1b4241"
+    }
+  },
+  "appearanceLimits": [
+    "2007 outdoor sky and display exposure were fitted once and applied to both material generations.",
+    "Comparisons sample homologous surfaces. Geometry, occlusion, and JPEG capture limit pixel correspondence.",
+    "Microscopic relief, resolved roughness and unobserved metal underneath coatings are authoring inferences.",
+    "Later museum close-ups support placement of abrasion and oxide. Their rust intensity and repaint are not copied across eras."
+  ],
+  "evidenceLocal": [
+    "Review/Comparisons",
+    "Review/Browser",
+    "Review/Data_MetalComparison.json",
+    "Review/Data_SurfaceZoneTexels.json",
+    "Review/Data_EditableSourcesV16.json",
+    "Review/Data_GameMotionReleased.json",
+    "Data_MetalRuntimeAudit.json"
+  ],
+  "browserValidation": {
+    "weaponInspectionAfter": {
+      "edition": "After",
+      "sha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+      "url": "http://127.0.0.1:8131/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261126GeometryV55SurfaceV16",
+      "triangles": 79821,
+      "materialErrors": 0
+    },
+    "propLibraryAnimationPassed": true,
+    "releasePrepushChecksPassed": 5
+  },
+  "strictStaging": {
+    "output": "Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank_Publisha6f97c0e24bba000c050e97f.glb",
+    "bytes": 35601188,
+    "sha256": "a6f97c0e24bba000c050e97f290fd1a35f8f5f3ff0e8378ad11cf4261d474a48",
+    "sizes": {
+      "1024": 6,
+      "4096": 3
+    },
+    "publishGeometrySha256": "10420a96a163f39f6c0a40889e6a77233a6e89c9f8e59573bc524f2fbbd27971"
+  }
+}

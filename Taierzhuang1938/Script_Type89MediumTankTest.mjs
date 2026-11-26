@@ -514,5 +514,47 @@ if(paintFinish){
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
   }
 }
+if (contract.materialRevision === 'SurfaceV16') {
+  const profileFile = path.join(here,'Model/Type89MediumTank/Data_MetalFinishProfile.json');
+  const profileBytes = Buffer.from(fs.readFileSync(profileFile,'utf8').replace(/\r\n/g,'\n'));
+  const profile = JSON.parse(profileBytes);
+  const finish = g.asset.extras?.Type89MuseumFinish;
+  Check(finish?.revision===profile.revision
+    && finish?.materialRecipeSha256===createHash('sha256').update(profileBytes).digest('hex')
+    && finish?.baselineSha256===profile.baselineRuntimeSha256,
+  'Runtime finish is bound to the reviewed material recipe');
+  for (const role of ['Armor','CastArmor','Guard']) {
+    const {coatWeight,coatRoughness,specular}=profile.roles[role];
+    const material=g.materials.find(value=>value.extras?.Type89Role===role);
+    const coat=material?.extensions?.KHR_materials_clearcoat;
+    const level=material?.extensions?.KHR_materials_specular?.specularFactor;
+    Check(coat?.clearcoatFactor===coatWeight&&coat?.clearcoatRoughnessFactor===coatRoughness&&level===specular*2,
+      'The runtime carries the calibrated dielectric finish for '+role);
+  }
+
+  const shoe=nodesByName.get('Mesh_TrackLinkLeft000');
+  const part=g.meshes[shoe.mesh].primitives.find(value=>g.materials[value.material].extras?.Type89Role==='Track');
+  const data=await ImageFor(g.materials[part.material].pbrMetallicRoughness.metallicRoughnessTexture);
+  const coordinates=ReadAccessor(glb,part.attributes.POSITION).data;
+  const normals=ReadAccessor(glb,part.attributes.NORMAL).data;
+  const uv=ReadAccessor(glb,part.attributes.TEXCOORD_0).data;
+  const indices=ReadAccessor(glb,part.indices).data;
+  const lands=[], webs=[];
+  for(let i=0;i<indices.length;i+=3){
+    const vertices=indices.subarray(i,i+3);
+    const Average=(array,width,component)=>vertices.reduce((sum,index)=>sum+array[index*width+component]/3,0);
+    const height=Average(coordinates,3,1), lead=Average(coordinates,3,2);
+    if(Average(normals,3,1)<=.55)continue;
+    const row=height>.024&&lead>.042?lands:height>.011&&Math.abs(lead)<.025?webs:null;
+    if(row){
+      const sample=[Average(uv,2,0),Average(uv,2,1)];
+      row.push([Sample(data,sample,1),Sample(data,sample,2)]);
+    }
+  }
+  const Mid=(row,index)=>row.map(sample=>sample[index]).sort((a,b)=>a-b)[Math.floor(row.length/2)];
+  const land=[Mid(lands,0),Mid(lands,1)], web=[Mid(webs,0),Mid(webs,1)];
+  Check(lands.length>=8&&webs.length>=8&&land[0]+.16<web[0]&&land[1]>web[1]+.21,
+    'Baked tread lands are smoother and more conductive than their cast webs',JSON.stringify({land,web}));
+}
 console.log(`Type89MediumTank: ${checks-failures}/${checks} passed`);
 process.exitCode=failures?1:0;

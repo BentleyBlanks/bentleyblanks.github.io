@@ -69,11 +69,12 @@
   },
   "currentReleaseMotionProof": {
     "geometryVersion": "20261126GeometryV55",
-    "runtimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+    "runtimeSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
     "summary": "Data_ExportAudit.json",
     "phaseSamples": 36,
     "browserChecks": 28,
     "minimumClearanceProofPairs": 210,
-    "passed": true
+    "passed": true,
+    "materialRevision": "SurfaceV16"
   }
 }

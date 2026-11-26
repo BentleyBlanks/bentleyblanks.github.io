@@ -55,7 +55,7 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV15",
+  "materialRevision": "SurfaceV16",
   "runtimeTriangleTarget": 80000,
   "runtimeTriangleCeiling": 80000,
   "runtimeRenderedTriangles": 79821,
@@ -72,15 +72,15 @@
   "status": "AuthorReviewedWithDeclaredInferences",
   "reviewedAt": "2026-11-26",
   "reviewScope": "Matched 2007 appearance, five closed 2025 views and two auxiliary rear/side views. High-model local geometry and material edits, independent rigid nodes and a new full-vehicle game mesh.",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV15",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV16",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
   "geometryRecipeSha256": "9cb5a6862cea20a2365511d3efb020e15010cbf59f6c7752e89f00eede7c8335",
-  "materialReview": "Data_MaterialReview.json",
+  "materialReview": "Data_MetalFinishReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+  "runtimeSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -118,15 +118,15 @@
       ]
     },
     "methods": [
-      "Selected-to-active high surface projection in stable rest transforms",
-      "High assembly AO multiplied by newly baked short-range contact AO",
-      "Neutral tangent fallback at invalid or reverse-facing samples",
-      "Game exhaust sheet cutout from the high hole pattern"
+      "Local cast finish, film roughness, oxide and directional wear evaluated on the calibrated high source",
+      "Selected-to-active reprojection into the released G55 UVs with all rigid geometry and transforms held fixed",
+      "Retain SurfaceV15 AO, guard alpha and protected badge/non-metal footprints"
     ],
     "extensions": [
       "KHR_materials_clearcoat",
       "KHR_materials_transmission",
-      "EXT_texture_webp"
+      "EXT_texture_webp",
+      "KHR_materials_specular"
     ]
   },
   "scopeLimitations": [
@@ -136,5 +136,6 @@
   ],
   "exportTriangulationZeroAreaTriangles": 0,
   "exporterOmittedTriangles": 58,
-  "highSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1"
+  "highSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
+  "materialHighSourceSha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e"
 }

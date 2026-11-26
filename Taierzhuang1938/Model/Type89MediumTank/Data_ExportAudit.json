@@ -2,11 +2,11 @@
   "schema": "Type89RestorationReleaseV55",
   "reviewedOn": "2026-11-26",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV15",
+  "materialRevision": "SurfaceV16",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
-    "bytes": 38921944,
+    "sha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+    "bytes": 36463272,
     "renderedTriangles": 79821,
     "hardCeiling": 80000,
     "meshInstances": 257,
@@ -39,7 +39,7 @@
   "highSource": {
     "blend": "Scene_Type89MediumTankHighPbr.blend",
     "triangles": 1465474,
-    "sha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
+    "sha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e",
     "referenceSource": "SurfaceV14/Scene_Type89MediumTankHighPbr.blend",
     "referenceSourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
     "changes": {
@@ -108,9 +108,9 @@
   "gameSource": {
     "blend": "Game/Scene_Type89MediumTankGamePbr.blend",
     "triangles": 79933,
-    "sha256": "31343413417ea739258ba7d88ded457fa347df2c109938a874ced2eefdcf7151",
-    "bakeSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
-    "exportBeforePackingSha256": "976fc9b909823ea4c37ae581640c3cf98e92eadc486ecf4c54a658b76793e030",
+    "sha256": "42b31ea4ec4ce22aa5ea1de3797072b13e93aae7f44d72aebd33c24b3d1b4241",
+    "bakeSourceSha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e",
+    "exportBeforePackingSha256": "6702aa10de84abfdf45ef5e106bbf1c8a9cf6922338730260043af4c8a3030c9",
     "removedByZeroAreaCleanup": 54,
     "removedOnExplicitTriangulation": 0,
     "facesOmittedByBlenderExporter": 58,
@@ -215,6 +215,16 @@
     "evidenceLocal": "Review/Comparisons, Review/Browser, Review/Data_PhotoAlignment.json, Review/Data_GameMotionReleased.json"
   },
   "referenceArchive": "Data_ReferenceArchive.json",
-  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV15",
-  "photographsAndSourceRemainLocal": true
+  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV16",
+  "photographsAndSourceRemainLocal": true,
+  "metalFinish": {
+    "pass": true,
+    "baseline": "SurfaceV15",
+    "proof": "Data_MetalFinishReview.json",
+    "highSourceGeometrySha256": "fe2427fd2f27fcb8794aca526f18ee8b7712a78b88484df7b25f80966ccc7410",
+    "gameSourceGeometrySha256": "5240cd60ef37fe6d2b8e312b22ca9d62a1240be53b75de3873110171a1242fad",
+    "actualGameModelSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+    "runtimeShapePreserved": true,
+    "motionVerifiedAgainstS16": true
+  }
 }

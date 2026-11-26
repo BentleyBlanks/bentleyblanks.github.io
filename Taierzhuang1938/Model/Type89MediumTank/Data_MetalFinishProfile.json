@@ -1,0 +1,122 @@
+{
+  "schema": "Type89MuseumMetalFinishV16",
+  "revision": "SurfaceV16",
+  "geometryVersion": "20261126GeometryV55",
+  "baselineRuntimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+  "referenceIds": [
+    2,
+    31,
+    32,
+    34,
+    39,
+    41
+  ],
+  "roles": {
+    "Armor": {
+      "paintLinearScale": [
+        0.76,
+        0.68,
+        0.51
+      ],
+      "lowerLinearScale": [
+        1.14,
+        1.06,
+        0.69
+      ],
+      "pressedLinearScale": [
+        0.99,
+        0.86,
+        0.55
+      ],
+      "skywardLinearScale": [
+        1.0,
+        0.93,
+        0.74
+      ],
+      "roughness": 0.55,
+      "specular": 0.32,
+      "coatWeight": 0.11,
+      "coatRoughness": 0.42,
+      "grainM": 0.009,
+      "reliefM": 0.0002
+    },
+    "CastArmor": {
+      "paintLinearScale": [
+        0.83,
+        0.735,
+        0.405
+      ],
+      "roughness": 0.64,
+      "specular": 0.3,
+      "coatWeight": 0.07,
+      "coatRoughness": 0.51,
+      "grainM": 0.015,
+      "reliefM": 0.00068
+    },
+    "Guard": {
+      "paintLinearScale": [
+        0.79,
+        0.71,
+        0.53
+      ],
+      "roughness": 0.59,
+      "specular": 0.32,
+      "coatWeight": 0.1,
+      "coatRoughness": 0.46,
+      "grainM": 0.008,
+      "reliefM": 0.00017
+    },
+    "Steel": {
+      "raceLinear": [
+        0.034,
+        0.027,
+        0.018
+      ],
+      "raceRoughness": 0.65,
+      "jacketLinear": [
+        0.078,
+        0.072,
+        0.064
+      ],
+      "jacketRoughness": 0.55,
+      "grainM": 0.011,
+      "reliefM": 0.00026,
+      "frontJacketLinear": [
+        0.047,
+        0.044,
+        0.037
+      ],
+      "frontJacketRoughness": 0.58
+    },
+    "Track": {
+      "castLinear": [
+        0.147,
+        0.122,
+        0.085
+      ],
+      "landLinear": [
+        0.605,
+        0.565,
+        0.482
+      ],
+      "castRoughness": 0.7,
+      "landRoughness": 0.365,
+      "castMetallic": 0.54,
+      "landMetallic": 0.85,
+      "grainM": 0.012,
+      "reliefM": 0.0005,
+      "leadingBandM": [
+        0.018,
+        0.044
+      ]
+    }
+  },
+  "calibration": "2007 Megapixie Tsuchiura is the appearance reference. Later details corroborate the location and direction of wear. Coating response and microgeometry are fitted authoring parameters from photographs.",
+  "preserve": [
+    "All positions, UVs, signed tangents, material assignments, rigid nodes and pivots",
+    "Runtime AO red",
+    "Guard alpha",
+    "Round cover badge",
+    "Glass, contact rubber, and exhaust core"
+  ]
+}

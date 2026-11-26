@@ -230,7 +230,7 @@
       "targetTriangles": 80000,
       "policy": "target",
       "sourceTexture": "以土浦 2007 原照为外观基准，以 2025 同车多角度及细节原片复核，从可编辑高源投射 PBR",
-      "runtimeTexture": "SurfaceV15，9 材质、9 张内嵌图，车体 4K、履带和排气罩各 1K，遮蔽、粗糙度、金属度分别检验",
+      "runtimeTexture": "SurfaceV16，车体 4K、履带和排气罩各 1K。重烘漆膜、铸件、氧化钢和履带擦亮边，保留 AO 红通道和排气罩透明区域。",
       "note": "可选资产按需加载。整车实际默认实例硬上限 80,000。米制 Y-up、-Z 车头；左右各 81 节履带、15 个轮组，沿用炮塔、主炮、机枪和舱盖的独立运动轴。隐藏结构与微观表面属于美术复原。",
       "exporterOmittedTriangles": 58
     },
