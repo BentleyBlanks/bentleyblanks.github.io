@@ -15,8 +15,6 @@ layout(location=2) out vec4 mapped;
 layout(location=3) out vec4 finishMask;
 const vec3 along=vec3(1,0,0),across=vec3(0,1,0),up=vec3(0,0,1);
 float luma(vec3 color){return dot(color,vec3(.2126,.7152,.0722));}
-vec3 displayToLinear(vec3 value){return mix(value/12.92,pow((value+.055)/1.055,vec3(2.4)),greaterThan(value,vec3(.04045)));}
-vec3 linearToDisplay(vec3 value){return mix(12.92*value,1.055*pow(max(value,vec3(.000001)),vec3(1./2.4))-.055,greaterThan(value,vec3(.0031308)));}
 vec3 artSpace(vec3 v){return vec3(-v.z,v.x,v.y);}
 float patch(vec3 p,vec3 center,vec3 extent){
  vec3 dist=(p-center)/extent;return exp(-dot(dist,dist)*1.35);
@@ -159,14 +157,74 @@ float crownBite(vec2 face,float phase){
  float hollow=max(1.-smoothstep(.005,.020,nearMark),1.-smoothstep(.004,.014,brokenMark));
  return hollow*(.64+.36*softNoise(face*vec2(170.,131.)+phase));
 }
-void layer(vec3 p,vec3 normal,vec3 axisU,vec3 axisV,vec2 scale,vec2 offset,float amount,inout vec3 color,inout vec2 surface,inout vec3 gradient){
- vec2 uv=vec2(dot(p,axisU),dot(p,axisV))*scale+offset;
- color+=amount*textureLod(pigmentMap,uv,0.).rgb;
- surface+=amount*textureLod(surfaceMap,uv,0.).rg;
- vec3 detail=textureLod(detailMap,uv,0.).xyz*2.-1.;
- vec3 slope=(detail.x*axisU+detail.y*axisV)/max(detail.z,.25);
- gradient+=amount*(slope-normal*dot(normal,slope));
+const int GRAIN_SCAN=0, WEATHERED_STEEL_SCAN=1, PLATE_SCAN=2;
+
+struct ScanSample {
+ vec3 pigment;
+ vec2 surface;
+ vec2 slope;
+};
+
+vec2 PlateSwatch(float choice){
+ const vec2 centers[6]=vec2[6](vec2(.108,.787),vec2(.351,.921),vec2(.595,.782),
+                               vec2(.916,.791),vec2(.133,.397),vec2(.645,.400));
+ return centers[min(5,int(choice*6.))];
 }
+
+ScanSample SampleScan(sampler2D colorMap,sampler2D properties,sampler2D normals,
+                      vec2 coordinate,vec2 extent,float salt,int material){
+ // Adjacent triangles share the same two patches along their common edge.
+ // The grain keeps its direction and the steel can turn freely around a patch.
+ const mat2 lattice=mat2(1.,0.,-.57735027,1.15470054);
+ const mat2 plane=mat2(1.,0.,.5,.86602540);
+ vec2 latticePoint=lattice*coordinate;
+ vec2 cell=floor(latticePoint),f=fract(latticePoint);
+ bool upper=f.x+f.y>1.;
+ vec3 weight=upper?vec3(f.x+f.y-1.,1.-f.x,1.-f.y):vec3(1.-f.x-f.y,f);
+ weight=weight*weight*(3.-2.*weight);
+ weight/=dot(weight,vec3(1.));
+ ScanSample result=ScanSample(vec3(0.),vec2(0.),vec2(0.));
+ for(int i=0;i<3;i++){
+  if(weight[i]<.00001)continue;
+  vec2 vertex=cell+(i==0?(upper?vec2(1.):vec2(0.)):
+                    i==1?(upper?vec2(0.,1.):vec2(1.,0.)):
+                         (upper?vec2(1.,0.):vec2(0.,1.)));
+  vec2 id=vertex+vec2(salt,1.29*salt);
+  float key=hash21(id+vec2(72.8,19.4));
+  vec2 offset=vec2(hash21(id+vec2(9.1,2.7)),hash21(id+vec2(3.4,63.2)));
+  float angle=6.28318531*key;
+  mat2 rotation=material==GRAIN_SCAN?mat2((key>.5?1.:-1.),0.,0.,1.):
+                            mat2(cos(angle),sin(angle),-sin(angle),cos(angle));
+  // The clean steel samples stay inside the inspected plates of the source scan.
+  // The full source image includes joints along the borders of those plates.
+  vec2 center=material==PLATE_SCAN?PlateSwatch(hash21(id+18.45))+.010*(offset-.5):offset;
+  vec2 uv=center+rotation*((coordinate-plane*vertex)*extent);
+  vec3 scan=textureLod(normals,uv,0.).xyz*2.-1.;
+  result.pigment+=weight[i]*textureLod(colorMap,uv,0.).rgb;
+  result.surface+=weight[i]*textureLod(properties,uv,0.).rg;
+  result.slope+=weight[i]*transpose(rotation)*scan.xy/max(scan.z,.34);
+ }
+ return result;
+}
+
+vec3 TimberFrame(vec3 p){
+ float camber=.010*(softNoise(vec2(3.75*p.x,4.37))-.5)
+             +.0035*(softNoise(vec2(13.9*p.x,31.5*p.z))-.5);
+ float sweep=.0075*(softNoise(vec2(6.9*p.x,3.16))-.5)+.020*p.x;
+ return vec3(p.x,1.09*(p.y+.113+sweep),p.z+.108+camber+.023*p.x);
+}
+
+float Latewood(vec3 p){
+ vec3 frame=TimberFrame(p);
+ float radial=length(frame.yz);
+ float year=radial*335.+.76*softNoise(vec2(117.*radial,6.3))+.89*softNoise(vec2(23.4*p.x,103.2*radial));
+ float ring=floor(year);
+ float t=fract(year);
+ float width=.18+.24*hash21(vec2(ring,10.23));
+ float density=.38+.62*hash21(vec2(ring,78.73));
+ return density*smoothstep(.016,.15,t)*(1.-smoothstep(width,width+.22,t));
+}
+
 float SteelNoise(vec3 point,vec3 weights){
  return dot(weights,vec3(softNoise(point.yz+3.1),softNoise(point.xz-5.7),softNoise(point.xy+8.2)));
 }
@@ -179,44 +237,65 @@ void main(){
  float rough,metal;
  vec3 visible;
  if(wood){
-  // The three pieces share a stain and a grain field in author space. The atlas
-  // boundaries only change where the samples are stored.
-  vec3 weights=pow(abs(normal),vec3(3));
-  weights/=max(weights.x+weights.y+weights.z,.0001);
-  const vec2 swatch=vec2(.171,.407);
-  float drift=.0018*sin(p.x*22.+p.y*34.)+.00075*sin(p.x*65.+p.z*52.);
-  vec3 grainPoint=p+vec3(0.,drift,drift)+vec3(0.,.046,.073)*p.x;
-  layer(grainPoint,normal,along,up,vec2(2.95,9.8),swatch,weights.y,color,surface,gradient);
-  layer(grainPoint,normal,along,across,vec2(2.95,9.8),swatch+vec2(0,.088),weights.z,color,surface,gradient);
-  layer(p,normal,across,up,vec2(6.9,9.1),swatch+vec2(.32,.22),weights.x,color,surface,gradient);
-  vec3 wearRgb=vec3(0.),wearSlope=vec3(0.);
-  float wearRough=0.;
+  // Growth rings and grain flow are evaluated on the timber volume. The three
+  // shells use the same stain and the cut ends show a section of that volume.
+  vec3 weights=pow(abs(normal),vec3(3.));
+  weights/=dot(weights,vec3(1.));
+  vec3 frame=TimberFrame(p);
+  float radial=length(frame.yz);
+  float cutEnd=smoothstep(.55,.91,abs(normal.x));
+  vec3 oldSlope=vec3(0.);
+  float oldRough=0.;
+  vec3 oldPigment=vec3(0.);
   for(int plane=0;plane<3;plane++){
-   vec3 axisU=plane==1?up:across,axisV=plane==0?up:along;
-   vec2 grainUv=vec2(dot(grainPoint,axisU),dot(grainPoint,axisV))*vec2(7.3,4.9)+swatch+vec2(.191,.097)*float(plane);
-   wearRgb+=weights[plane]*textureLod(wearColor,grainUv,0.).rgb;
-   wearRough+=weights[plane]*textureLod(wearSurface,grainUv,0.).r;
-   vec3 sampleNormal=textureLod(wearNormal,grainUv,0.).rgb*2.-1.;
-   vec3 slope=(sampleNormal.x*axisU+sampleNormal.y*axisV)/max(.32,sampleNormal.z);
-   wearSlope+=weights[plane]*(slope-normal*dot(normal,slope));
+   vec3 axisU=plane==0?across:along;
+   vec3 axisV=plane==2?across:up;
+   vec2 coordinates=vec2(dot(frame,axisU),dot(frame,axisV));
+   ScanSample veneer=SampleScan(pigmentMap,surfaceMap,detailMap,
+     coordinates*vec2(plane==0?39.:6.9,33.),vec2(.64,.73),8.21+7.53*float(plane),GRAIN_SCAN);
+   ScanSample aged=SampleScan(wearColor,wearSurface,wearNormal,
+     coordinates.yx*vec2(27.,plane==0?41.:6.1),vec2(.69,.63),19.49+4.57*float(plane),GRAIN_SCAN);
+   float weight=weights[plane];
+   color+=weight*veneer.pigment;
+   surface+=weight*veneer.surface;
+   oldPigment+=weight*aged.pigment;
+   oldRough+=weight*aged.surface.x;
+   gradient+=weight*(veneer.slope.x*axisU+veneer.slope.y*axisV);
+   oldSlope+=weight*(aged.slope.x*axisV+aged.slope.y*axisU);
   }
-  float radial=grainPoint.z+8.*p.y*p.y+.067*p.y;
-  vec2 grain=vec2(p.x,radial);
-  float figure=softNoise(grain*vec2(25.,340.));
-  vec2 threads=vec2(p.x*70.,(radial+.00064*figure)*1450.);
-  float fibre=softNoise(threads);
-  float pores=smoothstep(.39,.76,.60*(1.-fibre)+.40*(1.-figure));
-  float contact=clamp(.61*patch(p,vec3(.018,0,.003),vec3(.106,.064,.044))
-                     +.49*patch(p,vec3(.422,0,.013),vec3(.29,.052,.049)),0.,1.);
-  float polish=smoothstep(.18,.91,.56*contact+.44*softNoise(grain*vec2(10.,73.)));
-  float stain=1.+.14*(figure-.5)+.22*(fibre-.5)-.075*pores-.06*(1.-woodExposure);
-  vec3 pigment=mix(color*vec3(.377,.377,.381),wearRgb*.91,.58)*stain;
-  visible=linearToDisplay(displayToLinear(pigment)*vec3(1.46,1.07,.66));
-  rough=clamp(.583+.53*(surface.x-.55)+.17*(wearRough-.89)+.079*pores-.069*polish,.46,.73);
-  if(handguard)rough+=.017;
+
+  float ring=Latewood(p);
+  vec2 fibrePath=vec2(p.x,radial);
+  float figure=softNoise(fibrePath*vec2(16.9,251.));
+  vec2 fibreCoords=vec2(66.*p.x,(radial+.00083*figure)*1960.);
+  float fibre=softNoise(fibreCoords);
+  float vessel=flecks(vec2(p.x*227.,radial*2521.));
+  float pores=smoothstep(.46,.83,.52*(1.-fibre)+.33*ring+.15*vessel);
+  float shade=softNoise(vec2(p.x*20.1+3.*p.y,91.*radial));
+  float scanTone=clamp(.43*luma(color)+.57*luma(oldPigment),0.,1.);
+  float tone=clamp(.26*shade+.23*figure+.19*fibre+.32*scanTone,0.,1.);
+  vec3 walnut=mix(vec3(.194,.119,.069),vec3(.366,.254,.158),tone);
+  vec3 veneerTone=color*vec3(.525,.504,.456);
+  vec3 agedTone=oldPigment*vec3(1.12,1.09,.98);
+  walnut=mix(walnut,mix(veneerTone,agedTone,.66),.71);
+  float contact=clamp(.66*patch(p,vec3(.018,0.,.003),vec3(.129,.064,.048))
+                     +.53*patch(p,vec3(.421,0.,.013),vec3(.29,.051,.049))
+                     +.24*patch(p,vec3(-.150,0.,-.053),vec3(.116,.054,.037)),0.,1.);
+  float polish=smoothstep(.21,.81,.62*contact+.28*shade+.10*woodExposure);
+  float scanContrast=clamp(.73*(luma(oldPigment)-.220)+.48*(luma(color)-.454),-.18,.16);
+  float fibreContrast=.118*(fibre-.5)+.067*(figure-.5);
+  float stain=(1.-(.042+.026*shade)*ring-.099*pores-.052*cutEnd+.54*scanContrast+fibreContrast)
+               *(1.-.071*polish+.05*(woodExposure-.5));
+  visible=walnut*stain*vec3(.937,.889,.837);
+  rough=clamp(.579+.13*(surface.x-.57)+.17*(oldRough-.75)+.083*pores+.045*cutEnd-.130*polish,.420,.73);
+  if(handguard)rough+=.012;
   metal=0.;
-  float fibreSlope=softNoise(threads+vec2(0.,.16))-softNoise(threads-vec2(0.,.16));
-  gradient=(1.36*gradient+1.08*wearSlope)*(1.-.28*polish)+.17*fibreSlope*(up-normal*normal.z);
+  const vec3 stepAcross=vec3(0.,.00026,0.),stepUp=vec3(0.,0.,.00026);
+  vec3 ringSlope=across*(Latewood(p-stepAcross)-Latewood(p+stepAcross))
+                +up*(Latewood(p-stepUp)-Latewood(p+stepUp));
+  float fibreSlope=softNoise(fibreCoords+vec2(0.,.13))-softNoise(fibreCoords-vec2(0.,.13));
+  vec3 relief=.98*gradient+1.30*oldSlope+(.103+.047*cutEnd)*ringSlope+.175*fibreSlope*up;
+  gradient=(relief-normal*dot(normal,relief))*(1.-.39*polish);
 #ifdef STOCK_CREST_WEAR
   {
    float face=smoothstep(.25,.77,abs(normal.y));
@@ -265,9 +344,10 @@ void main(){
               +up*dot(relief,foreEndImpressions(face+vec2(0.,stepAt.y),reverseSide)-foreEndImpressions(face-vec2(0.,stepAt.y),reverseSide));
    float margin=smoothstep(.025,.11,face.x)*(1.-smoothstep(.93,.995,face.x));
    float wornFace=flank*margin*smoothstep(.09,.28,face.y)*(1.-smoothstep(.81,.98,face.y));
-   float rubbed=wornFace*(.58+.25*polish)*(1.-.43*pores);
+   float oilPatch=smoothstep(.31,.69,softNoise(vec2(p.x*25.7,radial*97.4)));
+   float rubbed=wornFace*(.58+.25*polish)*(1.-.43*pores)*(.55+.49*oilPatch);
    finishMask.r=rubbed*(1.-smoothstep(.035,.43,cuts.x))*(1.-.77*cuts.y);
-   visible*=1.+.095*wornFace-.33*cuts.x+.34*cuts.y;
+   visible*=.958*(1.+.062*wornFace-.33*cuts.x+.34*cuts.y);
    rough=clamp(rough-.067*rubbed+cuts.x*(.77-rough)*.85+.083*cuts.y,.43,.77);
    gradient+=.64*flank*(slope-normal*dot(slope,normal));
   }
@@ -283,21 +363,25 @@ void main(){
    vec3 axisV=plane==2?along:up;
    vec2 uv=vec2(dot(samplePoint,axisU),dot(samplePoint,axisV));
    float weight=weights[plane];
-   layer(p,normal,axisU,axisV,vec2(8.7,9.9),vec2(.318,.517)+.019*seed,weight,color,surface,gradient);
-   vec2 agedUv=uv*vec2(24.3,28.9)*(steelDetail==4?1.36:1.)+vec2(.37,.63);
-   agedColor+=weight*textureLod(wearColor,agedUv,0.).rgb;
-   agedSurface+=weight*textureLod(wearSurface,agedUv,0.).rg;
-   vec3 scan=textureLod(wearNormal,agedUv,0.).xyz*2.-1.;
-   agedSlope+=weight*(axisU*scan.x+axisV*scan.y)/max(scan.z,.34);
+   ScanSample plate=SampleScan(pigmentMap,surfaceMap,detailMap,uv*vec2(31.,28.),
+                               vec2(.043,.043),12.38+5.87*float(plane),PLATE_SCAN);
+   ScanSample aged=SampleScan(wearColor,wearSurface,wearNormal,
+     uv*vec2(18.7,23.3)*(steelDetail==4?1.31:1.),vec2(.41,.36),31.27+3.71*float(plane),WEATHERED_STEEL_SCAN);
+   color+=weight*plate.pigment;
+   surface+=weight*plate.surface;
+   gradient+=weight*(axisU*plate.slope.x+axisV*plate.slope.y);
+   agedColor+=weight*aged.pigment;
+   agedSurface+=weight*aged.surface;
+   agedSlope+=weight*(axisU*aged.slope.x+axisV*aged.slope.y);
    vec2 cell=uv*vec2(1550.,1470.)+vec2(2.4,8.1)*float(plane);
    pores+=weight*flecks(cell);
    poreSlope+=weight*(axisU*(flecks(cell-vec2(.14,0.))-flecks(cell+vec2(.14,0.)))
                     +axisV*(flecks(cell-vec2(0.,.14))-flecks(cell+vec2(0.,.14))));
   }
-  float cloud=SteelNoise(samplePoint*(steelDetail==4?238.:162.),weights);
+  float cloud=SteelNoise(samplePoint*(steelDetail==4?212.:116.),weights);
   float mottling=SteelNoise(samplePoint*428.,weights);
   float fine=SteelNoise(samplePoint*2170.,weights);
-  float film=smoothstep(.21,.82,.41*cloud+.38*mottling+.21*(1.-agedSurface.y));
+  float film=smoothstep(.21,.84,.55*cloud+.32*mottling+.13*(1.-agedSurface.y));
   if(steelDetail==4)film=mix(.46,film,.68);
   float pitDepth=pores*(.33+.67*film);
   float oxidation=smoothstep(.49,.78,.46*mottling+.32*film+.22*fine);
@@ -346,16 +430,26 @@ void main(){
   if(longShell)rub*=.79;
   // Real rounded faces provide the edge mask for the receiver and the sight.
   // Break up the wear with the scan and keep the surface normal at its baked scale.
-  float polish=clamp(rub+.64*edge*(.68+.32*mottling)-.19*film,0.,.92);
-  float mineral=clamp(.60*luma(agedColor)+.40*luma(color),0.,1.);
-  vec3 oxide=mix(vec3(.143,.134,.119),vec3(.239,.227,.209),.48*cloud+.36*mineral+.16*mottling);
-  if(finishGroup==1||finishGroup==3)oxide*=vec3(.96,1.01,1.035);
-  vec3 bare=mix(vec3(.288,.282,.266),vec3(.388,.377,.349),.35*cloud+.65*fine);
-  visible=mix(oxide,bare,polish)*(1.-.23*pitting-.083*oxidation);
-  rough=clamp(.484+.112*film+.085*pitting+.037*(agedSurface.x-.5)
-                   +.04*(surface.x-.5)-.265*polish,.32,.72);
-  metal=clamp(.915+.075*polish-.088*film-.134*pitting,.70,.985);
-  gradient=gradient*(.16+.064*film)+agedSlope*(.14+.13*film)+poreSlope*(.060+.105*film);
+  float polish=clamp(rub+.68*edge*(.74+.26*mottling)-.17*film,0.,.93);
+  float mineral=clamp(.36*luma(agedColor)+.64*luma(color),0.,1.);
+  float oxideTone=guard?.27*cloud+.47*mineral+.26*mottling:.49*cloud+.37*mineral+.14*mottling;
+  vec3 oxide=mix(vec3(.143,.136,.125),vec3(.236,.225,.207),oxideTone);
+  if(finishGroup==1||finishGroup==3)oxide*=vec3(.94,1.01,1.048);
+  vec3 bare=mix(vec3(.285,.280,.261),vec3(.431,.418,.390),.40*cloud+.60*fine);
+  float turned=(finishGroup==1||steelDetail==1)?1.:0.;
+  vec2 track=vec2(p.x*27.1,(p.z+.48*p.y)*1970.);
+  float toolMark=softNoise(track);
+  float cleaned=turned*polish*(1.-film);
+  float scanWeather=clamp(.40*(luma(agedColor)-.33)+.24*(luma(color)-.30),-.14,.14);
+  visible=mix(oxide,bare,polish)*(1.-.21*pitting-.057*oxidation+.043*cleaned*(toolMark-.5))
+          *(1.+(.33+.42*film)*scanWeather);
+  rough=clamp(.465+.107*film+.093*pitting+.037*(agedSurface.x-.5)
+                 +.047*(surface.x-.5)-.240*polish-.033*edge+.025*cleaned*(toolMark-.5),.30,.72);
+  metal=clamp(.923+.081*polish-.071*film-.114*pitting,.74,.988);
+  float trackSlope=softNoise(track+vec2(0.,.17))-softNoise(track-vec2(0.,.17));
+  vec3 relief=gradient*(.16+.047*film)+agedSlope*(.10+.092*film)
+             +poreSlope*(.085+.116*film)+.071*cleaned*trackSlope*up;
+  gradient=relief-normal*dot(normal,relief);
  }
  base=vec4(visible,1.);
  orm=vec4(visibility,rough,metal,1.);

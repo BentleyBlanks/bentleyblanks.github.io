@@ -55,11 +55,6 @@ for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin
 const detailCharts=new Set(['HY150_ExteriorSideRelief_Neg','HY150_ExteriorSideRelief_Pos','HY151_LowRearShoulder','Trigger_FlatCurvedExternalStrip']);
 const heelName='RearBand_ExternalAttachmentBridge';
 const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat','HandleRoot']);
-const retainedWood=report.texturePayloads.filter(({name})=>
- D.wood.includes(name.slice(0,name.lastIndexOf('_')))&&!name.endsWith('_ORM'))
- .map(image=>image.name+':'+image.sha256+'\n').sort();
-assert.equal(retainedWood.length,8);
-assert.equal(createHash('sha256').update(retainedWood.join('')).digest('hex'),'c4743c8fa932a3aaabca17f06897b040e3500d5de1e9f046b647f583a3d253a1','R27 wood pigment, normal and film textures remain byte-identical');
 assert.equal(doc.asset.extras.calibratedBaseColor,true);
 assert(doc.materials.every(mat=>(mat.pbrMetallicRoughness.baseColorFactor||[1,1,1,1]).every(v=>v===1)),'native albedo is stored in the texture');
 // Sample the exposed steel pigment on the mesh. Padding outside the UV islands
@@ -249,10 +244,8 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  const primitive=doc.meshes[node.mesh].primitives[0],attrs=primitive.attributes;
  const indexAccessor=doc.accessors[primitive.indices],indexData=Payload(indexAccessor.bufferView);
  const IndexAt=offset=>indexAccessor.componentType===5125?indexData.readUInt32LE(offset*4):indexData.readUInt16LE(offset*2);
- if(node.name!=='RearBand_ControlledCrown'&&!bevelParts.has(node.name)){
-  baselineSurface.update(indexData);
-  for(const semantic of ['POSITION','NORMAL','TEXCOORD_0','TANGENT'])baselineSurface.update(Payload(doc.accessors[attrs[semantic]].bufferView));
- }
+ baselineSurface.update(indexData);
+ for(const semantic of ['POSITION','NORMAL','TEXCOORD_0','TANGENT'])baselineSurface.update(Payload(doc.accessors[attrs[semantic]].bufferView));
  if(detailCharts.has(node.name)){
   const points=Read(attrs.POSITION),uvs=Read(attrs.TEXCOORD_0);
   for(let offset=0;offset<indexAccessor.count;offset+=3){
@@ -281,7 +274,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  }
 
 }
-assert.equal(baselineSurface.digest('hex'),'4619c6c7c6b320d27fce603a07d4d874db9b58327b518b75419442faf009db68','meshes outside the rib and bevel edits retain their R27 streams');
+assert.equal(baselineSurface.digest('hex'),'02e77cf986cc4880890964584f56cd3a5333a3925e16de9ed8f3829377f6c0cf','all R28 geometry and UV streams survive the material rebake');
 assert.deepEqual(new Set(Object.keys(report.exteriorFinish.inspectionBevels)),bevelParts);
 for(const [name,{before,after,roundedFaces}] of Object.entries(report.exteriorFinish.inspectionBevels)){
  assert(after!==before&&report.parts.find(part=>part.part===name).gameTriangles===after,name+' exports the rounded edges');

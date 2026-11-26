@@ -33,7 +33,7 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261126R28');assert.equal(evidence.identity.triangles,79909);
+ assert.equal(evidence.identity.version,'173R-20261126R29');assert.equal(evidence.identity.triangles,79909);
  assert.equal(evidence.identity.worldTriangles,79909);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  const timber=evidence.identity.materials.filter(material=>/^(MainWood_|FrontWood_|UpperWood_)/.test(material.part));
  assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-.45)<1e-5),'game preserves the calibrated walnut dielectric reflectance');

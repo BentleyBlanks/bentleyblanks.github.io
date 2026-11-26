@@ -184,6 +184,14 @@ The rear band takes its cross sections from the approved band mesh. Its raised r
 
 The actual weapon inspection bench comparison and its Albedo, Roughness and Reflection captures are in the archive's `Review` folder.
 
+### R29 walnut grain and steel patina
+
+The three timber surfaces share a walnut stain. Irregular growth rings follow the carved volume. Aperiodic samples of walnut grain and weathered wood supply the local fibres, pits and colour. The stock crest and worn forearm carry the retained oil in their roughness and finish masks. The handguard and stock reference photos show how the grain and sheen change around the curved surfaces. [Steven Lu, stock and handguard photographs](https://armsofchina.com/firearm/hanyang88/) · [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119)
+
+The steel uses overlapping scan patches with locally selected offsets and orientations. Clean steel patches stay within the plates of the source scan. Oxide, pits and machining marks vary across the longer surfaces, and the R28 bevels carry the polished highlights. The bake retains the R28 geometry and UV streams at 79,909 triangles.
+
+The reference comparison and the Albedo, Roughness and Reflection screenshots from the actual inspection bench are in the archive's `Review` folder.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
