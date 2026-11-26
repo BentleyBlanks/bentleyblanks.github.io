@@ -11,7 +11,7 @@ from mathutils import Matrix, Vector
 
 base = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
 revision = os.environ.get("TYPE94_PHOTO_REVISION","V107")
-studies = ("V107","V108","V109")
+studies = ("V107","V108","V109","V111")
 if revision not in studies:
     raise ValueError(f"Unknown Type 94 photo revision {revision}")
 root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/f"PhotoReconstruction{revision}"))

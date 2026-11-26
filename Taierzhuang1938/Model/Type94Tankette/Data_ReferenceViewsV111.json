@@ -1,0 +1,422 @@
+{
+  "schema": "Type94PhotoReferenceV111",
+  "sourceStudy": "Data_ReferenceViewsV109.json",
+  "addedCameras": {
+    "3": {
+      "image": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial3.jpg",
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            -0.665462805345298,
+            0.7413572313268212,
+            0.08688331405624904
+          ],
+          [
+            -0.08093484509280911,
+            0.044046988685939356,
+            -0.9957456571020055
+          ],
+          [
+            -0.7420301918060815,
+            -0.6696635859497903,
+            0.030690000017912538
+          ]
+        ],
+        "translationCameraFromBlender": [
+          0.27291938002128635,
+          0.8737941627346906,
+          4.183467195250642
+        ],
+        "k": [
+          [
+            1363.7279488759318,
+            0.0,
+            719.3903040639475
+          ],
+          [
+            0.0,
+            1363.7279488759318,
+            481.4652056829363
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          -0.006344518299880223,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "4": {
+      "image": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial4.jpg",
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            0.733983006176992,
+            0.6784152986565998,
+            -0.03196293465973366
+          ],
+          [
+            -0.08501042198062642,
+            0.045077968779547985,
+            -0.9953598368858299
+          ],
+          [
+            -0.6738265168409906,
+            0.7332943878684648,
+            0.09075883385407542
+          ]
+        ],
+        "translationCameraFromBlender": [
+          1.8482597145649868,
+          1.0042712218623175,
+          6.068259706413141
+        ],
+        "k": [
+          [
+            1337.7330661465778,
+            0.0,
+            720.0
+          ],
+          [
+            0.0,
+            1337.7330661465778,
+            480.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          -0.007293435598447415,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "5": {
+      "image": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial5.jpg",
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "17252acad0fd8b924c83a7fb919af18ed1226964728ba3e2a7904ce539706bc9"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            0.9351308475599314,
+            0.35277224216818737,
+            -0.03289442350121192
+          ],
+          [
+            -0.026239136604779407,
+            -0.023632476164688842,
+            -0.999376312397169
+          ],
+          [
+            -0.35332959917346635,
+            0.9354107393150655,
+            -0.012843018413200204
+          ]
+        ],
+        "translationCameraFromBlender": [
+          1.2809324269628533,
+          0.3908618186757191,
+          6.223872488120494
+        ],
+        "k": [
+          [
+            1879.0228247422804,
+            0.0,
+            719.5507573428993
+          ],
+          [
+            0.0,
+            1879.0228247422804,
+            478.5853217810266
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          -0.01999198816224937,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "6": {
+      "image": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\References\\PatriotOfficial\\Reference_PatriotOfficial6.jpg",
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            0.7305751630279177,
+            -0.6818383962424174,
+            -0.03682842076846787
+          ],
+          [
+            -0.018997356862050868,
+            0.033617873172527145,
+            -0.9992541914025742
+          ],
+          [
+            0.6825679684829841,
+            0.7307299364422702,
+            0.011607255838005008
+          ]
+        ],
+        "translationCameraFromBlender": [
+          -1.723881863419492,
+          0.7832643658351177,
+          6.086446014551041
+        ],
+        "k": [
+          [
+            1412.3159426542848,
+            0.0,
+            720.0
+          ],
+          [
+            0.0,
+            1412.3159426542848,
+            480.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          -0.01048768872493535,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "P": {
+      "image": {
+        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV109\\Acceptance\\Inputs\\Popov2022\\Reference_Popov1955.jpg",
+        "size": [
+          1200,
+          801
+        ],
+        "sha256": "e7199121f03bfaf6de4df63327c380117f551fe15b4d935ff6d542f92a6e2583"
+      },
+      "camera": {
+        "rotationCameraFromBlender": [
+          [
+            0.7603345786441271,
+            -0.6441135189270871,
+            -0.08372038732246041
+          ],
+          [
+            -0.26716433374660264,
+            -0.19264556482661105,
+            -0.9441985517497739
+          ],
+          [
+            0.5920426904301682,
+            0.7402739095010716,
+            -0.3185592435014361
+          ]
+        ],
+        "translationCameraFromBlender": [
+          -0.5942463664021682,
+          0.3990271210068366,
+          2.9017028078419616
+        ],
+        "k": [
+          [
+            1081.7185369168294,
+            0.0,
+            620.4309206729507
+          ],
+          [
+            0.0,
+            1081.7185369168294,
+            397.3389239561755
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          0.010924885633216077,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "turretYawRadians": 0.0
+      }
+    }
+  },
+  "photos": [
+    {
+      "id": "P",
+      "file": "PhotoReconstructionV109/Acceptance/Inputs/Popov2022/Reference_Popov1955.jpg",
+      "sha256": "e7199121f03bfaf6de4df63327c380117f551fe15b4d935ff6d542f92a6e2583",
+      "review": "Supplemental elevated rear photograph, Kpopov.ru gallery, 18 September 2022."
+    }
+  ],
+  "scope": "Same early small-idler museum vehicle. The 2017 olive finish remains the primary appearance. The 2022 rear photographs refine the connected sheet-metal folds.",
+  "photoCalibration": {
+    "4And6": "Photo-only museum feature pairs and display trim directions. Corrected right idler and rear tyre landmarks derive from local matches to the original view 3.",
+    "3": "Side-surface matches and measured display direction establish the relative orientation. The transverse rear fold point shared by 4/P establishes the baseline scale.",
+    "5": "Matched turret features and trailer surface points support the measured camera. The fender and running gear were held out.",
+    "P": "Independent 4/6/P resection with real photo tie points, trailer/rigid landmarks and projected display direction.",
+    "rightAxleTransferPx": {
+      "idler": [
+        -13.4,
+        -5.96
+      ],
+      "rearRoadWheel": [
+        3.6,
+        -24.68
+      ]
+    },
+    "heldOutRearBeltMedianAbsolutePixels": {
+      "4": 2.6356490938908337,
+      "P": 10.413511635030545
+    },
+    "terminalFoldObservations": {
+      "3": {
+        "observed": [
+          361,
+          548
+        ],
+        "candidate": [
+          361.12,
+          544.82
+        ],
+        "errorPx": [
+          0.12,
+          -3.18
+        ]
+      },
+      "4": {
+        "observed": [
+          1149.5,
+          576.5
+        ],
+        "candidate": [
+          1148.74,
+          577.69
+        ],
+        "errorPx": [
+          -0.76,
+          1.19
+        ]
+      },
+      "5": {
+        "observed": [
+          1323,
+          414
+        ],
+        "candidate": [
+          1322.2,
+          422.21
+        ],
+        "errorPx": [
+          -0.8,
+          8.21
+        ]
+      },
+      "P": {
+        "observed": [
+          1023,
+          367
+        ],
+        "candidate": [
+          1024.12,
+          367.83
+        ],
+        "errorPx": [
+          1.12,
+          0.83
+        ]
+      },
+      "6": {
+        "observed": [
+          296,
+          535
+        ],
+        "candidate": [
+          300.87,
+          536.94
+        ],
+        "errorPx": [
+          4.87,
+          1.94
+        ]
+      },
+      "PLeft": {
+        "observed": [
+          343,
+          688
+        ],
+        "candidate": [
+          335.86,
+          694.61
+        ],
+        "errorPx": [
+          -7.14,
+          6.61
+        ]
+      }
+    }
+  },
+  "verifiedAppearance": "Matched-camera review of the original views and two lighting setups. The corrected rear sheet geometry leaves the rigid assembly and both track paths at their existing poses.",
+  "inferences": [
+    "Lighting is an estimate of the museum setup. No gallery shadows or coloured floor illumination are baked into base colour.",
+    "Photo 5 has shallow depth of field. The trailer hides other surfaces. The obscured rear underside, mating faces and exact mounted thickness remain inferred.",
+    "Texture matches establish relative photographic placement; they are not a dimensional survey. The supplemental elevated photo retains a local track contour residual of approximately ten source pixels."
+  ]
+}

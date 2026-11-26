@@ -12,7 +12,7 @@ from scipy.ndimage import map_coordinates
 
 base = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
 revision = os.environ.get("TYPE94_PHOTO_REVISION","V107")
-studies = ("V107","V108","V109")
+studies = ("V107","V108","V109","V111")
 if revision not in studies:
     raise ValueError(f"Unknown Type 94 photo revision {revision}")
 root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/f"PhotoReconstruction{revision}"))
@@ -25,6 +25,7 @@ familyFile = base/study["sourceCameraFamily"]
 if hashlib.sha256(familyFile.read_bytes()).hexdigest()!=study["sourceCameraFamilySha256"]:
     raise ValueError("Reference camera record differs from the reviewed baseline")
 family = json.loads(familyFile.read_text(encoding="utf-8"))
+photos = {row["id"]:row for row in study["photos"]}
 for key,record in study["addedCameras"].items():
     family["images"][key] = record["image"]
     family["cameras"][key] = record["camera"]
@@ -33,7 +34,7 @@ for stage in studies[1:studies.index(revision)+1]:
     for key,record in supplement["addedCameras"].items():
         family["images"][key] = record["image"]
         family["cameras"][key] = record["camera"]
-photos = {row["id"]:row for row in study["photos"]}
+    photos.update({row["id"]:row for row in supplement.get("photos",[])})
 high = f"Scene_Type94TanketteHigh{revision}"
 game = "Model_Type94Tankette"
 
@@ -87,7 +88,7 @@ def Board(name, images, box=(0,0,1,1), panelWidth=760):
     board.thumbnail((640,640),Image.Resampling.LANCZOS)
     board.save(out/("Preview_"+name+".jpg"),quality=85)
 
-if revision in {"V108","V109"}:
+if revision in {"V108","V109","V111"}:
     previous = studies[studies.index(revision)-1]
     Board(f"Compare_Kubinka2017{revision}",[
         ("Kubinka 2017",Reference("2017")),
@@ -108,15 +109,31 @@ if revision in {"V108","V109"}:
         "4":(.61,.35,.99,.79),
         "6":(.03,.30,.42,.74),
     }
-    if revision=="V109":
+    if revision in {"V109","V111"}:
         windows["5"]=(.764,.31,.99,.57)
+    if revision=="V111":
+        windows["P"]=(.638,.30,.93,.70)
     for view,box in windows.items():
+        title = "Elevated rear photograph" if view=="P" else "Patriot "+view
         Board(f"Compare_RearPatriot{view}{revision}",[
-            ("Patriot "+view,Reference(view)),
+            (title,Reference(view)),
             (f"{previous} high / refined camera",Render(f"Scene_Type94TanketteHigh{previous}","gray",view)),
             (f"{revision} high / same camera",Render(high,"gray",view)),
             (f"{revision} actual game GLB",Render(game,"gray",view)),
         ],box,690)
+    if revision=="V111":
+        for key in ("2014","1","2","3","4","5","6","7","P"):
+            Board(f"Compare_Whole{key}{revision}",[
+                ("Photograph",Reference(key)),
+                ("V111 high",Render(high,"gray",key)),
+                ("V111 actual game GLB",Render(game,"gray",key)),
+            ])
+        for part in ("FrontJoint","FarCasting","DriveAndTrack","Rear"):
+            for light in ("museum","neutral"):
+                Board(f"Finish_{part}_{light}{revision}",[
+                    ("V111 high",Render(high,light,part)),
+                    ("V111 actual game GLB",Render(game,light,part)),
+                ],panelWidth=710)
     print(f"TYPE94_{revision}_COMPARISONS {out}")
     raise SystemExit(0)
 

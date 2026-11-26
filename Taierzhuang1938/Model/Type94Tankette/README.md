@@ -1,24 +1,24 @@
-# 九四式轻装甲车 · 馆藏照片复原 V109
+# 九四式轻装甲车 · 馆藏照片复原 V111
 
-以 2017 库宾卡同车橄榄漆照片为主，参看 2014 同车照片及馆方 1–7 号。V107 重做前挡泥板、首板上缘、传动罩、主动轮和履带开窗。V108 补齐左右后挡泥板连续的短弧下翻。V109 加入 5 号的部分可见车尾，参考 3、4、5 号收窄右后挡泥板末端，内收量约 75 毫米。最终游戏 GLB 为整车 79,178 三角面，重新投射 BaseColor、切线空间法线和 ORM。[资产合同](Data_Type94Tankette.json) · [交付记录](Data_ReleaseV109.json)
+以 2017 库宾卡同车橄榄漆照片为主，参看 2014 同车照片、馆方 1–7 号和一张 2022 年高角度车尾照。V107 重做前挡泥板、首板上缘、传动罩、主动轮和履带开窗。V111 用照片的共同特征复核轮轴标点和机位，再重塑两侧后挡泥板的下翻末端。游戏 GLB 整车实测 79,178 三角面，重新从高模投射切线空间法线、BaseColor 与包含 AO、粗糙度和金属度的 ORM。[资产合同](Data_Type94Tankette.json) · [交付记录](Data_ReleaseV111.json)
 
 米制、glTF +Y 向上、-Z 车头。现有 `Type94Tankette`、`Prop/type94Tankette` 和 `mechanisms.path` 接入复用同一个模型。炮塔、枪座、十个盖板或门、前后锁闩以及左右轮履沿用原有枢轴和演示行程。[机构模块](Script_Type94Mechanism.mjs)
 
-原图和旧工程保存在原来的 OneDrive 目录。本次输出位于 `Type94Tankette/PhotoReconstructionV109/`，含 `Scene_Type94TanketteHighV109.blend`、`Scene_Type94TanketteGameV109.blend`、`Textures/`、`Exports/` 和 `Acceptance/`。5 号以展陈固定点和炮塔轮廓定姿，右后折边留出验证。4 号末端的横向余差已缩小，垂直余差在挡泥板和履带上仍然存在。模糊边界、挂车遮挡处断面和展厅灯场依据现有图证推定。[参考和机位记录](Data_ReferenceViewsV109.json)
+原图和旧工程保存在原来的 OneDrive 目录。本次输出位于 `Type94Tankette/PhotoReconstructionV111/`，含 `Scene_Type94TanketteHighV111.blend`、`Scene_Type94TanketteGameV111.blend`、`Textures/`、`Exports/` 和 `Acceptance/`。重校机位后，留出的右后履带轮廓在馆方 4 号和高角度补图里的中位投影余差分别约为 3 和 10 像素。馆方 5 号的失焦、挂车遮挡处断面和展厅灯场均记录推定依据。[参考和机位记录](Data_ReferenceViewsV111.json)
 
 ## 重建与验收
 
-设置 `TYPE94_PHOTO_ROOT` 指向新的 OneDrive 输出子目录可独立重建。V109 重放使用保留的 V108 高源和低模几何，先保存高模再派生低模，投射阶段核对高模文件的 SHA-256。包装脚本在输出目录生成运行时 GLB。
+设置 `TYPE94_PHOTO_ROOT` 指向新的 OneDrive 输出子目录可独立重建。V111 使用保留的 V109 高源和低模几何，先保存重塑后的高模，再派生低模。投射阶段核对高模文件的 SHA-256。包装脚本在输出目录生成运行时 GLB。
 
 ```powershell
-$env:TYPE94_PHOTO_REVISION = "V109"
+$env:TYPE94_PHOTO_REVISION = "V111"
 node Taierzhuang1938/_blender/Script_BuildType94PhotoV107.mjs
 node Taierzhuang1938/_import/Script_PackageType94PhotoV107.mjs
 node scripts/Script_BlenderMcp.mjs start --task Type94Tankette --batch Taierzhuang1938/_blender/Script_VerifyType94PhotoV107.py
 node scripts/Script_BlenderMcp.mjs stop
 ```
 
-照片与两套光照的渲染入口是 `_blender/Script_RenderType94PhotoV107.py`。将 `TYPE94_PHOTO_RENDER_CASES` 设为 `gray:3,gray:4,gray:5,gray:6,museum:2017,neutral:2017,museum:Rear,neutral:Rear`。分别用 `TYPE94_PROBE_BLEND` 指定 V109 高模和封装 GLB，另用 V108 高模渲染四个灰模机位。合成使用 `_import/Script_ComposeType94EvidenceV107.py`，需要 NumPy、Pillow 与 SciPy。对照图和实机截图保留在 OneDrive。[V108 交付记录](Data_ReleaseV108.json) · [V107 交付记录](Data_ReleaseV107.json)
+照片与两套光照的渲染入口是 `_blender/Script_RenderType94PhotoV107.py`。用 `TYPE94_PROBE_BLEND` 分别指定 V111 高模及封装 GLB。灰模机位键为 `2014,1,2,3,4,5,6,7,P`，参考光与中性光使用 `2017,Rear,FrontJoint,FarCasting,DriveAndTrack`。对比基线使用 V109 高模，在 V111 机位下渲染 `3,4,5,6,P`。合成入口 `_import/Script_ComposeType94EvidenceV107.py` 需要 NumPy、Pillow 与 SciPy。对照图和实机截图保留在 OneDrive。[V109 交付记录](Data_ReleaseV109.json) · [V108 交付记录](Data_ReleaseV108.json) · [V107 交付记录](Data_ReleaseV107.json)
 
 ## 历史制作记录
 

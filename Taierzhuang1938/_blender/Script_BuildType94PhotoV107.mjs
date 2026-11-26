@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const phases = ["High", "LowGeometry", "Prepare", "Track", "Paint", "Steel", "Rubber", "Finalize"];
 const revision = process.env.TYPE94_PHOTO_REVISION || "V107";
-if (!["V107", "V108", "V109"].includes(revision)) throw new Error(`Unknown Type 94 photo revision ${revision}`);
+if (!["V107", "V108", "V109", "V111"].includes(revision)) throw new Error(`Unknown Type 94 photo revision ${revision}`);
 const args = process.argv.slice(2);
 if (args.includes("--help")) {
-  console.log(`Script_BuildType94PhotoV107 [--dry-run] [--phase=<${phases.join("|")}>]\nTYPE94_PHOTO_REVISION selects V107, V108 or V109. TYPE94_PHOTO_ROOT overrides the external output folder.`);
+  console.log(`Script_BuildType94PhotoV107 [--dry-run] [--phase=<${phases.join("|")}>]\nTYPE94_PHOTO_REVISION selects V107, V108, V109 or V111. TYPE94_PHOTO_ROOT overrides the external output folder.`);
   process.exit(0);
 }
 const phaseOption = args.find(value => value.startsWith("--phase="))?.slice(8);

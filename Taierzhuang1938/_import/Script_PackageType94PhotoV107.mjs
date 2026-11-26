@@ -7,7 +7,7 @@ import path from "node:path";
 import { CompressEmbeddedTextures, InspectEmbeddedTextures, ReadGlb } from "./Script_CompressEmbeddedTextures.mjs";
 
 const revision = process.env.TYPE94_PHOTO_REVISION || "V107";
-if (!["V107", "V108", "V109"].includes(revision)) throw new Error(`Unknown Type 94 photo revision ${revision}`);
+if (!["V107", "V108", "V109", "V111"].includes(revision)) throw new Error(`Unknown Type 94 photo revision ${revision}`);
 const root = path.resolve(process.env.TYPE94_PHOTO_ROOT ||
   `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/PhotoReconstruction${revision}`);
 const acceptance = path.join(root, "Acceptance");

@@ -9,14 +9,16 @@ import bpy
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, defaultSource
+from Script_Type94RearDatumV111 import FitRearFolds
 from Script_Type94RearMudguardV108 import REAR_PROFILE, ReplaceRearMudguards
 from Script_Type94RearTaperV109 import SweepRearRim
 
 
 revision=os.environ.get("TYPE94_PHOTO_REVISION","V108")
-if revision not in {"V108","V109"}:
+baselines={"V108":"V107","V109":"V108","V111":"V109"}
+if revision not in baselines:
     raise ValueError(f"Unknown rear source revision {revision}")
-baseline="V107" if revision=="V108" else "V108"
+baseline=baselines[revision]
 root=Path(os.environ.get("TYPE94_PHOTO_ROOT",defaultSource/f"PhotoReconstruction{revision}"))
 acceptance=root/"Acceptance"
 sourceRoot=defaultSource/f"PhotoReconstruction{baseline}"
@@ -44,9 +46,12 @@ def Build(high):
     if revision=="V108":
         changes=dict(tailPanelsReplaced=ReplaceRearMudguards(asset,high),connectedRearMudguards=2)
         scene["RearFendersRebuiltFromViews"]="Patriot official 3 / 4 / 6"
-    else:
+    elif revision=="V109":
         changes=SweepRearRim(asset)
         scene["RearFenderTaperDerivedFromViews"]="Patriot views 3, 4 and 5"
+    else:
+        changes=FitRearFolds(asset)
+        scene["RearFendersRebuiltFromViews"]="Patriot rear stereo, elevated 2022 rear photograph and held-out wheel contours"
     bpy.context.view_layer.update()
     for name,matrix in poses.items():
         if matrix!=bpy.data.objects[name].matrix_world:

@@ -19,7 +19,7 @@ repo = scriptDir.parents[1]
 modelDir = repo / "Taierzhuang1938/Model/Type94Tankette"
 defaultSource = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
 revision = os.environ.get("TYPE94_PHOTO_REVISION", "V107")
-if revision not in {"V107", "V108", "V109"}:
+if revision not in {"V107", "V108", "V109", "V111"}:
     raise ValueError(f"Unknown Type 94 photo revision {revision}")
 root = Path(os.environ.get("TYPE94_PHOTO_ROOT", defaultSource / f"PhotoReconstruction{revision}")).resolve()
 acceptance = root / "Acceptance"
