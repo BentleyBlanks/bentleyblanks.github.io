@@ -8196,7 +8196,7 @@ const EMPLACED_CONVERGE_M = 160;
 
 // gunCue / gunOpts：枪声用哪条 cue、带哪些 Play 选项。默认仍是旧的 type92（其它调用照旧）；
 // 第一关战车的车载机枪给 type11 + burst 1 + 车内低通（Data_Tuning_Tank.audio.mg*，战车包 2026-09-23）。
-function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null,gunCue="type92",gunOpts=null}={}) {
+function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null,gunCue="type92",gunOpts=null,severityKind="hmg"}={}) {
   const boxes=PlayerHitboxes(player.position,player.yaw,player.stance,[],player.LeanOffsetM);
   // isPlayer：给近失弹那条链认人用（Script_AudioWiring.BulletNearMissesForPlayer）。
   // 玩家在弹道链上从来不是本人，而是这个临时代理，所以标记只能挂在这儿。
@@ -8208,7 +8208,7 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   const targets=ai.soldiers.filter(s=>s.alive&&s.side==="nra");
   if(player.Alive)targets.push(playerTarget);
   const weapon=WEAPONS[weaponId],result=MarchBullet(from,direction,weapon,targets,sourceCollider),end=_hitPoint.clone();
-  vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
+  vfx.MuzzleFlash(from,direction,{scale:severityKind==="hmg"?1.1:0.85,kind:severityKind==="hmg"?"hmg":"mg"});
   // 每发一条从枪口到弹着点的光束（不是步枪那种 1/5 的短曳光）：玩家要看得清火力从哪儿来、
   // 扫到了哪儿。口径见 Data_Tuning_BulletVisual。
   vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot(gunCue,{position:from,volume:.85,weaponClass:"mg",...(gunOpts||{}),burst:1});
@@ -8216,9 +8216,9 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   // 曳光与弹着照旧，只是不伤人 —— 不能走 TakeHit(0)，那一下也会亮受击反馈。
   if(result.soldier&&!(damageScale>0)){}
   else if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
-  // 车载重机枪走 hmg 那一档（断肢概率比步枪高一个量级，见 SEVER_RULES）。
+  // 车载机枪按口径区分伤情档（九二式重机枪走 hmg，九一式 6.5mm 轻机枪走 mg）。
   else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
-    {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});
+    {kind:severityKind,shapeId:result.shape?.id||null,weaponId,point:end.clone()});
     if(result.part==="head")vfx.HeadshotBlood(end,direction,result.soldier);else vfx.Blood(end,direction,.5);}
   else if(result.wall){
     const normal=new THREE.Vector3(...result.wall.normal),surface=ImpactSurface(result.wall.box,"dirt");

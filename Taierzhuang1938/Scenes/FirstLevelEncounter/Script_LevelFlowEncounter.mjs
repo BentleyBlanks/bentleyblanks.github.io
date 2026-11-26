@@ -1,7 +1,7 @@
 import { FLOW_ZOOM } from "../../Data_Tuning_LevelFlow.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED, FLOW_PREVIOUS_INFANTRY_TANK } from "./Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
@@ -14,7 +14,7 @@ export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","
 const Area = (center, width = 5, depth = width) => ({ shape: "rect", center: [...center], size: [width, depth] });
 
 export function CreateEncounterDocument(timeline, waves, options = {}) {
-  const { id: docId = "FirstLevelEncounter", revision = "2026-11-17-beishahe-story-1" } = options;
+  const { id: docId = "FirstLevelEncounter", revision = "2026-11-27-infantry-tank-tactics-1" } = options;
   const Find = (id) => timeline.find((beat) => beat.id === id);
   const triggers = timeline.filter((beat) => beat.zone).map((beat) => ({
     id: `Arrival_${beat.id}`, label: beat.title, beat: beat.id, endBeat: beat.id,
@@ -94,11 +94,25 @@ export function CreateEncounterDocument(timeline, waves, options = {}) {
     Add("TempleGun","土地庙机枪","10c","10e",[181,480],[[181,480]],2,"enemy","suppress","player",140);
     Add("MortarTeam","场院掷弹筒","10c","10e",[199,449],[[199,449]],2,"enemy","guard","none",140);
   }
+  const formationNotes={
+    GroundWest:"西翼先导步兵（含十一年式轻机枪基准火力），05A 后段先于战车沿西侧掩体两两交互跃进，清扫凹路西沿",
+    GroundEast:"东翼先导步兵（含十一年式轻机枪基准火力），05A 后段先于战车沿东侧土埂残墙交互跃进，交叉压制凹路",
+    TankReinforce:"头车焚毁后由后车步兵掩护反击：东翼轻机枪组定点压制，三人分路借残骸与东侧土埂交替跃进摸进",
+  };
   for(const formation of FLOW_GROUND_FORMATIONS) {
     const group=groups.find(item=>item.id===formation.id);
+    if(formation.areaCenter) group.area.center=[...formation.areaCenter];
     group.area.size=[...formation.areaSize];
     group.spawnOffsets=structuredClone(formation.offsets);
     if(formation.holdUntil) group.holdUntil=structuredClone(formation.holdUntil);
+    if(formation.behavior) group.behavior=formation.behavior;
+    if(formation.weapon) group.weapon=formation.weapon;
+    if(formation.engageOn) group.engageOn=formation.engageOn;
+    if(formation.fireCycle) group.fireCycle=structuredClone(formation.fireCycle);
+    if(formation.interval!==undefined) group.interval=formation.interval;
+    if(formation.coverWaitSeconds!==undefined) group.coverWaitSeconds=formation.coverWaitSeconds;
+    if(formation.areaCenter && group.route.length) group.route[0]=[...formation.areaCenter];
+    if(formationNotes[formation.id]) group.note=formationNotes[formation.id];
     group.memberPlans=formation.offsets.map((offset,index)=>({
       delay:formation.delays[index],
       route:structuredClone(formation.routes?.[index]
@@ -124,7 +138,9 @@ export function CreateEncounterDocument(timeline, waves, options = {}) {
     }));
     group.interval=0;
     group.lifetime+=approachLead;
-    group.note="05A 在北侧土垄后随车出发，绕垄上车道，05C 车声靠近，06A 连续追入";
+    group.note=id==="TankEscort"
+      ? "05A 在北侧土垄后随头车隐蔽出发，双翼梯次护卫、接战前静默警戒，06A 起交替短停伴随推进"
+      : "05A 随二号车在纵深后方跟进（含轻机枪基准火力），双翼散开掩护侧后，06A 起与头车交替短停推进";
   }
   Object.assign(triggers.find(trigger=>trigger.id===escort.triggerId),{
     beat:"05a",area:Area(Find("05a").p[0],8,8),
@@ -467,10 +483,10 @@ function GroupActor(group,index,time,coreActors) {
   const tank=coreActors.find((actor)=>actor.id===(group.tankId||"tank1"));
   if(group.behavior==="escort"&&tank) {
     const progress=EscortRouteProgress(path,[tank.p[0]+(offset?.[0]||0),tank.p[1]]);
-    const spacing=group.memberPlans?3.2:1.1;
-    const clearance=group.memberPlans?5:3;
-    const limit=Math.max(0,progress-clearance-slot*spacing);
-    if(distance>=limit) movement.moving=tank.moving;
+    const setback=offset&&offset[1]<0?-offset[1]:(group.memberPlans?5+slot*3.2:3+slot*1.1);
+    const limit=Math.max(0,progress-setback);
+    if(distance>=total-0.05) movement.moving=false;
+    else if(distance>=limit-0.05) movement.moving=tank.moving&&limit<total-0.05;
     distance=Math.min(distance,limit);
   }
   if(group.withdrawAlongRoute && time>=group.end && !dead) distance=Math.max(0,distance-(time-group.end)*group.speed);
@@ -804,21 +820,44 @@ function UpgradeMergedBoards(document, defaults) {
   }
 }
 
+function UpgradeInfantryTankTactics(value, defaults) {
+  const spatialKeys = ["area", "route", "spawnOffsets", "memberPlans"];
+  const tacticKeys = [...spatialKeys, "behavior", "weapon", "engageOn", "fireCycle", "interval", "coverWaitSeconds", "note"];
+  for (const previous of FLOW_PREVIOUS_INFANTRY_TANK.groups) {
+    const current = value.groups.find(group => group.id === previous.id);
+    const next = defaults.groups.find(group => group.id === previous.id);
+    if (!current || !next) continue;
+    const spatialEdited = spatialKeys.some(key => JSON.stringify(current[key]) !== JSON.stringify(previous[key]));
+    for (const key of tacticKeys) {
+      if (spatialEdited && [...spatialKeys, "behavior", "interval", "coverWaitSeconds"].includes(key)) continue;
+      if (JSON.stringify(current[key]) === JSON.stringify(previous[key])) {
+        if (next[key] === undefined) delete current[key];
+        else current[key] = structuredClone(next[key]);
+      }
+    }
+  }
+  value.revision = defaults.revision;
+  return value;
+}
+
 export function UpgradeEncounterDocument(input,defaults) {
   if(defaults.id!=="FirstLevelEncounter") {
     const cloned=structuredClone(input);
     const eastFlankRevisions = ["2026-11-22-beishahe-merged-1", "2026-11-25-west-search-cover-1"];
     const boardsLegacyRevisions = [...eastFlankRevisions, "2026-11-26-east-flank-plan-a-1"];
+    const infantryTankLegacyRevisions = [...boardsLegacyRevisions, "2026-11-26-merged-boards-clear-1"];
     if (input.id === "L1_BeishaheMerged" && input.id === defaults.id && input.revision !== defaults.revision) {
       if (eastFlankRevisions.includes(input.revision)) UpgradeMergedEastFlank(cloned, defaults);
       if (boardsLegacyRevisions.includes(input.revision)) UpgradeMergedBoards(cloned, defaults);
+      if (infantryTankLegacyRevisions.includes(input.revision)) UpgradeInfantryTankTactics(cloned, defaults);
     }
     cloned.id=defaults.id;
     cloned.revision=defaults.revision;
     return cloned;
   }
+  if(input.revision===defaults.revision) return input;
+  if(input.revision==="2026-11-17-beishahe-story-1") return UpgradeInfantryTankTactics(structuredClone(input),defaults);
   const value=UpgradePriorBeishaheDocument(input,defaults);
-  if(input.revision===defaults.revision) return value;
   if(value===input) return input;
   const upgraded=structuredClone(value);
   const addedGroups=defaults.groups.filter(group=>Number(group.beat.slice(0,2))>=11);
@@ -827,8 +866,7 @@ export function UpgradeEncounterDocument(input,defaults) {
   for(const trigger of defaults.triggers.filter(entry=>triggerIds.has(entry.id))) {
     if(!upgraded.triggers.some(entry=>entry.id===trigger.id)) upgraded.triggers.push(structuredClone(trigger));
   }
-  upgraded.revision=defaults.revision;
-  return upgraded;
+  return UpgradeInfantryTankTactics(upgraded,defaults);
 }
 
 function UpgradePriorBeishaheDocument(input,defaults) {

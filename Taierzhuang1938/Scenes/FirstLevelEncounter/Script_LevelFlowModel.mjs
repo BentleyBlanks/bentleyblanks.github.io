@@ -171,28 +171,35 @@ const winterLoadingRoute=[loadingStart,LaneAtZ(loadingStart[1]),
 const tankKeys = Keys(FLOW_TANK_TRACKS.tank1);
 const secondTankKeys = Keys(FLOW_TANK_TRACKS.tank2);
 
-function MarchTime(seconds) {
+function MarchCumulative(seconds) {
   const cycle=FLOW_GROUND.tankMoveS+FLOW_GROUND.tankWaitS;
-  return Math.floor(seconds/cycle)*FLOW_GROUND.tankMoveS+Math.min(FLOW_GROUND.tankMoveS,seconds%cycle);
+  const wrapped=((seconds%cycle)+cycle)%cycle;
+  return Math.floor(seconds/cycle)*FLOW_GROUND.tankMoveS+Math.min(FLOW_GROUND.tankMoveS,wrapped);
 }
 
-function TankTrack(keys,time) {
+// Staggered paired bounding overwatch: tank1 (phaseOffset=0) and tank2 (phaseOffset=tankMoveS)
+// alternate 6 s bounds and 6 s hull-steady overwatch halts without resetting at beat boundaries.
+function TankTrack(keys,time,phaseOffset=0) {
   const end=keys.findIndex((key)=>key[0]>time);
   if(end<=0) return Track(keys,time);
-  const a=keys[end-1],b=keys[end],duration=b[0]-a[0],age=time-a[0];
+  const a=keys[end-1],b=keys[end];
   const bends=FLOW_GROUND.road.filter(point=>point[1]>Math.min(a[2],b[2]) && point[1]<Math.max(a[2],b[2]));
   if(b[2]<a[2]) bends.reverse();
-  return SampleRoute([a.slice(1),...bends,b.slice(1)],MarchTime(age)/MarchTime(duration));
+  const m0=MarchCumulative(a[0]+phaseOffset),m1=MarchCumulative(b[0]+phaseOffset),mt=MarchCumulative(time+phaseOffset);
+  const fraction=m1>m0?(mt-m0)/(m1-m0):1;
+  return SampleRoute([a.slice(1),...bends,b.slice(1)],fraction);
 }
 
-function TankState(keys,time) {
-  const position=TankTrack(keys,time),next=TankTrack(keys,time+0.02);
+function TankState(keys,time,phaseOffset=0) {
+  const position=TankTrack(keys,time,phaseOffset),next=TankTrack(keys,time+0.02,phaseOffset);
   const moving=Distance(position,next)>0.001;
   // Follow road bends, retaining the last travel direction during a cover halt.
-  const previous=TankTrack(keys,time-FLOW_GROUND.tankWaitS-0.02);
+  const lookBack=FLOW_GROUND.tankWaitS+0.5;
+  let previous=TankTrack(keys,time-lookBack,phaseOffset);
+  if(!moving&&Distance(position,previous)<=0.001) previous=TankTrack(keys,time-60,phaseOffset);
   const direction=moving?[next[0]-position[0],next[1]-position[1]]:[position[0]-previous[0],position[1]-previous[1]];
   const heading=Math.hypot(...direction)>0.001?Math.atan2(direction[0],-direction[1]):Math.PI;
-  return {p:position,moving,heading,status:moving?"地面推进":"停驶掩护，等待步兵"};
+  return {p:position,moving,heading,status:moving?"交错跃进推进（僚车架枪掩护）":"短停架枪掩护，步坦协同"};
 }
 
 function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
@@ -569,17 +576,19 @@ function CoreActors(beat, time, player, progress, tankStart=BeatById("05a").star
     const firstBurned = time >= BeatById("06f").start + BeatById("06f").duration * 0.8;
     const secondBurned = time >= BeatById("06h").start + BeatById("06h").duration * 0.8;
     const tankTime=time-tankStart+BeatById("05a").start;
-    const first=TankState(tankKeys,tankTime),second=TankState(secondTankKeys,tankTime);
+    const first=TankState(tankKeys,tankTime,0),second=TankState(secondTankKeys,tankTime,FLOW_GROUND.tankMoveS);
     if(firstBurned) Object.assign(first,{moving:false,status:"第一捆命中，焚毁"});
     if(secondBurned) Object.assign(second,{moving:false,status:"第二捆命中，焚毁"});
     const tankPosition=first.p;
-    const turretTarget=["06g","06h"].includes(beat.id)?yao:player;
+    const luoActor=actors.find(actor=>actor.id==="luo");
+    const yaoActor=actors.find(actor=>actor.id==="yao");
+    const turretTarget=["06g","06h"].includes(beat.id)?yao:(beat.stage==="06"&&Math.floor(time/6)%2===0&&luoActor?luoActor.p:player);
     const turret=time<BeatById("06a").start?first.heading
-      :Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.15;
+      :Math.atan2(turretTarget[0]-tankPosition[0],-(turretTarget[1]-tankPosition[1]))+Math.sin(time*0.8)*0.12;
     actors.push(Actor("tank1", "九四式 · 头车", "enemy", "tank", tankPosition, firstBurned ? "burn" : "stand",
       { ...first, surface:"ground", turret:firstBurned?first.heading:turret, disabled:firstBurned }));
-    const secondTarget=actors.find(actor=>actor.id==="yao").p;
-    const secondTurret=!secondBurned&&["06g","06h"].includes(beat.id)
+    const secondTarget=beat.stage==="06"&&(yaoActor?.p)?yaoActor.p:player;
+    const secondTurret=!secondBurned&&beat.stage==="06"
       ?Math.atan2(secondTarget[0]-second.p[0],-(secondTarget[1]-second.p[1])):second.heading;
     actors.push(Actor("tank2", "九四式 · 后车", "enemy", "tank", second.p, secondBurned?"burn":"stand",
       { ...second, surface:"ground", turret:secondTurret, disabled:secondBurned }));
@@ -765,7 +774,14 @@ function Effects(beat, time, progress, actors) {
   for(const tank of actors.filter(actor=>beat.stage==="06"&&actor.kind==="tank"&&actor.pose!=="burn")) {
     const cover=actors.filter(actor=>actor.coveringEvacuation && actor.firing)
       .reduce((nearest,actor)=>!nearest||Distance(tank.p,actor.p)<Distance(tank.p,nearest.p)?actor:nearest,null);
-    const target = ["06g","06h"].includes(beat.id) ? actors.find((actor)=>actor.id === "yao").p : cover?.p ?? player.p;
+    const yaoPos=actors.find((actor)=>actor.id==="yao")?.p;
+    const luoPos=actors.find((actor)=>actor.id==="luo")?.p;
+    const hePos=actors.find((actor)=>actor.id==="he")?.p;
+    const sectorTargets=tank.id==="tank2"
+      ?[yaoPos,luoPos,player.p].filter(Boolean)
+      :[luoPos,hePos,player.p].filter(Boolean);
+    const rotated=sectorTargets[Math.floor(time/6)%sectorTargets.length];
+    const target = ["06g","06h"].includes(beat.id) ? yaoPos : cover?.p ?? rotated ?? player.p;
     effects.push({ kind:"fire", a:tank.p, b:target, side:"enemy", heavy:true, phase:(time*5)%1 });
   }
   if (["crossfire","north"].includes(beat.fire) && beat.stage === "02") {

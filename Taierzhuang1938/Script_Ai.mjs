@@ -1056,6 +1056,14 @@ export class AiDirector {
     }
   }
 
+  /** 外部火力（如车载机枪近失弹）向单个士兵施加压制，保持 suppression 写所有权留在 Script_Ai。 */
+  SuppressSoldier(s, amount) {
+    if (!s?.alive || !(amount > 0)) return false;
+    s.suppression = Clamp01((s.suppression || 0) + amount);
+    s.suppressedAt = this.time;
+    return true;
+  }
+
   Spawn(side, x, z, options = {}) {
     if (this.aliveCount >= this.maxAlive) return null;
     // 兵种原型（Data_SoldierArchetypes）：写了 archetype 就先套上它的默认武器 / 外观 / 开关。

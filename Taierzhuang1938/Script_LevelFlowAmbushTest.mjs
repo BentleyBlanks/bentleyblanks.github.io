@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { BeatById, DEFAULT_ENCOUNTER_DOCUMENT, EvaluateFlow, FLOW_TIMELINE, Distance } from "./AdvancedTools/Script_LevelFlowModel.mjs";
 import { UpgradeEncounterDocument, ValidateEncounterDocument } from "./AdvancedTools/Script_LevelFlowEncounter.mjs";
-import { FLOW_PREVIOUS_AMBUSH } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_INFANTRY_TANK } from "./AdvancedTools/Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_GROUND } from "./AdvancedTools/Data_LevelFlow.mjs";
 import { SampleBeatRoute, SegmentDistance } from "./AdvancedTools/Script_LevelFlowGeometry.mjs";
 
@@ -123,4 +123,67 @@ oldArrival.area.center=[110,270];oldArrival.label="自定接近区";oldArrival.d
 assert.deepEqual(UpgradeEncounterDocument(oldOutcome,defaults).triggers.find(trigger=>trigger.id==="Arrival_06h"),oldArrival,"custom interaction areas are retained");
 oldOutcome.triggers=oldOutcome.triggers.filter(trigger=>trigger.id!=="Arrival_06h");
 assert.ok(!UpgradeEncounterDocument(oldOutcome,defaults).triggers.some(trigger=>trigger.id==="Arrival_06h"),"deleted interaction areas stay deleted");
-console.log("ok  Bend ambush: rear evacuation and rendezvous, separate tank destruction, no reversing or wreck fire, clear bomb approaches, continuity and draft migration");
+
+// 2026-11-27 combined-arms tactics checks (05A-06G): paired tank overwatch, leading LMG infantry screen, dual-wing escorts, 06G counter-assault, draft migration.
+let alternatingTankTicks = 0;
+for (let t = BeatById("05a").start; t < BeatById("06d").end; t += 0.5) {
+  const f = EvaluateFlow(t);
+  const t1 = f.actors.find(a => a.id === "tank1"), t2 = f.actors.find(a => a.id === "tank2");
+  if (t1 && t2 && t1.moving !== t2.moving) alternatingTankTicks++;
+}
+assert.ok(alternatingTankTicks > 100, `tank1 and tank2 alternate moving/halting overwatch (${alternatingTankTicks} ticks)`);
+
+for (const [bid, frac] of [["05b", 0.5], ["05c", 0.5], ["06a", 0.2]]) {
+  const b = BeatById(bid), f = EvaluateFlow(b.start + b.duration * frac);
+  const t1 = f.actors.find(a => a.id === "tank1");
+  const flankMaxZ = Math.max(...f.actors.filter(a => ["GroundWest", "GroundEast"].includes(a.groupId) && a.pose !== "dead").map(a => a.p[1]));
+  assert.ok(flankMaxZ >= t1.p[1] - 2, `${bid}@${frac} flanking infantry screen leads ahead of tank1 (${flankMaxZ.toFixed(1)} vs ${t1.p[1].toFixed(1)})`);
+}
+for (const groupId of ["GroundWest", "GroundEast", "TankRearScreen"]) {
+  const f = EvaluateFlow(BeatById("06a").start + 15);
+  assert.ok(f.actors.some(a => a.groupId === groupId && a.heavy), `${groupId} fields Type 11 LMG base-of-fire`);
+}
+for (const bid of ["05a", "05b", "05c"]) {
+  const b = BeatById(bid);
+  for (const frac of [0.25, 0.75]) {
+    const f = EvaluateFlow(b.start + b.duration * frac);
+    const firingEscorts = f.actors.filter(a => ["TankEscort", "TankRearScreen"].includes(a.groupId) && a.firing);
+    assert.equal(firingEscorts.length, 0, `${bid}@${frac} vehicle escorts keep fire discipline before 06A`);
+  }
+}
+{
+  const f06a = EvaluateFlow(BeatById("06a").start + 20);
+  const t1 = f06a.actors.find(a => a.id === "tank1");
+  const escorts = f06a.actors.filter(a => a.groupId === "TankEscort" && a.pose !== "dead");
+  assert.ok(escorts.some(a => a.p[0] < t1.p[0] - 1) && escorts.some(a => a.p[0] > t1.p[0] + 1), "TankEscort fans out across both west and east rear-quarter wings");
+  const f06e = EvaluateFlow(BeatById("06e").start + 8);
+  const e06e = f06e.actors.filter(a => a.groupId === "TankEscort" && a.pose !== "dead");
+  assert.ok(e06e.length > 0 && e06e.every(a => a.pose !== "run"), "TankEscort kneels/fires while tank1 holds overwatch in 06E instead of running in place");
+}
+{
+  const f06g = EvaluateFlow(BeatById("06g").start + 2);
+  const reinf = f06g.actors.filter(a => a.groupId === "TankReinforce" && a.pose !== "dead");
+  assert.equal(reinf.length, 5, "06G TankReinforce deploys full 5-man counter-assault team simultaneously");
+  assert.ok(reinf.some(a => a.heavy), "06G TankReinforce includes LMG base-of-fire");
+  const spreadX = Math.max(...reinf.map(a => a.p[0])) - Math.min(...reinf.map(a => a.p[0]));
+  assert.ok(spreadX > 10, `06G TankReinforce fans across dual wings (${spreadX.toFixed(1)}m)`);
+}
+{
+  const prevTactics = structuredClone(defaults);
+  prevTactics.revision = "2026-11-17-beishahe-story-1";
+  for (const old of FLOW_PREVIOUS_INFANTRY_TANK.groups) {
+    const g = prevTactics.groups.find(entry => entry.id === old.id);
+    Object.assign(g, structuredClone(old));
+    for (const k of ["weapon", "engageOn", "fireCycle", "coverWaitSeconds"]) if (old[k] === undefined) delete g[k];
+  }
+  assert.deepEqual(UpgradeEncounterDocument(prevTactics, defaults), defaults, "untouched 2026-11-17 drafts upgrade cleanly to 05-06 combined-arms defaults");
+  const editedTactics = structuredClone(prevTactics);
+  editedTactics.groups.find(g => g.id === "GroundWest").count = 6;
+  editedTactics.groups.find(g => g.id === "TankEscort").route = [[137, 53], [101, 260]];
+  editedTactics.groups = editedTactics.groups.filter(g => g.id !== "TankRearScreen");
+  const upgraded = UpgradeEncounterDocument(editedTactics, defaults);
+  assert.equal(upgraded.groups.find(g => g.id === "GroundWest").count, 6, "custom count survives tactics upgrade");
+  assert.deepEqual(upgraded.groups.find(g => g.id === "TankEscort").route, [[137, 53], [101, 260]], "custom escort route survives tactics upgrade");
+  assert.ok(!upgraded.groups.some(g => g.id === "TankRearScreen"), "deleted TankRearScreen stays deleted");
+}
+console.log("ok  Bend ambush: rear evacuation and rendezvous, separate tank destruction, no reversing or wreck fire, clear bomb approaches, continuity, combined-arms tactics and draft migration");

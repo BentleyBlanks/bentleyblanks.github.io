@@ -87,7 +87,7 @@ export class EncounterTankBrain {
     this.disabledAt = destroyed ? 0 : -1;
 
     // 感知与瞄准状态
-    this.phase = destroyed ? "disabled" : "idle"; // idle | traverse | aimHold | burst | rest | disabled
+    this.phase = destroyed ? "disabled" : "idle"; // idle | traverse | aimHold | burst | rest | reload | disabled
     this.nextPerceive = 0;
     this.visible = new Set();
     this.memory = new Map();
@@ -96,37 +96,63 @@ export class EncounterTankBrain {
     this.aimPoint = null;
     this.aimHoldUntil = 0;
     this.restUntil = 0;
+    this.reloadUntil = 0;
+    this.hopperRounds = tuning.mg.hopperCapacity ?? 50;
     this.burst = null;
     this.shotsOnTarget = 0;
     this.lastAim = null;
     this.suppressCycle = 0;
+    this.consecutiveBursts = { targetId: null, count: 0 };
+    this.saturationCooldowns = new Map();
 
-    // 受击与爆炸仇恨
+    // 受击、观察缝致盲与爆炸仇恨
     this.aggro = null; // { point, targetId, until, kind }
     this.lastBulletAggroAt = -Infinity;
+    this.recentBulletHits = [];
+    this.blindedUntil = -Infinity;
+    this.lastBlindAt = -Infinity;
     this.lastBlastReactAt = -Infinity;
     this.decoyStimulus = null; // { targetId, point, until }
     this.queuedEvents = [];
 
     // 统计（用于测试与取证）
-    this.stats = { bursts: 0, shots: 0, walkInShots: 0, lethalShots: 0, suppressShots: 0, bulletHits: 0, blastReacts: 0 };
+    this.stats = {
+      bursts: 0, shots: 0, walkInShots: 0, lethalShots: 0, suppressShots: 0,
+      bulletHits: 0, blastReacts: 0, reloads: 0, slitBlinds: 0,
+    };
   }
 
   Range(a, b) { return a + (b - a) * this.rng(); }
 
-  /** 被玩家步枪/机枪子弹击中车体装甲。返回 { aggro: boolean }。 */
+  /** 被玩家步枪/机枪子弹击中车体装甲。返回 { aggro: boolean, blinded: boolean }。 */
   OnBulletHit({ from = null, shooterId = "player" } = {}) {
     this.stats.bulletHits += 1;
-    if (this.destroyed || !from) return { aggro: false };
+    if (this.destroyed || !from) return { aggro: false, blinded: false };
     const R = this.T.react;
-    if (this.time - this.lastBulletAggroAt < R.bulletAggroCooldownS) return { aggro: false };
+    let blinded = false;
+    if ((R.slitHitsToBlind ?? 0) > 0) {
+      const windowS = R.slitHitWindowS ?? 3.0;
+      this.recentBulletHits.push(this.time);
+      this.recentBulletHits = this.recentBulletHits.filter((t) => this.time - t <= windowS);
+      if (this.recentBulletHits.length >= R.slitHitsToBlind && this.time - this.lastBlindAt >= (R.slitBlindCooldownS ?? 9.0)) {
+        this.lastBlindAt = this.time;
+        this.blindedUntil = this.time + (R.slitBlindS ?? 2.2);
+        this.recentBulletHits.length = 0;
+        this.burst = null;
+        if (this.phase === "burst" || this.phase === "aimHold") this.phase = "traverse";
+        this.stats.slitBlinds += 1;
+        this.queuedEvents.push({ id: "slitBlind", shooterId });
+        blinded = true;
+      }
+    }
+    if (this.time - this.lastBulletAggroAt < R.bulletAggroCooldownS) return { aggro: false, blinded };
     this.lastBulletAggroAt = this.time;
     const point = { x: from.x, y: from.y ?? this.groundY + 1.1, z: from.z };
     this.aggro = { point, targetId: shooterId, until: this.time + R.bulletAggroS, kind: "bullet" };
     // 正在歇息时提前唤醒准备回击
     if (this.phase === "rest") this.restUntil = Math.min(this.restUntil, this.time + 0.35);
     this.queuedEvents.push({ id: "aggro", kind: "bullet", targetId: shooterId });
-    return { aggro: true };
+    return { aggro: true, blinded };
   }
 
   /** 西坎诱饵（06g/06h 幺娃）向本车持续射击吸引炮塔注意。 */
@@ -242,15 +268,32 @@ export class EncounterTankBrain {
     return events;
   }
 
-  Prior(target, decoyRule) {
+  Prior(target, decoyRule, world = null) {
     const P = this.T.perceive;
+    const dist = Dist2D(this, target);
     let weight = (target.weight ?? 1) * (P.weights[target.kind] ?? P.weights.squad);
+    if (target.firingRecently && target.kind !== "zone") {
+      weight *= target.kind === "heavyAlly" ? (P.heavyFiringBonus ?? 1.45) : (P.firingBonus ?? 1.35);
+    }
+    if (target.exposed && target.kind !== "zone") {
+      weight *= P.exposedBonus ?? 1.25;
+    }
+    if (target.antiTank || (target.kind !== "zone" && target.hasBundle && dist <= (P.antiTankRangeM ?? 22))) {
+      weight *= P.antiTankBonus ?? 2.40;
+    }
     if (decoyRule && target.id === decoyRule.actorId) weight *= decoyRule.priorityBoost ?? 2.5;
-    if (decoyRule && target.kind === "player" && Dist2D(this, target) > (decoyRule.playerOverrideRangeM ?? 12)) {
+    if (decoyRule && target.kind === "player" && dist > (decoyRule.playerOverrideRangeM ?? 12)) {
       weight *= 0.42;
     }
-    const dist = Dist2D(this, target);
-    return (weight / (1 + dist / P.distanceFalloffM)) * (target.id === this.targetId ? P.inertia : 1);
+    const saturated = (this.saturationCooldowns.get(target.id) ?? -Infinity) > this.time;
+    if (saturated && !(decoyRule && target.id === decoyRule.actorId)) {
+      weight *= P.saturationScale ?? 0.40;
+    }
+    if (world?.otherTankTargets?.has?.(target.id) && !(decoyRule && target.id === decoyRule.actorId)) {
+      weight *= P.sharedTargetScale ?? 0.65;
+    }
+    const inertia = target.id === this.targetId && !saturated ? P.inertia : 1;
+    return (weight / (1 + dist / P.distanceFalloffM)) * inertia;
   }
 
   Perceive(world, muzzle) {
@@ -261,7 +304,7 @@ export class EncounterTankBrain {
     const decoyRule = world.decoyRule || null;
     const candidates = (world.targets || [])
       .filter((t) => t.alive !== false && Dist2D(this, t) <= P.rangeM)
-      .sort((a, b) => this.Prior(b, decoyRule) - this.Prior(a, decoyRule));
+      .sort((a, b) => this.Prior(b, decoyRule, world) - this.Prior(a, decoyRule, world));
 
     const seen = new Set();
     let rays = 0;
@@ -349,7 +392,7 @@ export class EncounterTankBrain {
       const visible = this.visible.has(t.id);
       const age = this.time - mem.seenAt;
       if (!visible && !mem.zone && age > P.memoryS) continue;
-      const score = this.Prior(t, decoyRule) * (visible ? 1 : mem.zone ? P.unseenZoneScale : P.unseenScale * (1 - age / P.memoryS));
+      const score = this.Prior(t, decoyRule, world) * (visible ? 1 : mem.zone ? P.unseenZoneScale : P.unseenScale * (1 - age / P.memoryS));
       if (score > bestScore) {
         bestScore = score;
         best = {
@@ -366,8 +409,21 @@ export class EncounterTankBrain {
     return best;
   }
 
+  BeginReload(eventsOut = this.queuedEvents) {
+    const M = this.T.mg;
+    this.burst = null;
+    this.phase = "reload";
+    this.reloadUntil = this.time + this.Range(M.reloadMinS ?? 4.8, M.reloadMaxS ?? 5.6);
+    this.stats.reloads += 1;
+    eventsOut.push({ id: "reload" });
+  }
+
   StartBurst(choice, world, muzzle) {
     const M = this.T.mg;
+    if (this.hopperRounds <= 0) {
+      this.BeginReload();
+      return;
+    }
     let kind = "lethal";
     let damageScale = choice.kind === "player" ? M.playerDamageScale : M.allyDamageScale;
     let point = { ...choice.point };
@@ -394,7 +450,7 @@ export class EncounterTankBrain {
         // 首次发现玩家：从身前 walkInStartM 处扫地走过来，零直接伤害但拉满压制、曳光与尘土警告！
         kind = "walkIn";
         damageScale = M.walkInDamageScale;
-        duration = M.burstMinS;
+        duration = M.walkInBurstS ?? M.burstMinS;
         const d = Math.max(0.5, Dist2D(this, point));
         const k = Math.min(M.walkInStartM, d * 0.55) / d;
         from = {
@@ -416,6 +472,8 @@ export class EncounterTankBrain {
       kind,
       targetId: choice.id,
       isPlayerTarget: choice.kind === "player",
+      isAggro: !!choice.aggro,
+      isDecoy: !!choice.decoy,
       from,
       point,
       damageScale,
@@ -430,12 +488,12 @@ export class EncounterTankBrain {
     if (kind === "lethal") this.shotsOnTarget += 1;
   }
 
-  StepBurst(fireOut, muzzle) {
+  StepBurst(fireOut, muzzle, eventsOut) {
     const M = this.T.mg;
     const b = this.burst;
     if (!b) return;
     const duration = Math.max(0.1, b.until - b.start);
-    while (this.time >= b.nextShot && b.nextShot < b.until) {
+    while (this.time >= b.nextShot && b.nextShot < b.until && this.hopperRounds > 0) {
       const progress = Clamp((b.nextShot - b.start) / duration, 0, 1);
       b.shots += 1;
       const n = b.shots;
@@ -449,13 +507,21 @@ export class EncounterTankBrain {
         };
       } else {
         const dist = Math.hypot(b.point.x - muzzle.x, b.point.z - muzzle.z);
-        const baseSpread = b.kind === "zone"
-          ? M.zoneSpreadM
+        const movingNow = this.speed > (M.movingSpeedThresholdMps ?? 0.3);
+        const rad = b.kind === "zone"
+          ? (M.zoneSpreadRad ?? 0.036)
           : b.kind === "suppress"
-            ? M.suppressSpreadM
-            : Math.max(M.spreadMinM, M.spreadFirstM * (M.spreadShrink ** b.burstStep));
-        const spread = baseSpread + M.spreadPerM * dist;
-        // 黄金角分布让连射在水平面上横扫一片压制带，既有真实散布又视觉极富压迫力
+            ? (M.suppressSpreadRad ?? 0.022)
+            : movingNow
+              ? (M.movingSpreadRad ?? 0.045)
+              : Math.max(M.settledSpreadRad ?? 0.0095, (M.coldSpreadRad ?? 0.024) * ((M.spreadShrink ?? 0.70) ** b.burstStep));
+        const floorM = b.kind === "zone"
+          ? (M.zoneSpreadM ?? 1.15)
+          : b.kind === "suppress"
+            ? (M.suppressSpreadM ?? 0.55)
+            : (M.spreadMinM ?? 0.28);
+        const spread = Math.max(floorM, rad * dist);
+        // 黄金角分布让连射在水平面上横扫一片压制带，行进间发散、短停收敛
         const sweep = b.kind === "zone" || b.kind === "suppress" ? (progress - 0.5) * spread * 1.4 : 0;
         const perpX = -(b.point.z - muzzle.z) / Math.max(0.5, dist);
         const perpZ = (b.point.x - muzzle.x) / Math.max(0.5, dist);
@@ -478,18 +544,36 @@ export class EncounterTankBrain {
           isPlayerTarget: b.isPlayerTarget,
           damageScale: b.damageScale,
         });
+        this.hopperRounds = Math.max(0, this.hopperRounds - 1);
         this.stats.shots += 1;
         if (b.kind === "walkIn") this.stats.walkInShots += 1;
         else if (b.kind === "lethal") this.stats.lethalShots += 1;
         else this.stats.suppressShots += 1;
       }
-      b.nextShot += M.shotIntervalS;
+      const jitter = (M.shotJitterS || 0) * (this.rng() * 2 - 1);
+      b.nextShot += Math.max(0.06, M.shotIntervalS + jitter);
+    }
+
+    if (this.hopperRounds <= 0) {
+      this.BeginReload(eventsOut);
+      return;
     }
 
     if (this.time >= b.until) {
+      if (b.kind !== "walkIn" && !b.isAggro && !b.isDecoy && b.targetId) {
+        if (this.consecutiveBursts.targetId === b.targetId) this.consecutiveBursts.count += 1;
+        else this.consecutiveBursts = { targetId: b.targetId, count: 1 };
+        if (this.consecutiveBursts.count >= (this.T.perceive.saturationBursts ?? 2)) {
+          this.saturationCooldowns.set(b.targetId, this.time + (this.T.perceive.saturationCooldownS ?? 6.0));
+          this.consecutiveBursts.count = 0;
+        }
+      }
+      const suppressRest = b.kind === "suppress" || b.kind === "zone";
+      const rMin = suppressRest ? (M.suppressRestMinS ?? M.restMinS) : M.restMinS;
+      const rMax = suppressRest ? (M.suppressRestMaxS ?? M.restMaxS) : M.restMaxS;
       this.burst = null;
       this.phase = "rest";
-      this.restUntil = this.time + this.Range(M.restMinS, M.restMaxS);
+      this.restUntil = this.time + this.Range(rMin, rMax);
     }
   }
 
@@ -575,7 +659,15 @@ export class EncounterTankBrain {
     this.cranking = Math.abs(this.turretRate) > 0.03;
 
     // 火力状态机
-    if (!weaponsFree) {
+    if (this.phase === "reload") {
+      if (this.time >= this.reloadUntil) {
+        this.hopperRounds = this.T.mg.hopperCapacity ?? 50;
+        this.phase = choice ? "traverse" : "idle";
+      }
+    } else if (!weaponsFree) {
+      this.burst = null;
+      this.phase = choice ? "traverse" : "idle";
+    } else if (this.time < this.blindedUntil) {
       this.burst = null;
       this.phase = choice ? "traverse" : "idle";
     } else if (choice) {
@@ -605,7 +697,7 @@ export class EncounterTankBrain {
           if (this.burst && choice.visible && this.burst.kind === "lethal") {
             this.burst.point = { ...choice.point };
           }
-          this.StepBurst(fire, muzzle);
+          this.StepBurst(fire, muzzle, events);
         }
       }
     }
@@ -632,6 +724,7 @@ export class EncounterTankBrain {
       gunPitchDeg: Number((this.gunPitch * 180 / Math.PI).toFixed(1)),
       phase: this.phase,
       targetId: this.targetId,
+      hopperRounds: this.hopperRounds,
       destroyed: this.destroyed,
       moving: this.moving,
       rpm: Math.round(this.rpm),

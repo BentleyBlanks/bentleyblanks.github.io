@@ -744,8 +744,38 @@ export class EncounterPlay {
     const playerDist=Math.hypot(playerPos.x-soldier.position.x,playerPos.z-soldier.position.z);
     const closeEnemyAlert=combat&&entry.spec.side==="ija"&&playerDist<=12;
     const holdWithdraw=entry.provoked&&group?.behavior==="withdraw";
+    const campHeld=group?.holdUntilTime!=null&&this.plan.time<group.holdUntilTime&&!this.stealth?.state?.alarm&&!closeEnemyAlert;
     let target=holdWithdraw?[soldier.position.x,soldier.position.z]:(group&&!route?[entry.spec.x,entry.spec.z]:current?.p||[soldier.position.x,soldier.position.z]),moving=false;
-    if(route&&!holdWithdraw) {
+    let escortSpeed=null,escortTethered=false;
+    if(group?.behavior==="escort"&&group.tankId&&!holdWithdraw) {
+      const tankBrain=this.tanks?.tanks?.get(group.tankId)?.brain;
+      const tankActor=frame.actors.find(a=>a.id===group.tankId);
+      const tankAlive=tankBrain?!tankBrain.destroyed:!!(tankActor&&tankActor.pose!=="burn"&&!tankActor.disabled);
+      if(tankAlive&&(tankBrain||tankActor)) {
+        const tx=tankBrain?tankBrain.x:tankActor.p[0],tz=tankBrain?tankBrain.z:tankActor.p[1];
+        const tankMoving=tankBrain?tankBrain.moving:!!tankActor?.moving;
+        const tankSpeed=tankBrain?tankBrain.speed:2.2;
+        const index=Number(entry.actor.id.slice((group.id||"").length+1))||0;
+        const slot=index%(group.maxAlive||1);
+        const offset=group.spawnOffsets?.[slot];
+        let wx=tx+(offset?offset[0]:(slot%2?2.2:-2.2));
+        let wz=tz+(offset?offset[1]:-(3.5+slot*3.0));
+        if(route?.length) wz=Math.min(wz,route.at(-1)[1]);
+        if(this.groundAt(wx,wz)<=1.5) wx=tx+1.8;
+        const distToSlot=Math.hypot(wx-soldier.position.x,wz-soldier.position.z);
+        target=[wx,wz];
+        escortTethered=true;
+        if(tankMoving) {
+          moving=distToSlot>1.2;
+          escortSpeed=Math.max(group.speed||2.2,Math.min(4.2,tankSpeed+0.7));
+        } else {
+          moving=distToSlot>4.0;
+          if(!moving) target=[soldier.position.x,soldier.position.z];
+          escortSpeed=group.speed||2.2;
+        }
+      }
+    }
+    if(route&&!holdWithdraw&&!escortTethered) {
       const endTarget=entry.routeIndex===route.length-1&&entry.holdOffset
         ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
         :route[entry.routeIndex];
@@ -755,19 +785,19 @@ export class EncounterPlay {
         const boundWait=group?.behavior==="bounds"&&entry.routeIndex>0&&entry.routeIndex<route.length-1?(group.coverWaitSeconds??6.5):0;
         entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||boundWait));
       }
-      if(arrived&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm||closeEnemyAlert)&&entry.routeIndex<route.length-1)entry.routeIndex++;
+      if(arrived&&(!campHeld||entry.routeIndex<1)&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm||closeEnemyAlert)&&entry.routeIndex<route.length-1)entry.routeIndex++;
       target=entry.routeIndex===route.length-1&&entry.holdOffset
         ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
         :route[entry.routeIndex];
-      if(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm&&!closeEnemyAlert)target=[soldier.position.x,soldier.position.z];
+      if((campHeld&&entry.routeIndex>=1&&arrived)||(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm&&!closeEnemyAlert))target=[soldier.position.x,soldier.position.z];
     }
-    moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
+    if(!escortTethered) moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
     if(group?.suppressedBy?.some(id=>[...this.entries.values()].some(e=>e.actor.groupId===id&&e.soldier.alive&&e.soldier.targetVisible))) {
       if(group.suppressionStop)target=group.suppressionStop;
       moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>cfg.routeReachM;
     }
     const guide=!!this.stealth&&entry.actor.id==="liu"&&frame.beat.id==="09a";
-    const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):group?.speed||2.6;
+    const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):(escortSpeed??group?.speed??2.6);
     const suspicionObserver=this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId;
     if(suspicionObserver){target=[soldier.position.x,soldier.position.z];moving=false;}
     const {yaw,forceYaw}=EncounterOrderYaw({
@@ -786,13 +816,13 @@ export class EncounterPlay {
     const isBayonetRush=isEnemyCombat&&!!group&&/BridgeRush/i.test(group.id);
     const isMgPost=isEnemyCombat&&!!group&&(["guard","suppress"].includes(group.behavior)||(group.weapon==="machineGun"&&!moving));
     const tacticalRadiusM=isEnemyCombat
-      ?(isBayonetRush?24:isMgPost?8:group?.behavior==="flank"?16:group?.behavior==="bounds"?14:16)
+      ?(isBayonetRush?24:escortTethered?12:isMgPost?8:group?.behavior==="flank"?16:group?.behavior==="bounds"?14:16)
       :0;
     const authoredStance=guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"||current?.pose==="crouch"?1:0;
     this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
       stance:allowCover?null:authoredStance,
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
-      allowCover,coverSlackM:allowCover?8.5:0,suppressible:allowCover,
+      allowCover,coverSlackM:allowCover?(escortTethered?6.5:8.5):0,suppressible:allowCover,
       tacticalRadiusM,fixBayonet:isBayonetRush});
   }
   NoFireArmed(frame) {
@@ -906,7 +936,12 @@ export class EncounterPlay {
       if(a.kind==="litter")spec.kind="litter";
       if(a.kind==="tank"){
         const ov=tankOverrides.get(a.id);
-        if(ov&&Number.isFinite(ov.turretYawDeg))spec.arc={yawDeg:ov.turretYawDeg};
+        if(ov){
+          if(Number.isFinite(ov.x))spec.x=ov.x;
+          if(Number.isFinite(ov.z))spec.z=ov.z;
+          if(Number.isFinite(ov.hullYawDeg))spec.yawDeg=ov.hullYawDeg;
+          if(Number.isFinite(ov.turretYawDeg))spec.arc={yawDeg:ov.turretYawDeg};
+        }
       }
       if(a.heading===undefined&&!a.parentId)spec.yawDeg=EncounterPuppetYaw(this.puppets.puppets.get(a.id),spec,dt,cfg.puppetFacing);
       return spec;
@@ -920,7 +955,9 @@ export class EncounterPlay {
     this.SetPlayerPuppetVisible(false);
     this.view.Update(id=>this.Position(id),dt);
     for(const actor of frame.actors)if(actor.kind==="tank"&&actor.pose==="burn"&&!this.smoke.has(actor.id)){
-      const point=new THREE.Vector3(actor.p[0],this.host.battlefield.GroundHeight(...actor.p)+.7,actor.p[1]);
+      const liveTank=this.tanks?.tanks?.get(actor.id)?.brain;
+      const sx=liveTank?liveTank.x:actor.p[0],sz=liveTank?liveTank.z:actor.p[1];
+      const point=new THREE.Vector3(sx,this.host.battlefield.GroundHeight(sx,sz)+.7,sz);
       this.smoke.set(actor.id,this.host.vfx.SmokeSource(point,{kind:"black",rate:7,life:5}));
     }
     const cue=this.failed||this.plan.completed?null:cfg.music[this.plan.beat.stage];
@@ -968,7 +1005,9 @@ export class EncounterPlay {
       if(this.host.state.bundles<=0)return false;
       const id=action==="plantFirst"?"tank1":"tank2",tank=this.plan.Frame().actors.find(a=>a.id===id);
       if(!tank)return false;
-      const pos=new THREE.Vector3(tank.p[0],this.host.battlefield.GroundHeight(...tank.p)+.2,tank.p[1]);
+      const liveTank=this.tanks?.tanks?.get(id)?.brain;
+      const tx=liveTank?liveTank.x:tank.p[0],tz=liveTank?liveTank.z:tank.p[1];
+      const pos=new THREE.Vector3(tx,this.host.battlefield.GroundHeight(tx,tz)+.2,tz);
       const projectile=this.host.combat.Throw("GrenadeBundle",0,pos,new THREE.Vector3(0,-1,0),0,{handRelease:true});
       if(!projectile)return false;this.host.state.bundles--;this.pendingActions.set(id+"Destroyed",projectile);
     }

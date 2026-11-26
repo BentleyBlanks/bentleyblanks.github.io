@@ -73,6 +73,7 @@ export class EncounterTankRuntime {
       brain,
       collider,
       registered: false,
+      initializedPose: false,
       lastColliderKey: "",
       muzzleWorld: null,
       gunPitchNode: null,
@@ -151,9 +152,12 @@ export class EncounterTankRuntime {
 
   BuildTargets(frame, soldierEntries, tankId) {
     const targets = [];
+    const aiTime = this.host.ai?.time ?? 0;
+    const fireWindow = this.T.perceive.recentFireWindowS ?? 3.0;
     const player = this.host.player;
     if (player?.Alive) {
       const p = player.position;
+      const playerFiring = player.lastShotAt != null && (aiTime - player.lastShotAt) <= fireWindow;
       targets.push({
         id: "player",
         kind: "player",
@@ -163,6 +167,9 @@ export class EncounterTankRuntime {
         ground: this.Ground(p.x, p.z),
         vx: player.velocity?.x || 0,
         vz: player.velocity?.z || 0,
+        firingRecently: playerFiring,
+        exposed: player.stance === "stand" || playerFiring,
+        hasBundle: (this.host.state?.bundles || 0) > 0,
         alive: true,
       });
     }
@@ -171,13 +178,17 @@ export class EncounterTankRuntime {
       const p = sEntry.soldier.position;
       const stance = sEntry.soldier.stance || 0;
       const isHeavy = sEntry.spec.weapon === "Zb26" || id === "yao";
+      const firingRecently = sEntry.soldier.lastShotAt != null && (aiTime - sEntry.soldier.lastShotAt) <= fireWindow;
+      const aimHeight = stance === 2 ? (firingRecently ? 0.58 : 0.38) : (firingRecently || stance === 0 ? 1.25 : 0.92);
       targets.push({
         id,
         kind: isHeavy ? "heavyAlly" : "squad",
         x: p.x,
-        y: p.y + (stance === 2 ? 0.38 : stance === 1 ? 0.85 : 1.25),
+        y: p.y + aimHeight,
         z: p.z,
         ground: this.Ground(p.x, p.z),
+        firingRecently,
+        exposed: stance === 0 || firingRecently,
         alive: true,
       });
     }
@@ -281,10 +292,25 @@ export class EncounterTankRuntime {
 
     for (const actor of activeActors) {
       const entry = this.EnsureTank(actor);
-      const x = actor.p[0], z = actor.p[1];
-      const groundY = this.Ground(x, z);
-      const hullYaw = -(actor.heading || 0);
+      let x = actor.p[0], z = actor.p[1];
+      let hullYaw = -(actor.heading || 0);
       const destroyed = actor.pose === "burn" || !!actor.disabled;
+
+      // 切拍跳时间时按道路时速平滑行驶追赶，避免 05A–06A 快进时战车在视野里瞬间瞬移
+      if (dt > 0 && entry.initializedPose && !destroyed) {
+        const dx = x - entry.brain.x;
+        const dz = z - entry.brain.z;
+        const dist = Math.hypot(dx, dz);
+        const snapM = this.T.motion?.teleportSnapM ?? 65;
+        const maxStep = (this.T.motion?.maxCatchupMps ?? 6.0) * dt;
+        if (dist > maxStep && dist < snapM) {
+          x = entry.brain.x + (dx / dist) * maxStep;
+          z = entry.brain.z + (dz / dist) * maxStep;
+          hullYaw = Math.atan2(-dx, -dz);
+        }
+      }
+      entry.initializedPose = true;
+      const groundY = this.Ground(x, z);
 
       if (this.SyncCollider(entry, x, groundY, z, hullYaw)) colliderTouched = true;
 
@@ -292,11 +318,19 @@ export class EncounterTankRuntime {
         ? { x: entry.muzzleWorld.x, y: entry.muzzleWorld.y, z: entry.muzzleWorld.z }
         : AnalyticTanketteMuzzle(x, groundY, z, hullYaw, entry.brain.turretYaw, entry.brain.gunPitch, this.T);
 
+      const otherTankTargets = new Set();
+      for (const [otherId, otherEntry] of this.tanks) {
+        if (otherId !== actor.id && !otherEntry.brain.destroyed && otherEntry.brain.targetId) {
+          otherTankTargets.add(otherEntry.brain.targetId);
+        }
+      }
+
       const decoyRule = decoyBeatRule && decoyBeatRule.tankId === actor.id ? decoyBeatRule : null;
       const out = entry.brain.Update(dt, {
         pose: { x, z, groundY, hullYaw, destroyed },
         weaponsFree: this.WeaponsFreeFor(frame, actor.id),
         targets: this.BuildTargets(frame, soldierEntries, actor.id),
+        otherTankTargets,
         Los: (a, b) => this.HasLos(a, b, entry.collider),
         Cover: (at, from) => this.CoverLip(at, from, entry.collider),
         muzzle,
@@ -304,6 +338,9 @@ export class EncounterTankRuntime {
       });
 
       overrides.set(actor.id, {
+        x: out.pose.x,
+        z: out.pose.z,
+        hullYawDeg: out.pose.hullYaw * RAD_TO_DEG,
         turretYawDeg: out.turret.yaw * RAD_TO_DEG,
         gunPitch: out.turret.pitch,
         hullRock: out.pose.hullRock,
@@ -320,7 +357,7 @@ export class EncounterTankRuntime {
       }
 
       // 执行实弹开火
-      for (const shot of out.fire) this.FireShot(entry, muzzle, shot);
+      for (const shot of out.fire) this.FireShot(entry, muzzle, shot, soldierEntries);
 
       // 挑最近的一辆驱动 TankAudio 三条循环 + 低频震屏
       if (playerPos) {
@@ -369,8 +406,8 @@ export class EncounterTankRuntime {
     return overrides;
   }
 
-  /** 发射一发九一式车载机枪实弹（含曳光光束、枪口火光、弹着泥土火星与强压制）。 */
-  FireShot(entry, muzzle, shot) {
+  /** 发射一发九一式 6.5mm 车载机枪实弹（含曳光光束、枪口火光、弹着泥土火星与人/友军双压制）。 */
+  FireShot(entry, muzzle, shot, soldierEntries = null) {
     const fireFn = this.host.FireVehicleBullet;
     if (typeof fireFn !== "function") return;
     const from = new THREE.Vector3(muzzle.x, muzzle.y, muzzle.z);
@@ -380,6 +417,7 @@ export class EncounterTankRuntime {
     const A = this.T.audio;
     const result = fireFn(from, dir, {
       weaponId: "Type11",
+      severityKind: "mg",
       damageScale: shot.damageScale,
       sourceCollider: entry.collider,
       gunCue: A.mgCue,
@@ -392,21 +430,36 @@ export class EncounterTankRuntime {
       },
     });
 
-    // 弹着砸在玩家周围掩体沿/沙包上时补充强压制与来火方向弧，营造真正的被机枪按在沟底的压迫感
-    const player = this.host.player;
-    if (player?.Alive && result?.end) {
+    // 弹着砸在玩家或友军周围掩体沿/沙包上时补充强压制与来火方向弧，营造真正的被机枪按在沟底的压迫感
+    if (result?.end) {
       const M = this.T.mg;
       const ex = result.end[0], ey = result.end[1], ez = result.end[2];
-      const pPos = player.position;
-      const hitDist = Math.hypot(ex - pPos.x, ey - (pPos.y + 1.0), ez - pPos.z);
-      if (hitDist <= M.suppressRadiusM) {
-        const falloff = Math.max(0.25, 1 - hitDist / M.suppressRadiusM);
-        player.Suppress(M.suppressPlayerPerShot * falloff, "bullet", from);
+      const player = this.host.player;
+      if (player?.Alive) {
+        const pPos = player.position;
+        const hitDist = Math.hypot(ex - pPos.x, ey - (pPos.y + 1.0), ez - pPos.z);
+        if (hitDist <= M.suppressRadiusM) {
+          const falloff = Math.max(0.25, 1 - hitDist / M.suppressRadiusM);
+          player.Suppress(M.suppressPlayerPerShot * falloff, "bullet", from);
+        }
+        const tankDist = Math.hypot(from.x - pPos.x, from.z - pPos.z);
+        if (tankDist < this.T.pressure.fireShakeRangeM) {
+          const k = 1 - tankDist / this.T.pressure.fireShakeRangeM;
+          player.shake?.Impulse?.({ pitch: this.T.pressure.fireShakePitchRad * k });
+        }
       }
-      const tankDist = Math.hypot(from.x - pPos.x, from.z - pPos.z);
-      if (tankDist < this.T.pressure.fireShakeRangeM) {
-        const k = 1 - tankDist / this.T.pressure.fireShakeRangeM;
-        player.shake?.Impulse?.({ pitch: this.T.pressure.fireShakePitchRad * k });
+      if (soldierEntries && this.host.ai?.SuppressSoldier) {
+        const allyRad = M.allySuppressRadiusM ?? 6.0;
+        const allyPer = M.allySuppressPerShot ?? 0.16;
+        for (const sEntry of soldierEntries.values()) {
+          if (sEntry.spec.side !== "nra" || !sEntry.soldier.alive) continue;
+          const sp = sEntry.soldier.position;
+          const d = Math.hypot(ex - sp.x, ey - (sp.y + 1.0), ez - sp.z);
+          if (d <= allyRad) {
+            const falloff = Math.max(0.25, 1 - d / allyRad);
+            this.host.ai.SuppressSoldier(sEntry.soldier, allyPer * falloff);
+          }
+        }
       }
     }
   }

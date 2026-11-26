@@ -194,4 +194,120 @@ const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
   assert.ok(muzzleSouth.z > 465.8, "South-facing turret muzzle projects southward (+Z)");
 }
 
+// 10. 九一式 6.5mm 实史射速/50 发漏斗换弹窗口/公平权重校准
+{
+  assert.equal(ENCOUNTER_TANK.mg.shotIntervalS, 0.12, "Type 91 MG runs at ~500 rpm (0.12s/shot)");
+  assert.equal(ENCOUNTER_TANK.mg.hopperCapacity, 50, "Type 91 MG uses authentic 50-round hopper");
+  assert.ok(ENCOUNTER_TANK.mg.playerDamageScale >= 0.85, "Type 91 6.5mm player damage avoids double-discount bug");
+  assert.equal(ENCOUNTER_TANK.perceive.weights.player, ENCOUNTER_TANK.perceive.weights.squad, "No hidden player-targeting bias vs rifle squadmates");
+  assert.ok(ENCOUNTER_TANK.perceive.weights.heavyAlly > ENCOUNTER_TANK.perceive.weights.player, "LMG crew draws higher base threat than a silent rifleman");
+
+  const brain = new EncounterTankBrain("tank1", { x: 101, z: 256, hullYaw: Math.PI, turretYaw: Math.PI });
+  const target = { id: "luo", kind: "squad", x: 92, y: 1.2, z: 274, ground: 0, alive: true, exposed: true };
+  let sawReload = false, reloadTicks = 0, shotsDuringReload = 0;
+  for (let i = 0; i < 240; i++) {
+    const wasReloading = brain.phase === "reload";
+    const out = brain.Update(0.1, {
+      pose: { x: 101, z: 256, groundY: 0, hullYaw: Math.PI },
+      weaponsFree: true,
+      targets: [target],
+      Los: () => true,
+    });
+    if (out.events.some((e) => e.id === "reload")) sawReload = true;
+    if (out.turret.phase === "reload") reloadTicks += 1;
+    if (wasReloading) shotsDuringReload += out.fire.length;
+  }
+  assert.ok(sawReload && brain.stats.reloads >= 1, "50-round hopper empties into an authentic reload cycle");
+  assert.ok(reloadTicks >= 45, "Commander hopper reload creates a real ~5s tactical window");
+  assert.equal(shotsDuringReload, 0, "Tank cannot shoot while reloading hopper");
+}
+
+// 11. 无稳定器行进间 45 mil 散布显著大于短停稳姿瞄射
+{
+  const CollectSpread = (movingSpeed) => {
+    const brain = new EncounterTankBrain("tank1", { x: 101, z: 220, hullYaw: Math.PI, turretYaw: Math.PI });
+    const target = { id: "luo", kind: "squad", x: 101, y: 1.2, z: 260, ground: 0, alive: true };
+    const errs = [];
+    for (let i = 0; i < 90; i++) {
+      const z = 220 + (movingSpeed > 0 ? (i * 0.1 * movingSpeed) : 0);
+      const tPos = { ...target, z: z + 40 };
+      const out = brain.Update(0.1, {
+        pose: { x: 101, z, groundY: 0, hullYaw: Math.PI },
+        weaponsFree: true,
+        targets: [tPos],
+        Los: () => true,
+      });
+      for (const s of out.fire) {
+        if (s.kind === "lethal") errs.push(Math.hypot(s.at.x - tPos.x, s.at.z - tPos.z));
+      }
+    }
+    return errs.reduce((a, b) => a + b, 0) / Math.max(1, errs.length);
+  };
+  const stillErr = CollectSpread(0);
+  const movingErr = CollectSpread(3.0);
+  assert.ok(movingErr > stillErr * 1.8, `Moving dispersion (${movingErr.toFixed(2)}m) must exceed halted dispersion (${stillErr.toFixed(2)}m)`);
+}
+
+// 12. 动态班组索敌：活跃轻机枪优先、防锁死单人轮转、双车射界分摊
+{
+  const brain = new EncounterTankBrain("tank1", { x: 101, z: 250, hullYaw: Math.PI, turretYaw: Math.PI });
+  const player = { id: "player", kind: "player", x: 91, y: 1.2, z: 274, ground: 0, alive: true, firingRecently: false };
+  const yao = { id: "yao", kind: "heavyAlly", x: 91, y: 1.2, z: 274, ground: 0, alive: true, firingRecently: true };
+  for (let i = 0; i < 6; i++) {
+    brain.Update(0.1, { pose: { x: 101, z: 250, groundY: 0, hullYaw: Math.PI }, weaponsFree: true, targets: [player, yao], Los: () => true });
+  }
+  assert.equal(brain.targetId, "yao", "Actively firing LMG ally outranks silent rifleman player at same distance");
+
+  // 第二辆车避开一号车已在压制的 yao，自动分摊射界转向另一目标
+  const brain2 = new EncounterTankBrain("tank2", { x: 101, z: 234, hullYaw: Math.PI, turretYaw: Math.PI });
+  const luo = { id: "luo", kind: "squad", x: 91, y: 1.2, z: 264, ground: 0, alive: true, firingRecently: true, exposed: true };
+  const yaoFar = { id: "yao", kind: "heavyAlly", x: 91, y: 1.2, z: 275, ground: 0, alive: true, firingRecently: false };
+  for (let i = 0; i < 6; i++) {
+    brain2.Update(0.1, {
+      pose: { x: 101, z: 234, groundY: 0, hullYaw: Math.PI },
+      weaponsFree: true,
+      targets: [luo, yaoFar],
+      otherTankTargets: new Set(["yao"]),
+      Los: () => true,
+    });
+  }
+  assert.equal(brain2.targetId, "luo", "Paired tank deconflicts firing sectors instead of dogpiling tank1's target");
+
+  // 同一目标打满饱和点射次数后自动轮转至邻近班组成员，避免死盯一人
+  const rotBrain = new EncounterTankBrain("tank1", { x: 101, z: 252, hullYaw: Math.PI, turretYaw: Math.PI });
+  const allyA = { id: "luo", kind: "squad", x: 90, y: 1.2, z: 272, ground: 0, alive: true, exposed: true };
+  const allyB = { id: "he", kind: "squad", x: 92, y: 1.2, z: 273, ground: 0, alive: true, exposed: true };
+  const engagedTargets = new Set();
+  for (let i = 0; i < 120; i++) {
+    const out = rotBrain.Update(0.1, {
+      pose: { x: 101, z: 252, groundY: 0, hullYaw: Math.PI },
+      weaponsFree: true,
+      targets: [allyA, allyB],
+      Los: () => true,
+    });
+    for (const s of out.fire) engagedTargets.add(s.targetId);
+  }
+  assert.ok(engagedTargets.has("luo") && engagedTargets.has("he"), "Saturation cooldown rotates fire across squad members instead of tunnel-visioning");
+}
+
+// 13. 连续 3 发命中炮塔/观察缝触发短暂致盲停火（2.2s）
+{
+  const brain = new EncounterTankBrain("tank1", { x: 101, z: 274, hullYaw: Math.PI, turretYaw: Math.PI });
+  const shooter = { x: 92, y: 1.2, z: 274 };
+  const target = { id: "luo", kind: "squad", x: 92, y: 1.2, z: 274, ground: 0, alive: true };
+  brain.OnBulletHit({ from: shooter, shooterId: "player" });
+  brain.Update(0.2, { pose: { x: 101, z: 274, groundY: 0, hullYaw: Math.PI }, weaponsFree: true, targets: [target], Los: () => true });
+  brain.OnBulletHit({ from: shooter, shooterId: "player" });
+  brain.Update(0.2, { pose: { x: 101, z: 274, groundY: 0, hullYaw: Math.PI }, weaponsFree: true, targets: [target], Los: () => true });
+  const third = brain.OnBulletHit({ from: shooter, shooterId: "player" });
+  assert.equal(third.blinded, true, "Three rapid hits to turret/vision slit blind the gunner briefly");
+  let blindShots = 0;
+  for (let i = 0; i < 18; i++) {
+    const out = brain.Update(0.1, { pose: { x: 101, z: 274, groundY: 0, hullYaw: Math.PI }, weaponsFree: true, targets: [target], Los: () => true });
+    blindShots += out.fire.length;
+  }
+  assert.equal(blindShots, 0, "Blinded commander holds fire during vision-slit flinch window");
+  assert.equal(brain.stats.slitBlinds, 1);
+}
+
 console.log("Script_EncounterTankTest: ALL PASSED");
