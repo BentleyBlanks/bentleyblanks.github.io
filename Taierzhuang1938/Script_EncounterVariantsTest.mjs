@@ -7,6 +7,8 @@ import path from "node:path";
 import { registerHooks } from "node:module";
 import { fileURLToPath } from "node:url";
 import { SCENE_IDS, ValidateScene, DecodeSceneHeights, BlockoutDocFromScene } from "./Script_SceneDoc.mjs";
+import { SceneSurfaceSampler } from "./Script_SceneSurface.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CompileSceneAirWalls, SceneAirWallObjects } from "./Script_SceneAirWalls.mjs";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { DecodeTrenchDatum, PrepareSceneTerrain, GridSampler } from "./Script_SceneTrenches.mjs";
@@ -804,6 +806,57 @@ for (const spec of ENCOUNTER_VARIANTS) {
     const [x, z] = variant.evaluate(beat.start + 0.01, variant.defaultDocument).player;
     assert.ok(zones.some((v) => Math.abs(x - v.center[0]) <= v.size[0] / 2 && Math.abs(z - v.center[2]) <= v.size[2] / 2),
       `${spec.id} ${beat.id} 已按黄昏钟点开局，但玩家 (${x.toFixed(0)}, ${z.toFixed(0)}) 不在黄昏环境区域内`);
+  }
+}
+
+// 01–05 壕沟斜坡白盒封堵校验：所有不可上坡的壕沟坡道须配真实实体土堆/断木（noClimb 且不误标 planning/Cover），
+// 自动随 z<355 继承进合并版、不阻断玩家 01–07 主线，且敌军单向下沟坡道保持上坡跨步 ≤ stepMax、下坡陡坎 > jumpRiseMax。
+{
+  const baseSlopeBlocks = baseDisk.doc.objects.filter((o) => o.id.startsWith("SlopeBlock_"));
+  const mergedSlopeBlocks = resolved.doc.objects.filter((o) => o.id.startsWith("SlopeBlock_"));
+  assert.ok(baseSlopeBlocks.length >= 40, `01–05 壕沟斜坡封堵应包含完整土堆与断木构件（实测 ${baseSlopeBlocks.length}）`);
+  assert.equal(mergedSlopeBlocks.length, baseSlopeBlocks.length, "全部壕沟斜坡封堵（z<355）均须无缝继承进 FirstLevelMerged");
+  for (const cluster of [
+    "DugoutNorth", "NorthPursuit", "TrafficFlank", "DragWest", "CrestEast",
+    "CampWest", "LaneNorth", "LaneMiddle",
+    "FrontStepLeft", "FrontStepWest", "FrontStepEast", "FrontStepRight",
+  ]) {
+    assert.ok(baseSlopeBlocks.some((o) => o.id.startsWith(`SlopeBlock_${cluster}_`)), `缺少斜坡封堵簇 SlopeBlock_${cluster}_*`);
+  }
+  for (const sb of baseSlopeBlocks) {
+    assert.equal(sb.solid, true, `${sb.id} 必须为实体碰撞`);
+    assert.equal(sb.noClimb, true, `${sb.id} 必须禁止玩家攀爬（noClimb: true）`);
+    assert.ok(!sb.meta?.planning && sb.material !== "Whitebox/Cover", `${sb.id} 属于封坡土堆/断木，不得混标为战术掩体`);
+  }
+  const baseDatumBytes = fs.readFileSync(path.join(dirHere, "Scenes/FirstLevelEncounter", baseDisk.doc.trenches.datum.file));
+  const baseTerrain = PrepareSceneTerrain(baseDisk.doc, baseDisk.heights, baseDatumBytes);
+  const baseSurface = SceneSurfaceSampler(baseDisk.doc.surface, GridSampler(baseDisk.doc.terrain, baseTerrain.heights));
+  for (const beat of original.timeline.filter((b) => Number(b.stage) <= 7)) {
+    for (let i = 1; i < beat.p.length; i++) {
+      const a = [beat.p[i - 1][0], baseSurface(...beat.p[i - 1]) + 0.9, beat.p[i - 1][1]];
+      const b = [beat.p[i][0], baseSurface(...beat.p[i]) + 0.9, beat.p[i][1]];
+      for (const sb of baseSlopeBlocks) {
+        assert.ok(!RayHitsOrientedBox(a, b, sb, baseSurface), `玩家主线 ${beat.id} 不得被斜坡封堵 ${sb.id} 阻断`);
+      }
+    }
+  }
+  for (const [prefix, rampId] of [
+    ["DugoutNorth", "DugoutPressureRamp"],
+    ["NorthPursuit", "NorthPursuitRamp"],
+    ["TrafficFlank", "TrafficFlankRamp"],
+  ]) {
+    const mound = baseSlopeBlocks.find((o) => o.id === `SlopeBlock_${prefix}_Mound`);
+    const ramp = baseDisk.doc.surface.ramps.find((r) => r.id === rampId);
+    assert.ok(mound && ramp, `缺少单向斜坡土堆 ${prefix} / ${rampId}`);
+    const p0 = ramp.points[0], p2 = ramp.points.at(-1);
+    const len = Math.hypot(p2[0] - p0[0], p2[1] - p0[1]);
+    const ux = (p2[0] - p0[0]) / len, uz = (p2[1] - p0[1]) / len;
+    const halfD = mound.size[2] / 2;
+    const yUp = baseSurface(mound.pos[0] + ux * halfD, mound.pos[2] + uz * halfD);
+    const yDown = baseSurface(mound.pos[0] - ux * halfD, mound.pos[2] - uz * halfD);
+    const topY = mound.pos[1] + mound.size[1];
+    assert.ok(topY - yUp <= TRAVERSAL.stepMax - 0.1, `${mound.id} 坡顶侧高差 ${(topY - yUp).toFixed(2)}m 须 ≤ stepMax，确保敌军顺畅下沟`);
+    assert.ok(topY - yDown >= TRAVERSAL.jumpRiseMax + 0.25, `${mound.id} 沟底侧陡坎 ${(topY - yDown).toFixed(2)}m 须高于玩家跳跃上限`);
   }
 }
 
