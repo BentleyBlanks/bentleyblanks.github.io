@@ -17,6 +17,7 @@ COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
+SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
 
@@ -312,6 +313,42 @@ def ShoeFinish(folder):
     residue = np.clip((warmth - .035) / .255, 0, 1)
     field["oxideCoverage"] = np.rint(100 * residue).astype(int).tolist()
     field["detail"] = ShoeDetail(image, strips)
+    return field
+
+
+def SleeveFinish(folder):
+    image, source = Photo(folder, 1)
+    rails = [[1149, 593, 642], [1164, 593, 648], [1183, 593, 640],
+             [1260, 594, 639], [1334, 594, 639], [1354, 595, 641]]
+    source["sampleRails"] = rails
+    photoX, top, bottom = np.asarray(rails).T
+    xs = np.linspace(photoX[0], photoX[-1], 37)
+    low, high = (np.interp(xs, photoX, rail) for rail in (top, bottom))
+    samples = np.array([[Sample(image, x, y, radius=3) for x, y in zip(xs, low + t * (high - low))]
+                        for t in np.linspace(0, 1, 17)])
+    footprint = {"uCenter": .375, "uHalfSpan": .166, "vRange": [.026, .984]}
+    field = FinishMap(samples, source, footprint)
+    lightness = samples @ LUMA
+    warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
+    oxide = np.clip((warmth - .185) / .32, 0, 1)
+    oxide *= np.clip((samples[..., 0] - samples[..., 1] - 4) / 21, 0, 1)
+    field["oxideCoverage"] = np.rint(100 * oxide ** 1.7).astype(int).tolist()
+
+    tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=5.4)
+    columns = np.arange(image.shape[1])
+    rows = np.arange(image.shape[0])[:, None]
+    upper, lower = (np.interp(columns, photoX, rail) for rail in (top, bottom))
+    clearance = np.minimum(rows - upper, lower - rows)
+    confidence = np.clip((clearance - 1.5) / 7.5, 0, 1)
+    confidence *= np.clip((lightness - 17) / 16, 0, 1) * np.clip((233 - lightness) / 31, 0, 1)
+    # Remove reflection streaks shared across the photographed arc before
+    # transferring the irregular oxide and fine scratches.
+    tone -= .80 * np.median(tone[605:635], axis=0)
+    us, vs = np.meshgrid(np.linspace(0, 1, 88), np.linspace(0, 1, 352))
+    x = photoX[0] + vs * (photoX[-1] - photoX[0])
+    upper, lower = (np.interp(x, photoX, rail) for rail in (top, bottom))
+    field["detail"] = SaveDetailPlate(tone, warmth, confidence, x, upper + us * (lower - upper),
+                                     SLEEVE_DETAIL, halfSize=False)
     return field
 
 
@@ -745,7 +782,7 @@ def Main():
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": BarrelFinish(args.photos), "CollarRing": CollarFinish(args.photos),
-                          "Stem": StemFinish(args.photos),
+                          "Stem": StemFinish(args.photos), "Sleeve": SleeveFinish(args.photos),
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)

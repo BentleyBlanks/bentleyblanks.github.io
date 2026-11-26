@@ -27,7 +27,7 @@ FINISHES = {
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Shoulder": (0, (168, 160, 151), (64, 53, 45), .58, (.41, .69), (.89, .43), .60),
     "Knurl": (3, (145, 140, 135), (86, 79, 74), .49, (.392, .622), (.947, .44), .79),
-    "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
+    "Sleeve": (1, (86, 85, 85), (38, 37, 37), .73, (.37, .68), (.94, .40), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
     "Tab": (2, (141, 129, 114), (70, 53, 39), .51, (.35, .68), (.95, .41), .73),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
@@ -45,6 +45,7 @@ FINISHES = {
 # Finish, coverage channel, roughness, metallic, blend strength and relief attenuation.
 REGISTERED_FINISHES = {
     "Stem": ((177, 162, 144), "rubbedCoverage", .406, .84, .49, .43),
+    "Sleeve": ((148, 89, 40), "oxideCoverage", .76, .24, .78, .31),
     "Saddle": ((121, 105, 82), "oxideCoverage", .74, .31, .65, .16),
     "Neck": ((113, 97, 79), "oxideCoverage", .78, .34, .65, .15),
     "Tab": ((163, 149, 134), "rubbedCoverage", .425, .88, .59, .29),
@@ -318,11 +319,13 @@ def BakeRegion(name, sample, size, index, reference):
             tonalDelta += .40 * ReferenceField(field, xx, vv, "relativeLuminance")
             warmth += ReferenceField(field, xx, vv, "relativeWarmth") / 260
     if name == "Sleeve":
-        # The thin brown residue at the stem-side shoulder is visible on the
-        # overall and side close-ups of the same object.
+        sleeveTone, sleeveWarmth, sleeveCoverage = PhotographicGrain(closeup, xx, vv)
+        sleeveDetail = sleeveTone * sleeveCoverage
+        # The wider arc remains cool. Retain warm oxidation at its worn end.
         shoulder = np.exp(-((vv - .101) / .032) ** 2)
-        warmth += .108 * shoulder
-        oxidation += .13 * shoulder
+        tonalDelta += 65 * sleeveDetail - (2.0 * detail + 2.5 * medium) * sleeveCoverage
+        warmth += .28 * sleeveWarmth * sleeveCoverage + .012 * shoulder
+        oxidation += .091 * shoulder
 
     heightField = strength * (.23 * detail + .17 * medium - .22 * pits)
     roughnessDelta = np.zeros_like(luminance)
@@ -341,6 +344,10 @@ def BakeRegion(name, sample, size, index, reference):
         heightField *= 1 - .57 * neckCoverage
         heightField += .32 * neckDetail
         roughnessDelta += .13 * np.maximum(-neckDetail, 0) - .074 * np.maximum(neckDetail, 0)
+    if name == "Sleeve":
+        heightField *= 1 - .38 * sleeveCoverage
+        heightField += .21 * sleeveDetail
+        roughnessDelta += .11 * np.maximum(-sleeveDetail, 0) - .066 * np.maximum(sleeveDetail, 0)
     if name in ("Tab", "TabBack"):
         heightField *= 1 - .56 * tabCoverage
         heightField += .27 * tabDetail
@@ -686,6 +693,7 @@ def Bake():
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
+               "sleeveDetail": reference["closeups"]["Sleeve"]["detail"],
                "neckDetail": reference["closeups"]["Neck"]["detail"],
                "saddleDetail": reference["closeups"]["Saddle"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
