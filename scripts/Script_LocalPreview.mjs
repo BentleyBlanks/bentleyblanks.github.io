@@ -2,8 +2,10 @@
 // 用来先本地验收、再推 master —— 省掉每次都等 Pages 打包上传那几分钟。
 //
 // 用法：
-//   node scripts/Script_LocalPreview.mjs             # 服务本脚本所在的那棵树
+//   node scripts/Script_LocalPreview.mjs             # 服务本脚本所在的那棵树（默认 2 小时后自动关闭）
 //   node scripts/Script_LocalPreview.mjs 8090        # 换端口
+//   node scripts/Script_LocalPreview.mjs --ttl=30m   # 指定自动停服时长（--ttl=0 / --no-ttl 常驻）
+//   node scripts/Script_LocalPreview.mjs --stop      # 平滑关闭本目录已启动的本地预览服
 //   node scripts/Script_LocalPreview.mjs --lan       # 同时监听局域网（手机上验收）
 //   node scripts/Script_LocalPreview.mjs --open      # 明确要求打开浏览器（默认不打开）
 //   node scripts/Script_LocalPreview.mjs --no-open   # 强制不打开，兼容旧调用
@@ -68,6 +70,42 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
 const APP_ID = "BlanksLocalPreview";
 const PORT_SPAN = 60;
+const MAX_TIMEOUT_MS = 2147483647;
+export const DEFAULT_TEST_TTL_MS = 2 * 60 * 60 * 1000; // 等待用户测试时默认开 2 小时
+
+export function ParseTtlMs(raw) {
+  const text = String(raw ?? "").trim().toLowerCase();
+  if (!text) throw new Error("自动停服时长不能为空（例：--ttl=2h、--ttl=30m、--ttl=0）");
+  if (["0", "off", "none", "never", "false"].includes(text)) return null;
+  const match = /^(\d+(?:\.\d+)?)\s*(ms|s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)?$/.exec(text);
+  if (!match) throw new Error(`无法解析自动停服时长「${raw}」（支持 2h / 30m / 120s / 500ms / 0）`);
+  const value = Number(match[1]);
+  const unit = match[2] || "s";
+  const scale = unit === "ms" ? 1
+    : unit.startsWith("s") ? 1000
+    : unit.startsWith("m") ? 60 * 1000
+    : 60 * 60 * 1000;
+  const ms = Math.round(value * scale);
+  if (!Number.isFinite(ms) || ms <= 0 || ms > MAX_TIMEOUT_MS) {
+    throw new Error(`自动停服时长超出范围「${raw}」（须大于 0 且不超过 24 天）`);
+  }
+  return ms;
+}
+
+export function FormatDuration(ms) {
+  if (!ms) return "不自动关闭";
+  if (ms < 1000) return `${ms}ms`;
+  if (ms % (60 * 60 * 1000) === 0) return `${ms / (60 * 60 * 1000)} 小时`;
+  if (ms % (60 * 1000) === 0) return `${ms / (60 * 1000)} 分钟`;
+  if (ms % 1000 === 0) return `${ms / 1000} 秒`;
+  return `${(ms / 1000).toFixed(1)} 秒`;
+}
+
+function FormatLocalTime(timestampMs) {
+  const date = new Date(timestampMs);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -313,9 +351,12 @@ function RenderHub(context) {
   const lanLine = lanUrls.length
     ? `<p class="dim">局域网：${lanUrls.map((u) => `<a href="${u}/__preview/">${u}</a>`).join(" · ")}（手机上验收用）</p>`
     : "";
+  const ttlNote = context.expiresAt
+    ? ` · 预计 ${FormatLocalTime(context.expiresAt)} 自动停服`
+    : "";
   return PageShell("本地预览", `
 <h1>本地预览 · <span class="dim">${EscapeHtml(path.basename(rootDir))}</span></h1>
-<p class="dim">${EscapeHtml(rootDir)} → <code>http://127.0.0.1:${port}/</code> · 不缓存，改完刷新即生效 · 关掉黑窗口就停服</p>
+<p class="dim">${EscapeHtml(rootDir)} → <code>http://127.0.0.1:${port}/</code> · 不缓存，改完刷新即生效 · 关掉黑窗口就停服${ttlNote}</p>
 ${lanLine}
 <div class="bar"><input type="search" id="filter" placeholder="筛选…（按项目名）" autofocus></div>
 <h2>页面 · 按最近改动排序</h2>
@@ -406,6 +447,18 @@ async function RequestGracefulShutdown(port, rootDir) {
 // ------------------------------------------------------------------ 主体
 
 const mounts = new Map(); // absRoot -> { port, server }
+let shutdownTimer = null;
+
+function ShutdownAllServers(primaryServer) {
+  if (shutdownTimer) { clearTimeout(shutdownTimer); shutdownTimer = null; }
+  for (const mounted of mounts.values()) {
+    mounted.server?.closeAllConnections?.();
+    mounted.server?.close?.();
+  }
+  primaryServer.closeAllConnections?.();
+  primaryServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 500).unref();
+}
 
 function CreateServer(rootDir, context) {
   const handleEncounterCodex = CreateReloadableEncounterCodexHandler(rootDir);
@@ -423,6 +476,9 @@ function CreateServer(rootDir, context) {
       response.end(JSON.stringify({
         app: APP_ID, root: rootDir, port: context.port, runtimeRevision,
         stale: runtimeRevision !== latestRevision, canShutdown: true,
+        startedAt: context.startedAt ?? null,
+        ttlMs: context.ttlMs ?? null,
+        expiresAt: context.expiresAt ?? null,
       }));
       return;
     }
@@ -441,15 +497,7 @@ function CreateServer(rootDir, context) {
       }
       response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
       response.end(JSON.stringify({ stopping: true, port: context.port }));
-      setImmediate(() => {
-        for (const mounted of mounts.values()) {
-          mounted.server?.closeAllConnections?.();
-          mounted.server?.close?.();
-        }
-        server.closeAllConnections?.();
-        server.close(() => process.exit(0));
-        setTimeout(() => process.exit(0), 500).unref();
-      });
+      setImmediate(() => ShutdownAllServers(server));
       return;
     }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
@@ -1100,12 +1148,14 @@ function CreateShortcut(rootDir) {
 
 const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127.0.0.1 上。零 npm 依赖，只要有 node。
 
-  node scripts/Script_LocalPreview.mjs              服务本脚本所在的那棵树，默认 8080，不打开浏览器
+  node scripts/Script_LocalPreview.mjs              服务本脚本所在的那棵树，默认 8080、不打开浏览器、2 小时后自动关闭
   node scripts/Script_LocalPreview.mjs 8090         换端口（占用了就自动往上让）
+  node scripts/Script_LocalPreview.mjs --ttl=30m    自定义自动停服时长（支持 h/m/s/ms；--ttl=0 或 --no-ttl 常驻）
+  node scripts/Script_LocalPreview.mjs --stop       平滑关闭本目录正在运行的预览服务（可加端口号指定）
   node scripts/Script_LocalPreview.mjs --shortcut   在桌面放一个双击就起服的快捷方式，然后退出
   node scripts/Script_LocalPreview.mjs --lan        同时监听局域网（手机上验收）
   node scripts/Script_LocalPreview.mjs --open       明确要求打开默认浏览器
-  node scripts/Script_LocalPreview.mjs --desktop    桌面入口：复用同目录服务，起服时使用指定端口，不递增
+  node scripts/Script_LocalPreview.mjs --desktop    桌面入口：复用同目录服务，起服时使用指定端口，不递增，默认不定时关闭
   node scripts/Script_LocalPreview.mjs --no-open    强制不打开浏览器，优先于 --open（兼容旧调用）
   node scripts/Script_LocalPreview.mjs --root=<dir> 指定要服务的目录
 
@@ -1128,6 +1178,26 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
   { doc: {...}, revision: "<读文件时那份原始字节的 sha1>" }
   过 ValidateAssetStandards 后原子写 Taierzhuang1938/AssetPipeline/Data_AssetStandards.json（body ≤ 2 MB）；其余同上。`;
 
+async function StopPreviewsForRoot(rootDir, basePort, explicitPort) {
+  const ports = explicitPort
+    ? [basePort]
+    : Array.from({ length: Math.min(PORT_SPAN + 1, 65536 - basePort) }, (_, index) => basePort + index);
+  const probed = await Promise.all(ports.map(async (port) => ({ port, info: await ProbeExisting(port) })));
+  const targets = probed.filter(({ info }) => SamePreviewRoot(info, rootDir));
+  if (targets.length === 0) {
+    console.log(`未发现本目录正在运行的本地预览服（根：${rootDir}）。`);
+    return;
+  }
+  const stopped = [];
+  const failed = [];
+  for (const { port } of targets) {
+    if (await RequestGracefulShutdown(port, rootDir)) stopped.push(port);
+    else failed.push(port);
+  }
+  if (stopped.length) console.log(`已关闭本目录预览服：${stopped.map((p) => `:${p}`).join(", ")}（根：${rootDir}）`);
+  if (failed.length) throw new Error(`未能关闭本目录预览服：${failed.map((p) => `:${p}`).join(", ")}`);
+}
+
 async function Main() {
   const args = process.argv.slice(2);
   if (args.includes("--help") || args.includes("-h")) { console.log(HELP); return; }
@@ -1140,8 +1210,17 @@ async function Main() {
   const host = lan ? "0.0.0.0" : "127.0.0.1";
   const desktop = args.includes("--desktop");
   const controlCenter = args.includes("--control-center");
+  const ttlArg = args.find((a) => a.startsWith("--ttl="));
+  const ttlMs = args.includes("--no-ttl")
+    ? null
+    : ttlArg
+      ? ParseTtlMs(ttlArg.slice("--ttl=".length))
+      : process.env.PREVIEW_TTL !== undefined && process.env.PREVIEW_TTL !== ""
+        ? ParseTtlMs(process.env.PREVIEW_TTL)
+        : (desktop ? null : DEFAULT_TEST_TTL_MS);
 
   if (args.includes("--shortcut")) { CreateShortcut(rootDir); return; }
+  if (args.includes("--stop")) { await StopPreviewsForRoot(rootDir, basePort, Boolean(portArg)); return; }
   if (desktop && (!Number.isInteger(basePort) || basePort < 1 || basePort > 65535)) {
     throw new Error(`预览端口无效：${basePort}`);
   }
@@ -1191,7 +1270,9 @@ async function Main() {
     console.log(`:${selectedPort} 上已有预览（根：${existing.root}），为当前运行时另选端口。`);
   }
 
-  const context = { port: selectedPort, basePort: selectedPort, host, lanUrls: [] };
+  const startedAt = Date.now();
+  const expiresAt = ttlMs ? startedAt + ttlMs : null;
+  const context = { port: selectedPort, basePort: selectedPort, host, lanUrls: [], startedAt, ttlMs, expiresAt };
   const server = CreateServer(rootDir, context);
   let port;
   try {
@@ -1205,6 +1286,12 @@ async function Main() {
   context.basePort = port;
   context.lanUrls = lan ? LanAddresses(port) : [];
   mounts.set(rootDir, { port, server });
+  if (ttlMs) {
+    shutdownTimer = setTimeout(() => {
+      console.log(`\n  已到达定时停服时间（${FormatDuration(ttlMs)}），本地预览平滑退出。`);
+      ShutdownAllServers(server);
+    }, ttlMs);
+  }
 
   // 窗口标题从这里设，不从 .cmd 里设：批处理里的中文会被 chcp 生效前的
   // 代码页拆错，node 写标题是宽字符，稳。
@@ -1214,13 +1301,19 @@ async function Main() {
   console.log(`  本地预览就绪  ->  http://127.0.0.1:${port}/__preview/`);
   console.log(`  根目录        :  ${rootDir}`);
   for (const url of context.lanUrls) console.log(`  局域网        :  ${url}/__preview/`);
-  console.log(`  停服          :  关掉这个窗口，或按 Ctrl+C`);
+  if (ttlMs) {
+    console.log(`  自动停服      :  ${FormatDuration(ttlMs)}后（约 ${FormatLocalTime(expiresAt)}），可提前 Ctrl+C 或执行 --stop 关闭`);
+  } else {
+    console.log(`  停服          :  关掉这个窗口，或按 Ctrl+C`);
+  }
   console.log(`  放桌面快捷方式:  node scripts/Script_LocalPreview.mjs --shortcut`);
   console.log("");
   ShowEntry(port);
 }
 
-Main().catch((error) => {
-  console.error("本地预览起不来：", error.message);
-  process.exitCode = 1;
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  Main().catch((error) => {
+    console.error("本地预览起不来：", error.message);
+    process.exitCode = 1;
+  });
+}

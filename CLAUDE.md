@@ -17,6 +17,7 @@ node scripts/Script_LocalPreview.mjs --no-open
 ```
 
 - 默认端口 8080，被占用时按输出使用实际端口；`/__preview/` 顶部核对服务根目录，确保看到本任务的代码。
+- 非 `--desktop` 模式默认 **2 小时**后自动关闭（`--ttl=2h`，等待用户测试用）；已提交推送 `master` 后用 `node scripts/Script_LocalPreview.mjs --stop` 立即关闭本目录测试服。
 - 无需 npm 安装；支持 Range、游戏资源 MIME、缓存与 Pages 兼容的隔离头。完整参数见 `node scripts/Script_LocalPreview.mjs --help`。
 - 另有两个**只在回环上可用**的调参口（滕县的敌军 AI 编辑器用，见 `Taierzhuang1938/docs/Data_EnemyAi.md` §14.3）：
   `GET /__tuning/status` 报可不可写；`POST /__tuning/save` 就地改 `Taierzhuang1938/Data_Tuning_*.mjs` 里的**那一个数字字面量**
