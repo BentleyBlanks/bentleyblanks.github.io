@@ -5259,6 +5259,114 @@
         "sha256": "bd5d9c3252fbd0e63dc756222a240f93110db3e730abe996f28e9035838741b7",
         "toneScale": 300,
         "warmthScale": 520
+      },
+      "responseCalibration": {
+        "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+        "sampleStrips": [
+          [457, 1458, 1468],
+          [490, 1438, 1473],
+          [530, 1419, 1493],
+          [563, 1402, 1515],
+          [603, 1388, 1491],
+          [643, 1375, 1480],
+          [680, 1356, 1456],
+          [724, 1352, 1428],
+          [760, 1363, 1409]
+        ],
+        "footprint": {
+          "uCenter": 0.5,
+          "uHalfSpan": 0.383,
+          "vRange": [0.14, 0.585]
+        },
+        "file": "Texture_Type89LauncherSaddleResponse.png",
+        "sha256": "1132b64f8307c04999e3cb1dc7b2b3dd328c7592b20d3b5f2074f832626a2a53",
+        "scale": 95000,
+        "frameSha256": {
+          "V52SaddleFreshDefault": {
+            "beauty.png": "e51bbd45bef2983f72e599f41dbb280d73d2b4455d888d14ce097e049baa5837",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "ProbeZero.png": "e51bbd45bef2983f72e599f41dbb280d73d2b4455d888d14ce097e049baa5837",
+            "AlongPlus.png": "1d72df453eea83278c06f3964d629c2ab0b7017589e325c98135b007bfe732a4",
+            "AlongMinus.png": "f490cfef62f348db6542b1f91285a0ab2dd3208d6c83cb972fdb9fdc300111c5",
+            "RoughPlus.png": "07a1721a0570c6cebe28223e6059e9f1dffec2927860289f8766e159007319c1",
+            "RoughMinus.png": "2b54207757148824915307d5d3d9fe5d9d67f57e1fd6bdfb23cfefc559b223a0",
+            "AcrossPlus.png": "04816c22264124c097f759d6efa4d5cf732d1431fe9d0adfcebe9c9c11a40f72",
+            "AcrossMinus.png": "89d317f35d38db023ed4b4f31f6b33d80eba72d41dd633660cf748c8a4cc35d4",
+            "BasePlus.png": "783fdc2d43ba8132875c07e029b61df8b2934bd1f9d49aa3173eb72b6d13c826",
+            "BaseMinus.png": "c8862d43585ee8500cab88fb40d790469df3cddd31da939e5723c1121d6098f5"
+          },
+          "V52SaddleFreshFill": {
+            "beauty.png": "0468aaac25a179766d2e75e1839e6211388deded4357c6f93c3d0d697f6e40f2",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "ProbeZero.png": "0468aaac25a179766d2e75e1839e6211388deded4357c6f93c3d0d697f6e40f2",
+            "AlongPlus.png": "97c72527874db381e6efaa2d165af9a1b32fb80766961bdc00647035d2f69f10",
+            "AlongMinus.png": "f91a61666a87eb5e99e4f655dc93c8409596cdf7470aadde26b0ebff863ffbb4",
+            "RoughPlus.png": "9d65cb722e06d11ec937c4617bd9ab4f345ea3e138552ee8e76e86f4cbf846a0",
+            "RoughMinus.png": "aba5f8de16177c5b4e0f8869fa8293151bc1a24d5fd3cf8a77e0891682562d45",
+            "AcrossPlus.png": "94329eff9b0a9054c6f832a819dfe6ee07125c1501b3b5c972a3535ae93d530f",
+            "AcrossMinus.png": "4d9505b7eaf00c5402135ae1496a7a6106fc1ab6a320213b81003ba3663f3fe0",
+            "BasePlus.png": "a3658403bf442bfe1dbb3e672db8d1941bbf851cdeed281a9d0303d99ce006d2",
+            "BaseMinus.png": "32f127ef7c42d164b4aeb595d70ae4943f2b94fba05ed5ce01465ced4d81601f"
+          },
+          "V52SaddleRakeBRDF": {
+            "beauty.png": "21d22129632f315071be422bfd1ac06cbd3c9045d6baddc6bf8ab8dd4e42542e",
+            "uvHi.png": "003b3b71cd398e738682e2af49fd4995dbcde0cd20a18157ee869726691fa4f1",
+            "uvLo.png": "df0e2efd0ceb27a01366bdfcf29913d7ae6f33cb6c41346be256d376f775e21c",
+            "ProbeZero.png": "21d22129632f315071be422bfd1ac06cbd3c9045d6baddc6bf8ab8dd4e42542e",
+            "AlongPlus.png": "8c751f564dd783817b94d230d7813b3bae611c2e7ac1d90900c516241e92dc62",
+            "AlongMinus.png": "ca54dae18dbe524dd691278a87142f0727758ff2ba6241602118cdb64b451b6a",
+            "RoughPlus.png": "c1341c72f8bd808f8f17f760a4847136dd905e3326b24af5395cb04a14a3bda1",
+            "RoughMinus.png": "354841c69f9f862655b647eb6684c85cc1ef26c138110d09d460ceefe3128fc5",
+            "AcrossPlus.png": "d9229e250a33e155a389ac7b151b372114b05f09805d0b22f4218f7997826c75",
+            "AcrossMinus.png": "042c4a4913cf04fa46a2f694253dcc725cc177e4ca27d0ec4e2ff8ca21710e8f",
+            "BasePlus.png": "3a0f694f369746a97fc8450fafa04c82cb4b8fc24b097faeb3b9dbad20c6cc1e",
+            "BaseMinus.png": "65e2360267895904adb89ffaa8b5ccb3636ff4f09394d9bcad4ba2b32d55df24"
+          },
+          "V52AngularResponseDefault": {
+            "beauty.png": "331b971b4682d4758b4a9d9a4aa7c9d29358e19196c5be87407a903adc98a232",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "ProbeZero.png": "331b971b4682d4758b4a9d9a4aa7c9d29358e19196c5be87407a903adc98a232",
+            "AlongPlus.png": "66340a813071957a98230886bdae08ef0817e71e8c71e3487efb6ada11d73d6b",
+            "AlongMinus.png": "867d725f09870c6dca5c613b3235d2f0b4a1901228ea1d14a5158724e491cc44",
+            "RoughPlus.png": "29afbc1f56d9f349efbbca08b80da54cbeb537bbebba6776212c50b998c56966",
+            "RoughMinus.png": "09febebc823ca2f28fd0a412b99b850f8ac41d5eb96710dd9c166d0d2bd0b44b",
+            "AcrossPlus.png": "e7e9ab0b4300307158e859546ed5ea80aeaa90070bcfdc4b26be278ad1963825",
+            "AcrossMinus.png": "4794ca0a2ded7e13a5168e8f606db402b3e142cb73b426760ed97843912ad578",
+            "BasePlus.png": "91f30b6e6b3e5a433e35175234348880abdb0d2e065c51362d267a38d27557df",
+            "BaseMinus.png": "c64a677cc864df63ab3ad54ea9d906d3bfad1976d4e53f0ad0245afad79a512a"
+          },
+          "V52AngularResponseFill": {
+            "beauty.png": "5153be8b0e374d3a0803320e43e81c3ad4b2c4cc872e44f5a61c4433e52804a0",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "ProbeZero.png": "5153be8b0e374d3a0803320e43e81c3ad4b2c4cc872e44f5a61c4433e52804a0",
+            "AlongPlus.png": "22d62fd1b816d8ca2c8876b3f6313ad5bfa092426d31a95b0bc558cb6b28fb93",
+            "AlongMinus.png": "dc8922be600cbda89ffa874e25d6bda127227e7363a4bd445a48be22de47d2e5",
+            "RoughPlus.png": "78c0895b0abade1427337a2cc60dbdd0a6f292fcc6768e386983f83607bca4da",
+            "RoughMinus.png": "77188920fa5ac4c4bba19edd0ff5ba76199936e80b3ea12750adfaff95c7b29f",
+            "AcrossPlus.png": "a8cb34771ca3d50b5b8346383fc4ac72a096ff18665b8d9e57a2f8c3e0fdc691",
+            "AcrossMinus.png": "f849ad7dccab05aa39c044c1da846a6ede6fc6b7360e8ef8ce3dc6ba9e59cf33",
+            "BasePlus.png": "c5ad0cd2a9471225c1a9b0af4f8a7ff955f6533d56eefa63c537a91b5d166d12",
+            "BaseMinus.png": "001b43c3c8bf59a624b1707ef0909172f99d5f085b2fc9a80aa3ca52de547fb1"
+          },
+          "V52AngularResponseRake": {
+            "beauty.png": "9e20fc5ab7bd62d1ca9209dd609faaee01763be7076da32afa1f66329ad9cbdf",
+            "uvHi.png": "003b3b71cd398e738682e2af49fd4995dbcde0cd20a18157ee869726691fa4f1",
+            "uvLo.png": "df0e2efd0ceb27a01366bdfcf29913d7ae6f33cb6c41346be256d376f775e21c",
+            "ProbeZero.png": "9e20fc5ab7bd62d1ca9209dd609faaee01763be7076da32afa1f66329ad9cbdf",
+            "AlongPlus.png": "e9ca82f393e09667e80ea480aafc04e49fc1ea7035816af40b53cc3e2911beff",
+            "AlongMinus.png": "0ea8d41dd96fa858a20381a94f9f5ced4c5d1f55d217aa77f82ce185159e957e",
+            "RoughPlus.png": "1047095427ff38b1bb9b011cb6a88caa17dd571842f760a639a8ccb33f693474",
+            "RoughMinus.png": "a5efd1259adbf530528c0b8e91e864de569f63bda5251eb776edc47b99a289ec",
+            "AcrossPlus.png": "758e634aa7a55e12f14470b80725cc8191beecd880bed528ce20d0aa118bc813",
+            "AcrossMinus.png": "e6ae7fd921a865cb3f255fa44a39b5074e5fccb77cb048191ccc697de760132b",
+            "BasePlus.png": "80aeca9caa9b637c6aeb64acd4e03c6aa7a4048342c1c6c3ad4197ac9f10ce12",
+            "BaseMinus.png": "30efd066ae4a11e037d68a3678455a1db83cd6736ea3d063925244600268b744"
+          }
+        }
       }
     },
     "Neck": {

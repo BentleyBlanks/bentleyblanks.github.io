@@ -122,28 +122,28 @@ def BarrelTexelCenters(width, height, sampling):
     return np.meshgrid(np.interp(column, packed, arc), last - row * (last - first))
 
 
-def ApplyBarrelResponse(tile, closeup, calibration, channels):
-    CheckBarrelRegistration(calibration, closeup)
+def ApplyResponseFields(tile, calibration, channels, uu, vv):
     path = REFERENCE.with_name(calibration["file"])
     if Sha256(path) != calibration["sha256"]:
-        raise ValueError(f"Barrel response does not match the measured reference: {path}")
+        raise ValueError(f"Response fields do not match the measured reference: {path}")
     with Image.open(path) as image:
         encoded = (np.asarray(image, dtype=float) - 32768) / calibration["scale"]
     if encoded.ndim != 2 or encoded.shape[1] % len(channels):
-        raise ValueError(f"Invalid barrel response fields: {path}")
+        raise ValueError(f"Invalid response fields: {path}")
     base, normal, orm = tile
-    height, width = base.shape[:2]
-    uu, vv = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
     fields = {name: ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
               for name, field in zip(channels, np.split(encoded, len(channels), axis=1))}
     gain = fields["gain"]
     base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
-    if "tilt" in fields:
+    tiltU, tiltV = fields.get("tilt"), fields.get("tiltV")
+    if tiltU is not None or tiltV is not None:
         # Bias the tangent direction of the existing relief before normalizing it.
-        tilt = fields["tilt"]
-        active = abs(tilt) > 1e-8
+        active = (abs(tiltU if tiltU is not None else 0) + abs(tiltV if tiltV is not None else 0)) > 1e-8
         vector = normal[active].astype(float) / 127.5 - 1
-        vector[:, 0] += tilt[active] * vector[:, 2]
+        if tiltU is not None:
+            vector[:, 0] += tiltU[active] * vector[:, 2]
+        if tiltV is not None:
+            vector[:, 1] += tiltV[active] * vector[:, 2]
         unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
         normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
     if "roughness" in fields:
@@ -151,6 +151,24 @@ def ApplyBarrelResponse(tile, closeup, calibration, channels):
         active = abs(roughness) > 1e-8
         channel = orm[..., 1]
         channel[active] = np.rint(255 * np.clip(channel[active] / 255 + roughness[active], .17, .92)).astype(np.uint8)
+
+
+def ApplyBarrelResponse(tile, closeup, calibration, channels):
+    CheckBarrelRegistration(calibration, closeup)
+    height, width = tile[0].shape[:2]
+    ApplyResponseFields(tile, calibration, channels, *BarrelTexelCenters(width, height, ATLAS["barrelSampling"]))
+
+
+def ApplySaddleResponse(tile, saddle, calibration):
+    if (calibration["photoSha256"] != saddle["source"]["sha256"]
+            or calibration["sampleStrips"] != saddle["source"]["sampleStrips"]
+            or calibration["footprint"] != saddle["footprint"]):
+        raise ValueError("The saddle response does not match the source photo and projection")
+    height, width = tile[0].shape[:2]
+    padding = ATLAS["padding"]
+    column = (np.arange(width) + .5 - padding) / (width - 2 * padding)
+    row = 1 - (np.arange(height) + .5 - padding) / (height - 2 * padding)
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *np.meshgrid(column, row))
 
 
 def PhotographicGrain(closeup, xx, vv):
@@ -1034,6 +1052,10 @@ def BuildAtlas(reference):
                     ApplyBarrelResponse(tile, closeup, calibration, channels)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
+            if name == "Saddle":
+                saddle = reference["closeups"]["Saddle"]
+                if (calibration := saddle.get("responseCalibration")) is not None:
+                    ApplySaddleResponse(tile, saddle, calibration)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1074,6 +1096,8 @@ def Bake():
         calibration = reference["closeups"]["Barrel"].get(key)
         if calibration is not None:
             details[name] = calibration
+    if (calibration := reference["closeups"]["Saddle"].get("responseCalibration")) is not None:
+        details["saddleResponse"] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

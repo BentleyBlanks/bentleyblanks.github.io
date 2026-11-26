@@ -23,6 +23,7 @@ BARREL_BAND = RECORD.with_name("Texture_Type89LauncherBarrelBand.png")
 BARREL_GRAIN = RECORD.with_name("Texture_Type89LauncherBarrelGrain.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
+SADDLE_RESPONSE = RECORD.with_name("Texture_Type89LauncherSaddleResponse.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
@@ -733,12 +734,13 @@ def FitBarrelFacets(photo, barrel, evidence, distances, *, refine):
                  for scale, field in ((.16, tilt), (.31, gain))), hashes
 
 
-def WriteBarrelResponseFields(plate, barrel, fields, hashes):
+def WriteResponseFields(plate, identity, fields, hashes, *, scale=120000):
     # Pack the signed fields side by side without losing the small fitted changes.
-    scale = 120000
-    encoded = np.rint(32768 + scale * np.concatenate([field.T for field in fields], axis=1)).astype(np.uint16)
-    Image.fromarray(encoded).save(plate)
-    return {**BarrelCalibrationIdentity(barrel), "file": plate.name,
+    encoded = np.rint(32768 + scale * np.concatenate([field.T for field in fields], axis=1))
+    if not np.all((encoded >= 0) & (encoded <= 65535)):
+        raise ValueError(f"The fitted response exceeds the signed image range: {plate.name}")
+    Image.fromarray(encoded.astype(np.uint16)).save(plate)
+    return {**identity, "file": plate.name,
             "sha256": sha256(plate.read_bytes()).hexdigest(), "scale": scale, "frameSha256": hashes}
 
 
@@ -749,7 +751,37 @@ def BarrelFacetCalibration(photo, barrel, evidence):
     remaining, resolveHashes = FitBarrelFacets(photo, barrel, evidence, distances, refine=True)
     resolved = [np.clip(old + .88 * delta, -bound, bound)
                 for old, delta, bound in zip(first, remaining, (.205, .196))]
-    return WriteBarrelResponseFields(BARREL_FACETS, barrel, resolved, {**studyHashes, **resolveHashes})
+    return WriteResponseFields(BARREL_FACETS, BarrelCalibrationIdentity(barrel), resolved,
+                               {**studyHashes, **resolveHashes})
+
+
+def ResponseEquations(basis, residual, average, shape):
+    pull = np.stack([average(direction * residual) for direction in basis], axis=-1)
+    response = np.zeros((*shape, len(basis), len(basis)))
+    for i, direction in enumerate(basis):
+        for j in range(i + 1):
+            response[..., i, j] = response[..., j, i] = average(direction * basis[j])
+    return pull, response
+
+
+def FitSignedResponse(pull, response, axes, iterations):
+    fit = np.zeros_like(pull)
+    # Treat the two measured directions independently. A direction may cross
+    # a specular peak, and each material parameter can take only one sign.
+    for _ in range(iterations):
+        for axis, (_, _, bounds, penalty) in enumerate(axes):
+            index = 2 * axis
+            pair = slice(index, index + 2)
+            fit[..., pair] = 0
+            update = pull[..., pair] - np.einsum("...ij,...j->...i", response[..., pair, :], fit)
+            curvature = np.stack([response[..., k, k] for k in range(index, index + 2)], axis=-1)
+            curvature += penalty**2
+            amount = np.clip(update / curvature, 0, bounds)
+            improvement = amount * (update - .5 * curvature * amount)
+            positive = improvement[..., 0] >= improvement[..., 1]
+            fit[..., index] = amount[..., 0] * positive
+            fit[..., index + 1] = amount[..., 1] * (~positive)
+    return fit
 
 
 def BarrelBandCalibration(photo, barrel, evidence):
@@ -788,27 +820,8 @@ def BarrelBandCalibration(photo, barrel, evidence):
     def Average(signal):
         return Smooth(np.sum(weights * signal, axis=1)) / np.maximum(support, .45)
 
-    pull = np.stack([Average(direction * residual) for direction in basis], axis=-1)
-    response = np.zeros((*shape, len(basis), len(basis)))
-    for i, direction in enumerate(basis):
-        for j in range(i + 1):
-            response[..., i, j] = response[..., j, i] = Average(direction * basis[j])
-    fit = np.zeros_like(pull)
-    # The two measured slopes for each parameter are independent because the
-    # response changes near a polished highlight. Keep just one sign per field.
-    for _ in range(8):
-        for axis, (_, _, bound, penalty) in enumerate(responseAxes):
-            index = 2 * axis
-            pair = slice(index, index + 2)
-            fit[..., pair] = 0
-            update = pull[..., pair] - np.einsum("...ij,...j->...i", response[..., pair, :], fit)
-            curvature = np.stack((response[..., index, index], response[..., index+1, index+1]), axis=-1)
-            curvature += penalty**2
-            amount = np.clip(update / curvature, 0, bound)
-            improvement = amount * (update - .5 * curvature * amount)
-            positive = improvement[..., 0] >= improvement[..., 1]
-            fit[..., index] = amount[..., 0] * positive
-            fit[..., index + 1] = amount[..., 1] * (~positive)
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    fit = FitSignedResponse(pull, response, responseAxes, 8)
 
     uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
     x, y = BarrelPhotoCoordinates(projection, angle, uu, vv)
@@ -818,7 +831,7 @@ def BarrelBandCalibration(photo, barrel, evidence):
     coverage *= np.clip(support / .7, 0, 1)
     tilt, roughness, gain = [gaussian_filter(step * (fit[..., 2*i] - fit[..., 2*i+1]), (.70, .75)) * coverage
                              for i, (_, step, _, _) in enumerate(responseAxes)]
-    return WriteBarrelResponseFields(BARREL_BAND, barrel, (tilt, gain, roughness), hashes)
+    return WriteResponseFields(BARREL_BAND, BarrelCalibrationIdentity(barrel), (tilt, gain, roughness), hashes)
 
 
 def BarrelGrainCalibration(photo, barrel, evidence):
@@ -868,7 +881,7 @@ def BarrelGrainCalibration(photo, barrel, evidence):
     brightSteel = np.clip((uu - .63) / .06, 0, 1) * np.clip((vv - .62) / .07, 0, 1)
     brightSteel *= np.clip((photoLuma - 119) / 25, 0, 1)
     gain *= 1 - brightSteel * (gain < 0)
-    return WriteBarrelResponseFields(BARREL_GRAIN, barrel, (gain,), hashes)
+    return WriteResponseFields(BARREL_GRAIN, BarrelCalibrationIdentity(barrel), (gain,), hashes)
 
 
 def RegisteredBarrelMarks(photo, barrel, folder, distances):
@@ -1113,7 +1126,91 @@ def ShoeDetail(image, strips):
     return SaveDetailPlate(tone, warmth, confidence, x - x0, y - y0, SADDLE_DETAIL, halfSize=False)
 
 
-def ShoeFinish(folder):
+def SaddleCalibrationIdentity(saddle):
+    source = saddle["source"]
+    return {"photoSha256": source["sha256"], "sampleStrips": source["sampleStrips"],
+            "footprint": saddle["footprint"]}
+
+
+def SaddleViewResponse(photo, saddle, folder, weight, transition, axes, shape):
+    u, v, visible, rgb, hashes = ReadRegisteredFrame(folder)
+    rows, left, right = np.asarray(saddle["source"]["sampleStrips"]).T
+    y = rows[0] + (rows[-1] - rows[0]) * u
+    lo, hi = (np.interp(y, rows, edge) for edge in (left, right))
+    target = SampleBilinear(photo, hi + v * (lo - hi), y)
+    current = rgb @ REGISTERED_LUMA
+    interior = binary_erosion(visible & (u > .08) & (u < .92) & (v > .09) & (v < .91), iterations=3)
+    selected = interior & (target > 29) & (target < 228)
+    if selected.sum() < 16000:
+        raise ValueError(f"The response frame does not cover the photographed saddle face: {folder.name}")
+
+    def Sample(name):
+        return ReadRegisteredLuma(folder, name + ".png", hashes)[selected]
+
+    if np.max(abs(Sample("ProbeZero") - current[selected])) > .3:
+        raise ValueError(f"The zero-response frame differs from the saddle finish: {folder.name}")
+    desired = target[selected]
+    observed = np.log(current[selected] + 18)
+    residual = np.clip(np.log(desired + 18) - observed, -.46, .64)
+    basis = [np.log(Sample(axis + side) + 18) - observed
+             for axis, *_ in axes for side in ("Plus", "Minus")]
+    bins = np.rint(u[selected] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(v[selected] * (shape[1] - 1)).astype(int)
+    emphasis = weight - transition * np.clip((95 - desired) / 31, 0, 1)
+
+    def Smooth(values):
+        field = np.bincount(bins, weights=values, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(field, (1.42, 1.34))
+
+    support = Smooth(np.ones_like(desired))
+
+    def Average(values):
+        return Smooth(values * emphasis) / np.maximum(support, .45)
+
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    return pull, response, support, hashes
+
+
+def FitSaddleResponse(photo, saddle, evidence, *, refine):
+    if refine:
+        setups = (("V52AngularResponseDefault", .18, .13), ("V52AngularResponseFill", .35, -.05),
+                  ("V52AngularResponseRake", .47, -.08))
+        axes = (("Along", .16, (.51, .52), .051), ("Rough", .14, (.58, .59), .046),
+                ("Across", .16, (.53, .53), .063), ("Base", .31, (.35, .50), .052))
+    else:
+        setups = (("V52SaddleFreshDefault", .36, .18), ("V52SaddleFreshFill", .30, -.08),
+                  ("V52SaddleRakeBRDF", .34, -.10))
+        axes = (("Along", .16, (1.16, .82), .043), ("Rough", .14, (.72, 1.02), .040),
+                ("Across", .16, (.57, .57), .058), ("Base", .31, (1.04, .54), .054))
+    shape = (71, 61)
+    views = [SaddleViewResponse(photo, saddle, evidence / name, weight, transition, axes, shape)
+             for name, weight, transition in setups]
+    # Normalize each view before combining their measured responses in the same UV cells.
+    pull = np.sum([row[0] for row in views], axis=0)
+    response = np.sum([row[1] for row in views], axis=0)
+    fit = FitSignedResponse(pull, response, axes, 10)
+
+    u, v = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    coverage = np.clip(np.minimum(u, 1 - u) / .134, 0, 1)
+    coverage *= np.clip(np.minimum(v, 1 - v) / .138, 0, 1)
+    coverage *= np.clip(np.minimum.reduce([row[2] for row in views]) / .80, 0, 1)
+    fields = {name: gaussian_filter(step * (fit[..., 2*i] - fit[..., 2*i+1]), (.9, .82)) * coverage
+              for i, (name, step, _, _) in enumerate(axes)}
+    return fields, {view[0]: row[3] for view, row in zip(setups, views)}
+
+
+def SaddleResponseCalibration(image, saddle, evidence):
+    photo = image @ REGISTERED_LUMA
+    first, initialHashes = FitSaddleResponse(photo, saddle, evidence, refine=False)
+    remaining, resolvedHashes = FitSaddleResponse(photo, saddle, evidence, refine=True)
+    limits = {"Along": (-.15, .218), "Across": (-.138, .138), "Rough": (-.167, .112), "Base": (-.19, .327)}
+    fields = [np.clip(first[name] + .92 * remaining[name], *limits[name])
+              for name in ("Base", "Across", "Along", "Rough")]
+    return WriteResponseFields(SADDLE_RESPONSE, SaddleCalibrationIdentity(saddle), fields,
+                               {**initialHashes, **resolvedHashes}, scale=95000)
+
+
+def ShoeFinish(folder, previous=None, *, responseEvidence=None):
     image, source = Photo(folder, 1)
     # On the photographed convex face U increases downward and V toward the
     # left. End each strip inside the steel, clear of the dark return and stem.
@@ -1135,6 +1232,11 @@ def ShoeFinish(folder):
     residue = np.clip((warmth - .035) / .255, 0, 1)
     field["oxideCoverage"] = np.rint(100 * residue).astype(int).tolist()
     field["detail"] = ShoeDetail(image, strips)
+    if responseEvidence is not None:
+        field["responseCalibration"] = SaddleResponseCalibration(image, field, responseEvidence)
+    elif previous and (calibration := previous.get("responseCalibration")):
+        if all(calibration.get(key) == value for key, value in SaddleCalibrationIdentity(field).items()):
+            field["responseCalibration"] = calibration
     return field
 
 
@@ -1856,6 +1958,7 @@ def Main():
     options.add_argument("--barrel-facet-evidence", type=Path, help="V49 Evidence directory with tangent-normal and base-color response captures")
     options.add_argument("--barrel-band-evidence", type=Path, help="V50 Evidence directory with three-light barrel response captures")
     options.add_argument("--barrel-grain-evidence", type=Path, help="V51 Evidence directory with registered fine-grain color response captures")
+    options.add_argument("--saddle-response-evidence", type=Path, help="V52 Evidence directory with saddle material response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1872,7 +1975,8 @@ def Main():
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": sleeve,
-                          "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
+                          "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
+                          "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)
