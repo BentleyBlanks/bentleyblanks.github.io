@@ -29,14 +29,11 @@
     </div>
   </div>
 
-  <!-- 顶部栏：仅标题、当前动作名与路线标、实时运行态提示、以及唯一聚合的「系统」抽屉入口 -->
+  <!-- 顶部栏：极简品牌 + 右侧定时队列与系统抽屉 -->
   <header class="mwBar">
-    <div class="mwBrand">AI 动作生成</div>
-    <div class="mwBarDiv"></div>
-    <div class="mwCurrentHead">
-      <span id="topBeatCode" class="mwMono mwTopCode">—</span>
-      <span id="topTaskTitle" class="mwTopTitle">加载中…</span>
-      <span id="topRouteTag" class="mwRoutePill">—</span>
+    <div class="mwBrandGroup">
+      <div class="mwBrand">AI 动作生成</div>
+      <span class="mwBrandTag">第一关 · 01 防炮洞</span>
     </div>
     <div class="mwBarRight">
       <button id="topBusyPill" class="mwBusyPill hidden" type="button" title="点击定位正在运行的任务">
@@ -56,12 +53,12 @@
   </header>
 
   <div class="mwShell">
-    <!-- 左栏：第一关 · 01 防炮洞 大纲动作卡（带概念图封面占位，零手填新建表单） -->
+    <!-- 左栏：第一关 · 01 防炮洞 大纲动作卡 -->
     <aside class="mwLeft">
       <div class="mwLeftHead">
         <div class="mwSceneCaption">
-          <span class="mwPaneTitle">第一关 · 01 防炮洞</span>
-          <span id="taskCountBadge" class="mwMono mwDim">—</span>
+          <span class="mwPaneTitle">动作任务列表</span>
+          <span id="taskCountBadge" class="mwMono mwCountPill">—</span>
         </div>
         <div class="mwFilterBar" id="routeFilters">
           <button class="mwFilterBtn active" data-filter="mocap" type="button">需转骨骼</button>
@@ -563,13 +560,17 @@
                 <div class="mwViewPane">
                   <div class="mwViewHead">
                     <span id="s5CharViewportTitle">角色 3D 重定向预览</span>
-                    <div class="mwCamBtns">
-                      <button class="mwCamBtn" data-cam="front" type="button">正</button>
-                      <button class="mwCamBtn active" data-cam="oblique" type="button">45°</button>
-                      <button class="mwCamBtn" data-cam="side" type="button">侧</button>
-                      <button class="mwCamBtn" data-cam="back" type="button">背</button>
-                      <button class="mwCamBtn" id="btnToggleSkel" type="button">骨架</button>
-                      <button class="mwCamBtn active" id="btnToggleLight" type="button" title="切换明亮天空球 / 深灰暗棚">天空</button>
+                    <div class="mwCamToolbar">
+                      <div class="mwCamSeg" role="group" aria-label="相机视角">
+                        <button class="mwCamBtn" data-cam="front" type="button">正</button>
+                        <button class="mwCamBtn active" data-cam="oblique" type="button">45°</button>
+                        <button class="mwCamBtn" data-cam="side" type="button">侧</button>
+                        <button class="mwCamBtn" data-cam="back" type="button">背</button>
+                      </div>
+                      <div class="mwCamToggles">
+                        <button class="mwCamBtn" id="btnToggleSkel" type="button">骨架</button>
+                        <button class="mwCamBtn active" id="btnToggleLight" type="button" title="切换明亮天空球 / 深灰暗棚">天空</button>
+                      </div>
                     </div>
                   </div>
                   <div class="mwViewBody mw3dWrap">
@@ -607,26 +608,26 @@
           <aside class="mwInspector">
             <div class="mwInspBody">
               <div class="mwSec">
-                <div class="mwSecH">试穿目标角色（Mixamo 规范）</div>
+                <div class="mwSecH">试穿目标角色</div>
                 <div id="s5CharGrid" class="mwCharGrid"></div>
               </div>
               <div class="mwSec">
                 <div class="mwSecH">重定向体检</div>
-                <div class="mwFacts">
-                  <div class="mwFact"><span class="k">骨位映射</span><span id="qaMapped" class="v mwMono">—</span></div>
-                  <div class="mwFact"><span class="k">十指通道</span><span id="qaFingers" class="v mwMono">—</span></div>
-                  <div class="mwFact"><span class="k">身高缩放</span><span id="qaScale" class="v mwMono">—</span></div>
-                  <div class="mwFact"><span class="k">鞋底高度</span><span id="qaFoot" class="v mwMono">—</span></div>
-                  <div class="mwFact"><span class="k">腕部平滑</span><span id="qaWrist" class="v mwMono">—</span></div>
+                <div class="mwQaGrid">
+                  <div class="mwQaTile"><span class="mwQaLabel">骨位映射</span><span id="qaMapped" class="v mwMono">—</span></div>
+                  <div class="mwQaTile"><span class="mwQaLabel">十指通道</span><span id="qaFingers" class="v mwMono">—</span></div>
+                  <div class="mwQaTile"><span class="mwQaLabel">鞋底贴地</span><span id="qaFoot" class="v mwMono">—</span></div>
+                  <div class="mwQaTile"><span class="mwQaLabel">腕部步角</span><span id="qaWrist" class="v mwMono">—</span></div>
                 </div>
-                <div id="qaHint" class="mwReadout">—</div>
+                <div class="mwQaScaleRow"><span>目标身高缩放</span><span id="qaScale" class="v mwMono">—</span></div>
+                <div id="qaHint" class="mwQaHint hidden">—</div>
               </div>
               <div class="mwSec">
                 <button id="btnRunRetarget" class="mwBtn mwFull" type="button">重新转换 Mixamo GLB</button>
               </div>
             </div>
             <div class="mwInspFoot">
-              <button id="btnApproveRetarget" class="mwBtn mwPrimary mwFull" type="button">✓ 二次验收通过 · 可入库</button>
+              <button id="btnApproveRetarget" class="mwBtnCta mwFull" type="button">✓ 二次验收通过 · 可入库</button>
             </div>
           </aside>
         </section>
@@ -750,10 +751,10 @@
       </footer>
     </div>
 
-    <!-- TAB 2: 管线配置（按功能分组） -->
+    <!-- TAB 2: 管线配置（日常核心选项清晰展示，底层 CLI 路径与密钥折叠收拢） -->
     <div class="mwDrawerBody hidden" data-syspanel="config">
       <div class="mwDashBox">
-        <div class="mwDashBoxHead"><span>分镜图生成来源</span></div>
+        <div class="mwDashBoxHead"><span>常用生成引擎与模型</span></div>
         <div class="mwCfgGrid2">
           <div class="mwPropCol">
             <span class="mwLbl">默认分镜来源</span>
@@ -774,97 +775,102 @@
             </select>
           </div>
         </div>
+        <div class="mwPropCol">
+          <span class="mwLbl">Cursor Grok 模型</span>
+          <select id="cfgCursorModel" class="mwSelect">
+            <option value="grok-4.7-xhigh">Grok 4.7 Extra High（推荐）</option>
+            <option value="grok-4.7-xhigh-fast">Grok 4.7 Extra High Fast</option>
+            <option value="cursor-grok-4.6-xhigh">Cursor Grok 4.6 Extra High</option>
+            <option value="cursor-grok-4.6-xhigh-fast">Cursor Grok 4.6 Extra High Fast</option>
+            <option value="grok-4.7-high">Grok 4.7 High</option>
+            <option value="cursor-grok-4.5-high">Cursor Grok 4.5 High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mwDashBox">
+        <div class="mwDashBoxHead"><span>云端提骨算力</span></div>
         <div class="mwCfgGrid2">
           <div class="mwPropCol">
-            <span class="mwLbl">Cursor CLI 路径</span>
-            <input id="cfgCursorPath" type="text" placeholder="agent.ps1 / cursor-agent">
-          </div>
-          <div class="mwPropCol">
-            <span class="mwLbl">Cursor Grok 模型</span>
-            <select id="cfgCursorModel" class="mwSelect">
-              <option value="grok-4.7-xhigh">Grok 4.7 Extra High（推荐）</option>
-              <option value="grok-4.7-xhigh-fast">Grok 4.7 Extra High Fast</option>
-              <option value="cursor-grok-4.6-xhigh">Cursor Grok 4.6 Extra High</option>
-              <option value="cursor-grok-4.6-xhigh-fast">Cursor Grok 4.6 Extra High Fast</option>
-              <option value="grok-4.7-high">Grok 4.7 High</option>
-              <option value="cursor-grok-4.5-high">Cursor Grok 4.5 High</option>
+            <span class="mwLbl">默认提骨引擎</span>
+            <select id="cfgMocapBackend" class="mwSelect">
+              <option value="colab_cli">Colab CLI（推荐 · Pro+）</option>
+              <option value="modal_serverless">Modal Serverless（按秒计费）</option>
             </select>
           </div>
-        </div>
-        <div class="mwCfgGrid2">
           <div class="mwPropCol">
-            <span class="mwLbl">Codex CLI 路径</span>
-            <input id="cfgCodexPath" type="text" placeholder="codex">
-          </div>
-          <div class="mwPropCol">
-            <span class="mwLbl">Codex 模型（可选）</span>
-            <input id="cfgCodexModel" type="text" placeholder="留空沿用默认">
+            <span class="mwLbl">空闲停表（秒，0=跑完即停）</span>
+            <input id="cfgColabAutoStop" type="text" placeholder="180">
           </div>
         </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">OpenAI API Key <em id="cfgOpenAiKeyBadge" class="mwKeyState"></em></span>
-          <input id="cfgOpenAiKey" type="password" placeholder="sk-...（留空保持已有密钥或环境变量）">
-        </div>
-        <div class="mwCfgGrid2">
+      </div>
+
+      <details class="mwCfgAdvanced">
+        <summary>高级路径、API 密钥与本地目录（一般无需修改）</summary>
+        <div class="mwCfgAdvancedBody">
+          <div class="mwCfgSubhead">生图 CLI 与 OpenAI 接口</div>
+          <div class="mwCfgGrid2">
+            <div class="mwPropCol">
+              <span class="mwLbl">Cursor CLI 路径</span>
+              <input id="cfgCursorPath" type="text" placeholder="agent.ps1 / cursor-agent">
+            </div>
+            <div class="mwPropCol">
+              <span class="mwLbl">Codex CLI 路径</span>
+              <input id="cfgCodexPath" type="text" placeholder="codex">
+            </div>
+          </div>
+          <div class="mwCfgGrid2">
+            <div class="mwPropCol">
+              <span class="mwLbl">Codex 模型（可选）</span>
+              <input id="cfgCodexModel" type="text" placeholder="留空沿用默认">
+            </div>
+            <div class="mwPropCol">
+              <span class="mwLbl">OpenAI 图片模型</span>
+              <input id="cfgOpenAiModel" type="text" placeholder="gpt-image-1">
+            </div>
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">OpenAI API Key <em id="cfgOpenAiKeyBadge" class="mwKeyState"></em></span>
+            <input id="cfgOpenAiKey" type="password" placeholder="sk-...（留空保持已有密钥或环境变量）">
+          </div>
           <div class="mwPropCol">
             <span class="mwLbl">OpenAI Base URL</span>
             <input id="cfgOpenAiBase" type="text" placeholder="https://api.openai.com">
           </div>
-          <div class="mwPropCol">
-            <span class="mwLbl">OpenAI 图片模型</span>
-            <input id="cfgOpenAiModel" type="text" placeholder="gpt-image-1">
-          </div>
-        </div>
-      </div>
 
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead"><span>云端提骨 GPU（Colab CLI / Modal）</span></div>
-        <div class="mwCfgGrid2">
+          <div class="mwCfgSubhead">云端算力路径与网关</div>
           <div class="mwPropCol">
-            <span class="mwLbl">提骨引擎</span>
-            <select id="cfgMocapBackend" class="mwSelect">
-              <option value="colab_cli">Colab CLI（推荐 · 用现有 Pro+）</option>
-              <option value="modal_serverless">Modal Serverless（按秒无服务器）</option>
-            </select>
+            <span class="mwLbl">Colab CLI 路径</span>
+            <input id="cfgColabPath" type="text" placeholder="C:\Users\admin\.local\bin\colab.exe">
           </div>
           <div class="mwPropCol">
-            <span class="mwLbl">空闲自动释放（秒，0=跑完即停）</span>
-            <input id="cfgColabAutoStop" type="text" placeholder="180">
+            <span class="mwLbl">Modal 网关 URL（仅切 Modal 时需要）</span>
+            <input id="cfgModalUrl" type="text" placeholder="https://...--gemx-mocap-serverless-web-api.modal.run">
           </div>
-        </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">Colab CLI 路径</span>
-          <input id="cfgColabPath" type="text" placeholder="C:\Users\admin\.local\bin\colab.exe">
-        </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">Modal 网关 URL（仅切换 Modal 时需要）</span>
-          <input id="cfgModalUrl" type="text" placeholder="https://...--gemx-mocap-serverless-web-api.modal.run">
-        </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">Modal Bearer Token（可选）</span>
-          <input id="cfgModalToken" type="password" placeholder="留空表示无鉴权">
-        </div>
-      </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">Modal Bearer Token（可选）</span>
+            <input id="cfgModalToken" type="password" placeholder="留空表示无鉴权">
+          </div>
 
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead"><span>本地工具与目录</span></div>
-        <div class="mwPropCol">
-          <span class="mwLbl">即梦 CLI</span>
-          <input id="cfgDreaminaPath" type="text">
+          <div class="mwCfgSubhead">本地工具与镜像目录</div>
+          <div class="mwPropCol">
+            <span class="mwLbl">即梦 CLI</span>
+            <input id="cfgDreaminaPath" type="text">
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">成品镜像目录</span>
+            <input id="cfgExportMirror" type="text">
+          </div>
+          <div class="mwPropCol">
+            <span class="mwLbl">修缮命令模板</span>
+            <input id="cfgRefineCmd" type="text">
+          </div>
         </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">成品镜像目录</span>
-          <input id="cfgExportMirror" type="text">
-        </div>
-        <div class="mwPropCol">
-          <span class="mwLbl">修缮命令模板</span>
-          <input id="cfgRefineCmd" type="text">
-        </div>
-      </div>
+      </details>
 
       <div class="mwCfgFoot">
         <span id="cfgTestStatus" class="mwCfgMsg"></span>
-        <button id="btnSaveConfig" class="mwBtn mwPrimary" type="button">保存并测活</button>
+        <button id="btnSaveConfig" class="mwBtnCta" type="button">保存并测活</button>
       </div>
     </div>
 

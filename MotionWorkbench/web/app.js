@@ -460,8 +460,7 @@ function taskStatusMeta(task, st) {
 
 function renderTaskList() {
   const list = filteredTasks();
-  const mocapCount = appState.tasks.filter((t) => t.routeType !== "mixamo").length;
-  $("#taskCountBadge").textContent = `${list.length} / ${appState.tasks.length}（定制 ${mocapCount}）`;
+  $("#taskCountBadge").textContent = `${list.length} / ${appState.tasks.length}`;
 
   $$(".mwFilterBtn").forEach((b) => b.classList.toggle("active", b.dataset.filter === appState.routeFilter));
 
@@ -511,14 +510,13 @@ function renderTaskList() {
       (x) => x.taskId === task.id && (x.status === "pending" || x.status === "running")
     );
     const schSlot = schItems[0]?.scheduledTime || appState.schedule?.runTime || "06:00";
+    const schKinds = schItems.map((x) => (x.kind === "stage4_mocap" ? "提骨" : "H3 视频")).join(" + ");
     const schBadgeHtml = schItems.length
-      ? `<span class="mwCoverSchBadge" title="已加入定时队列">定时 ${escapeHtml(schSlot)} · ${schItems
-          .map((x) => (x.kind === "stage4_mocap" ? "提骨" : "H3"))
-          .join("+")}</span>`
+      ? `<div class="mwCoverSchRibbon" title="已加入定时队列"><span>⏱ 已入队 · ${escapeHtml(schSlot)}</span><span>${escapeHtml(schKinds)}</span></div>`
       : "";
     const card = document.createElement("button");
     card.type = "button";
-    card.className = `mwActionCard ${task.id === appState.selectedTaskId ? "active" : ""}`;
+    card.className = `mwActionCard ${task.id === appState.selectedTaskId ? "active" : ""} ${schItems.length ? "isQueuedCard" : ""}`;
     card.innerHTML = `
       <div class="mwCoverSlot">
         ${coverUrl ? `<img src="${coverUrl}" alt="${escapeHtml(task.title)}">` : `<span class="mwCoverPlaceholder">待生成封面</span>`}
@@ -791,11 +789,13 @@ function renderTaskDetail() {
   if (!task) return;
   const isMixamo = task.routeType === "mixamo";
 
-  $("#topBeatCode").textContent = task.beatCode || "—";
-  $("#topTaskTitle").textContent = task.title;
+  if ($("#topBeatCode")) $("#topBeatCode").textContent = task.beatCode || "—";
+  if ($("#topTaskTitle")) $("#topTaskTitle").textContent = task.title;
   const pill = $("#topRouteTag");
-  pill.textContent = isMixamo ? "Mixamo 复用" : "GEM-X 77骨定制";
-  pill.className = `mwRoutePill ${isMixamo ? "mixamo" : "mocap"}`;
+  if (pill) {
+    pill.textContent = isMixamo ? "Mixamo 复用" : "GEM-X 77骨定制";
+    pill.className = `mwRoutePill ${isMixamo ? "mixamo" : "mocap"}`;
+  }
 
   renderStageRail(task);
 
@@ -1453,14 +1453,19 @@ function renderStage5Retarget(task, selectedTake) {
   const qa = task.stage5?.qa;
   $("#qaMapped").textContent = qa ? `${qa.mappedBones} / ${qa.totalTargetBones} 骨` : "—";
   $("#qaMapped").className = `v mwMono ${qa ? "ok" : ""}`;
-  $("#qaFingers").textContent = qa ? `${qa.fingerChannels} / 30 通道` : "—";
+  $("#qaFingers").textContent = qa ? `${qa.fingerChannels} / 30` : "—";
   $("#qaFingers").className = `v mwMono ${qa?.fingerChannels >= 30 ? "ok" : "warn"}`;
-  $("#qaScale").textContent = `${cInfo.name} · hipsScale ${cInfo.hipsScale}`;
-  $("#qaFoot").textContent = qa ? `minY ${qa.minFootY} m` : "—";
+  $("#qaScale").textContent = `${cInfo.name} · ${Number(cInfo.hipsScale).toFixed(2)}×`;
+  $("#qaFoot").textContent = qa ? `${qa.minFootY} m` : "—";
   $("#qaFoot").className = `v mwMono ${qa?.groundStatus === "warn" ? "warn" : "ok"}`;
-  $("#qaWrist").textContent = qa ? `最大步角 ${qa.maxWristStepDeg}°` : "—";
+  $("#qaWrist").textContent = qa ? `${qa.maxWristStepDeg}°` : "—";
   $("#qaWrist").className = `v mwMono ${qa?.wristStatus === "warn" ? "warn" : "ok"}`;
-  $("#qaHint").textContent = cInfo.clipOverrideHint || "—";
+  const cleanHint = String(cInfo.clipOverrideHint || "").replace(/建议第\s*6\s*步/g, "可在入库前").trim();
+  const qaHintEl = $("#qaHint");
+  if (qaHintEl) {
+    qaHintEl.textContent = cleanHint;
+    qaHintEl.classList.toggle("hidden", !cleanHint || cleanHint === "—");
+  }
 
   $("#btnApproveRetarget").textContent =
     task.stage5?.status === "approved" ? "✓ 已通过二次验收（可入库）" : "✓ 二次验收通过 · 可入库";
@@ -1472,9 +1477,9 @@ function renderStage5Retarget(task, selectedTake) {
   $("#s5NoVideoNote").classList.toggle("hidden", hasVid);
   setVideoSrcIfChanged($("#vidRetargetOrig"), hasVid ? selectedTake.url : "");
 
-  $("#s5CharViewportTitle").textContent = `${cInfo.name}（Mixamo · hipsScale ${cInfo.hipsScale}）`;
+  $("#s5CharViewportTitle").textContent = `${cInfo.name} · 3D 预览`;
   $("#s5RetSummary").textContent = qa
-    ? `${qa.targetSkeleton} · ${qa.frames} 帧 @ ${qa.fps} FPS · 胯高比 ${qa.legRatio}`
+    ? `${qa.frames} 帧 @ ${qa.fps} FPS · 胯高比 ${qa.legRatio}`
     : "";
 
   const dl = $("#s5RetDownloads");
@@ -1698,15 +1703,15 @@ function renderScheduleUI() {
   if (s3q) {
     s3q.classList.toggle("isQueued", Boolean(curH3Item));
     s3q.textContent = curH3Item
-      ? `✓ 已排入 ${curH3Item.scheduledTime || runTime} 错峰队列（点此查看）`
-      : `加入 ${runTime} 错峰队列（MiniMax-H3）`;
+      ? `✓ 已排入 ${curH3Item.scheduledTime || runTime} 队列 · 查看`
+      : `⏱ 加入 ${runTime} 定时队列（H3）`;
   }
   const s4q = $("#btnStage4QueueSch");
   if (s4q) {
     s4q.classList.toggle("isQueued", Boolean(curMocapItem));
     s4q.textContent = curMocapItem
-      ? `✓ 已排入 ${curMocapItem.scheduledTime || runTime} 错峰队列（点此查看）`
-      : `加入 ${runTime} 错峰队列（Colab 提骨）`;
+      ? `✓ 已排入 ${curMocapItem.scheduledTime || runTime} 队列 · 查看`
+      : `⏱ 加入 ${runTime} 定时队列（提骨）`;
   }
 
   if ($("#schEnabled")) $("#schEnabled").checked = Boolean(sch.enabled);
