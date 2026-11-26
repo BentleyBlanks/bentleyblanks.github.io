@@ -15,7 +15,8 @@ from scipy.ndimage import distance_transform_edt, gaussian_filter
 from scipy.interpolate import PchipInterpolator
 
 from Script_Type38ExteriorFinish import FrameEngraving, PaintBandScuff, ReadGlb, WriteGlb
-from Script_Type38EdgeProfiles import BlendCoverCrown, ShapeButtCap, ShapeRolledBand, WriteAttributes
+from Script_Type38EdgeProfiles import BlendCoverCrown, ShapeButtCap, ShapeFittedMiddleBand, ShapeRolledBand, WriteAttributes
+from Script_Type38RenderBatches import PackType38, UpdateType38PublishRules
 
 
 SAMPLES = {
@@ -33,6 +34,16 @@ METAL_SOURCES = {
                   'Roughness':'82cf613070e28568613b8ed71093c04664015da4f925f13e91928c692edd958a'}
 }
 COVER_STEEL_TONES = ([59,55,49],[155,149,138])
+SIGHT_BEVEL_PARTS = {
+    'Exterior_FoldedFrame12': .00018,
+    'Exterior_FoldedRoundShoulder47_-1': .00020,
+    'Exterior_FoldedRoundShoulder47_1': .00020,
+    'Exterior_LowRoundedSupport70': .00021,
+    'Exterior_ShortTransverseHead71': .00014,
+    'Exterior_RearTransverseRelief49': .00012,
+    'T38_430L_VisibleUpperShoulderCoordination': .00019,
+}
+FRONT_TIP_SKIN = 'T38_430J_Exterior_ImportedRemainder_Plate72'
 
 
 def FineScanBand(sample, along, gain):
@@ -78,7 +89,7 @@ def ReadSamples(cache):
                 staging.write(download)
             Path(staging.name).replace(pack)
     layers['steelMicro'] = FineScanBand(layers['Metal009Displacement'],2.0,7.6)
-    layers['tubeMicro'] = FineScanBand(layers['Metal009Displacement'],3.6,7.6)
+    layers['tubeMicro'] = FineScanBand(layers['Metal009Displacement'],6.4,7.6)
     layers['steelPits'] = FineScanBand(layers['Metal046BColor'],.88,9.5)
     return layers
 
@@ -643,6 +654,86 @@ def RearEdgeWear(part, field, width):
     return 0
 
 
+def EaseSightBevels(doc, views, primitive, part):
+    attrs = primitive['attributes']
+    points = Attribute(doc,views,attrs['POSITION'],3)
+    normal = Attribute(doc,views,attrs['NORMAL'],3)
+    tangent = Attribute(doc,views,attrs['TANGENT'],4)
+    uv = Attribute(doc,views,attrs['TEXCOORD_0'],2)
+    triangles = Attribute(doc,views,primitive['indices'],3)
+    _,orig,weld = np.unique(points.round(7),axis=0,return_index=True,return_inverse=True)
+    corners = points[orig]
+    faces = weld[triangles]
+    current = corners[faces]
+    planes = np.cross(current[:,1]-current[:,0],current[:,2]-current[:,0])
+    planes /= np.maximum(1e-12,np.linalg.norm(planes,axis=1,keepdims=True))
+    vertexNormals = np.zeros_like(corners)
+    for i in range(3):
+        np.add.at(vertexNormals,faces[:,i],planes)
+    vertexNormals /= np.maximum(1e-9,np.linalg.norm(vertexNormals,axis=1,keepdims=True))
+    mismatch = np.max(1-np.sum(planes[:,None,:]*vertexNormals[faces],axis=2),axis=1)
+    curvature = np.zeros(len(corners),dtype='f')
+    planar = np.zeros(len(corners),dtype='f')
+    for i in range(3):
+        np.maximum.at(curvature,faces[:,i],mismatch)
+        np.maximum.at(planar,faces[:,i],np.abs(planes[:,1]))
+    pairs = np.unique(np.sort(np.stack((faces,np.roll(faces,-1,axis=1)),axis=2).reshape(-1,2),axis=1),axis=0)
+    a,b = pairs.T
+    delta = corners[b]-corners[a]
+    inverse = 1/np.maximum(np.linalg.norm(delta,axis=1),.00008)
+    step = np.zeros_like(corners)
+    count = np.zeros(len(corners),dtype='f')
+    np.add.at(step,a,delta*inverse[:,None]);np.add.at(step,b,-delta*inverse[:,None])
+    np.add.at(count,a,inverse);np.add.at(count,b,inverse)
+    step /= np.maximum(count,1)[:,None]
+    weight = Ramp(.012,.13,curvature)
+    if part == 'Exterior_FoldedFrame12':
+        weight *= 1-Ramp(.934,.991,planar)
+    if part == 'Exterior_ShortTransverseHead71':
+        lateral = np.abs(corners[:,0]-.5*(corners[:,0].max()+corners[:,0].min()))
+        weight *= Ramp(np.ptp(corners[:,0])*.31,np.ptp(corners[:,0])*.47,lateral)
+    cap = SIGHT_BEVEL_PARTS[part]
+    step *= np.minimum(.26,cap/np.maximum(1e-12,np.linalg.norm(step,axis=1)))[:,None]*weight[:,None]
+    updated = corners+step
+    shifted = updated[faces]
+    plane = np.cross(shifted[:,1]-shifted[:,0],shifted[:,2]-shifted[:,0])
+    plane /= np.maximum(1e-12,np.linalg.norm(plane,axis=1,keepdims=True))
+    turn = np.zeros_like(corners)
+    for i in range(3):
+        np.add.at(turn,faces[:,i],plane)
+    turn /= np.maximum(1e-9,np.linalg.norm(turn,axis=1,keepdims=True))
+    smooth = normal+(turn[weld]-normal)*(.46*weight[weld,None])
+    smooth /= np.linalg.norm(smooth,axis=1,keepdims=True)
+    direction = tangent[:,:3]-smooth*np.sum(tangent[:,:3]*smooth,axis=1,keepdims=True)
+    direction /= np.linalg.norm(direction,axis=1,keepdims=True)
+    WriteAttributes(doc,views,primitive,points+step[weld],smooth,np.column_stack((direction,tangent[:,3])),uv,triangles)
+
+
+def CleanDisplayTip(doc, views, primitive):
+    attrs = primitive['attributes']
+    points = Attribute(doc,views,attrs['POSITION'],3).copy()
+    normal = Attribute(doc,views,attrs['NORMAL'],3).copy()
+    tangent = Attribute(doc,views,attrs['TANGENT'],4).copy()
+    uv = Attribute(doc,views,attrs['TEXCOORD_0'],2)
+    index = Attribute(doc,views,primitive['indices'],3)
+    tri = points[index]
+    cap = (tri[:,:,2].max(axis=1)<-.978)&(tri[:,:,1].min(axis=1)>.0535)
+    top = np.unique(index[cap])
+    height = points[top,1].max()
+    slope = np.clip(np.polyfit(points[top,2],points[top,1],1)[0],-.14,.14)
+    axis = points[top,2]*slope
+    # One facing plane makes the small cap read as a single finish.
+    for old,value in zip(points[top].copy(),height+axis-axis.max(),strict=True):
+        matching = np.max(np.abs(points-old),axis=1)<1e-7
+        points[matching,1] = value
+    basis = np.array([0,1,-slope],dtype='f')
+    basis /= np.linalg.norm(basis)
+    normal[top] = basis
+    direction = tangent[:,:3]-normal*np.sum(tangent[:,:3]*normal,axis=1,keepdims=True)
+    direction /= np.linalg.norm(direction,axis=1,keepdims=True)
+    WriteAttributes(doc,views,primitive,points,normal,np.column_stack((direction,tangent[:,3])),uv,index)
+
+
 def PoreField(length, transverse):
     def Hash(col, row, salt):
         value = col.astype('uint32')*np.uint32(3266489917) + row.astype('uint32')*np.uint32(668265263) + np.uint32(salt)
@@ -713,6 +804,54 @@ def VarnishTraces(length, transverse, positiveSide):
             target = chips if index%4==0 else traces
             target[selected] = np.maximum(target[selected],opacity)
     return traces,chips
+
+
+def WoodUseDents(side, up, length, normalSide, grain, crown):
+    """Localized compressed fibres and small losses in the old wood finish."""
+    stations = (
+        ((-.610,.046,.0037,.0017,.26),(-.557,.048,.0044,.0020,-.19),
+         (-.472,.044,.0026,.0015,.14),(-.393,.050,.0034,.0016,.32)) if crown else
+        ((-.866,.024,.0033,.0018,.23),(-.758,.026,.0048,.0025,-.19),
+         (-.640,.028,.0051,.0024,.41),(-.585,.024,.0040,.0018,-.32),
+         (-.519,.017,.0035,.0016,.12),(-.202,.018,.0044,.0021,.33),
+         (-.107,.012,.0058,.0027,-.39),(-.025,.001,.0037,.0018,.17),
+         (.074,-.030,.0046,.0022,-.27),(.147,-.045,.0054,.0029,.43),
+         (.197,-.056,.0061,.0032,-.38),(.232,-.018,.0039,.0023,.76))
+    )
+    depression = np.zeros_like(length)
+    exposed = np.zeros_like(length)
+    shoulder = np.zeros_like(length)
+    rng = np.random.default_rng(38129 if crown else 38121)
+    face = Ramp(.16,.70,np.abs(normalSide))
+    placements = [(*station,-1 if index%3==0 else 1) for index,station in enumerate(stations)]
+    if not crown:
+        placements.extend((
+            (-.591,.0243,.0052,.0028,-.25,1),(-.644,.0212,.0055,.0028,.48,1),
+            (-.6635,.0225,.0064,.0026,.22,1),(-.101,.012,.0062,.0029,-.36,-1),
+            (-.0754,.0138,.0046,.0025,.32,-1),(-.0527,.0123,.0050,.0024,-.15,-1),
+        ))
+    for index,(z,y,wide,high,angle,sign) in enumerate(placements):
+        local = face*Ramp(.001,.009,side*sign)
+        chipStrength = .68+.26*np.sin(2.41*index+.85)
+        for attempt in range(3):
+            dz = length-z-(rng.uniform(-.013,.012) if attempt else 0)
+            dy = up-y-(rng.uniform(-.005,.005) if attempt else 0)
+            axis = angle+rng.uniform(-.35,.35)
+            c,s = np.cos(axis),np.sin(axis)
+            size = 1 if attempt==0 else rng.uniform(.25,.58)
+            across = (c*dz-s*dy)/(wide*size)
+            along = (s*dz+c*dy)/(high*size)
+            asymmetry = .052*np.sin(4*np.arctan2(along,across)+index)
+            radius = np.maximum(0,np.hypot(across,along)+.085*grain+asymmetry)
+            bowl = (1-Ramp(.13,1.02,radius))**1.39*local
+            rim = np.exp(-((radius-.79)/.15)**2)*local
+            fracture = Ramp(-.20,.84,.63*grain+.79*across-.46*along)
+            lip = Ramp(.32,.68,radius)*(1-Ramp(.79,1.02,radius))*local
+            broken = (.27*bowl+.63*lip)*fracture*chipStrength
+            depression = np.maximum(depression,bowl*(.92 if attempt==0 else .63))
+            exposed = np.maximum(exposed,broken*(1 if attempt==0 else .53))
+            shoulder = np.maximum(shoulder,rim*(.65 if attempt==0 else .33))
+    return depression,exposed,shoulder
 
 
 def FinishSteelAtlas(doc, views, source, load, store):
@@ -800,7 +939,28 @@ def FinishSteelAtlas(doc, views, source, load, store):
     return {name:np.percentile(rough[mask],[10,50,90]).round(1).tolist() for name,mask in coverage.items()}
 
 
-def Build(cache, output=None):
+def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
+    folder.mkdir(exist_ok=True,parents=True)
+    authorImages = len(doc['images'])
+    rules = None
+    if not author:
+        doc,views,rules = PackType38(doc,views,repo)
+    digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
+    manifest.update(version=26 if author else 27,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
+                    images=len(doc['images']),authorImages=authorImages)
+    if rules is not None:
+        manifest['publishImageRules'] = rules
+    manifest['imagePayloads'] = []
+    for index,image in enumerate(doc['images']):
+        chunk = views[image['bufferView']]
+        manifest['imagePayloads'].append(dict(index=index,name=image['name'],bytes=len(chunk),sha256=hashlib.sha256(chunk).hexdigest()))
+    lod['sourceSha256'] = digest
+    for name,record in [('Data_Type38_511.json',manifest),('Data_Type38NpcLod.json',lod)]:
+        (folder/name).write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
+    print('Finished:',digest,flush=True)
+
+
+def Build(cache, output=None, author=False):
     repo = Path(__file__).resolve().parents[2]
     folder = output or repo / 'Taierzhuang1938/Model/Type38_511'
     folder.mkdir(exist_ok=True,parents=True)
@@ -816,7 +976,7 @@ def Build(cache, output=None):
     profileDeltas = {}
     profiles = {
         'Exterior_ButtCap04': ShapeButtCap,
-        'Exterior_MiddleBand57': ShapeRolledBand,
+        'Exterior_MiddleBand57': ShapeFittedMiddleBand,
         'T38_407F_VisualSkin_Exterior_FrontBandBody78': ShapeRolledBand,
         'Exterior_HandleOval08': ShapeHandle,
         'Exterior_FrontWindowBacking49': ShapeWindowTrim,
@@ -864,6 +1024,10 @@ def Build(cache, output=None):
                             shape[:,10:12],roundovers[part+'_indices'])
         if part == 'T38_460G_WoodGroove_VisualCandidate':
             EaseVisibleWoodSeat(doc,views,primitive)
+        if part in SIGHT_BEVEL_PARTS:
+            EaseSightBevels(doc,views,primitive,part)
+        if part == FRONT_TIP_SKIN:
+            CleanDisplayTip(doc,views,primitive)
         delta = doc['accessors'][primitive['indices']]['count']//3-before
         if delta:
             profileDeltas[part] = delta
@@ -1104,6 +1268,18 @@ def Build(cache, output=None):
                 relief *= 1-.29*shelteredSeat
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.85*shelteredSeat))
                 filmRoughness += 53*shelteredSeat
+            dent,broken,rolledEdge = WoodUseDents(side,up,length,normalSide,grainSteel,separate)
+            protection = 1 if separate else timber*(1-.88*np.maximum(glazeFill,shelteredSeat))
+            dent *= protection
+            broken *= protection
+            rolledEdge *= protection
+            fibresInDent = Tint([103,66,38],[202,152,93],.47+.28*fibre+.14*stain)
+            color = Blend(color,fibresInDent,.94*broken)
+            color *= (1-.32*dent+.062*rolledEdge)[:,:,None]
+            rough += 51*broken+22*dent-8*rolledEdge
+            relief += .33*rolledEdge-2.48*dent
+            varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.58*broken-.32*dent))
+            filmRoughness += 35*broken+23*dent-7*rolledEdge
             varnish[:,:,1] = np.where(padded,np.clip(filmRoughness,31,173),0)
             Store(coat['clearcoatTexture'], varnish)
         else:
@@ -1136,12 +1312,14 @@ def Build(cache, output=None):
             metal = 251 - oxidation*(22 if bare else 41)
             if exposedTube:
                 freshWear = Ramp(-.720,-.645,length)
+                cloud = OxideField(length*17.1+.26,up*105.7+side*116.3+.46,4043)
+                buff = Ramp(-.43,.79,-cloud+.34*flow+.19*normalUp)
                 rub = np.clip(.30+.24*flow+.17*stain+.16*freshWear,0,1)
                 contact = Ramp(-.677,-.645,length)*np.clip(.20+.26*flow+.27*edge,0,.59)
-                color = Tint([51,50,47],[137,132,122],.32+.47*rub+.083*grainSteel)
+                color = Tint([50,49,47],[148,144,136],.274+.42*rub+.217*buff+.066*grainSteel)
                 color = Blend(color,Tint([91,88,81],[135,130,120],.44+.16*brush),contact)
-                rough = 119+10*stain+9*brush-17*rub-19*contact
-                metal = 226+19*rub+9*contact-10*oxidation
+                rough = 120+10*stain+6*brush+13*cloud-17*rub-19*contact-10*buff
+                metal = 227+17*rub+9*contact+7*buff-10*oxidation
             if part == 'Exterior_FrontOuterTube76':
                 color = Tint([43,42,39],[104,101,94],.45+.17*flow+.08*stain)
                 rough = 102+9*flow+7*stain+5*brush
@@ -1294,13 +1472,13 @@ def Build(cache, output=None):
                 rough += 28*groove-8*border
                 relief += -2.8*groove+.64*border
             if not part.startswith('SightDetail') and part != 'Exterior_FoldedFrame12':
-                fine = ScanStrips(acrossSteel*2+.13,length*5.15+.32,axis=1,seed=9191) if exposedTube else ScanStrips(
+                fine = ScanStrips(acrossSteel*2+.13,length*3.85+.32,axis=1,seed=9191) if exposedTube else ScanStrips(
                     grainU*2+.13,grainV*2+.32,axis=1 if band or collar else 0,seed=9191)
                 lines = np.clip((fine.Read(source['tubeMicro' if exposedTube else 'steelMicro'],128)-128)/37,-1.25,1.25)
                 dents = Ramp(.33,1.03,(128-fine.Read(source['steelPits'],128))/34)
                 detail = .42 if handle else .82 if collar or backing else 1
                 if exposedTube:
-                    detail *= .58
+                    detail *= .49
                 if disk:
                     detail = .42*(1-face)
                 color *= (1+detail*(.037*lines-.062*dents))[:,:,None]
@@ -1319,9 +1497,21 @@ def Build(cache, output=None):
                     local = Ramp(-.141,-.083,length)
                     rough += 8*local*(1-burnish)
                     relief *= 1-.16*local
+            if part in SIGHT_BEVEL_PARTS:
+                castEdge = Ramp(.055,.34,bend)*(1-Ramp(.89,.992,np.abs(normalUp)))
+                castEdge *= np.clip(.51+.19*stain+.09*grainSteel,.28,.76)
+                edgeSteel = Tint([83,80,74],[134,129,119],.39+.16*flow)
+                color = Blend(color,edgeSteel,.48*castEdge)
+                rough += castEdge*(89+9*flow-rough)
+                metal += castEdge*(240-metal)*.69
+                relief *= 1-.47*castEdge
+            if part == FRONT_TIP_SKIN:
+                tipCap = (1-Ramp(-.980,-.973,length))*Ramp(.0535,.0564,up)*Ramp(.74,.97,normalUp)
+                rough += tipCap*(124+4*brush-rough)*.86
+                relief *= 1-.82*tipCap
         if exposedTube:
             name = 'Texture_Type38ForeSteelNormal'
-            normalSlot = dict(index=len(doc['textures']),scale=.43)
+            normalSlot = dict(index=len(doc['textures']),scale=.51)
             doc['textures'].append(dict(source=len(doc['images']),sampler=doc['textures'][baseSlot['index']]['sampler']))
             doc['images'].append(dict(name=name,mimeType='image/png',bufferView=len(views)))
             doc['bufferViews'].append(dict(buffer=0,byteLength=0))
@@ -1363,30 +1553,28 @@ def Build(cache, output=None):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_RearRims23'
+    doc['asset']['extras']['version'] = 'Type38_SightFit24'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
-    digest = WriteGlb(folder/'Model_Type38_511.glb', doc, views)
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=25, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
-    manifest['imagePayloads'] = []
-    for index,image in enumerate(doc['images']):
-        chunk = views[image['bufferView']]
-        manifest['imagePayloads'].append(dict(index=index,name=image['name'],bytes=len(chunk),sha256=hashlib.sha256(chunk).hexdigest()))
-    for name, record in [('Data_Type38_511.json', manifest), ('Data_Type38NpcLod.json', {**json.loads(Original('Data_Type38NpcLod.json')), 'sourceSha256':digest, 'fpsTriangles':triangles, 'npcTriangles':triangles-4608})]:
-        (folder/name).write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
-    print('Finished:', digest, flush=True)
+    lod = json.loads(Original('Data_Type38NpcLod.json'))
+    lod.update(fpsTriangles=triangles,npcTriangles=triangles-4608)
+    WriteType38Assets(repo,folder,doc,views,manifest,lod,author)
+    if output is None and not author:
+        UpdateType38PublishRules(repo,manifest['publishImageRules'])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cache', type=Path, default=Path(__file__).resolve().parents[2]/'tmp/Type38SurfaceSources')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--author', action='store_true',help='retain individual parts for Blender editing')
     args = parser.parse_args()
-    Build(args.cache,args.output)
+    Build(args.cache,args.output,args.author)

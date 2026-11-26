@@ -157,7 +157,41 @@ def ShapeButtCap(doc, views, primitive):
     return mesh.Write(doc,views,primitive)
 
 
-def ShapeRolledBand(doc, views, primitive):
+def VisibleBandContact(doc, views, center, directions, nominal, depth):
+    # Sample the existing display surfaces around the band to fit its visible lip.
+    shell = ('Wood_UpperFittedCrown05', 'T38_460G_WoodGroove_VisualCandidate', 'Exterior_LongRound44')
+    sections = []
+    for node in doc['nodes']:
+        if node.get('extras', {}).get('SourceObject') not in shell:
+            continue
+        primitive = doc['meshes'][node['mesh']]['primitives'][0]
+        indices = doc['accessors'][primitive['indices']]
+        kind = {5123:'<u2', 5125:'<u4'}[indices['componentType']]
+        triangles = ReadPoints(doc,views,primitive)[np.frombuffer(views[indices['bufferView']],dtype=kind).reshape(-1,3)]
+        z = triangles[:,:,2]
+        for tri in triangles[(z.min(axis=1)<depth)&(z.max(axis=1)>depth)]:
+            cross = []
+            for a,b in zip(tri,np.roll(tri,-1,axis=0),strict=True):
+                if (a[2]-depth)*(b[2]-depth)<0:
+                    cross.append((a+(b-a)*((depth-a[2])/(b[2]-a[2])))[:2]-center)
+            if len(cross)==2:
+                sections.append(cross)
+    if not sections:
+        return nominal
+    sample = np.asarray(sections)
+    origin = sample[:,0]
+    segment = sample[:,1]-origin
+    across = directions[:,0,None]*segment[:,1]-directions[:,1,None]*segment[:,0]
+    valid = abs(across)>1e-9
+    divisor = np.where(valid,across,1)
+    extent = (origin[:,0]*segment[:,1]-origin[:,1]*segment[:,0])/divisor
+    position = (origin[:,0]*directions[:,1,None]-origin[:,1]*directions[:,0,None])/divisor
+    hits = valid&(extent>0)&(position>=0)&(position<=1)
+    outer = np.max(np.where(hits,extent,-np.inf),axis=1)
+    return np.where(np.isfinite(outer),np.minimum(nominal,outer-.00012),nominal)
+
+
+def ShapeRolledBand(doc, views, primitive, fitStock=False):
     original = ReadPoints(doc,views,primitive)
     mesh = ProfileMesh(72)
     center,outline = Outline(original[:,:2],mesh.segments)
@@ -176,6 +210,25 @@ def ShapeRolledBand(doc, views, primitive):
              *((end-along,inset) for along,inset in reversed(arc)), (end,innerLip)]
     points = [np.column_stack((center+outline-radial*(inset*roll),np.full_like(x,first+along*roll)))
               for along,inset in bands]
+    if fitStock:
+        # Bring the floating upper arc toward the displayed wood, tapering out
+        # the adjustment near the existing lower attachment.
+        fit = Ease(-.63,.065,radial[:,1])
+        lip = []
+        outer = []
+        for ring,sample in ((0,first+.0002),(-1,last-.0002)):
+            nominal = np.linalg.norm(points[ring][:,:2]-center,axis=1)
+            fitted = VisibleBandContact(doc,views,center,radial,nominal,sample)
+            gap = nominal-fitted
+            even = gaussian_filter1d(gap[:-1],1.20,mode='wrap')
+            outer.append(fit*np.minimum(gap,np.r_[even,even[0]]))
+            lip.append(nominal-fit*gap)
+        for ring,(along,_) in enumerate(bands):
+            phaseAtRing = along/end
+            shift = (1-phaseAtRing)*outer[0]+phaseAtRing*outer[1]
+            points[ring][:,:2] -= radial*shift[:,None]
+        points[0][:,:2] = center+radial*lip[0][:,None]
+        points[-1][:,:2] = center+radial*lip[1][:,None]
     charts = [mesh.Ring(ring,np.column_stack((np.full_like(x,u),phase)))
               for ring,u in zip(points,np.linspace(.06,.874,len(points)),strict=True)]
     for a,b in zip(charts,charts[1:]):
@@ -184,6 +237,10 @@ def ShapeRolledBand(doc, views, primitive):
              for ring,u in [(points[-1],.896),(points[0],.978)]]
     mesh.Strip(*inner,flip=True)
     return mesh.Write(doc,views,primitive)
+
+
+def ShapeFittedMiddleBand(doc, views, primitive):
+    return ShapeRolledBand(doc,views,primitive,fitStock=True)
 
 
 def BlendCoverCrown(doc, views, primitive):

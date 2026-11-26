@@ -189,8 +189,8 @@
       "targetTriangles": 80000,
       "policy": "target",
       "sourceTexture": "用户提供Dots 511工程；高模及作者程序材质留OneDrive",
-      "runtimeTexture": "45部件、117张内嵌图；后部圆角磨光与木托接缝漆面分通道烘焙",
-      "note": "2026-11-26 补后部槽口、侧板、柄根、钢环和尾盘的可见圆角，并修整接缝露木。8 万三角面预算，普通 NPC 共用材质及照门 LOD。"
+      "runtimeTexture": "23 个渲染子网格、68 张内嵌 PBR 贴图；Blender 源工程保留 45 个部件",
+      "note": "2026-11-27 重烘前段钢面和木托压痕，收顺照门、准星顶面及中箍接缝。8 万三角面预算，普通 NPC 共用材质及照门 LOD。"
     },
     {
       "id": "RifleSlingFlatV3",

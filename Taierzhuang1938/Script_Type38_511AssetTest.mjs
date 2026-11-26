@@ -19,9 +19,12 @@ assert.equal(createHash('sha256').update(bytes).digest('hex'),D.sourceSha256);
 assert.equal(contract.runtimeSha256,D.sourceSha256);
 assert.equal(contract.approvedReductionTriangles,69454);assert.equal(contract.triangles,D.triangles);
 assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
-assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,117);
+assert.equal(doc.meshes.length,D.renderMeshes);assert.equal(doc.meshes.length,contract.renderMeshes);
+assert.equal(doc.images.length,contract.images);assert.equal(doc.images.length,contract.imagePayloads.length);
+assert(D.renderMeshes<D.parts,'the game GLB must contain fewer rendering meshes than source parts');
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
-const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part).mesh].primitives[0]);
+const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
+ node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);
 const atlasMaterial=doc.materials[insetPrimitives[0].material].pbrMetallicRoughness;
 for(const primitive of insetPrimitives.slice(1)){
  const material=doc.materials[primitive.material].pbrMetallicRoughness;
@@ -62,14 +65,18 @@ const asset={gltf,npcLod,materials:new Map()},library=new MaterialLibrary(null);
 ConfigureType38_511(asset,library);
 const fps=InstantiateType38_511(asset),world=InstantiateType38_511(asset,{batch:true});
 const npc=InstantiateType38_511(asset,{batch:true,npcLod:true});
-assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.meshes.length,45);
+assert.equal(npc.tris,D.npcTriangles);assert.equal(npc.meshes.length,D.renderMeshes);
 for(let i=0;i<npc.meshes.length;i++){
  assert.equal(npc.meshes[i].material,fps.meshes[i].material);
- if(npc.meshes[i].userData.type38Part!==D.npcLodPart)assert.deepEqual(npc.meshes[i].geometry.attributes.position.array,world.meshes[i].geometry.attributes.position.array,'all other44 parts retain exact full geometry');
+ if(npc.meshes[i].userData.type38Part!==D.npcLodPart)assert.deepEqual(npc.meshes[i].geometry.attributes.position.array,world.meshes[i].geometry.attributes.position.array,'the other batches retain full geometry');
 }
-assert.equal(fps.tris,D.triangles);assert.equal(world.tris,D.triangles);assert.equal(fps.meshes.length,45);
+assert.equal(fps.tris,D.triangles);assert.equal(world.tris,D.triangles);assert.equal(fps.meshes.length,D.renderMeshes);
 assert(fps.meshes.every((mesh,i)=>mesh.geometry!==world.meshes[i].geometry&&mesh.material===world.meshes[i].material));
-assert.equal(fps.nodes.get('boltBody').children.length,4);assert.equal(fps.nodes.get('dustCover').children.length,2);
+const logicalParts=meshes=>meshes.flatMap(mesh=>mesh.userData.type38Parts).sort();
+assert.equal(new Set(logicalParts(fps.meshes)).size,D.parts);
+assert.deepEqual(logicalParts(fps.nodes.get('boltBody').children),[...D.bolt].sort());
+assert.deepEqual(logicalParts(fps.nodes.get('dustCover').children),[...D.dustCover].sort());
+assert.equal(fps.nodes.get('dustCover').children.length,1,'both cover halves should use a single rendering mesh');
 assert(fps.meshes.every((mesh,index)=>{
  const source=doc.materials[doc.meshes[index].primitives[0].material].pbrMetallicRoughness;
  const expected=(source.baseColorFactor||[1,1,1]).slice(0,3);
@@ -89,13 +96,39 @@ library.ConfigureExternalPbr(sourceMaterial,{mesh:namedShell});
 assert.equal(sourceMaterial.userData.externalMaterialClass,'authored','explicit PBR policy persists across repeated configuration');
 namedShell.geometry.dispose();namedShell.material.dispose();
 taggedNormal.dispose();taggedRoughness.dispose();taggedBase.dispose();
-const head=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_ShortTransverseHead71');
+// Read the packed slices for the existing individual silhouette and contact checks.
+const inspectionGeometry=[];
+const inspectionParts=fps.meshes.flatMap(mesh=>{
+ const ranges=mesh.userData.type38SourceRanges;
+ if(!ranges)return [mesh];
+ return ranges.map(({part,vertexStart,vertexCount,indexStart,indexCount,tile})=>{
+  const slice=new THREE.BufferGeometry();
+  for(const [name,attribute] of Object.entries(mesh.geometry.attributes)){
+   const first=vertexStart*attribute.itemSize,last=first+vertexCount*attribute.itemSize;
+   const data=attribute.array.slice(first,last);
+   if(name==='uv'&&tile){
+    for(let i=0;i<data.length;i+=2)for(let axis=0;axis<2;axis++){
+     data[i+axis]=(data[i+axis]*tile.atlasSize[axis]-tile.atlasOrigin[axis]+tile.sourceRect[axis])/tile.sourceSize[axis];
+    }
+   }
+   slice.setAttribute(name,new THREE.BufferAttribute(data,attribute.itemSize,attribute.normalized));
+  }
+  const indices=mesh.geometry.index.array.slice(indexStart,indexStart+indexCount);
+  for(let i=0;i<indices.length;i++)indices[i]-=vertexStart;
+  slice.setIndex(new THREE.BufferAttribute(indices,1));
+  inspectionGeometry.push(slice);
+  const source=new THREE.Mesh(slice,mesh.material);
+  source.userData.type38Part=part;
+  return source;
+ });
+});
+const head=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_ShortTransverseHead71');
 fps.root.updateMatrixWorld(true);const ray=new THREE.Raycaster(new THREE.Vector3(-.000284,.055,0),new THREE.Vector3(0,0,-1));ray.layers.enableAll();
 assert.equal(ray.intersectObject(head).length,0,'real open sight notch at the eye line');
 ray.ray.origin.x=.006;assert(ray.intersectObject(head).length>0,'both solid sight shoulders remain');
 assert(Math.abs(fps.bounds.max.z-fps.bounds.min.z-1.276)<.002);
-const exteriorCrown=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_430J_Exterior_ImportedRemainder_Plate72');
-const exteriorSeat=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_FrontUpperRoot80');
+const exteriorCrown=inspectionParts.find(mesh=>mesh.userData.type38Part==='T38_430J_Exterior_ImportedRemainder_Plate72');
+const exteriorSeat=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_FrontUpperRoot80');
 const crownPositions=exteriorCrown.geometry.attributes.position,tipPoints=[];
 for(let index=0;index<crownPositions.count;index++){
  const point=new THREE.Vector3().fromBufferAttribute(crownPositions,index);
@@ -107,10 +140,18 @@ assert(crownBounds.intersectsBox(exteriorSeat.geometry.boundingBox),'visible cro
 const seamProbe=new THREE.Raycaster(new THREE.Vector3(.04,(crownBounds.max.y+exteriorSeat.geometry.boundingBox.max.y)/2,crownBounds.getCenter(new THREE.Vector3()).z),new THREE.Vector3(-1,0,0));
 seamProbe.layers.enableAll();assert(seamProbe.intersectObject(exteriorCrown).length>0,'side silhouette spans the old visible air gap');
 assert(Math.abs(crownBounds.max.y-.05245)<.0001,'original visual tip height retained');
+const capPlanes=[];
+for(let i=0;i<exteriorCrown.geometry.index.count;i+=3){
+  const corners=[0,1,2].map(offset=>new THREE.Vector3().fromBufferAttribute(crownPositions,exteriorCrown.geometry.index.getX(i+offset)));
+  if(corners.some(point=>point.y<crownBounds.max.y-.0039||point.z>crownBounds.max.z+.002))continue;
+  const n=corners[1].clone().sub(corners[0]).cross(corners[2].clone().sub(corners[0])).normalize();
+  if(n.y>.90)capPlanes.push(n);
+}
+assert(capPlanes.length>=3&&capPlanes.every(n=>n.dot(capPlanes[0])>.9999),'the visible cap should have one consistent facing plane');
 assert(contract.triangles<=80000 && doc.asset.extras.runtimeTriangles===contract.triangles);
-const woodRim=fps.meshes.find(mesh=>mesh.userData.type38Part==='Wood_UpperFittedCrown05');
-const middleBand=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_MiddleBand57');
-const windowTrim=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_FrontWindowBacking49');
+const woodRim=inspectionParts.find(mesh=>mesh.userData.type38Part==='Wood_UpperFittedCrown05');
+const middleBand=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_MiddleBand57');
+const windowTrim=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_FrontWindowBacking49');
 windowTrim.geometry.computeBoundingBox();
 const trimBounds=windowTrim.geometry.boundingBox,windowCenter=trimBounds.getCenter(new THREE.Vector3());
 const windowExtent=trimBounds.getSize(new THREE.Vector3()).multiplyScalar(.5);
@@ -119,7 +160,7 @@ windowProbe.layers.enableAll();
 for(const [longitudinal,expected] of [[-.34,woodRim],[.075,windowTrim],[.445,woodRim]]){
  for(const lateral of [-.24,0,.24]){
   windowProbe.ray.origin.set(windowCenter.x+lateral*windowExtent.x,trimBounds.max.y+.08,windowCenter.z+longitudinal*windowExtent.z);
-  assert.equal(windowProbe.intersectObjects(fps.meshes)[0]?.object,expected,'both exterior windows reveal the actual handguard, with a steel divider between them');
+  assert.equal(windowProbe.intersectObjects(inspectionParts)[0]?.object,expected,'both exterior windows reveal the actual handguard, with a steel divider between them');
  }
 }
 assert.equal(windowTrim.geometry.index.count/3,1000);
@@ -129,18 +170,38 @@ const bandSpan=bandBox.max.z-bandBox.min.z,rimFraction=(bandBox.min.z-rimBox.min
 assert(rimFraction>.65&&rimFraction<1.05,'rounded wood lip must remain visible beyond the grey band');
 const woodProbe=new THREE.Raycaster(new THREE.Vector3(.06,bandBox.max.y-.38*bandSpan,bandBox.min.z-.42*bandSpan),new THREE.Vector3(-1,0,0));
 woodProbe.layers.enableAll();
-assert.equal(woodProbe.intersectObjects(fps.meshes)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
-const FindPart=name=>fps.meshes.find(mesh=>mesh.userData.type38Part===name);
+assert.equal(woodProbe.intersectObjects(inspectionParts)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
+const bandCenter=bandBox.getCenter(new THREE.Vector3());
+const bandPosition=middleBand.geometry.attributes.position;
+const bandUv=middleBand.geometry.attributes.uv;
+const bandBacking=inspectionParts.filter(mesh=>[woodRim.userData.type38Part,'T38_460G_WoodGroove_VisualCandidate','Exterior_LongRound44'].includes(mesh.userData.type38Part));
+const contactRay=new THREE.Raycaster();contactRay.layers.enableAll();
+let upperSamples=0,backedSamples=0;
+for(let i=0;i<bandPosition.count;i++){
+  if(bandUv.getX(i)<.965||bandPosition.getY(i)<bandCenter.y+.15*(bandBox.max.y-bandBox.min.y))continue;
+  const edge=new THREE.Vector3().fromBufferAttribute(bandPosition,i);
+  const radial=edge.clone().sub(bandCenter).setZ(0).normalize();
+  edge.z=bandBox.min.z+.0002;
+  contactRay.set(edge.addScaledVector(radial,.010),radial.multiplyScalar(-1));
+  const contact=contactRay.intersectObjects(bandBacking)[0];
+  upperSamples++;
+  if(contact&&contact.distance<=.010+.045*bandSpan)backedSamples++;
+}
+assert(upperSamples>8&&backedSamples>=.9*upperSamples,'the upper band lip should seat on the visible stock contours');
+const FindPart=name=>inspectionParts.find(mesh=>mesh.userData.type38Part===name);
 const rimRay=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(-1,0,0));
 rimRay.layers.enableAll();
 for(const band of [middleBand,FindPart('T38_407F_VisualSkin_Exterior_FrontBandBody78')]){
   band.geometry.computeBoundingBox();
   const box=band.geometry.boundingBox,mid=box.getCenter(new THREE.Vector3());
-  const normals=[.002,.017,.032,.047,.062,.082].map(phase=>{
+  const normalAt=phase=>{
     rimRay.ray.origin.set(box.max.x+.03,mid.y,box.min.z+phase*(box.max.z-box.min.z));
     return -rimRay.intersectObject(band)[0]?.normal?.normalize().z;
-  });
-  assert(normals[0]>.90&&normals.at(-1)<.105&&normals.every((value,i)=>i===0||value<normals[i-1]-.02),
+  };
+  const outerNormal=normalAt(.38);
+  const normals=[.002,.017,.032,.047,.062,.082].map(normalAt);
+  assert(Math.abs(outerNormal)<.18&&normals[0]>.90&&Math.abs(normals.at(-1)-outerNormal)<.105&&
+    normals.every((value,i)=>i===0||value<normals[i-1]-.02),
     'the band fillet must turn smoothly from the rim onto the outer face');
 }
 const cap=FindPart('Exterior_ButtCap04');
@@ -168,7 +229,7 @@ for(const z of [-.225,-.193,-.161,-.121]){
   assert(normals.every(Boolean)&&normals[0].angleTo(normals[1])<.16,'visible top faces must share a smooth highlight across the split');
 }
 const edgeStart=new THREE.Vector3(),edgeEnd=new THREE.Vector3(),corner=new THREE.Vector3(),normal=new THREE.Vector3(),tangent=new THREE.Vector3();
-for(const mesh of fps.meshes.filter(item=>item===woodRim||item===windowTrim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
+for(const mesh of inspectionParts.filter(item=>item===woodRim||item===windowTrim||Object.hasOwn(contract.exteriorTriangleDeltas,item.userData.type38Part))){
  const geometry=mesh.geometry,{position,normal:normalAttr,tangent:tangentAttr}=geometry.attributes;
  for(let index=0;index<position.count;index++){
   normal.fromBufferAttribute(normalAttr,index);tangent.fromBufferAttribute(tangentAttr,index);
@@ -181,9 +242,9 @@ for(const mesh of fps.meshes.filter(item=>item===woodRim||item===windowTrim||Obj
   assert(edgeStart.cross(edgeEnd).length()>1e-12,`collapsed exterior bevel: ${mesh.name}`);
  }
 }
-assert.deepEqual(Object.keys(contract.finishRoughnessP10P50P90).sort(),fps.meshes.map(m=>m.userData.type38Part).sort());
+assert.deepEqual(Object.keys(contract.finishRoughnessP10P50P90).sort(),inspectionParts.map(m=>m.userData.type38Part).sort());
 assert.deepEqual(contract.markings,['scale graduations and numerals only']);
-const grip=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_HandleOval08').geometry;
+const grip=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_HandleOval08').geometry;
 const gripPoints=grip.attributes.position, gripNormals=grip.attributes.normal;
 grip.computeBoundingBox();
 const gripBox=grip.boundingBox,gripSpan=gripBox.max.x-gripBox.min.x,angles=new Set();
@@ -193,7 +254,7 @@ for(let index=0;index<gripPoints.count;index++){
 }
 assert(angles.size>=28,'handle neck must give a continuous round highlight, not the old four-flat silhouette');
 assert.equal(grip.index.count/3,2304);
-const rearShell=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess').geometry;
+const rearShell=inspectionParts.find(mesh=>mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess').geometry;
 rearShell.computeBoundingBox();
 const shellBox=rearShell.boundingBox,shellRadius=(shellBox.max.y-shellBox.min.y)/2;
 const shellCenterY=(shellBox.max.y+shellBox.min.y)/2,shellCenterX=shellBox.max.x-shellRadius;
@@ -215,8 +276,8 @@ assert(rearBaseRadius>.73&&rearBaseRadius<.79,'the visible rear face must flare 
 assert(lowerLeftTip>1.20&&lowerLeftTip<1.35&&upperLeftReach<1,'rear exterior needs one lower-left outward lobe, not an upper notch');
 assert(surfaceDepth.length&&rimDepth.length&&Math.max(...rimDepth)-Math.max(...surfaceDepth)>shellRadius*.023,
  'central depression and rim must exist in vertex positions, independent of the normal map');
-const stock=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_460G_WoodGroove_VisualCandidate').geometry;
-const loop=fps.meshes.find(mesh=>mesh.userData.type38Part==='Exterior_RetainedImportedBody74').geometry;
+const stock=inspectionParts.find(mesh=>mesh.userData.type38Part==='T38_460G_WoodGroove_VisualCandidate').geometry;
+const loop=inspectionParts.find(mesh=>mesh.userData.type38Part==='Exterior_RetainedImportedBody74').geometry;
 loop.computeBoundingBox();
 const loopBox=loop.boundingBox,loopHeight=loopBox.max.y-loopBox.min.y;
 const bottomRows=new Set();
@@ -238,5 +299,6 @@ for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_Middl
  const [low,,high]=contract.finishRoughnessP10P50P90[part];assert(high-low>24,`flat surface response: ${part}`);
 }
 for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
+for(const geometry of inspectionGeometry)geometry.dispose();
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
-console.log(`ok Type38 511: ${D.triangles} triangles, 45 parts, ${doc.images.length} verified PBR images, continuous heel and crown shading`);
+console.log(`ok Type38 511: ${D.triangles} triangles, ${fps.meshes.length} draw meshes from ${inspectionParts.length} source parts, ${doc.images.length} verified PBR images, continuous heel and crown shading`);
