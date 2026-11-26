@@ -41,6 +41,13 @@ def RectUv(rect, u, v):
 
 
 def AtlasUv(tile, u, v):
+    if tile in ("Barrel", "Stripe"):
+        # The visible steel occupies the active rows. Angular knots land on mesh loops.
+        sampling = ATLAS["barrelSampling"]
+        if tile == "Barrel":
+            u = RemapUv(u, sampling["angularCurve"])
+        first, last = sampling["activeV"]
+        v = (v - first) / (last - first)
     return RectUv(ATLAS["regions"][tile], u, v)
 
 

@@ -154,6 +154,26 @@ def WriteDetailPlate(image, xs, ys, path, excluded=()):
     return SaveDetailPlate(tone, warmth, confidence, xs, ys, path)
 
 
+def BarrelPhotoCoordinates(projection, halfSpan, u, v):
+    center, radius, first, last = projection
+    x = center + radius * np.sin(2 * np.pi * halfSpan * (2 * u - 1))
+    y = first + (last - first) * v
+    return x, y
+
+
+def BarrelSteelIslands(image, projection, halfSpan):
+    # Average over the tiny pits and favor the pale steel within the warm oxide.
+    smooth = gaussian_filter(image, (3.4, 3.4, 0), mode="nearest")
+    u, v = np.meshgrid(np.linspace(0, 1, 85), np.linspace(0, 1, 65), indexing="ij")
+    x, y = BarrelPhotoCoordinates(projection, halfSpan, u, v)
+    sampled = np.stack([SampleBilinear(smooth[..., channel], x, y) for channel in range(3)], axis=-1)
+    luma = sampled @ LUMA
+    warmth = (sampled[..., 0] - sampled[..., 2]) / np.maximum(luma, 25)
+    bright = np.clip((luma - 102) / 31, 0, 1)
+    pale = .58 + .42 * np.clip((.23 - warmth) / .154, 0, 1)
+    return np.rint(bright * pale * 100).astype(int).tolist()
+
+
 def BarrelDetail(image, projection, halfSpan, stampTrace):
     # Hold out the punch marks while keeping the steel grain beside the grooves.
     untracedMarks = [[148, 291, 197, 353], [756, 284, 811, 346]]
@@ -172,10 +192,8 @@ def BarrelDetail(image, projection, halfSpan, stampTrace):
             draw.ellipse((x - halfWidth, y - halfWidth, x + halfWidth, y + halfWidth), fill=0)
     confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(feather)), dtype=np.float32) / 255
     confidence *= np.clip((245 - lightness) / 30, 0, 1)
-    center, radius, first, last = projection
     us, vs = np.meshgrid(np.linspace(0, 1, 584), np.linspace(0, 1, 320))
-    xs = center + radius * np.sin(2 * np.pi * halfSpan * (2 * us - 1))
-    ys = first + (last - first) * vs
+    xs, ys = BarrelPhotoCoordinates(projection, halfSpan, us, vs)
     detail = SaveDetailPlate(tone, warmth, confidence, xs, ys, BARREL_DETAIL, halfSize=False)
     return {**detail, "excludedMarks": untracedMarks, "strokeMarginPixels": strokeMargin,
             "maskFeatherPixels": feather, "registrationOffsetInFootprint": [.003937, -.005615]}
@@ -221,6 +239,7 @@ def BarrelFinish(folder):
         ],
     }
     result["detail"] = BarrelDetail(image, projection, halfSpan, result["stampTrace"])
+    result["exposedSteelIslands"] = BarrelSteelIslands(image, projection, halfSpan)
     return result
 
 

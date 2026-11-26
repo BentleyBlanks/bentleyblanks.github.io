@@ -7,6 +7,7 @@ import sys
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
+from scipy.ndimage import gaussian_filter, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 
@@ -129,8 +130,9 @@ def SampleBarrelStripe(maps, size):
     pad = ATLAS["padding"]
     halfSpan = .032 / (2 * np.pi)
     span = width - 2 * pad
-    extent = (x + pad + (.25 - halfSpan) * span, y + pad,
-              x + pad + (.25 + halfSpan) * span, y + height - pad)
+    oldU, packedU = np.asarray(ATLAS["barrelSampling"]["angularCurve"]).T
+    left, right = np.interp([.25 - halfSpan, .25 + halfSpan], oldU, packedU)
+    extent = (x + pad + left * span, y + pad, x + pad + right * span, y + height - pad)
     inner = (size[0] - 2 * pad, size[1] - 2 * pad)
     padding = ((pad, pad), (pad, pad), (0, 0))
     sampled = []
@@ -138,6 +140,43 @@ def SampleBarrelStripe(maps, size):
         crop = Image.fromarray(pixels).transform(inner, Image.Transform.EXTENT, extent, Image.Resampling.BILINEAR)
         sampled.append(np.pad(np.asarray(crop), padding, mode="edge"))
     return sampled
+
+
+def RepackBarrelTile(dense, prior, reference):
+    # Retain the established finish around the back and give the photographed wear more texels.
+    height, width = dense[0].shape[:2]
+    pad = ATLAS["padding"]
+    sampling = ATLAS["barrelSampling"]
+    oldU, packedU = np.asarray(sampling["angularCurve"]).T
+    texelsU = np.clip((np.arange(width) + .5 - pad) / (width - 2 * pad), 0, 1)
+    texelsY = np.clip((np.arange(height) + .5 - pad) / (height - 2 * pad), 0, 1)
+    u = np.interp(texelsU, packedU, oldU)
+    start, end = sampling["activeV"]
+    v = start + (1 - texelsY) * (end - start)
+    rows, columns = np.meshgrid(pad + (1 - v) * (height - 2 * pad) - .5,
+                                pad + u * (width - 2 * pad) - .5, indexing="ij")
+    field = reference["closeups"]["Barrel"]["footprint"]
+    first, last = field["vRange"]
+    axial = (v - first) / (last - first)
+    arc = (u - field["uCenter"]) / field["uHalfSpan"]
+    radialWeight = np.clip((1.16 - np.abs(arc)) * 5.0, 0, 1)
+    axialWeight = np.clip((axial + .16) * 4.8, 0, 1) * np.clip((1.16 - axial) * 4.8, 0, 1)
+    photographed = (axialWeight[:, None] * radialWeight[None, :])[..., None]
+    backArc = np.abs((u - field["uCenter"] + .5) % 1 - .5)
+    backWeight = np.clip((backArc - .18) / .12, 0, 1)[None, :, None]
+
+    result = []
+    for channel, (pixels, previous) in enumerate(zip(dense, prior)):
+        old = previous.astype(np.float32)
+        sampled = np.stack([map_coordinates(ch, (rows, columns), order=3, mode="nearest")
+                            for ch in np.moveaxis(old, -1, 0)], axis=-1)
+        if channel == 0:
+            luma = sampled @ LUMA
+            fine = luma - gaussian_filter(luma, (.85, .90), mode="nearest")
+            sampled += 1.32 * backWeight * fine[..., None]
+        mixed = pixels * photographed + sampled * (1 - photographed)
+        result.append(np.rint(np.clip(mixed, 0, 255)).astype(np.uint8))
+    return result
 
 
 def CircumferentialAbrasion(luminance):
@@ -210,7 +249,7 @@ def EyeWear(reference, xx, vv):
     return frontWear, reverseWear
 
 
-def BakeRegion(name, sample, size, index, reference):
+def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
     sourceIndex, metalColor, oxideColor, coverage, roughness, metalness, strength = FINISHES[name]
     width, height = size
     padding = ATLAS["padding"]
@@ -220,6 +259,11 @@ def BakeRegion(name, sample, size, index, reference):
         indexing="ij",
     )
     vv = 1 - yy
+    if barrelSampling is not None:
+        oldU, packedU = np.asarray(barrelSampling["angularCurve"]).T
+        xx = np.interp(xx, packedU, oldU).astype(np.float32)
+        bottom, top = barrelSampling["activeV"]
+        vv = bottom + vv * (top - bottom)
     # The photographed grip sample carries its original glare and perspective.
     # Use its microtexture, with the diamond scale and lighting rebuilt in UVs.
     # The short ring and wheel charts use shallower source crops along V.
@@ -545,6 +589,14 @@ def BakeRegion(name, sample, size, index, reference):
         diffuseGain = .09 * matteOxide * deepCloseOxide
         diffuseGain += .34 * near * shadow * (1 - .60 * exposedSteel) * (1 - .75 * warmOxide)
         diffuseGain -= .45 * warmOxide
+        if barrelSampling is not None:
+            # Worn steel catches a brighter reflection than the oxide beside it.
+            steelIslands = ReferenceField(closeup, xx, vv, "exposedSteelIslands") / 100
+            bareSteel = warmOxide * steelIslands
+            matte = warmOxide * (1 - steelIslands) * (1 - .80 * shadow)
+            rough += .043 * matte - .045 * bareSteel
+            metal += .075 * bareSteel
+            diffuseGain += (1.17 + .56 * steelIslands**2) * bareSteel - .28 * matte
         linear *= (1 + diffuseGain)[..., None]
     if name == "CollarRing":
         oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
@@ -663,7 +715,10 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Barrel":
         coolPatina = .029 * near * (.40 + .60 * oxideCoverage)
         base -= coolPatina[..., None] * LUMA_NEUTRAL_WARMTH
-        base += .072 * warmOxide[..., None] * LUMA_NEUTRAL_WARMTH
+        if barrelSampling is not None:
+            base += .076 * (warmOxide - .55 * bareSteel)[..., None] * LUMA_NEUTRAL_WARMTH
+        else:
+            base += .072 * warmOxide[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
@@ -827,6 +882,11 @@ def BuildAtlas(reference):
             tile = BakeKnurl(quadrants, width, height, index, reference)
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
+        elif name == "Barrel":
+            oldTile = BakeRegion(name, quadrants, (width, height), index, reference)
+            denseTile = BakeRegion(name, quadrants, (width, height), index, reference,
+                                   barrelSampling=ATLAS["barrelSampling"])
+            tile = RepackBarrelTile(denseTile, oldTile, reference)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
@@ -841,7 +901,7 @@ def Bake():
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
     maps = BuildAtlas(reference)
     size = ATLAS["size"]
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 86)):
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 85)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)

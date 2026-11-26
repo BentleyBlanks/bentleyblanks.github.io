@@ -1,6 +1,10 @@
 {
   "size": 2048,
   "padding": 12,
+  "barrelSampling": {
+    "angularCurve": [[0, 0], [0.23214285714285715, 0.15], [0.5535714285714286, 0.7], [1, 1]],
+    "activeV": [0.0849, 0.8957]
+  },
   "wheelPatterns": 4,
   "saddleBackSourceHeight": 416,
   "knurlSourceV": [0.3144656123, 0.8327999897],
