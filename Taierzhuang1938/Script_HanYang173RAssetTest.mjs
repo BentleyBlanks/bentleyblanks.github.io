@@ -25,7 +25,14 @@ assert.equal(createHash('sha256').update(bytes).digest('hex'),report.gameSha256)
 assert.equal(report.sourceSha256,D.sourceSha256);
 assert.equal(bytes.readUInt32LE(0),0x46546c67);assert.equal(bytes.readUInt32LE(8),bytes.length);
 const length=bytes.readUInt32LE(12),doc=JSON.parse(bytes.subarray(20,20+length)),bin=bytes.subarray(28+length);
-assert.equal(doc.meshes.length,44);assert.equal(doc.images.length,134);assert(!doc.skins?.length&&!doc.animations?.length);
+assert.equal(doc.meshes.length,44);
+assert.equal(doc.asset.extras.hanYangBatching,1);
+assert.equal(report.batching.originalMeshes,44);
+assert.equal(report.batching.renderMeshes,13);
+assert.equal(doc.materials.length,13);
+assert.equal(doc.images.length,41);
+assert.equal(doc.images.length,report.batching.images);
+assert(!doc.skins?.length&&!doc.animations?.length);
 assert(doc.buffers.every(b=>!b.uri)&&doc.images.every(i=>!i.uri));
 const required=new Set([...D.wood,...D.bolt,...D.cocking,D.trigger,...D.frontSight,...D.rearSight]);
 for(const n of doc.nodes)required.delete(n.name);assert.equal(required.size,0,`missing ${[...required]}`);
@@ -44,7 +51,7 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
   assert.equal(Math.abs(ts[i][3]),1);
  }
 }
-assert.equal(triangles,report.triangles);assert.equal(triangles,79440);
+assert.equal(triangles,report.triangles);assert.equal(triangles,79513);
 assert.equal(doc.asset.extras.gameTriangles,triangles);
 assert.equal(report.exteriorFinish.triangleLimit,80000);assert(triangles<=report.exteriorFinish.triangleLimit);
 for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
@@ -54,7 +61,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 const detailCharts=new Set(['HY150_ExteriorSideRelief_Neg','HY150_ExteriorSideRelief_Pos','HY151_LowRearShoulder','Trigger_FlatCurvedExternalStrip']);
 const heelName='RearBand_ExternalAttachmentBridge';
-const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat','HandleRoot','LowerPlateGuard_FlatSideNarrowReturn','FrontBandSideStrip','RearOuterCover_RoundedSideReturn','RearTab','RearTopExternalLever','RearSmallCover','RearCockingExterior']);
+const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat','HandleRoot','LowerPlateGuard_FlatSideNarrowReturn','FrontBandSideStrip','RearOuterCover_RoundedSideReturn','RearTab','RearTopExternalLever','RearSmallCover','RearCockingExterior','MiddleSideDisk','SideWoodButton']);
 assert.equal(doc.asset.extras.calibratedBaseColor,true);
 assert(doc.materials.every(mat=>(mat.pbrMetallicRoughness.baseColorFactor||[1,1,1,1]).every(v=>v===1)),'native albedo is stored in the texture');
 // Sample the exposed steel pigment on the mesh. Padding outside the UV islands
@@ -89,11 +96,17 @@ for(const [name,minLuma,maxLuma] of [
  assert(Math.max(...mean)-Math.min(...mean)<.017,name+' retains a low-chroma steel finish');
 }
 const publishRules=JSON.parse(fs.readFileSync(new URL('./Data_PublishPathRules.json',import.meta.url),'utf8'));
-for(const index of [57,58,59]){
- assert(doc.images[index].name.startsWith('MainWood_ContinuousLowerShoulder_'),'4K selectors track the actual stock maps');
- const rule=StrictRule(publishRules,'Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb',index);
- assert.equal(rule.maxSize,4096);assert.equal(rule.format,'ktx2-bc7');
+const sourcePath='Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb';
+let packedTexels=0;
+for(const [index,image] of doc.images.entries()){
+ const rule=StrictRule(publishRules,sourcePath,index);
+ const size=await sharp(Payload(image.bufferView)).metadata();
+ assert.equal(rule.format,'ktx2-bc7');
+ assert(rule.maxSize>=Math.max(size.width,size.height),'publication preserves the atlas density');
+ packedTexels+=size.width*size.height;
 }
+const authoredTexels=report.parts.reduce((sum,part)=>sum+3*part.rebake.textureSize**2,2*1024**2);
+assert(packedTexels<=authoredTexels*1.05,'texture gutters and packing keep the texel budget near the authored asset');
 const reshaped=new Set(report.mechanismRepair.shapeParts);
 const frontWood='FrontWood_ContinuousOval';
 const profiledBands=new Set(['FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown']);
@@ -121,8 +134,9 @@ for(const part of report.parts){
   assert(Math.max(...coords.filter(point=>-point[2]>.39).map(point=>point[1]))>.063,'upper wood away from the edited shoulder keeps its height');
   continue;
  }
- if(part.part==='RearOuterCover_RoundedSideReturn'){
-  assert(delta.toR2M<.00035&&delta.fromR2M<.0024,'rolled cheeks follow the previous surface and shorten the buried toe');
+ if(part.part==='RearOuterCover_RoundedSideReturn')continue;
+ if(part.part==='MiddleSideDisk'||part.part==='SideWoodButton'){
+  assert(delta.fromR2M<.00045&&delta.toR2M<.0011,'round the exposed rim and seat the hidden disk body');
   continue;
  }
  assert(Math.max(delta.toR2M,delta.fromR2M)<=.0005,`${part.part}: retain previous silhouette`);
@@ -196,7 +210,8 @@ const foreFilm=lacquered.find(material=>material.name.includes('FrontWood_')).ex
 assert.equal(foreFilm.clearcoatFactor,.20);assert.equal(foreFilm.clearcoatRoughnessFactor,.36);
 assert(!foreFilm.clearcoatRoughnessTexture&&!foreFilm.clearcoatNormalTexture);
 const foreFilmImage=doc.textures[foreFilm.clearcoatTexture.index].extensions.EXT_texture_webp.source;
-assert.equal(foreFilmImage,133);assert.equal(doc.textures[oilFilm.clearcoatTexture.index].extensions.EXT_texture_webp.source,132);
+assert.equal(doc.images[foreFilmImage].name,'FrontWood_ContinuousOval_OilFilm');
+assert.equal(oilImage.name,'MainWood_ContinuousLowerShoulder_OilFilm');
 assert.equal(StrictRule(publishRules,'Taierzhuang1938/Model/HanYang173R/Model_HanYang173R.glb',foreFilmImage).format,'ktx2-bc7');
 const {data:foreMask,info:foreInfo}=await sharp(Payload(doc.images[foreFilmImage].bufferView)).removeAlpha().raw().toBuffer({resolveWithObject:true});
 assert.equal(foreInfo.width,1024);assert.equal(foreInfo.height,1024);
@@ -239,28 +254,62 @@ assert(impressed.every(([film])=>film<20),'both branches of the fork and the oth
 assert(MedianOil(impressed.map(v=>v[1]))>MedianOil(surrounding.map(v=>v[1]))+17,'abraded fibre beds remain rougher than the surrounding satin finish');
 function MedianOil(samples){return samples.sort((left,right)=>left-right)[Math.floor(samples.length/2)];}
 const baselineSurface=createHash('sha256');
-const closedFineReturns=new Set(['Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
+const closedFineReturns=new Set(['MiddleSideDisk','SideWoodButton','Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
 const rolledBands=new Set(['FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown']);
-const changedMeshes=new Set(['UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront', 'ReceiverOuterCollar', 'HandleRoot', 'Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
+const changedMeshes=new Set(['RearOuterCover_RoundedSideReturn', 'MiddleSideDisk', 'SideWoodButton']);
 const frontBandPrimitive=doc.meshes[doc.nodes.find(node=>node.name==='FrontBand_ContinuousEnvelopeContact').mesh].primitives[0];
 function Payload(viewId){
  const view=doc.bufferViews[viewId],offset=view.byteOffset||0;
  return bin.subarray(offset,offset+view.byteLength);
 }
+function PartImage(image,name){
+ const input=sharp(Payload(image.bufferView));
+ const tile=report.batching.tiles[name];
+ if(!tile)return input;
+ const [left,top,width,height]=tile.placement;
+ return input.extract({left,top,width,height});
+}
+const atlasRectangles=new Map();
+for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
+ const tile=report.batching.tiles[node.name];
+ if(!tile)continue;
+ const [left,top,width,height]=tile.placement;
+ const [atlasWidth,atlasHeight]=tile.size;
+ const primitive=doc.meshes[node.mesh].primitives[0];
+ const group=atlasRectangles.get(primitive.material)||[];
+ for(const other of group){
+  const [x,y,w,h]=other;
+  assert(left+width<=x||x+w<=left||top+height<=y||y+h<=top,'atlas tiles do not overlap');
+ }
+ group.push(tile.placement);
+ atlasRectangles.set(primitive.material,group);
+ assert.equal(tile.sourceSize,report.parts.find(part=>part.part===node.name).rebake.textureSize);
+ const padding=report.batching.gutter-.008;
+ for(const [u,v] of Read(primitive.attributes.TEXCOORD_0)){
+  const x=u*atlasWidth,y=v*atlasHeight;
+  assert(x>=left+padding&&x<=left+width-padding&&y>=top+padding&&y<=top+height-padding,
+    node.name+' keeps texel padding on every UV boundary');
+ }
+}
+assert(atlasRectangles.size>0&&[...atlasRectangles.values()].every(group=>group.length>1));
 for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  const primitive=doc.meshes[node.mesh].primitives[0],attrs=primitive.attributes;
  const indexAccessor=doc.accessors[primitive.indices],indexData=Payload(indexAccessor.bufferView);
  const IndexAt=offset=>indexAccessor.componentType===5125?indexData.readUInt32LE(offset*4):indexData.readUInt16LE(offset*2);
  if(!changedMeshes.has(node.name)){
   baselineSurface.update(indexData);
-  for(const semantic of ['POSITION','NORMAL','TEXCOORD_0','TANGENT'])baselineSurface.update(Payload(doc.accessors[attrs[semantic]].bufferView));
+  for(const semantic of ['POSITION','NORMAL','TEXCOORD_0','TANGENT']){
+   if(semantic==='TEXCOORD_0'&&report.batching.tiles[node.name])continue;
+   baselineSurface.update(Payload(doc.accessors[attrs[semantic]].bufferView));
+  }
  }
  if(detailCharts.has(node.name)){
   const points=Read(attrs.POSITION),uvs=Read(attrs.TEXCOORD_0);
   for(let offset=0;offset<indexAccessor.count;offset+=3){
    const corners=[IndexAt(offset),IndexAt(offset+1),IndexAt(offset+2)];
    const [a,b,c]=corners.map(i=>new THREE.Vector3(...points[i]));
-   const [ta,tb,tc]=corners.map(i=>new THREE.Vector2(...uvs[i]));
+   const pixelScale=new THREE.Vector2(...(report.batching.tiles[node.name]?.size||[1,1]));
+   const [ta,tb,tc]=corners.map(i=>new THREE.Vector2(...uvs[i]).multiply(pixelScale));
    const e1=b.sub(a),e2=c.sub(a),length=e1.length(),u=e1.dot(e2)/length,v=e1.clone().cross(e2).length()/length;
    const du=tb.sub(ta).multiplyScalar(1/length),dv=tc.sub(ta).addScaledVector(du,-u).multiplyScalar(1/v);
    const squared=du.lengthSq()+dv.lengthSq(),det=Math.abs(du.cross(dv));
@@ -283,7 +332,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  }
 
 }
-assert.equal(baselineSurface.digest('hex'),'ccf482ae5305f76524c51d5ee48b13c2668a1b3a3cff2129fba42a4628cb29a3','parts outside the marked R32 edge edits retain their R31 geometry, UVs and tangent frames');
+assert.equal(baselineSurface.digest('hex'),'f6e0a61ecb43a954cfffe55b1c7411246bbc53bc92f5ff8e51402facc72b2572','R32 geometry and tangent frames survive batching, including UVs on unatlased parts');
 assert.deepEqual(new Set(Object.keys(report.exteriorFinish.inspectionBevels)),bevelParts);
 for(const [name,{before,after,roundedFaces}] of Object.entries(report.exteriorFinish.inspectionBevels)){
  assert(after!==before&&report.parts.find(part=>part.part===name).gameTriangles===after,name+' exports the rounded edges');
@@ -303,6 +352,25 @@ for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachment
   assert(Math.abs((second[0]-first[0])*(third[1]-first[1])-(second[1]-first[1])*(third[0]-first[0]))>1e-10,'closed shell triangle has nondegenerate UVs');
  }
  assert([...edges.values()].every(([count,balance])=>count===2&&balance===0),`${node.name}: no open bevel edges or inverted neighbours after welding chart splits`);
+ if(node.name==='RearOuterCover_RoundedSideReturn'){
+  const adjacent=new Map();
+  for(const edge of edges.keys()){
+   const [a,b]=edge.split(';');
+   if(!adjacent.has(a))adjacent.set(a,[]);
+   if(!adjacent.has(b))adjacent.set(b,[]);
+   adjacent.get(a).push(b);
+   adjacent.get(b).push(a);
+  }
+  const remaining=[adjacent.keys().next().value],visited=new Set(remaining);
+  while(remaining.length){
+   for(const point of adjacent.get(remaining.pop())){
+    if(visited.has(point))continue;
+    visited.add(point);
+    remaining.push(point);
+   }
+  }
+  assert.equal(visited.size,adjacent.size,'the rear return is one continuous shell');
+ }
 }
 for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachmentLoop'))){
  const pos=Read(doc.meshes[node.mesh].primitives[0].attributes.POSITION),turn=new THREE.Quaternion().fromArray(node.rotation),offset=new THREE.Vector3().fromArray(node.translation);
@@ -319,7 +387,8 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  if(!contactParts.includes(node.name)){assert(!slot,`${node.name}: no fixed contact baked onto independent parts`);continue;}
  assert.equal(slot.index,material.pbrMetallicRoughness.metallicRoughnessTexture.index);assert.equal(slot.strength,.85);
  const image=doc.images[doc.textures[slot.index].extensions.EXT_texture_webp.source];
- const red=(await sharp(Payload(image.bufferView)).stats()).channels[0];
+ const {data,info}=await PartImage(image,node.name).raw().toBuffer({resolveWithObject:true});
+ const red=(await sharp(data,{raw:{width:info.width,height:info.height,channels:info.channels}}).stats()).channels[0];
  assert(red.min<227&&red.max===255&&red.stdev>1,`${node.name}: contact and unobscured regions both present`);
 }
 const bandMesh=doc.meshes[doc.nodes.find(node=>node.name==='RearBand_ControlledCrown').mesh].primitives[0];
@@ -368,7 +437,7 @@ function PartPositions(name){
  const node=doc.nodes.find(n=>n.name===name),matrix=node.matrix?new THREE.Matrix4().fromArray(node.matrix):new THREE.Matrix4().compose(new THREE.Vector3().fromArray(node.translation||[0,0,0]),new THREE.Quaternion().fromArray(node.rotation||[0,0,0,1]),new THREE.Vector3().fromArray(node.scale||[1,1,1]));
  return Read(doc.meshes[node.mesh].primitives[0].attributes.POSITION).map(p=>new THREE.Vector3(...p).applyMatrix4(matrix));
 }
-const cheeks=PartPositions('RearOuterCover_RoundedSideReturn');
+const rearSaddle=PartPositions('RearOuterCover_RoundedSideReturn');
 const buttNode=doc.nodes.find(node=>node.name.startsWith('ButtCap_'));
 const butt=doc.meshes[buttNode.mesh].primitives[0],endPoints=Read(butt.attributes.POSITION);
 const capBounds=doc.accessors[butt.attributes.POSITION],widthAcross=capBounds.max[0]-capBounds.min[0];
@@ -499,17 +568,31 @@ for(const side of [-1,1]){
 }
 for(const mesh of [frontSeam,rearSeam,lowerTimber,upperTimber,foreMesh])mesh.geometry.dispose();
 foreMesh.material.dispose();
-assert(cheeks.every(p=>Math.abs(p.x)>.009),'protective cheeks leave the central cocking body exposed');
 const cap=PartPositions('RearSmallCover'),capBox=new THREE.Box3().setFromPoints(cap),capSize=capBox.getSize(new THREE.Vector3());
 assert(capSize.x>.015&&capSize.y>.015,'rear disc has a complete circular silhouette');
+const saddleBounds=new THREE.Box3().setFromPoints(rearSaddle);
+assert(saddleBounds.max.y<capBox.max.y+.0002,'rear cover sits down at the cap silhouette');
+const tailCentre=capBox.getCenter(new THREE.Vector3());
+assert(saddleBounds.max.z>capBox.max.z+.001
+ && rearSaddle.filter(p=>p.z>capBox.max.z).every(p=>p.y<tailCentre.y-.004),
+ 'the tapered tail stays low against the stock behind the cap');
+assert(rearSaddle.some(p=>Math.abs(p.x)<.0002&&p.y<capBox.min.y&&p.z<capBox.min.z),
+ 'there is a continuous lower return below the cap');
+const outerDisks=PartPositions('MiddleSideDisk'),innerDisks=PartPositions('SideWoodButton');
+for(const side of [-1,1]){
+ const depth=outerDisks.map(p=>side*p.x);
+ const inset=innerDisks.filter(p=>p.x*side>0).map(p=>p.x*side);
+ assert(Math.min(...inset)<Math.max(...depth)&&Math.max(...inset)>Math.max(...depth),
+    'the raised round center sits against its outer disk on both sides');
+}
 const flag=PartPositions('RearTab'),flagSize=new THREE.Box3().setFromPoints(flag).getSize(new THREE.Vector3());
 assert(flagSize.z<.0025,'safety flag has the reference thin-section profile');
 assert.equal(report.parts.find(p=>p.part==='HandleSphere').gameTriangles,2208,'bolt knob silhouette uses the refined surface');
 for(const name of ['RearOuterCover_RoundedSideReturn','HandleSphere','RearSmallCover','RearBand_ControlledCrown','FrontBand_ContinuousEnvelopeContact','LowerPlateGuard_FlatSideNarrowReturn']){
  const node=doc.nodes.find(n=>n.name===name),primitive=doc.meshes[node.mesh].primitives[0],material=doc.materials[primitive.material];
  const texture=doc.textures[material.pbrMetallicRoughness.metallicRoughnessTexture.index];
- const image=doc.images[texture.extensions?.EXT_texture_webp?.source??texture.source],view=doc.bufferViews[image.bufferView];
- const {data,info}=await sharp(bin.subarray(view.byteOffset||0,(view.byteOffset||0)+view.byteLength)).removeAlpha().raw().toBuffer({resolveWithObject:true});
+ const image=doc.images[texture.extensions?.EXT_texture_webp?.source??texture.source];
+ const {data,info}=await PartImage(image,name).removeAlpha().raw().toBuffer({resolveWithObject:true});
  let sum=0,squared=0;for(let index=1;index<data.length;index+=info.channels){const value=data[index]/255;sum+=value;squared+=value*value;}
  const count=info.width*info.height,mean=sum/count,deviation=Math.sqrt(Math.max(0,squared/count-mean*mean));
  if(name==='RearBand_ControlledCrown'||name==='FrontBand_ContinuousEnvelopeContact'){
@@ -606,4 +689,4 @@ const tri=new THREE.BufferGeometry();tri.setAttribute('position',new THREE.Float
 tri.setAttribute('normal',new THREE.Float32BufferAttribute(Array(6).fill([0,0,1]).flat(),3));tri.setIndex([0,1,2,3,4,5]);
 RepairHanYangWinding(tri);assert.deepEqual(Array.from(tri.index.array),[0,1,2,3,5,4]);
 mesh.geometry.dispose();mesh.material.dispose();
-console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts, 132 PBR images plus two localized finish masks, aligned UVs, finite tangent frames and ORM decoding`);
+console.log(`ok HanYang173R: ${triangles} triangles, ${vertices} vertices, 44 parts in 13 render batches, 41 maps, aligned UVs, finite tangent frames and ORM decoding`);

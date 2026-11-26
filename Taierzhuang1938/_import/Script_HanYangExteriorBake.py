@@ -9,6 +9,7 @@ import moderngl
 from Script_HanYangReceiverFinish import ShapeReceiverWood
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
 from Script_HanYangBandProfiles import FormInspectionBand, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
+from Script_HanYangBatchRuntime import BatchRuntime
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
 import numpy as np
 from PIL import Image
@@ -24,7 +25,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261126R32'
+version = '173R-20261127R33'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -39,6 +40,7 @@ stockProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragment
 fineEdges = {
     'ReceiverOuterCollar', 'HandleRoot', 'RearTab', 'RearSmallCover', 'RearCockingExterior',
     'RearTopExternalLever', 'Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers',
+    'MiddleSideDisk', 'SideWoodButton', 'RearOuterCover_RoundedSideReturn',
     'Sight_LowCrossPiece',
 }
 
@@ -50,7 +52,7 @@ steelDetails = {
     'RearSmallCover': 6,
     'RearSmallPin': 2,
     'RearCockingExterior': 3,
-    'RearOuterCover_RoundedSideReturn': 6,
+    'RearOuterCover_RoundedSideReturn': 7,
     'RearTab': 6,
     'RearTopExternalLever': 3,
     'Sight_LowContinuousLeaf_NoUnknownNumbers': 4,
@@ -310,7 +312,7 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R32: eased exterior edge transitions and shared dark walnut stain.'
+report['rebake']='R33: rolled side disks, stock-seated rear cover and compressed timber wear.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
 report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)
@@ -326,7 +328,4 @@ report['exteriorFinish']['contactVisibility']={'parts':sorted(contactFields.file
 doc['asset']['extras'].update(gameTriangles=report['triangles'],materialMatch=version,rebake=report['rebake'],calibratedBaseColor=True);doc['extensionsRequired']=['EXT_texture_webp']
 header=json.dumps(doc,separators=(',',':')).encode();header+=b' '*((-len(header))%4);out=struct.pack('<4sII',b'glTF',2,28+len(header)+len(payload))+struct.pack('<I4s',len(header),b'JSON')+header+struct.pack('<I4s',len(payload),b'BIN\0')+payload
 report['gameSha256']=hashlib.sha256(out).hexdigest()
-outputDirectory.mkdir(parents=True,exist_ok=True)
-(outputDirectory/'Model_HanYang173R.glb').write_bytes(out)
-(outputDirectory/'Data_GameGeometry.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf8')
-print('READY',report['triangles'],len(out),report['gameSha256'])
+BatchRuntime(doc,payload,report,outputDirectory)

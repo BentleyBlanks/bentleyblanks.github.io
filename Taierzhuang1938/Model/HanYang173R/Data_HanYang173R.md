@@ -210,6 +210,14 @@ The sight plate and seat follow their existing outlines with curved perimeter st
 
 The three timber pieces share a darker walnut stain chosen from the lit flanks of DM000453. Grain, roughness and oil remain in their authored maps. The inspection bench captures both feedback views and the timber albedo. The runtime remains below 80,000 triangles.
 
+### R33 rear stock contour and side disk rims
+
+The rear steel uses a single tapered exterior shell. Its visible edge follows the low contour in the side and overhead photographs. The rear-axis view is inferred from those two views. The large stock disks and their raised centers have round profiles with actual curved rims. The inspection bench compares the rear-axis and oblique views and the disks' Normal and Reflection channels. [Te Papa DM000453, closed side](https://media.tepapa.govt.nz/collection/131366/full) · [Steven Lu, stock comparison](https://armsofchina.com/wp-content/uploads/2026/04/145.jpg)
+
+The wooden flanks carry compressed dents and short broken edges guided by the stock photographs. Their relief comes from a shallow depression in the normal map. The stain is darker in the bed, with local roughness changes around each rim. [Te Papa DM000453, closed side](https://media.tepapa.govt.nz/collection/131366/full)
+
+The game draws the 44 named pieces in 13 meshes. Pieces with compatible material parameters and animation ownership share lossless Base Color, ORM and Normal atlases. The packing preserves source texel density and leaves a 32-pixel gutter. The GLB retains the named geometry for the Blender archive, and the inspection bench can select its regions inside a merged draw mesh. The tapered rear cover belongs to the fixed body.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.

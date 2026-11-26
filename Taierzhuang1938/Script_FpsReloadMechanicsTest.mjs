@@ -61,9 +61,13 @@ try {
           if(authored173R){
             // Dots has separate named collar and safety lever, unlike the
             // legacy receiver leaf. Use their actual geometry as witnesses.
-            const local=new THREE.Vector3().fromBufferAttribute(p,0),position=Point(mesh,local);
-            if(mesh.userData.hanYang173RPart==='ReceiverOuterCollar'){rearTang={mesh,local,position};best=0;}
-            if(mesh.userData.hanYang173RPart==='RearTopExternalLever')rearBar={mesh,local,position};
+            const regions=mesh.userData.hanYangPartRanges || [{name:mesh.userData.hanYang173RPart,vertexStart:0}];
+            for(const region of regions){
+              if(region.name!=='ReceiverOuterCollar'&&region.name!=='RearTopExternalLever')continue;
+              const local=new THREE.Vector3().fromBufferAttribute(p,region.vertexStart),position=Point(mesh,local);
+              if(region.name==='ReceiverOuterCollar'){rearTang={mesh,local,position};best=0;}
+              else rearBar={mesh,local,position};
+            }
             return;
           }
           for(let i=0;i<p.count;i++) {

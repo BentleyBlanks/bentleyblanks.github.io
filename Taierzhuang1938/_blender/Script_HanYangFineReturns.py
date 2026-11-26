@@ -23,8 +23,9 @@ def FinishProfile(name, points, normals, faces, wear):
     finally:
         edit.free()
     mesh.update()
-    assert len(mesh.vertices)==len(normals), name
-    mesh.normals_split_custom_set_from_vertices(np.asarray(normals).tolist())
+    if normals is not None:
+        assert len(mesh.vertices)==len(normals), name
+        mesh.normals_split_custom_set_from_vertices(np.asarray(normals).tolist())
     print(name,len(mesh.polygons),'triangles in rounded profile')
     return mesh
 
@@ -139,3 +140,84 @@ def RoundedAxialCap(name, points, radius):
                 faces.append((a[j],b[j],b[k],a[k]))
             wear.append(min(stations[i][2],stations[i+1][2]))
     return FinishProfile(name,vertices,normals,faces,wear)
+
+
+def RoundedSideDisks(name, points, width):
+    """Make the visible circles round and give the edge a real roll into the wood."""
+    outer = name=='MiddleSideDisk'
+    segments = 48 if outer else 40
+    angle = np.arange(segments)*2.*math.pi/segments
+    rays = np.column_stack((np.cos(angle),np.sin(angle)))
+    axial = .00025 if outer else .00020
+    vertices,normals,faces,wear = [],[],[],[]
+    for sign in (-1.,1.):
+        side = points[sign*points[:,0]>0.]
+        plane = side[:,1:].astype(np.float64)
+        centre = .5*(plane.max(axis=0)+plane.min(axis=0))
+        radius = np.quantile(np.linalg.norm(plane-centre,axis=1),.74)
+        front = np.max(sign*side[:,0])+(.00003 if outer else 0.)
+        rows = [(front-.00085,radius,0.)]
+        for bend in np.linspace(0.,math.pi/2,4):
+            rows.append((front-axial*(1.-math.sin(bend)),radius-width*(1.-math.cos(bend)),bend))
+        start = len(vertices)
+        for depth,radial,bend in rows:
+            ring = centre+radial*rays
+            vertices.extend(np.column_stack((np.full(segments,sign*depth),ring)))
+            normal = np.column_stack((np.full(segments,sign*width*math.sin(bend)),axial*math.cos(bend)*rays))
+            normals.extend(normal/np.linalg.norm(normal,axis=1)[:,None])
+        for row in range(len(rows)-1):
+            first = start+row*segments
+            for i in range(segments):
+                following = (i+1)%segments
+                faces.append((first+i,first+following,first+following+segments,first+i+segments))
+                wear.append(.14 if row==0 else .89)
+        back = tuple(range(start,start+segments))
+        faceStart = start+(len(rows)-1)*segments
+        faces.extend((back,tuple(range(faceStart,faceStart+segments))))
+        wear.extend((0.,0.))
+    return FinishProfile(name,vertices,normals,faces,wear)
+
+
+def RearStockSaddle(name):
+    """The decorative rear cover tapers into the stock as one continuous shell."""
+    centreY = .04194
+    # Exterior sections follow the shoulders and tapered tail seen in the
+    # side and overhead photographs. The section heights are in game space.
+    sections = (
+        (-.1425, .0135, .0130, .0427),
+        (-.1396, .0144, .0134, .0468),
+        (-.1310, .0146, .0136, .0491),
+        (-.1195, .0143, .0136, .0493),
+        (-.1030, .0136, .0134, .0480),
+        (-.0860, .0127, .0130, .0449),
+        (-.0740, .0118, .0127, .0405),
+        (-.0615, .0106, .0130, .03345),
+        (-.0523, .0077, .0130, .03270),
+        (-.0472, .0052, .0134, .03165),
+    )
+    sectionsCount = 25
+    vertices,faces,wear = [],[],[]
+    for z,width,drop,lip in sections:
+        def Arc(halfWidth,depth,rim):
+            angle = math.asin((rim-centreY)/depth)
+            sweep = np.linspace(math.pi-angle,2.*math.pi+angle,sectionsCount)
+            return np.column_stack((halfWidth*np.cos(sweep),centreY+depth*np.sin(sweep)))
+        outer = Arc(width,drop,lip-.00024)
+        inside = Arc(width-.00305,drop-.0018,lip-.00024)
+        # The wider shoulder rolls gently into the adjacent curved wall.
+        def Lip(a,b):
+            return np.asarray([a+t*(b-a)+[0.,.00018] for t in (.23,.77)])
+        outline = np.concatenate((outer,Lip(outer[-1],inside[-1]),inside[::-1],Lip(inside[0],outer[0])))
+        vertices.extend(np.column_stack((outline,np.full(len(outline),z))))
+    stride = len(outline)
+    lips = {0,sectionsCount-2,sectionsCount-1,sectionsCount,sectionsCount+1,
+            sectionsCount+2,2*sectionsCount,2*sectionsCount+1,2*sectionsCount+2,2*sectionsCount+3}
+    for row in range(len(sections)-1):
+        offset = row*stride
+        for i in range(stride):
+            j = (i+1)%stride
+            faces.append((offset+i,offset+j,offset+j+stride,offset+i+stride))
+            wear.append(.51 if i in lips else 0.)
+    faces.extend((tuple(range(stride)),tuple(range(len(vertices)-stride,len(vertices)))))
+    wear.extend((.18,.18))
+    return FinishProfile(name,vertices,None,faces,wear)

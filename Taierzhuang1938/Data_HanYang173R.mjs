@@ -1,8 +1,8 @@
 // Dots 173R author-space metres, +Y up, muzzle -Z. Values are measured in the
 // delivered GLB; weapon operation remains driven by the existing game timeline.
 export const HANYANG_173R = Object.freeze({
-  version: '173R-20261126R32',
-  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261126r32',
+  version: '173R-20261127R33',
+  url: './Model/HanYang173R/Model_HanYang173R.glb?v=173r-20261127r33',
   sourceSha256: '3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c',
   // SideWoodButton is metal in the source ORM despite its object name.
   wood: ['MainWood_ContinuousLowerShoulder', 'FrontWood_ContinuousOval', 'UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront'],
@@ -50,6 +50,7 @@ export const HANYANG_173R = Object.freeze({
   frontSight: ['HY150_RoundedUpperExterior', 'HY150_ExteriorSideRelief_Neg', 'HY150_ExteriorSideRelief_Pos', 'HY151_LowRearShoulder'],
   rearSight: ['Sight_LowContinuousLeaf_NoUnknownNumbers', 'Sight_LowCrossPiece', 'Sight_ShallowRoundSeat', 'Sight_SideRoundHead_1', 'Sight_SideRoundHead_-1'],
   trigger: 'Trigger_FlatCurvedExternalStrip',
+  stockReturn: 'RearOuterCover_RoundedSideReturn',
   mounts: {
     muzzle: [0, 0.03857, -0.995], gripR: [0, 0, 0], gripL: [0, -0.012, -0.418],
     sight: [0, 0.06535, -0.321], magazine: [0, -0.015, -0.04],

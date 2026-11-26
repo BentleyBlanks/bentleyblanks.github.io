@@ -37,6 +37,30 @@ float flecks(vec2 coord){
 float strokeDistance(vec2 p,vec2 start,vec2 end){
  vec2 line=end-start;return length(p-start-line*clamp(dot(p-start,line)/dot(line,line),0.,1.));
 }
+// A shallow compressed bed and a broken rim from handling dents in the
+// stock photographs. The slope is the derivative of the depressed surface.
+vec4 woodImpression(vec2 panel,float phase,float wear){
+ vec2 spacing=vec2(.025,.019);
+ vec2 field=panel/spacing+vec2(phase,.57*phase);
+ vec2 cell=floor(field);
+ float grainvar=hash21(cell+11.9);
+ float active=smoothstep(.58,.86,hash21(cell+3.58)+.21*wear);
+ vec2 centre=.36+.28*vec2(hash21(cell+11.4),hash21(cell+31.7));
+ vec2 shift=(fract(field)-centre)*spacing;
+ float oblique=hash21(cell+5.87);
+ float angle=mix(-.71,.71,oblique);
+ vec2 direction=vec2(cos(angle),sin(angle));
+ vec2 acrossGrain=vec2(-direction.y,direction.x);
+ vec2 extent=vec2(mix(.0026,.0063,grainvar),mix(.00115,.00255,hash21(cell+9.18)));
+ vec2 coordinates=vec2(dot(shift,direction),dot(shift,acrossGrain))/extent;
+ float squared=dot(coordinates,coordinates);
+ float bed=max(1.-squared,0.);
+ float depth=mix(.00020,.00054,hash21(cell+23.19));
+ vec2 slope=-4.*depth*bed*(coordinates.x/extent.x*direction+coordinates.y/extent.y*acrossGrain);
+ float rim=smoothstep(.47,.82,squared)*(1.-smoothstep(.88,1.09,squared));
+ rim*=smoothstep(-.67,.88,coordinates.y-.35*coordinates.x);
+ return active*vec4(bed*bed,rim,slope);
+}
 struct WearSample{vec3 marks;float freshness;};
 WearSample stockPatina(vec2 position,float sidePhase){
  float taper=smoothstep(-.128,-.048,position.x);
@@ -363,6 +387,16 @@ void main(){
    rough=clamp(rough-.067*rubbed+cuts.x*(.77-rough)*.85+.083*cuts.y,.43,.77);
    gradient+=.64*flank*(slope-normal*dot(slope,normal));
   }
+  float wornZone=clamp(.63*contact+.44*patch(p,vec3(-.142,0.,-.035),vec3(.10,.046,.052))
+                       +.30*patch(p,vec3(.665,0.,.018),vec3(.164,.04,.05)),0.,1.);
+  float flankWear=smoothstep(.25,.82,abs(normal.y))*(1.-.82*cutEnd);
+  vec4 impression=woodImpression(vec2(p.x,p.z+.26*p.y),17.31+17.5*float(p.y<0.)+seed,wornZone)*flankWear;
+  vec3 dentSlope=along*impression.z+(up+.26*across)*impression.w;
+  visible*=1.-.25*impression.x+.11*impression.y;
+  rough=mix(rough,.75,.65*impression.x);
+  rough=mix(rough,.47,.25*impression.y);
+  gradient+=dentSlope-normal*dot(dentSlope,normal);
+  finishMask.r*=1.-.43*impression.x;
  }else{
   vec3 weights=pow(abs(normal),vec3(4.));
   weights/=max(dot(weights,vec3(1.)),.0001);
@@ -407,6 +441,7 @@ void main(){
   float shoulder=abs(normal.z);
   float rub=.18+.09*worn+.09*cloud;
   float edge=max(edgeWear,rim*(steelFamily==1?.86:.24));
+  if(steelDetail==7)edge*=.51;
 
   if(steelFamily==1||steelFamily==7){
    // Burnishing breaks into patches as it leaves the edge of the formed strap.
@@ -430,6 +465,8 @@ void main(){
    rub=.25+.11*mottling;
   }else if(steelDetail==6){
    rub=.17+.11*mottling+.08*shoulder;
+  }else if(steelDetail==7){
+   rub=.11+.09*mottling+.045*shoulder;
   }else if(steelDetail==4){
    rub=.14+.08*shoulder+.07*cloud;
   }
@@ -477,6 +514,11 @@ void main(){
    rough=mix(rough,.510+.049*mottling,.62*(1.-edge));
    visible*=mix(vec3(.91,.93,.95),vec3(1.),edge);
    relief*=.69+.31*edge;
+  }
+  if(steelDetail==7){
+   rough=mix(rough,.548+.038*mottling,.67);
+   visible*=.91+.09*edge;
+   relief*=.75;
   }
   if(guard){
    vec2 toOpening=vec2(.104-p.x,-.012-p.z);

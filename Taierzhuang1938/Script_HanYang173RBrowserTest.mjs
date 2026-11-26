@@ -23,8 +23,10 @@ try{
   const meshes=[];vm.rig.group.traverse(o=>{if(o.userData.hanYang173RPart)meshes.push(o);});
   const world=g.actorFactory.ModelInstance('HanYang');
   const result={version:vm.rig.assetVersion,triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),
-   parts:meshes.length,worldTriangles:world.tris,privateGeometry:world.meshes.every(m=>meshes.every(f=>f.geometry!==m.geometry)),
-   materials:meshes.map(m=>({part:m.userData.hanYang173RPart,authored:m.material.userData.preserveAuthoredPbr,materialClass:m.material.userData.externalMaterialClass,skin:m.material.userData.materialShadingSurface?.skin,baseFilter:m.material.map?.anisotropy,coatFilter:m.material.clearcoatMap?.anisotropy,base:m.material.map?.colorSpace,normal:m.material.normalMap?.colorSpace,
+   parts:meshes.reduce((sum,mesh)=>sum+(mesh.userData.hanYangPartRanges?.length||1),0),
+   drawMeshes:meshes.length,worldDrawMeshes:world.meshes.length,worldTriangles:world.tris,privateGeometry:world.meshes.every(m=>meshes.every(f=>f.geometry!==m.geometry)),
+   materials:meshes.map(m=>({part:m.userData.hanYang173RPart,
+    regions:m.userData.hanYangPartRanges?.map(region=>region.name)||[m.userData.hanYang173RPart],role:m.userData.weaponPart,authored:m.material.userData.preserveAuthoredPbr,materialClass:m.material.userData.externalMaterialClass,skin:m.material.userData.materialShadingSurface?.skin,baseFilter:m.material.map?.anisotropy,coatFilter:m.material.clearcoatMap?.anisotropy,base:m.material.map?.colorSpace,normal:m.material.normalMap?.colorSpace,
     orm:m.material.roughnessMap?.colorSpace,folded:!m.material.metalnessMap,patches:PatchesOf(m.material).map(p=>p.key),
     color:m.material.color.toArray(),metalness:m.material.metalness,roughness:m.material.roughness,specular:m.material.specularIntensity??1,
     coat:m.material.clearcoat??0,coatRough:m.material.clearcoatRoughness??0,filmMap:!!m.material.clearcoatMap,filmSpace:m.material.clearcoatMap?.colorSpace}))};
@@ -33,8 +35,12 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261126R32');assert.equal(evidence.identity.triangles,79440);
- assert.equal(evidence.identity.worldTriangles,79440);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.version,'173R-20261127R33');assert.equal(evidence.identity.triangles,79513);
+ assert.equal(evidence.identity.worldTriangles,79513);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
+ assert.equal(evidence.identity.drawMeshes,13);
+ assert.equal(evidence.identity.worldDrawMeshes,13);
+ assert(evidence.identity.materials.some(m=>m.role==='body'&&m.regions.includes('RearOuterCover_RoundedSideReturn')),
+   'the stock-seated rear return belongs to the fixed mesh');
  const timber=evidence.identity.materials.filter(material=>/^(MainWood_|FrontWood_|UpperWood_)/.test(material.part));
  assert.equal(timber.length,3);assert(timber.every(material=>Math.abs(material.specular-.45)<1e-5),'game preserves the calibrated walnut dielectric reflectance');
  const oil=timber.find(material=>material.part.startsWith('MainWood_'));
@@ -50,9 +56,9 @@ try{
  }
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert(['','srgb-linear'].includes(m.normal));assert(['','srgb-linear'].includes(m.orm));assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
  const contact=evidence.identity.materials.filter(material=>material.patches.includes('ormma'));
- assert.equal(contact.length,9,'fixed-contact AO folds into the existing roughness sampler in game');
- assert(contact.some(material=>material.part.startsWith('ButtCap_')),'the fixed butt-cap joint receives the shared contact field');
- assert(contact.some(material=>material.part==='RearBand_ControlledCrown')&&timber.every(material=>contact.includes(material)));
+ assert.equal(contact.flatMap(m=>m.regions).length,9,'fixed-contact AO folds into the existing roughness sampler in game');
+ assert(contact.some(material=>material.regions.some(part=>part.startsWith('ButtCap_'))),'the fixed butt-cap joint receives the shared contact field');
+ assert(contact.some(material=>material.regions.includes('RearBand_ControlledCrown'))&&timber.every(material=>contact.includes(material)));
  evidence.lighting=[];
  for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
   const row=await page.evaluate(async mode=>{
@@ -108,7 +114,7 @@ try{
  });
  assert(evidence.frame.rifle.rows.length>0,'production frame includes authored rifle draws');
  assert.deepEqual(errors,[]);
- console.log(`ok HanYang173R actual game: ${evidence.identity.triangles} triangles, 44 PBR parts, high day/shadow/overcast/night/ADS`);
+ console.log(`ok HanYang173R actual game: ${evidence.identity.triangles} triangles, 13 render meshes, high day/shadow/overcast/night/ADS`);
 }finally{
  await fs.writeFile(path.join(out,'Data_Acceptance.json'),JSON.stringify({evidence,errors},null,2));
  await browser.close();await new Promise(r=>server.close(r));

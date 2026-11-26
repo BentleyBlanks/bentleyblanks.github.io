@@ -471,7 +471,7 @@ try {
       const details = inspector.closest(".details");
       const count = window.WeaponInspection.scene.model.body.children[0].children.filter((child) => child.isMesh).length;
       return inspector.querySelector('[aria-label="网格"]').options.length === count
-        && details.scrollWidth === details.clientWidth && inspector.querySelectorAll(".material-metrics dd").length === 3
+        && count === 13 && details.scrollWidth === details.clientWidth && inspector.querySelectorAll(".material-metrics dd").length === 3
         && inspector.querySelectorAll(".material-properties img").length >= 3
         && !!inspector.querySelector(".texture-metadata").textContent.match(/\d+ × \d+ · (sRGB|线性) · UV\d/);
     }));
@@ -488,18 +488,25 @@ try {
     });
     const originalModel = await ReadPixels();
     const originalMaterial = await MaterialPixels();
-    await meshPicker.selectOption({ index: 1 });
+    const testBatch = await page.evaluate(() => {
+      const meshes = window.WeaponInspection.scene.model.body.children[0].children.filter(object => object.isMesh);
+      const index = meshes.findIndex((mesh, i) => i !== 0 && mesh.userData.hanYangPartRanges?.length > 1);
+      return {index,part:meshes[index].userData.hanYangPartRanges[0].name,material:meshes[index].material.name};
+    });
+    await meshPicker.selectOption({ index: testBatch.index });
     const meshSlot = page.locator(".mesh-slot").first();
-    const expectedMaterial = await meshSlot.locator("span").textContent();
+    Check("合并网格保留独立部件的可选区域", await meshSlot.locator("span").textContent() === testBatch.part);
     await meshSlot.click();
-    Check("子网格材质槽链接到对应材质", await materialPicker.locator("option:checked").textContent() === expectedMaterial);
-    const selectedPart = await page.evaluate(() => {
+    Check("部件区域链接到共享材质", await materialPicker.locator("option:checked").textContent() === testBatch.material);
+    const selectedPart = await page.evaluate(index => {
       const stage = window.WeaponInspection.scene;
       stage.Draw();
       const { group, geometry } = stage.selection;
-      const mesh = stage.model.body.children[0].children.filter((object) => object.isMesh)[1];
-      return group.parent === mesh && geometry.attributes.position.count === (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count);
-    });
+      const mesh = stage.model.body.children[0].children.filter(object => object.isMesh)[index];
+      const region = mesh.userData.hanYangPartRanges[0];
+      return group.parent === mesh && geometry.attributes.position.count === region.count
+        && region.count < mesh.geometry.index.count;
+    },testBatch.index);
     const highlighted = await ReadPixels();
     const selectedMaterial = await MaterialPixels();
     Check("子网格点选只高亮对应几何，材质球随选择更新",

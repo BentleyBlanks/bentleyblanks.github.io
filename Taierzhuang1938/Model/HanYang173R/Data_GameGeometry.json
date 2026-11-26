@@ -1,7 +1,7 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "275f275a6e985c6aeaf324f5d4af8070487d579e8dbd1e7f9e1e0a72e446cfa1",
-  "triangles": 79440,
+  "gameSha256": "a73893c50c293e2a4f6573c68623249ded937c409255b9bf46d5901ca7667760",
+  "triangles": 79513,
   "repairedTangents": 45491,
   "parts": [
     {
@@ -307,14 +307,14 @@
     {
       "part": "MiddleSideDisk",
       "sourceTriangles": 1920,
-      "gameTriangles": 912,
-      "gameToSourceMaxM": 6.067890353733674e-05,
-      "sourceToGameMaxM": 0.0001223885192302987,
+      "gameTriangles": 952,
+      "gameToSourceMaxM": 5.5925920605659485e-05,
+      "sourceToGameMaxM": 6.413939192825258e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 15.47,
-        "uvCoverage": 0.548954,
+        "pxPerMm": 24.5,
+        "uvCoverage": 0.627748,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -427,14 +427,14 @@
     {
       "part": "RearOuterCover_RoundedSideReturn",
       "sourceTriangles": 2936,
-      "gameTriangles": 952,
-      "gameToSourceMaxM": 0.006529168822219472,
-      "sourceToGameMaxM": 0.010142046546120324,
+      "gameTriangles": 1076,
+      "gameToSourceMaxM": 0.023654422015105342,
+      "sourceToGameMaxM": 0.009502370089390194,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 23.41,
-        "uvCoverage": 0.691457,
+        "pxPerMm": 16.35,
+        "uvCoverage": 0.526007,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -547,14 +547,14 @@
     {
       "part": "SideWoodButton",
       "sourceTriangles": 1920,
-      "gameTriangles": 883,
-      "gameToSourceMaxM": 5.440817403723486e-05,
-      "sourceToGameMaxM": 0.00010239520634058863,
+      "gameTriangles": 792,
+      "gameToSourceMaxM": 6.33173635765398e-05,
+      "sourceToGameMaxM": 4.4223940626683714e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 1024,
-        "pxPerMm": 27.26,
-        "uvCoverage": 0.647002,
+        "pxPerMm": 54.19,
+        "uvCoverage": 0.595741,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -667,1019 +667,283 @@
   ],
   "texturePayloads": [
     {
-      "name": "ButtCap_LimitedProfileBlend_Normal",
+      "name": "HanYang173R_body_Atlas1_BaseColor",
+      "sha256": "e851bf7586837ecf2018ff0098ee3f9509574db210b297d5dbdb741b43458510",
+      "sourceSha256": "8e59f8104ce841a2b00f83bd79ea0dcd5cbd203c85f3c06ce8619179a8eeedb5",
       "mimeType": "image/webp",
-      "sha256": "a2492cef74094813a522f0cc31f793ee66c1dc8750233014206e0e5e5880d9bf",
-      "sourceSha256": "160ad23a643a33d7b343baa2d67e5e0f6752c4e08f7186d416e2957424c69020",
-      "islandCoverage": 0.256355,
+      "islandCoverage": 0.407206,
       "rebake": true
     },
     {
-      "name": "ButtCap_LimitedProfileBlend_BaseColor",
+      "name": "HanYang173R_body_Atlas1_ORM",
+      "sha256": "4ea654eef379d3b037d9af2d2ec422de2237ef46cae061e7e8e5b153249d64a3",
+      "sourceSha256": "65b0ffaf6fd3abbb2123964f28ddb7c216d56fb54ee07e5153e8cda4593b8e5c",
       "mimeType": "image/webp",
-      "sha256": "e14c033938ec4e62de196bbed06691888bbe79fc708ec587067cabac8c790472",
-      "sourceSha256": "f0a3ccac30bc791faeaf860f58c3ffc1e25641dd04eaf565e9349f48a8889fe7",
-      "islandCoverage": 0.256355,
+      "islandCoverage": 0.407206,
       "rebake": true
     },
     {
-      "name": "ButtCap_LimitedProfileBlend_ORM",
+      "name": "HanYang173R_body_Atlas1_Normal",
+      "sha256": "8766d04b8acb25a0fe70c6bc7ebf03c958b88057eb9ca753d8ccdd37151c1110",
+      "sourceSha256": "747dbc5bf8c7f2bebad65750eff590a4b176700522e0c7ab8ecb40d5a3e10ee3",
       "mimeType": "image/webp",
-      "sha256": "4450381f990e5c32f4d29da9512c555616882a3c2a219570e3a8db480c0c6b2e",
-      "sourceSha256": "ee3e7bb519ba4f7a89f292770afa09392b17c4508fe1b1039f172a033ca23294",
-      "islandCoverage": 0.256355,
+      "islandCoverage": 0.407206,
       "rebake": true
     },
     {
-      "name": "FrontBand_ContinuousEnvelopeContact_Normal",
+      "name": "HanYang173R_body_Atlas2_BaseColor",
+      "sha256": "7d9a228932b99dfa5de6fcb6d200b66b22391a40c0002a325e88e070d763787b",
+      "sourceSha256": "cf82644287f0d16b5036d7c59ac04aae3adba42b57cb0a7fd776287e1fd5ed8f",
       "mimeType": "image/webp",
-      "sha256": "202b3f547726894110cca69aa5e1e1adcd29970910c83e724c780eab11e154fc",
-      "sourceSha256": "040127603d28dd66fd595a4dfd4015684095641bc1387762c0c13208a2dd5f2f",
-      "islandCoverage": 0.497677,
+      "islandCoverage": 0.275843,
       "rebake": true
     },
     {
-      "name": "FrontBand_ContinuousEnvelopeContact_BaseColor",
+      "name": "HanYang173R_body_Atlas2_ORM",
+      "sha256": "a345e07340c47f4d7bde188686a94610286de2a1c5da02bc5f964aa3eb812f5a",
+      "sourceSha256": "83ba9f76072411a4f4407e5ccbb443da8044216dc84868981741e9d8f9ad4062",
       "mimeType": "image/webp",
-      "sha256": "eb844f6fb630aff27310d4a00bd6ad11e412f59c6c7131e2c17e2068e2a3b5fa",
-      "sourceSha256": "a1bcaa28510d4ee78c3114bbce69634c7c0d826456595252f71fe2d3d2b46268",
-      "islandCoverage": 0.497677,
+      "islandCoverage": 0.275843,
       "rebake": true
     },
     {
-      "name": "FrontBand_ContinuousEnvelopeContact_ORM",
+      "name": "HanYang173R_body_Atlas2_Normal",
+      "sha256": "90f60d087dc3b2d83f4f1e5d854c73bdc460a6e87ad35a632976d1f30eaa3302",
+      "sourceSha256": "28dd0b626ab904c930d2754206b91465176cc693093e466803323f10da42ab16",
       "mimeType": "image/webp",
-      "sha256": "8d338892c76b1a9b0f02e15f561bbae21305e094c9d4e374a2b097e997fd84cb",
-      "sourceSha256": "672305d1ffa2ce59a163e938ba37fc8ee8fa7977d6b4cec3d327029acbb7ba1f",
-      "islandCoverage": 0.497677,
+      "islandCoverage": 0.275843,
       "rebake": true
     },
     {
-      "name": "FrontBandSideStrip_Normal",
+      "name": "HanYang173R_body_Atlas3_BaseColor",
+      "sha256": "f0d4834b600e7b212a7e912779a1a40b467767c6b367838d6d07dc42408f91aa",
+      "sourceSha256": "3e6c68f3e10acac1f77d61c67cabc28d7935eef33d408c8de281a3aeef90a05e",
       "mimeType": "image/webp",
-      "sha256": "e34d63f8e18130d856e9e3083aed13bef30e2077958303f34001b3f159e45bf0",
-      "sourceSha256": "b5900d2c7a8518dab1047c17bf3e856542cd55f2312d81322d248ca4b60cd8fd",
-      "islandCoverage": 0.267773,
+      "islandCoverage": 0.688503,
       "rebake": true
     },
     {
-      "name": "FrontBandSideStrip_BaseColor",
+      "name": "HanYang173R_body_Atlas3_ORM",
+      "sha256": "985a37e4dc2f5673a9aa6edce2020554f0ff7f66b56d0f47fe7fed9114eb2bf1",
+      "sourceSha256": "25724a851cdd285563479a8a6a30dcf7457bbe0db62eb2796ffc24b253963e68",
       "mimeType": "image/webp",
-      "sha256": "07874009210371fec1bd55e8cb19ae091dd7dde0cc5f113aae9f3d5fd658d81c",
-      "sourceSha256": "2e494b2b39fd61440f50cf90332ac19232c853691bdea80565d2e97b1d408d74",
-      "islandCoverage": 0.267773,
+      "islandCoverage": 0.688503,
       "rebake": true
     },
     {
-      "name": "FrontBandSideStrip_ORM",
+      "name": "HanYang173R_body_Atlas3_Normal",
+      "sha256": "0ae7923e75d549738e52065eb89272f8be1b9e800dd4473b34ebf2edcdd6aa46",
+      "sourceSha256": "c987faec268b984b2b352bf2585f9397ee69b558e102224937e1e340596f1bd3",
       "mimeType": "image/webp",
-      "sha256": "0e9f767f781f2018d63f49305b01f4e34d1d5babc6a304cbbb8638229d49e850",
-      "sourceSha256": "89a92179dfc57baa3eecc5a5933cdbab7c3eff1cdb2cec8611ca89316ac9ff91",
-      "islandCoverage": 0.267773,
+      "islandCoverage": 0.688503,
       "rebake": true
     },
     {
-      "name": "FrontSideBoss_LowRoundedExterior_Normal",
+      "name": "HanYang173R_body_Atlas4_BaseColor",
+      "sha256": "c6990f5b3b765029ccc6728559c4228eb038788187a76d2f2009d1643d11299d",
+      "sourceSha256": "e7513e2e905ebfa64ec8239271c7e6a31ab7bee6926d0a8f05145c0ba9789de5",
       "mimeType": "image/webp",
-      "sha256": "f45fea2c1b32a187343528cdb1f62542b49501c226ded3caddf748b879aa9cda",
-      "sourceSha256": "22fab726b3dff0a4fbdfb9759d789182842602e806fea8be4415b3596df54536",
-      "islandCoverage": 0.413998,
+      "islandCoverage": 0.449166,
       "rebake": true
     },
     {
-      "name": "FrontSideBoss_LowRoundedExterior_BaseColor",
+      "name": "HanYang173R_body_Atlas4_ORM",
+      "sha256": "461028d85cd38fee1d3b2db492abe2220dc0700b374d479a023a17a5be1a1781",
+      "sourceSha256": "178156a86abef16d35a3e6e3dce0e6b759f534b0cb96819bf6f31034fea31502",
       "mimeType": "image/webp",
-      "sha256": "46fb3db7bed358bbd48dd6491fe84f0d14e21492bf012328b0543fa6670cb169",
-      "sourceSha256": "a3f649e69da4c61828dc9abfb59ceb080afbd25e7e670451de3224a439e7a72c",
-      "islandCoverage": 0.413998,
+      "islandCoverage": 0.449166,
       "rebake": true
     },
     {
-      "name": "FrontSideBoss_LowRoundedExterior_ORM",
+      "name": "HanYang173R_body_Atlas4_Normal",
+      "sha256": "f8895bde196217638dfd56f9547b1c7a73da6124ad415c776db37e3b9bb8f442",
+      "sourceSha256": "4ae41274d9337c157c65174dbb3b2b9d50861a7d6d24a288da0c516238fc364c",
       "mimeType": "image/webp",
-      "sha256": "899276e98c2a7a84e98158d214f1ef97f542c9403ee0f61f473ddcce4f1a8d7b",
-      "sourceSha256": "c52103cd5abe43ada564a11aa776c68810a1bf3d1c743bf229a2a5bcf87b7341",
-      "islandCoverage": 0.413998,
+      "islandCoverage": 0.449166,
       "rebake": true
     },
     {
-      "name": "FrontWood_ContinuousOval_Normal",
+      "name": "HanYang173R_body_Atlas5_BaseColor",
+      "sha256": "4f87e18957def3b5e68a1cf9a4b8e95280ddf67eb8924e02182ba14aa5a15563",
+      "sourceSha256": "de9ff2117f5f12e9baadebf301909f36dfced37f6ff5a8469290a6e494b56ba7",
       "mimeType": "image/webp",
-      "sha256": "88c21a17728a8f1505f2b7ef45d19723c1a155af7a31365af4ce8157d867bb21",
-      "sourceSha256": "da218b937df6b5ae3568c7d7574a45bac5b9497969c8ca2070133cbadb0d44ba",
-      "islandCoverage": 0.261859,
+      "islandCoverage": 0.294369,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_body_Atlas5_ORM",
+      "sha256": "97fd1be40c9ddaebe497af86bd72690cb793a6f08eb8c8da23b5b9534caba17f",
+      "sourceSha256": "486120ce9198cf70c0c2c99fb3a7fa3f63d70dd9873fcfdc68de944998cc0fd6",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.294369,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_body_Atlas5_Normal",
+      "sha256": "bd78321ac512e3d9f34a285d64e22c8f48cb0cb11c979b9c339da3d12d6b5fa6",
+      "sourceSha256": "81b32c36dffecee3715660f603a095159d37cc7cd07454a9ae6319d879bdc516",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.294369,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_boltBody_Atlas6_BaseColor",
+      "sha256": "f586a2159ea84ab1faf22d6efba4913b196f05d71ad463ade384f4c3c8529beb",
+      "sourceSha256": "328f161d4b23ffc6058cb479714fb2e39e018b4d39cf19292dde4920c4b73912",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.634682,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_boltBody_Atlas6_ORM",
+      "sha256": "f2b6d6825f807794ff64c6524c9fd90fe76646def00cef6a60f6b46da3d4b192",
+      "sourceSha256": "c146013c682ed07bfd9ba97028790e29a73c0a28163caa444605e09ac36ac207",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.634682,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_boltBody_Atlas6_Normal",
+      "sha256": "afb7cf5d8eaf466370e9208795f57b4752598f6a1e0a20888b3e9e7f6411da65",
+      "sourceSha256": "94345d5c2f72ffc2600db5674541493200af3609ddbbdc9f22b0de0f298f3405",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.634682,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_frontSight_Atlas7_BaseColor",
+      "sha256": "4b593d35a1359105c107c764ceb1876a02364a2a1d0e32429c3a5c5b3cae301a",
+      "sourceSha256": "b1db3a6cc44cf29194f5afadaf751c3adc358f69b22d381165132d6f86b131f0",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.422207,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_frontSight_Atlas7_ORM",
+      "sha256": "3d08e136e80093159f21e3300a11406d5a1e75da081c193622af132d3c12e95a",
+      "sourceSha256": "541f8325a115cd06c9a61c9bacada3c1db34dad7c29bd519ebc64ab1304b07cd",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.422207,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_frontSight_Atlas7_Normal",
+      "sha256": "a7da73814b1a08273ef9dbcbab62bf37950ddddfa6e00a4527c3601217b6ef82",
+      "sourceSha256": "65d5497759377c146eccf79b82bcd528e5797ceee4e3ab255d3a90e20e2b4302",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.422207,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_cockingPiece_Atlas8_BaseColor",
+      "sha256": "ad9907309df48e9d3b919fc0a42c66910eda7bf23b56d1f04097c120bfa0586f",
+      "sourceSha256": "99155cc6670a05264a1f3e8738c1c7265943d50247f0834b8b18f5528fb872e7",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.540672,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_cockingPiece_Atlas8_ORM",
+      "sha256": "382d86ca454f5fc57c5b8485c5f9e15f84a2c72fef096506369583d8817b9acb",
+      "sourceSha256": "18d02ea24973903a204edbd37473204b9b17d2bb33f37e335bb1834004192b06",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.540672,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_cockingPiece_Atlas8_Normal",
+      "sha256": "3ae02339778232cfbd59cd4334224ecac84163208b3cf855dbf7143595ebc6d6",
+      "sourceSha256": "1d3d8afb7863f4ab0277e43a1ae9cda54ff7a445a9516f613becf1d4c832af23",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.540672,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_rearSight_Atlas9_BaseColor",
+      "sha256": "5633983bf30fb4ca1693a186c1986b11d151143c26fe9704f554a4e1de461851",
+      "sourceSha256": "be62e1e27b5fe5ca89416968a0a582f037ca119ecfbe0696b1d962c4b2364dc4",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.404926,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_rearSight_Atlas9_ORM",
+      "sha256": "ff16751c5bde0f7ca7c91e2f66234acf21e155674bcfd30a6cd3cf40624b9835",
+      "sourceSha256": "1536c17b39f293480c56c81f3e050120f5d529bad1ec266443ac98553c5ffb38",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.404926,
+      "rebake": true
+    },
+    {
+      "name": "HanYang173R_rearSight_Atlas9_Normal",
+      "sha256": "dbdccbf5ffa4b2f306a4d2c89d00389cb4585547160581dea6917c7953c2e25f",
+      "sourceSha256": "be32fc0e7f77e5f5d4e1b76f18f4890c8abaf96344389b9037dfadd24cc84e56",
+      "mimeType": "image/webp",
+      "islandCoverage": 0.404926,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "16b9c76c9100e91ea684a4dd08422812c59b700db1b2dd2fa5d8c8a5b68031c1",
-      "sourceSha256": "e62b27a79288484bb1b71f0eca514b5061307e9fdae82bbdc8d4a8431902c9b4",
+      "sha256": "ae3ce4a2dbbcdad0801c2476de6775f4845f8d6cb5db60e03db22cb4cc234ef5",
+      "sourceSha256": "e87d8211f8ecc6b7ca7427b74b624424f41f9776b12b5ca1d92c24752a382dfb",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_ORM",
       "mimeType": "image/webp",
-      "sha256": "1e2e7cd3ee0486cbe2553870a0f3070df850b42b396ffb4efa2f326e213947f1",
-      "sourceSha256": "a3dd33e2722eeffe7ed1b48bbf0293288f9568dfcfe5b46c85aaceb22084ed73",
+      "sha256": "425921028ed2f201fbf6a202b0d3c8f1734ce473984b54706ca4f10dcd33edaa",
+      "sourceSha256": "c023993f75b5bf4716ad20e7a840d9eeb085c3c8587caa143ec9afb971c3ce84",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
-      "name": "HandledCylinder_Normal",
+      "name": "FrontWood_ContinuousOval_Normal",
       "mimeType": "image/webp",
-      "sha256": "6afaf55aac8b9e945f6e7e5a574c6c534b3cce7930e23086b88a2d57f449f122",
-      "sourceSha256": "bad7f7c114266984c3800770f2a6e9aad6ef49edc35e5d90bf47def6235634ca",
-      "islandCoverage": 0.688978,
+      "sha256": "e02295fb336231504e8c2f5860449aa7011c9742bff56646cc62e8a08557f575",
+      "sourceSha256": "a40ceced182ac1dbdfd1d6d73f3504d06f69bfafc12825a122757b6db163561c",
+      "islandCoverage": 0.261859,
       "rebake": true
     },
     {
-      "name": "HandledCylinder_BaseColor",
+      "name": "FrontWood_ContinuousOval_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "2d4708a704f1e0c7b92471075738d3835234c36a2b3cb70e19a3d8ae54f0ab21",
-      "sourceSha256": "55bcad120eaff6b9dcae613194975039d53fc5b9c29e4bab4d135555f12bd3a7",
-      "islandCoverage": 0.688978,
-      "rebake": true
-    },
-    {
-      "name": "HandledCylinder_ORM",
-      "mimeType": "image/webp",
-      "sha256": "6373d4e821c3f1b4b03a9693971d476cfd70aaf6cf787422f6fbc41eaf0103f7",
-      "sourceSha256": "97e6e52a7e2c527c3425a39ec33fdaca2100dc11ac863e0d3bbd453f4b9e2382",
-      "islandCoverage": 0.688978,
-      "rebake": true
-    },
-    {
-      "name": "HandleNeck_Normal",
-      "mimeType": "image/webp",
-      "sha256": "9adbccc8f1f26650011b16e44e406220bb6d2690b5d668ced1bd98b34bd52836",
-      "sourceSha256": "8f86894246715c91e80867326241e798c355e9ee321e58f15fdce4cd4fc0f85c",
-      "islandCoverage": 0.719956,
-      "rebake": true
-    },
-    {
-      "name": "HandleNeck_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "036186475b618c719d153d88ec11e7b68753579a80d6362c82bb6a31c0d4b3b9",
-      "sourceSha256": "28afe34e30aadcdfc1bd1268312bb83b7255a6ae29c00fe9752213adf7f91829",
-      "islandCoverage": 0.719956,
-      "rebake": true
-    },
-    {
-      "name": "HandleNeck_ORM",
-      "mimeType": "image/webp",
-      "sha256": "64c445b6a56c6f24b63eee69f606f9492fa75b3ed3becc5f98bac0bf9f43d327",
-      "sourceSha256": "93387b069c26640f0e7fb85337b4d3472b091e9c81c4adfc951573e12eeca778",
-      "islandCoverage": 0.719956,
-      "rebake": true
-    },
-    {
-      "name": "HandleRoot_Normal",
-      "mimeType": "image/webp",
-      "sha256": "9fcf13ee44379e61ae3db5a50709030ec7ab7d25bfc02b7294b5370e7d6df2a8",
-      "sourceSha256": "a34eeb6e8bd69546ec1b01c3775fc0364116beb3ec0575ab333abac3c41ff235",
-      "islandCoverage": 0.682659,
-      "rebake": true
-    },
-    {
-      "name": "HandleRoot_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "df9a2f9806b062028c4f390610c0db061c339ccab957fa223ff693835d052be0",
-      "sourceSha256": "4bacf2a7d0525a2e83ca34b889054d21713bdb034f652e50d0853ac6b9c02902",
-      "islandCoverage": 0.682659,
-      "rebake": true
-    },
-    {
-      "name": "HandleRoot_ORM",
-      "mimeType": "image/webp",
-      "sha256": "b45d2c0c08d58db13836785682fa96b527f70022922650a70edcfcf4316d5ca4",
-      "sourceSha256": "a186a585c6ed5c44c2b7dfadd1aecfef33ab865547a8924a56bf405959446858",
-      "islandCoverage": 0.682659,
-      "rebake": true
-    },
-    {
-      "name": "HandleSphere_Normal",
-      "mimeType": "image/webp",
-      "sha256": "a7998572c93993a0257d8c793cb3197028d410c83af2e3c825857cc586a2b398",
-      "sourceSha256": "5a7e3275a140372bb2f962756d8939ae87cc26de9e5cf61d7bb4371ff6f09aa0",
-      "islandCoverage": 0.527671,
-      "rebake": true
-    },
-    {
-      "name": "HandleSphere_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "62234de1658e78d9ce03a3732c7cceb51aa829ed092dec9df3ad39d6b0fcfe3c",
-      "sourceSha256": "74696ae6f4895b1df6390798219c7e357c8662ab68e168d9c5056d94e2aa0f98",
-      "islandCoverage": 0.527671,
-      "rebake": true
-    },
-    {
-      "name": "HandleSphere_ORM",
-      "mimeType": "image/webp",
-      "sha256": "5e9959db9dba5b399a09ef8e8ff71377df39f9594aa4600f73065e1b4e0a3d87",
-      "sourceSha256": "1531530697aef26cc66febc7cea571c2423b0f4dd9586c749673211dbee501a4",
-      "islandCoverage": 0.527671,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Neg_Normal",
-      "mimeType": "image/webp",
-      "sha256": "8071271f4390dbf0b2dd655339c0fb64e87628a0c09160d9eff0ff4db123f0cc",
-      "sourceSha256": "f2bb1b008c564541835f8ccb53b140185326f1e08435279d58d581d5b31dc4af",
-      "islandCoverage": 0.541988,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Neg_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "e9ade1a9b3cf77638824e436b465ffbe04f59ced0b15e5dec879275eeadd186a",
-      "sourceSha256": "85921883d43e071e4e0a3365676fbb95b4cc9f9be3a6b2d7c2599d62c532d0bf",
-      "islandCoverage": 0.541988,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Neg_ORM",
-      "mimeType": "image/webp",
-      "sha256": "70b873773c973999aec469cf0ee800012ce1be4e20f9d864d6eb643fa7d8e90d",
-      "sourceSha256": "3cf019034ca67f727a19ce731a92b13a6644293054c7c273a4f23caa4a7edcb9",
-      "islandCoverage": 0.541988,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Pos_Normal",
-      "mimeType": "image/webp",
-      "sha256": "4494318d8bd76020445bcda9759e4defc4834657fb5e3021f1a3fab1b2b512b4",
-      "sourceSha256": "f0f7c3b9517ad090990dc55eaa61d16568b4181896a3bca449992d46f4921391",
-      "islandCoverage": 0.545017,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Pos_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "6b9d0aefb04729aee0b8f2c50706e90414765d5f5ce4714f104fb6f6ddfd61ca",
-      "sourceSha256": "ea792e5ede9b658dac347dae2f9621cdb0ec89e2f8405e6a7b111ca5e65f1ba3",
-      "islandCoverage": 0.545017,
-      "rebake": true
-    },
-    {
-      "name": "HY150_ExteriorSideRelief_Pos_ORM",
-      "mimeType": "image/webp",
-      "sha256": "926ae1476b9cc33a429bf832cb0db811d7f4b72c6e6d974d0b0a3acd793ec40d",
-      "sourceSha256": "13ae35492d019a06ae941f6277b093aace06934c14a7102410ebbcf16e7e3afd",
-      "islandCoverage": 0.545017,
-      "rebake": true
-    },
-    {
-      "name": "HY150_RoundedUpperExterior_Normal",
-      "mimeType": "image/webp",
-      "sha256": "13bfe304957e1cf0f7c4f042230bd536f6087557ade898e24013a5d20a5cafcc",
-      "sourceSha256": "101464d5e1e1179317cbc24574abc6e98cabc790b5c1dde9fd15aa94f450a88f",
-      "islandCoverage": 0.474796,
-      "rebake": true
-    },
-    {
-      "name": "HY150_RoundedUpperExterior_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "a2016fb10f59b66cb05abebbf0dac58ad1ac53da53580f86bda754f11c51cb41",
-      "sourceSha256": "332a5400acc29c4a22458113c8a066b7289bab4beac926c080b0d98864ceef8a",
-      "islandCoverage": 0.474796,
-      "rebake": true
-    },
-    {
-      "name": "HY150_RoundedUpperExterior_ORM",
-      "mimeType": "image/webp",
-      "sha256": "571fc1bfb9c7941b2f63f009b178e021e4652041f8c2bb70e17dc8f3e27e09fd",
-      "sourceSha256": "ad70e4bf73d13b3d770fecacdca721ead8f4698017c367440f750f79d7d01ff4",
-      "islandCoverage": 0.474796,
-      "rebake": true
-    },
-    {
-      "name": "HY150_VisualFrontSleeve_Normal",
-      "mimeType": "image/webp",
-      "sha256": "e3a28138ead28a30b46cc1ff15312cf9693e440bceb765f5dee79cc4622d9095",
-      "sourceSha256": "3b4731a328c823dbed4379ac7616a1642075bc334de69d1e6d451bef347a1b4a",
-      "islandCoverage": 0.589287,
-      "rebake": true
-    },
-    {
-      "name": "HY150_VisualFrontSleeve_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "f75c6a05bca073a44878110893b2a3193e0c3d07cc679f696b2fec0f8fea659d",
-      "sourceSha256": "76b154ec83253f760355e1badd6e09703635b61ee65cffeecfc97ccceec768fb",
-      "islandCoverage": 0.589287,
-      "rebake": true
-    },
-    {
-      "name": "HY150_VisualFrontSleeve_ORM",
-      "mimeType": "image/webp",
-      "sha256": "fcbc6a6a99f2bc1f8c4660d42655d2103f29fe7659cb830ee136f72801e560b6",
-      "sourceSha256": "78396ee20b8649b4dfea2e9bbba82dd0de8bfbc79479dbff63219b91255e4824",
-      "islandCoverage": 0.589287,
-      "rebake": true
-    },
-    {
-      "name": "HY151_LowRearShoulder_Normal",
-      "mimeType": "image/webp",
-      "sha256": "28f4bb29b78f02a4a1846189814d6abd64fcfc5998555a756dfca91fa0f95a84",
-      "sourceSha256": "61b7e0c61eec23130bb05f47d04f8f52569a73cc6edc9d682924aa20946468f4",
-      "islandCoverage": 0.549644,
-      "rebake": true
-    },
-    {
-      "name": "HY151_LowRearShoulder_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "2922c51bd3f36e23edc12fb65350ab9c56a93844d2236d88f6677324415723c2",
-      "sourceSha256": "fd1f9c8f139d0543e5fa2d397c2dacb79c51ea2d3fedb883a8362e773332efac",
-      "islandCoverage": 0.549644,
-      "rebake": true
-    },
-    {
-      "name": "HY151_LowRearShoulder_ORM",
-      "mimeType": "image/webp",
-      "sha256": "5e6d6ff85f0ba27561858331dce44f0f58a5e8d373b2bbba6bce10177b1150e3",
-      "sourceSha256": "b111b927e9920b9b5259c171b9cea4026928567f58816b965986fae4f935542b",
-      "islandCoverage": 0.549644,
-      "rebake": true
-    },
-    {
-      "name": "HY153_VisualMouthLipAndShallowRecess_Normal",
-      "mimeType": "image/webp",
-      "sha256": "2d899bee6a383777d28a6b5176025e81c94cb3b659bdbf94a698c4b80e993be7",
-      "sourceSha256": "ddf5abd88a2468a72f29eeee8ac035fca6e3cef5c64625ce072e03347349bbab",
-      "islandCoverage": 0.386684,
-      "rebake": true
-    },
-    {
-      "name": "HY153_VisualMouthLipAndShallowRecess_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "eb50b6a435a94da0cf6e3e7dfd5e0b01421a9b53893bf977500232f6112a4e00",
-      "sourceSha256": "89690c8fecc6d334b72eebcfeb1dc3aaed712454856e416c6f332bf21b843c48",
-      "islandCoverage": 0.386684,
-      "rebake": true
-    },
-    {
-      "name": "HY153_VisualMouthLipAndShallowRecess_ORM",
-      "mimeType": "image/webp",
-      "sha256": "9a981467d39d72fb810214a2808bed3c41e4265a015d50ed1dac0438b9abe472",
-      "sourceSha256": "5206505849066dc9b13b40e116d936eb27506cc4a26b239d007a2ca4e1cc8da5",
-      "islandCoverage": 0.386684,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Neg_Normal",
-      "mimeType": "image/webp",
-      "sha256": "eecf00fda2edb4c7f1d5f07ebcf21e63809fa77e84039dd92e789bfafa72c90c",
-      "sourceSha256": "d3c73c81eb5232676b3e8349aa06e2a23fb3e5ee940c485915d4a9c73c2a038d",
-      "islandCoverage": 0.030169,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Neg_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "b8584d90cb5197ae37f11978947f75e20d579b9336a92b2f291e93e470d26989",
-      "sourceSha256": "af78e45867248e7d888a0ab062687f78f360711d12786b71936790bcc12cf081",
-      "islandCoverage": 0.030169,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Neg_ORM",
-      "mimeType": "image/webp",
-      "sha256": "4ecd58168521e14e933e14d74201b281aa584e4c52c770c56298f244bb34071f",
-      "sourceSha256": "23b67f7cd85ccc36ca8dceaa8760b7e629df9fcef7231fc111f560413471a4bf",
-      "islandCoverage": 0.030169,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Pos_Normal",
-      "mimeType": "image/webp",
-      "sha256": "2225e112925bf4ff8b072998700f2427ec8cb475345e54f83ec0f17fe27ef156",
-      "sourceSha256": "58e9aa65c8fc1078b47b65de0d6a55f8ffebd76be1b2cf9fbcb5265bab366c3c",
-      "islandCoverage": 0.02996,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Pos_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "be238afbcab26ca77c3af62f9b2d57da6c5bb3b682a45294cd349072112bf619",
-      "sourceSha256": "63f048ffdc38b80961fe7049704a14f43891cebd62ef61043887970c7df6b6fc",
-      "islandCoverage": 0.02996,
-      "rebake": true
-    },
-    {
-      "name": "HY155_ContinuousInnerEdgeTrim_Pos_ORM",
-      "mimeType": "image/webp",
-      "sha256": "5adeb479fb730d7661598508f1d9713c9a7b122379101f66191d5f31e710e3b4",
-      "sourceSha256": "715b6f030dc732999cd60bfb96f0de3936e5c76af0582231139b03c5f1a721fa",
-      "islandCoverage": 0.02996,
-      "rebake": true
-    },
-    {
-      "name": "LongOuterSteel_TrueRound_Normal",
-      "mimeType": "image/webp",
-      "sha256": "eecaa2dba2676a93d01fe3af177179e2a640477087410b1c98caf5143ca0b8c8",
-      "sourceSha256": "552acb695168b896ecca4b908797ed9096f65a9fc31f3f761bf40680ad30b6c1",
-      "islandCoverage": 0.558266,
-      "rebake": true
-    },
-    {
-      "name": "LongOuterSteel_TrueRound_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "ea72584550f04575146f185dd0f5bf431788e44ac154e74ed6ed363fcd8764f8",
-      "sourceSha256": "38a03dc5518701dc657cc80a46e5f2f4f722697f49aed5d07dfe5a236121af7e",
-      "islandCoverage": 0.558266,
-      "rebake": true
-    },
-    {
-      "name": "LongOuterSteel_TrueRound_ORM",
-      "mimeType": "image/webp",
-      "sha256": "b6f403db4096ab5f018bb9b8e9f9869560a33a4957330018aebf6a68d767e2d0",
-      "sourceSha256": "47a563d3bf01327cf928017dfae40e40019c0f2aeadfbf5c19625a85a2285cec",
-      "islandCoverage": 0.558266,
-      "rebake": true
-    },
-    {
-      "name": "LowerPlateGuard_FlatSideNarrowReturn_Normal",
-      "mimeType": "image/webp",
-      "sha256": "158a5e1b2eba1bd7fba1b3f27c3cee72314bf4062eac52e70dfad0098432d0a1",
-      "sourceSha256": "27b26825d8bf1a442e18ca2cf6435527c1d107efa73d1e7a78d2be1018721e40",
-      "islandCoverage": 0.226986,
-      "rebake": true
-    },
-    {
-      "name": "LowerPlateGuard_FlatSideNarrowReturn_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "17b729c234b3961c4abdd2ec0220daa42fd379dd0c86dfe4c4b5731999d62c81",
-      "sourceSha256": "0ed9daf1d81e327b7969b34f4322a20f494f51c22b486581a21bc1d2746491b8",
-      "islandCoverage": 0.226986,
-      "rebake": true
-    },
-    {
-      "name": "LowerPlateGuard_FlatSideNarrowReturn_ORM",
-      "mimeType": "image/webp",
-      "sha256": "55a022367dbaccb71895a4eed02e41eff5d979cb6f3ab6a9dc131b7f18db5c54",
-      "sourceSha256": "dfd393316bdca8966f9d6be66631d560f4d9fb77765b6e1920d359170965b7f8",
-      "islandCoverage": 0.226986,
-      "rebake": true
-    },
-    {
-      "name": "MainWood_ContinuousLowerShoulder_Normal",
-      "mimeType": "image/webp",
-      "sha256": "18b8daf99291c94593ed7f064d06ceb241b93862dcd7a6950a07be407dc744f4",
-      "sourceSha256": "24126d0bf5911090cfc904ae31f24cf23307c7a33ffc4c9a342494b52c17b70c",
-      "islandCoverage": 0.175897,
+      "sha256": "73d7624704ae64916ab8edfee8ef117d89b75d92928dd887d2d5777a78d36f18",
+      "sourceSha256": "529f01fcc3157fb73cf9d4c372a03b100494ae5875dfb869387438612b2f9ab0",
+      "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "738a93deac9781cfaf6aae50bc9e7f6fb22f68d59a2a9669d9102db0134e3891",
-      "sourceSha256": "6f75ab2bdcb7d7157ae6bbba0dd3760b5b36c92a8ce70fa1d0b6be32d789513b",
+      "sha256": "b10a74d049f986dda7903014bab5c2dc6f9a68aa5da3b4269df488842a2044f9",
+      "sourceSha256": "95527161935bf509c2eb54e702ca96633c0e8a74372f68b0774981258afb8351",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "64db82f8c3e9b0a2332790f511cc48e4dc03d157b4029c7bf2bb7e05a14baaa0",
-      "sourceSha256": "247fbcd1665e45400b57236943a48fbff887fce16f5bdf27e252adc32fde2830",
+      "sha256": "d50edd550a1c07c3f10ad43db249599b7422aa11e69c46ee88fa3d97fce217dc",
+      "sourceSha256": "82b6f0a2ab01baf6c8eafbb9db803df1210593e9c9738ae05cecb5f8db2467ce",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
-      "name": "MiddleSideDisk_Normal",
+      "name": "MainWood_ContinuousLowerShoulder_Normal",
       "mimeType": "image/webp",
-      "sha256": "af650bd71859baa768d9b0b7e765b2ea1b2c9ba9137672a167af53199b9935c0",
-      "sourceSha256": "e36323ed72ed1a83f7acd117059c7f7ecc25e055b8e84ce1eee01f461c4bd4a4",
-      "islandCoverage": 0.548954,
+      "sha256": "0048f5273108a787e82083a17c1e95f06bec3ecdf30ebd887b8667753d4b9603",
+      "sourceSha256": "9805454d618f4444c3b6190b544a0745b9f7064cbff292089b2be761b0a7e724",
+      "islandCoverage": 0.175897,
       "rebake": true
     },
     {
-      "name": "MiddleSideDisk_BaseColor",
+      "name": "MainWood_ContinuousLowerShoulder_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "49745478b1d8dca69f92dfae61c06afcdbee943f8c7f9c5a1910e8d400081054",
-      "sourceSha256": "9195d8c9e409ccb5003412a176b348c827ddafe6a12e8da2821de7bf390c09a7",
-      "islandCoverage": 0.548954,
-      "rebake": true
-    },
-    {
-      "name": "MiddleSideDisk_ORM",
-      "mimeType": "image/webp",
-      "sha256": "60cd0a19a5e530cf0f85f327d41970b64f50094bc1dd82f93bc52e9117084ebe",
-      "sourceSha256": "7b3bb7bd655e7cf4fba861660a1ecefb1898a2d5fd417ebcabe8cc93ecb5a44e",
-      "islandCoverage": 0.548954,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_1_Normal",
-      "mimeType": "image/webp",
-      "sha256": "3cf8353138c4609ceabd9b9b5672ebe2750b3178560666d125ddc1ef46a989f2",
-      "sourceSha256": "19ab24d9722811651ec29185d41369ce104ddb7a9da3baceb0efcc97c83132a3",
-      "islandCoverage": 0.578474,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_1_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "4ebd496d67655f306ef154d901d0d8f43cd474081178c9fef6e6bfa7cd05023b",
-      "sourceSha256": "c64ee2e87ebd1ea8bb12602a2a5a8254ff529bc07942cc94a445bcac85766a42",
-      "islandCoverage": 0.578474,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_1_ORM",
-      "mimeType": "image/webp",
-      "sha256": "7c08c7e14de64f4d348f674b3b862b95af26a46a1004f07b098a657583a87dbc",
-      "sourceSha256": "d15c16ab0583584ab15be6753c85517b654f5cd245d1b0460a82e7d8a49ff747",
-      "islandCoverage": 0.578474,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_2_Normal",
-      "mimeType": "image/webp",
-      "sha256": "81b1d3a9ce5ef8634232b96cecead5587bcab9e661034402cdcf73e7dc8f7a16",
-      "sourceSha256": "c1ceef4c054ef5e7a50ef61715013f993c9c1351085c2bc57c81b58d5973d495",
-      "islandCoverage": 0.628974,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_2_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "61113ed83df73f326942946b48fb0165c3ab07ec90fba504b366888e9e4fbb6e",
-      "sourceSha256": "eaaf13c74f026565d6c2ce4422122323c0ea2cfe52162cb81ee8682e34209e24",
-      "islandCoverage": 0.628974,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_2_ORM",
-      "mimeType": "image/webp",
-      "sha256": "a0f70153e8cc8e5d2831e886bab9a8205fd17976b1ccb1603fcea9fa5ad91737",
-      "sourceSha256": "166302d67593e078cb8ac1e3a1450457205c82019a39ea85c2d9913978781eb1",
-      "islandCoverage": 0.628974,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_3_Normal",
-      "mimeType": "image/webp",
-      "sha256": "28a31266f2f83836678cac31e5e27ccd8f2aeff6799d2a65620dcd36fb3ff65c",
-      "sourceSha256": "941fc1c1a739657336acd462ba0a7ab05b1ed566bc48c179882371a389cb1992",
-      "islandCoverage": 0.566546,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_3_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "a3f7140d7619f25f005d22657e22af0d94ea3f1b8f88d93f8c7744cddb69bf6f",
-      "sourceSha256": "ebe4a2e1a2f01891e2be15a633be55816d56fff3c33a55fac37bc62d3bb78cd6",
-      "islandCoverage": 0.566546,
-      "rebake": true
-    },
-    {
-      "name": "PlateExterior_ShallowSurfaceMark_3_ORM",
-      "mimeType": "image/webp",
-      "sha256": "1ebfd54adadd6a393737972c19fcb8f9092f8050986066bffc0debaab36a5cc1",
-      "sourceSha256": "603d5aac32e7a6c8e5b1f2851b9bc1322d90a9f1b4c3c4fb9b032c36bca0cbf1",
-      "islandCoverage": 0.566546,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ControlledCrown_Normal",
-      "mimeType": "image/webp",
-      "sha256": "0f02c7910bf8c15bd22cae13e46ca3bf54e92b8a88758458e29e95b2f25bc84b",
-      "sourceSha256": "23269d9c3c0dc6dc542d8db0d93dd5b1dbed16a23175f7b24650e7607c1da992",
-      "islandCoverage": 0.717499,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ControlledCrown_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "aa5303f0d799ce893f80c8411c2ddb4175e053a6f174a7364617c6f157aee63e",
-      "sourceSha256": "401569e9fb0329efb2f9f34cb5aede1560c6f96efe70962e7f32c6e441902a97",
-      "islandCoverage": 0.717499,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ControlledCrown_ORM",
-      "mimeType": "image/webp",
-      "sha256": "9c81d6e1254e73c2d42938c1f9dc9b3ebba7015a0f8049296b3cd055ca6774dd",
-      "sourceSha256": "a32391ead943b36aee07101ec313cee1c1bb0258aafb155e58aeee1076f35a10",
-      "islandCoverage": 0.717499,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentBridge_Normal",
-      "mimeType": "image/webp",
-      "sha256": "8de81011fc6cc6227b31d39867f5869d2d9aa440fe3342d7089dbf458e1c70e6",
-      "sourceSha256": "8e41907a366d7a336d8fc69946c3784f952635bd9943a44ac944f7dbb9d2e79a",
-      "islandCoverage": 0.549778,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentBridge_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "85ed984bde4b50069f0b9db975a9578f1d226af129061faa68b1db5d315ece4a",
-      "sourceSha256": "65bc0df88232b6132052e78eaf186d7bf8362017ab76246e7b32c3221feb7af0",
-      "islandCoverage": 0.549778,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentBridge_ORM",
-      "mimeType": "image/webp",
-      "sha256": "60b93f30dbc2cd3899de25fb291368bce22614fb576fbf662c880d415787b88a",
-      "sourceSha256": "47b92a5f230ade9f1d4d054968582120bebe2ad90070581be13f66a3d3c520a8",
-      "islandCoverage": 0.549778,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentLoop_Normal",
-      "mimeType": "image/webp",
-      "sha256": "1e2adb7475146994d60d26ae90c7ac4ae0cbf66725cb8e9cc1c3a2823372df8d",
-      "sourceSha256": "7ea053343d34ac048fdd7c765662eb65d65fd57f04feb81ae32af80c2a7cb57b",
-      "islandCoverage": 0.328816,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentLoop_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "679b4e049149f838c1d98ef2a094ed279fc4c1f3e97d9237079f9a09ad676cd1",
-      "sourceSha256": "d1a478b7835bea089352724d03ea287e0de0e79ff60aab151343e302df6aeb71",
-      "islandCoverage": 0.328816,
-      "rebake": true
-    },
-    {
-      "name": "RearBand_ExternalAttachmentLoop_ORM",
-      "mimeType": "image/webp",
-      "sha256": "d719b0d387963beec29a093821d494f6739a457602dd8b785c63625b5f7db561",
-      "sourceSha256": "c5658963889284386b68815bfde963db06557cb36d1bbf9e132ee694d36b3c84",
-      "islandCoverage": 0.328816,
-      "rebake": true
-    },
-    {
-      "name": "RearCockingExterior_Normal",
-      "mimeType": "image/webp",
-      "sha256": "2285eeeef71cc688778b02e4c1847c4f666e0dcae1680ebb36efc88374f7c695",
-      "sourceSha256": "0f3d34569e676a69007498439b9aeaf0215260d547c187d6a14db58db1337f21",
-      "islandCoverage": 0.691662,
-      "rebake": true
-    },
-    {
-      "name": "RearCockingExterior_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "46f2d5205babd3444dabf3451fed62ee53ffa90bba5272d6a161e43202e45bc9",
-      "sourceSha256": "a3f870cd233520f8432c04e0a734e6b3a42db60f9c086ef8488fe25caeca6d68",
-      "islandCoverage": 0.691662,
-      "rebake": true
-    },
-    {
-      "name": "RearCockingExterior_ORM",
-      "mimeType": "image/webp",
-      "sha256": "2280bde5cbb1622b6d173f7ea439b627e42bfbeeedc83e5585e7ed353b475e52",
-      "sourceSha256": "e88d22c3429f1ef99b2aa48b5a9fe4a2a60748f620e8514250dc76de3689004e",
-      "islandCoverage": 0.691662,
-      "rebake": true
-    },
-    {
-      "name": "RearOuterCover_RoundedSideReturn_Normal",
-      "mimeType": "image/webp",
-      "sha256": "f2eb6526991dd03714ccbe223f5e9fd854c12cb39da33560328265f8a2b73938",
-      "sourceSha256": "92008dd1197638b6e5002a22d3ef5df3bcd6ab84eb432282736f93b2208fa8fd",
-      "islandCoverage": 0.691457,
-      "rebake": true
-    },
-    {
-      "name": "RearOuterCover_RoundedSideReturn_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "44098e57c7c9643c44d2b21e7a403ebd4619ddf8e93ad4d8301ccefe7a969d97",
-      "sourceSha256": "0c0473b0885bccc7eef61d7b8a64aa5efc300b5c61dcac4f808b0efad8267456",
-      "islandCoverage": 0.691457,
-      "rebake": true
-    },
-    {
-      "name": "RearOuterCover_RoundedSideReturn_ORM",
-      "mimeType": "image/webp",
-      "sha256": "dbe1285e685ffa7739df48a772b190911cdd239dfb55b08dfb6531a025f1e796",
-      "sourceSha256": "e78921543755b4d6ccf78c426cdb8f63a0d04dba44a272712fd7282c6fea4b36",
-      "islandCoverage": 0.691457,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallCover_Normal",
-      "mimeType": "image/webp",
-      "sha256": "cea2d2474149bd9ff83d31d0c908dea6510409f856848d26582257b5d8dbc950",
-      "sourceSha256": "81eaf1de7e6efeff4f59b587e8becf37aa9fc221be1630ef68be0f3023c2164e",
-      "islandCoverage": 0.592592,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallCover_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "d784f2274e86dc4b7bb06adf089793d883b3807af9ac7d351132f3bc52308efa",
-      "sourceSha256": "1568e3c02c91a732a5c1c9fb5c9ecf73d559ba835af18396c0cf77115342db49",
-      "islandCoverage": 0.592592,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallCover_ORM",
-      "mimeType": "image/webp",
-      "sha256": "131d6f7372fc2557085fc8f408d9eaac42fdcf77e1ba654feca4c8ae772acc07",
-      "sourceSha256": "f87d2721078bd6088fe920c25a932c68d33486d9256fb403e29590bd8b810219",
-      "islandCoverage": 0.592592,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallPin_Normal",
-      "mimeType": "image/webp",
-      "sha256": "53ddcf8de38235cf72d44a2ba6cf3f6c1c30492b1a03dc82a1da44a7e0682efb",
-      "sourceSha256": "2d5b6f0221e1ccb60855062e50ba0a3e070837afd19dd993c3c5ff990c94e311",
-      "islandCoverage": 0.594162,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallPin_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "236897cf69bfdfbf8eb1e37e7528faf630e852248a9a2b562e80742a7255546f",
-      "sourceSha256": "262cfe4de4391fc7b7edb0090f262755bc53179cc354870ce592bb30d9b40588",
-      "islandCoverage": 0.594162,
-      "rebake": true
-    },
-    {
-      "name": "RearSmallPin_ORM",
-      "mimeType": "image/webp",
-      "sha256": "3910af16aeade96316f9e1a2c85034ecd002ee16098d857c815b7e43ce8c235a",
-      "sourceSha256": "f9e99bc3e19585f81721e63a233e015d0738d62c1b7df12d9a86d8bb6c05c767",
-      "islandCoverage": 0.594162,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentBridge_Normal",
-      "mimeType": "image/webp",
-      "sha256": "df111048664066fde358b4d62f1e88fbc018ba9c3fbc7d9d15f5c7e3218b5c7a",
-      "sourceSha256": "31d426fe338e7e07087a3abf54720ffabc5b6c83b8616835f11a528de254b798",
-      "islandCoverage": 0.185932,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentBridge_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "9706971dbf8837bc3f9c2fca070ad37fd8353ec3e2cb6d55a0a4b107daeadb8a",
-      "sourceSha256": "b8c9922930fba63c9d7260d4687a99dd020aa458fd1b81c08b4c890b9d80cff3",
-      "islandCoverage": 0.185932,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentBridge_ORM",
-      "mimeType": "image/webp",
-      "sha256": "135629e248438a92d76b59058269794db281ded4a307b5c1a662510ec26e61e9",
-      "sourceSha256": "fefcb891b5294f5d3b0251824cc372c3e92a5d9b9c64f06d0d269c328e236fc6",
-      "islandCoverage": 0.185932,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentLoop_Normal",
-      "mimeType": "image/webp",
-      "sha256": "5c853c210e86f22fabd93a7a88ace6cf52c1738da0c235ad6eee9231b667707a",
-      "sourceSha256": "8125e9f0bf72fc0719a091d2e903af31d9bde9f9ef2369ed043856c5b5505c34",
-      "islandCoverage": 0.302164,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentLoop_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "fe7069c25ff30055e1b794238f0811b1e5c0804b2020167d18107f1da68e5839",
-      "sourceSha256": "f471b69c3f91da25615875fcc46d88c3908c50147dc38476f30e5a4785d83580",
-      "islandCoverage": 0.302164,
-      "rebake": true
-    },
-    {
-      "name": "RearStock_ExternalAttachmentLoop_ORM",
-      "mimeType": "image/webp",
-      "sha256": "7959e4d5f83d745bbb881579b7db9a8b1b71ce99abd3d722c97995ce0704ec52",
-      "sourceSha256": "b9b5dd1e98465b5912bdf6dd41149e3c862c438d20d0125dc40b8b9361234218",
-      "islandCoverage": 0.302164,
-      "rebake": true
-    },
-    {
-      "name": "RearTab_Normal",
-      "mimeType": "image/webp",
-      "sha256": "2b7fedd5c679ad226ff087a2a7b249662bfdf817d09268651ffc55e17046330d",
-      "sourceSha256": "69691df6e36cbcf8d989871b3d276388be4c4ce3a5a134a9d6db8dfabaf4c8f3",
-      "islandCoverage": 0.470193,
-      "rebake": true
-    },
-    {
-      "name": "RearTab_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "402420754e185d88657ca785ee7094375659f28f605212655cd37baeb308a732",
-      "sourceSha256": "4765b96af6c212928afa02031291b26628f2722c8a692bb2d08bc6ff1b7c7116",
-      "islandCoverage": 0.470193,
-      "rebake": true
-    },
-    {
-      "name": "RearTab_ORM",
-      "mimeType": "image/webp",
-      "sha256": "c2eff4c5fff982c453e453180ae045d5ae57ece52ef4af6f70602f1aa4e15043",
-      "sourceSha256": "128db0cbb334f434cf928d601fc77c48be02f46e07ccdae7105feeeb50916027",
-      "islandCoverage": 0.470193,
-      "rebake": true
-    },
-    {
-      "name": "RearTopExternalLever_Normal",
-      "mimeType": "image/webp",
-      "sha256": "fcc52f718d2a72751a21968488ca9dc62c71fa25e0298b930025280e87e09787",
-      "sourceSha256": "4100850b9022c7d6d94c801ba1d0df8a7d089dd03ba9e236ae3a59b79fdf3fc9",
-      "islandCoverage": 0.291099,
-      "rebake": true
-    },
-    {
-      "name": "RearTopExternalLever_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "228f1b401c78b730e90b90d98f8795e324ad4474b037389ac567ca077ff0a110",
-      "sourceSha256": "0e754b6d8155646ea124fd1c794a72a90abc8171bd27b4a6ac05015624ea4de2",
-      "islandCoverage": 0.291099,
-      "rebake": true
-    },
-    {
-      "name": "RearTopExternalLever_ORM",
-      "mimeType": "image/webp",
-      "sha256": "8c2e161f16ecd1f7d620e4ef99807664dbab89f0dc07a3d0f66cfe056d7e3778",
-      "sourceSha256": "e27e6a21e7d7c745a2036ddef5619ce63adca8a1cf962ad6fe435cf342d922db",
-      "islandCoverage": 0.291099,
-      "rebake": true
-    },
-    {
-      "name": "ReceiverOuterCollar_Normal",
-      "mimeType": "image/webp",
-      "sha256": "10bab6a63c72ff8e5e13a4e881d91119c7ccb3e88cb76c465160a9e6ccad9234",
-      "sourceSha256": "62768ab2b712e40ac10feda7215a07a8c372e3f9396e554f8c21b10d9e17129f",
-      "islandCoverage": 0.282864,
-      "rebake": true
-    },
-    {
-      "name": "ReceiverOuterCollar_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "3b11925ddece8b6f827518f4d1c8bca1a1155710092026fdfcc32727c8e45c7c",
-      "sourceSha256": "2a84679378cb1c368027288c06f72f5e12a7159756f3f4c69f426cc5b03d89ba",
-      "islandCoverage": 0.282864,
-      "rebake": true
-    },
-    {
-      "name": "ReceiverOuterCollar_ORM",
-      "mimeType": "image/webp",
-      "sha256": "d4f9030f3afd0bd057b6c700da116b795785ee6ff6f30393b31cfc508df2537b",
-      "sourceSha256": "1b994644eea5208b365e94612449a9786f45e9e2b48c2946f390efc607d3ae10",
-      "islandCoverage": 0.282864,
-      "rebake": true
-    },
-    {
-      "name": "SideWoodButton_Normal",
-      "mimeType": "image/webp",
-      "sha256": "43e9b6eb06e6973dd57fd16d1b0e028b4f6e3693846b0904c96f296fe6b3a82c",
-      "sourceSha256": "9ae5236aaff8fdbf775f4ba47c14b06c46a57614b31901529aa1ec3e5c1b6aa9",
-      "islandCoverage": 0.647002,
-      "rebake": true
-    },
-    {
-      "name": "SideWoodButton_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "4f3285035c42d3cc340c6bfd1de14947466c36a970db106ef38b0e69ba2bf904",
-      "sourceSha256": "ee51932c5ca19b313c316aacae718fbb873b752bd032cd49ce6be6314318f71f",
-      "islandCoverage": 0.647002,
-      "rebake": true
-    },
-    {
-      "name": "SideWoodButton_ORM",
-      "mimeType": "image/webp",
-      "sha256": "c923682121080ff8093f50ab976e5a47b7f1a88813234228f4429d4580892cdf",
-      "sourceSha256": "8afd6510edff05f2ee5434524b1c391f52bf41a9b0f22a1cc464cc826f872414",
-      "islandCoverage": 0.647002,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_Normal",
-      "mimeType": "image/webp",
-      "sha256": "c175d7ff1feb6eb3b8fea945ca6461d410dd953bf7050d9f90dfea662efaaac2",
-      "sourceSha256": "5f6c79bbfad673af70345aaa1ea1c73e84f584a168830821fee57e8b80d8f3f8",
-      "islandCoverage": 0.433986,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "f23af03406f4bffc1300c5ea1d6658590bf7436f0b176084b195581520005fde",
-      "sourceSha256": "6fcc18b0b18f7bcabcecdab367abcce83ffd0df7aaa0258dfb48d598f2417314",
-      "islandCoverage": 0.433986,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowContinuousLeaf_NoUnknownNumbers_ORM",
-      "mimeType": "image/webp",
-      "sha256": "862900ae943e8b4172075c6b8dd873022470cba22a761d03285eb964ea04ee9b",
-      "sourceSha256": "d5383ad11a5abe52125b184b25dc9bc6e27d6f57a0945ed14c99ccedca550b57",
-      "islandCoverage": 0.433986,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowCrossPiece_Normal",
-      "mimeType": "image/webp",
-      "sha256": "908c493a569bb7884dc20a86b66152187681229ca69870c53efe68d712bee695",
-      "sourceSha256": "7df7a86434f373e877917bf82625dc1eb9628c384ee36b41667feaa7d6e5eb27",
-      "islandCoverage": 0.555035,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowCrossPiece_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "283f841594825582bdf40cf5d8569b1494b163bf75b5314c9ee494b09539ca27",
-      "sourceSha256": "a3ffa60f7192519c78370774c33aa685a704c5280afd0b32032a1b635026d611",
-      "islandCoverage": 0.555035,
-      "rebake": true
-    },
-    {
-      "name": "Sight_LowCrossPiece_ORM",
-      "mimeType": "image/webp",
-      "sha256": "8aef041fbf11f23d46f189bada266b1142122254fbc9de52c2bb45f3ca0ff6b0",
-      "sourceSha256": "8475a40872e10c8008efc70918c2f47dd56feefc7c530687fc5aedf868705ee1",
-      "islandCoverage": 0.555035,
-      "rebake": true
-    },
-    {
-      "name": "Sight_ShallowRoundSeat_Normal",
-      "mimeType": "image/webp",
-      "sha256": "6004b08529c247421a08948a6f437a737c57fc539884b1b1b74d0c2b9678b23e",
-      "sourceSha256": "4ef655b1eb8047d6474f4e45ad3a786664ab15813974b737c145fc7b15613cc7",
-      "islandCoverage": 0.444984,
-      "rebake": true
-    },
-    {
-      "name": "Sight_ShallowRoundSeat_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "bbbceda2c697910b899da76552b58fecc9876706226e3e11a6d089066c129a1b",
-      "sourceSha256": "7327a193ceb3b06c28f07d3e6a57e2d6f03cfc8e884e2f536811bb970300c427",
-      "islandCoverage": 0.444984,
-      "rebake": true
-    },
-    {
-      "name": "Sight_ShallowRoundSeat_ORM",
-      "mimeType": "image/webp",
-      "sha256": "0cb591ce00aa15c2915d0bf529e78327c30b0e3bb07cd5c48cc1955b2d5a956b",
-      "sourceSha256": "c286e90dc9cddb279f098da90eef4c779710b447c0479f0957194dc4adb88ef6",
-      "islandCoverage": 0.444984,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_1_Normal",
-      "mimeType": "image/webp",
-      "sha256": "74e565cf7b09e9bb48b9ef61b0bc92e7c985389636eaa4e4f8ee0bf71228f2b3",
-      "sourceSha256": "ce0383d5547eddead64dbdc52287236974b0f19260de9adc6b612880bfa47a97",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_1_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "d6d2683ff3f1ebc4387030fa8a01ac3e46e18efb7128605b8817ceab78d508a9",
-      "sourceSha256": "d067a843586ae56a12f77de635fc26d11349adb2ee3419dc6d6a711c80ea78e1",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_1_ORM",
-      "mimeType": "image/webp",
-      "sha256": "b3211a32cf649d474d6674b386cb443ba0f82864c0c3d300a5a8958f06843b4b",
-      "sourceSha256": "b8fa5a4e65bea8b674309f70b11f0f3e5012e7ced3fd5d6695ba99ac630ce56f",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_-1_Normal",
-      "mimeType": "image/webp",
-      "sha256": "bd082af664c6fcf6f8e189902ab2d87ad421470dc5e030e8b0da4dce29969baa",
-      "sourceSha256": "4b5dd7e55bc5c3637bb58d97595616bbe4256b3d00a6d87e6f672ad7399c1ce9",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_-1_BaseColor",
-      "mimeType": "image/webp",
-      "sha256": "dc43bae8d32ddf72cc2ca9cf706c1d2c1d704b9f8c85fe2d93bef86cefd3dc99",
-      "sourceSha256": "9f55f19b684b21e02d330c2735fbefb8f2d30fe46d14d26157644cef560b9f6a",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Sight_SideRoundHead_-1_ORM",
-      "mimeType": "image/webp",
-      "sha256": "27b5a0ed2c7411309bf0f4aabd9d91f3679ebb1093449409eab767b6de1929ed",
-      "sourceSha256": "3cc8f06d30abbadb701e53ec56bc2ad78e28a55055d737066e50c57c93987e4f",
-      "islandCoverage": 0.667957,
-      "rebake": true
-    },
-    {
-      "name": "Trigger_FlatCurvedExternalStrip_Normal",
-      "mimeType": "image/webp",
-      "sha256": "87d39430b6c4b04e939bf50de6e089d23b8e9cbcf2bb643f66a78d6ed75ea3d4",
-      "sourceSha256": "d7be6bdd26adc2da616993b3aafe2040a6d0675bd1516757bc800802c8d909d7",
-      "islandCoverage": 0.544674,
+      "sha256": "e371be6a25addbe79cf9ec00c61c88e4764875f8272958d52359393ea53b583c",
+      "sourceSha256": "1cac95412476d5d04f3136ad418261b0232deca9bd0e183fe0f4679f3e3d0ed3",
+      "islandCoverage": 0.175897,
       "rebake": true
     },
     {
@@ -1699,48 +963,40 @@
       "rebake": true
     },
     {
-      "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
+      "name": "Trigger_FlatCurvedExternalStrip_Normal",
       "mimeType": "image/webp",
-      "sha256": "442b8309345dd0ee450b6cd643cacb36396df132d9b31afedf67a3b1d0939959",
-      "sourceSha256": "953f74d464756aa07c2ea1e13d86249fdd312f7d08d2e1d174f64b5d2c6d378a",
-      "islandCoverage": 0.32717,
+      "sha256": "87d39430b6c4b04e939bf50de6e089d23b8e9cbcf2bb643f66a78d6ed75ea3d4",
+      "sourceSha256": "d7be6bdd26adc2da616993b3aafe2040a6d0675bd1516757bc800802c8d909d7",
+      "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "769d4b195ed97415842ef12540978a2b67311b2c85f5419de4dfb5d48e1e1651",
-      "sourceSha256": "ba95882b59086b64148c9c6e90f27b41b4a05e02194162dedd701549e5cb6c13",
+      "sha256": "db5f62889fe7d0869f6f7f592265e8aaebdeaa49c9573179a23f7c04b5d41eb9",
+      "sourceSha256": "e9da5b417b658d548bad3a9af0dd7aa2c9a337bd9c90b92ed08655d777a9977f",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "ec39455cccb8e843336669176f072b4d758fe045224827b2cdfde1578e523d9d",
-      "sourceSha256": "884161aa6bc8356b005fcafdc5de31200bd82a69b04346a13189d0ef11f3a28a",
+      "sha256": "a43da6ac700d0f84ca2b06b3946f3952bb64a6a7c90e6c88f0914fb11b091232",
+      "sourceSha256": "d3501cf635ec282d7f9660595294c09c207618736ec34e468605be79fcb56507",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
-      "name": "MainWood_ContinuousLowerShoulder_OilFilm",
+      "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
       "mimeType": "image/webp",
-      "sha256": "2d47995a9acbcd0b19e149df468ad4730c4eb341d21ac0dd23eaa34958889836",
-      "sourceSha256": "27e88848c45b8fd865699252c3c319f6dd4e88f98ecd1883bf76171c4e7b4f5a",
-      "islandCoverage": 0.175897,
-      "rebake": true
-    },
-    {
-      "name": "FrontWood_ContinuousOval_OilFilm",
-      "mimeType": "image/webp",
-      "sha256": "f69a70f10c7da155786be2672ef0f4eac6ccd710b8b2e0f3cc4ca3015ea9e74b",
-      "sourceSha256": "e668679c19425bd633cd8627c325755ad5623bc305f0e4a7a1f1baec8bcff212",
-      "islandCoverage": 0.261859,
+      "sha256": "32acc11b33ecc7844feab0a7d78855b86b1cafff26718eb82397a15e61ccc6cc",
+      "sourceSha256": "14fa4644f2cd91ff07d1014bf87640f3eca092d31dcd1b023f9cdfb957ca65c5",
+      "islandCoverage": 0.32717,
       "rebake": true
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R32: eased exterior edge transitions and shared dark walnut stain.",
+  "rebake": "R33: rolled side disks, stock-seated rear cover and compressed timber wear.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -2008,7 +1264,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261126R32",
+    "version": "173R-20261127R33",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -2194,12 +1450,12 @@
   },
   "runtimeNormalPacking": {
     "runtimeBits": 8,
-    "images": 44,
+    "images": 13,
     "source": "OpenGL material normals reoriented into the exported tangent frame, independent of pigment."
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261126R32",
+    "version": "173R-20261127R33",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -2365,10 +1621,10 @@
         "fromR2M": 0.004408444660497924
       },
       "MiddleSideDisk": {
-        "toDotsM": 6.067890353733674e-05,
-        "fromDotsM": 0.0001223885192302987,
-        "toR2M": 2.045239398285048e-06,
-        "fromR2M": 2.272318624818581e-06
+        "toDotsM": 5.5925920605659485e-05,
+        "fromDotsM": 6.413939192825258e-05,
+        "toR2M": 0.00012005445003352789,
+        "fromR2M": 9.118497486489236e-05
       },
       "PlateExterior_ShallowSurfaceMark_1": {
         "toDotsM": 1.9619345039245673e-05,
@@ -2413,10 +1669,10 @@
         "fromR2M": 0.00010180528125604042
       },
       "RearOuterCover_RoundedSideReturn": {
-        "toDotsM": 0.006529168822219472,
-        "fromDotsM": 0.010142046546120324,
-        "toR2M": 0.0002899998798966408,
-        "fromR2M": 0.0023233905039522044
+        "toDotsM": 0.023654422015105342,
+        "fromDotsM": 0.009502370089390194,
+        "toR2M": 0.01967492072060678,
+        "fromR2M": 0.010002643103796083
       },
       "RearSmallCover": {
         "toDotsM": 0.013969024120872614,
@@ -2461,10 +1717,10 @@
         "fromR2M": 0.00032432745899299423
       },
       "SideWoodButton": {
-        "toDotsM": 5.440817403723486e-05,
-        "fromDotsM": 0.00010239520634058863,
-        "toR2M": 1.0156387588722282e-06,
-        "fromR2M": 1.0449456340211327e-06
+        "toDotsM": 6.33173635765398e-05,
+        "fromDotsM": 4.4223940626683714e-05,
+        "toR2M": 0.00014682827439603993,
+        "fromR2M": 8.264931553916331e-05
       },
       "Sight_LowContinuousLeaf_NoUnknownNumbers": {
         "toDotsM": 0.00018376749600654442,
@@ -2526,6 +1782,11 @@
         "after": 3448,
         "roundedFaces": 192
       },
+      "MiddleSideDisk": {
+        "before": 912,
+        "after": 952,
+        "roundedFaces": 576
+      },
       "RearCockingExterior": {
         "before": 576,
         "after": 720,
@@ -2533,8 +1794,8 @@
       },
       "RearOuterCover_RoundedSideReturn": {
         "before": 1144,
-        "after": 952,
-        "roundedFaces": 640
+        "after": 1076,
+        "roundedFaces": 180
       },
       "RearSmallCover": {
         "before": 576,
@@ -2555,6 +1816,11 @@
         "before": 2058,
         "after": 2573,
         "roundedFaces": 632
+      },
+      "SideWoodButton": {
+        "before": 883,
+        "after": 792,
+        "roundedFaces": 480
       },
       "Sight_LowContinuousLeaf_NoUnknownNumbers": {
         "before": 77,
@@ -2616,6 +1882,777 @@
       "channel": "linear ORM red",
       "strength": 0.85,
       "sampling": "32 cosine-weighted directions per fixed exterior vertex. The guard return also samples the opposite inner wall."
+    }
+  },
+  "batching": {
+    "originalMeshes": 44,
+    "renderMeshes": 13,
+    "authoredSha256": "a5e0bf4d766a8c87f1b032394cdd5d5b8fad0036916d7b484dfa058063982b4c",
+    "materials": 13,
+    "sourceImages": 134,
+    "images": 41,
+    "gutter": 32,
+    "tiles": {
+      "ButtCap_LimitedProfileBlend": {
+        "crop": [
+          -28,
+          -28,
+          1916,
+          2104
+        ],
+        "placement": [
+          0,
+          0,
+          1916,
+          2104
+        ],
+        "size": [
+          3988,
+          2104
+        ],
+        "sourceSize": 2048
+      },
+      "LongOuterSteel_TrueRound": {
+        "crop": [
+          -24,
+          -16,
+          2072,
+          2088
+        ],
+        "placement": [
+          1916,
+          0,
+          2072,
+          2088
+        ],
+        "size": [
+          3988,
+          2104
+        ],
+        "sourceSize": 2048
+      },
+      "LowerPlateGuard_FlatSideNarrowReturn": {
+        "crop": [
+          -20,
+          -12,
+          1880,
+          2084
+        ],
+        "placement": [
+          0,
+          0,
+          1880,
+          2084
+        ],
+        "size": [
+          3720,
+          2084
+        ],
+        "sourceSize": 2048
+      },
+      "ReceiverOuterCollar": {
+        "crop": [
+          -20,
+          -12,
+          1840,
+          2084
+        ],
+        "placement": [
+          1880,
+          0,
+          1840,
+          2084
+        ],
+        "size": [
+          3720,
+          2084
+        ],
+        "sourceSize": 2048
+      },
+      "FrontBand_ContinuousEnvelopeContact": {
+        "crop": [
+          196,
+          16,
+          1656,
+          2016
+        ],
+        "placement": [
+          0,
+          0,
+          1656,
+          2016
+        ],
+        "size": [
+          3672,
+          2016
+        ],
+        "sourceSize": 2048
+      },
+      "RearBand_ControlledCrown": {
+        "crop": [
+          16,
+          16,
+          2016,
+          1944
+        ],
+        "placement": [
+          1656,
+          0,
+          2016,
+          1944
+        ],
+        "size": [
+          3672,
+          2016
+        ],
+        "sourceSize": 2048
+      },
+      "RearOuterCover_RoundedSideReturn": {
+        "crop": [
+          -20,
+          -24,
+          1852,
+          2096
+        ],
+        "placement": [
+          0,
+          0,
+          1852,
+          2096
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 2048
+      },
+      "MiddleSideDisk": {
+        "crop": [
+          -28,
+          -28,
+          1080,
+          1076
+        ],
+        "placement": [
+          0,
+          2096,
+          1080,
+          1076
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "PlateExterior_ShallowSurfaceMark_3": {
+        "crop": [
+          -28,
+          -28,
+          1076,
+          1080
+        ],
+        "placement": [
+          1080,
+          2096,
+          1076,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "SideWoodButton": {
+        "crop": [
+          -28,
+          -28,
+          1076,
+          1080
+        ],
+        "placement": [
+          1852,
+          0,
+          1076,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "RearBand_ExternalAttachmentLoop": {
+        "crop": [
+          -32,
+          -12,
+          1088,
+          1068
+        ],
+        "placement": [
+          2156,
+          1080,
+          1088,
+          1068
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "PlateExterior_ShallowSurfaceMark_1": {
+        "crop": [
+          -28,
+          -28,
+          1068,
+          1080
+        ],
+        "placement": [
+          2156,
+          2148,
+          1068,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "PlateExterior_ShallowSurfaceMark_2": {
+        "crop": [
+          -28,
+          -28,
+          1028,
+          1080
+        ],
+        "placement": [
+          2928,
+          0,
+          1028,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "HY155_ContinuousInnerEdgeTrim_Neg": {
+        "crop": [
+          -28,
+          -28,
+          672,
+          1080
+        ],
+        "placement": [
+          3244,
+          1080,
+          672,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "HY155_ContinuousInnerEdgeTrim_Pos": {
+        "crop": [
+          -28,
+          -28,
+          672,
+          1080
+        ],
+        "placement": [
+          3224,
+          2160,
+          672,
+          1080
+        ],
+        "size": [
+          3956,
+          3240
+        ],
+        "sourceSize": 1024
+      },
+      "RearStock_ExternalAttachmentLoop": {
+        "crop": [
+          -32,
+          92,
+          1088,
+          964
+        ],
+        "placement": [
+          0,
+          0,
+          1088,
+          964
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 1024
+      },
+      "HY153_VisualMouthLipAndShallowRecess": {
+        "crop": [
+          -36,
+          -28,
+          580,
+          568
+        ],
+        "placement": [
+          1088,
+          0,
+          580,
+          568
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "HY150_VisualFrontSleeve": {
+        "crop": [
+          -32,
+          -32,
+          564,
+          576
+        ],
+        "placement": [
+          1088,
+          568,
+          564,
+          576
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "FrontSideBoss_LowRoundedExterior": {
+        "crop": [
+          -32,
+          -32,
+          556,
+          576
+        ],
+        "placement": [
+          1652,
+          568,
+          556,
+          576
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "RearStock_ExternalAttachmentBridge": {
+        "crop": [
+          -28,
+          -24,
+          568,
+          560
+        ],
+        "placement": [
+          1668,
+          0,
+          568,
+          560
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "FrontBandSideStrip": {
+        "crop": [
+          -32,
+          -32,
+          576,
+          528
+        ],
+        "placement": [
+          2208,
+          560,
+          576,
+          528
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "RearBand_ExternalAttachmentBridge": {
+        "crop": [
+          -28,
+          -24,
+          568,
+          500
+        ],
+        "placement": [
+          2236,
+          0,
+          568,
+          500
+        ],
+        "size": [
+          2804,
+          1144
+        ],
+        "sourceSize": 512
+      },
+      "HandledCylinder": {
+        "crop": [
+          -24,
+          240,
+          2096,
+          1832
+        ],
+        "placement": [
+          0,
+          0,
+          2096,
+          1832
+        ],
+        "size": [
+          3748,
+          1840
+        ],
+        "sourceSize": 2048
+      },
+      "HandleNeck": {
+        "crop": [
+          -32,
+          -4,
+          1088,
+          1060
+        ],
+        "placement": [
+          2096,
+          0,
+          1088,
+          1060
+        ],
+        "size": [
+          3748,
+          1840
+        ],
+        "sourceSize": 1024
+      },
+      "HandleSphere": {
+        "crop": [
+          -28,
+          272,
+          1080,
+          780
+        ],
+        "placement": [
+          2096,
+          1060,
+          1080,
+          780
+        ],
+        "size": [
+          3748,
+          1840
+        ],
+        "sourceSize": 1024
+      },
+      "HandleRoot": {
+        "crop": [
+          -32,
+          -32,
+          572,
+          548
+        ],
+        "placement": [
+          3176,
+          1060,
+          572,
+          548
+        ],
+        "size": [
+          3748,
+          1840
+        ],
+        "sourceSize": 512
+      },
+      "HY150_RoundedUpperExterior": {
+        "crop": [
+          -32,
+          -32,
+          576,
+          576
+        ],
+        "placement": [
+          0,
+          0,
+          576,
+          576
+        ],
+        "size": [
+          576,
+          2276
+        ],
+        "sourceSize": 512
+      },
+      "HY150_ExteriorSideRelief_Neg": {
+        "crop": [
+          -32,
+          -32,
+          572,
+          568
+        ],
+        "placement": [
+          0,
+          576,
+          572,
+          568
+        ],
+        "size": [
+          576,
+          2276
+        ],
+        "sourceSize": 512
+      },
+      "HY150_ExteriorSideRelief_Pos": {
+        "crop": [
+          -32,
+          -32,
+          572,
+          568
+        ],
+        "placement": [
+          0,
+          1144,
+          572,
+          568
+        ],
+        "size": [
+          576,
+          2276
+        ],
+        "sourceSize": 512
+      },
+      "HY151_LowRearShoulder": {
+        "crop": [
+          -32,
+          -32,
+          564,
+          564
+        ],
+        "placement": [
+          0,
+          1712,
+          564,
+          564
+        ],
+        "size": [
+          576,
+          2276
+        ],
+        "sourceSize": 512
+      },
+      "RearCockingExterior": {
+        "crop": [
+          -28,
+          -28,
+          972,
+          1080
+        ],
+        "placement": [
+          0,
+          0,
+          972,
+          1080
+        ],
+        "size": [
+          3940,
+          1080
+        ],
+        "sourceSize": 1024
+      },
+      "RearTab": {
+        "crop": [
+          -28,
+          -28,
+          864,
+          1080
+        ],
+        "placement": [
+          972,
+          0,
+          864,
+          1080
+        ],
+        "size": [
+          3940,
+          1080
+        ],
+        "sourceSize": 1024
+      },
+      "RearTopExternalLever": {
+        "crop": [
+          -28,
+          -28,
+          448,
+          1080
+        ],
+        "placement": [
+          1836,
+          0,
+          448,
+          1080
+        ],
+        "size": [
+          3940,
+          1080
+        ],
+        "sourceSize": 1024
+      },
+      "RearSmallCover": {
+        "crop": [
+          -28,
+          -28,
+          1080,
+          952
+        ],
+        "placement": [
+          2284,
+          0,
+          1080,
+          952
+        ],
+        "size": [
+          3940,
+          1080
+        ],
+        "sourceSize": 1024
+      },
+      "RearSmallPin": {
+        "crop": [
+          -32,
+          -32,
+          576,
+          576
+        ],
+        "placement": [
+          3364,
+          0,
+          576,
+          576
+        ],
+        "size": [
+          3940,
+          1080
+        ],
+        "sourceSize": 512
+      },
+      "Sight_LowContinuousLeaf_NoUnknownNumbers": {
+        "crop": [
+          -28,
+          -28,
+          1076,
+          1080
+        ],
+        "placement": [
+          0,
+          0,
+          1076,
+          1080
+        ],
+        "size": [
+          3224,
+          1152
+        ],
+        "sourceSize": 1024
+      },
+      "Sight_LowCrossPiece": {
+        "crop": [
+          -28,
+          -28,
+          1060,
+          1076
+        ],
+        "placement": [
+          1076,
+          0,
+          1060,
+          1076
+        ],
+        "size": [
+          3224,
+          1152
+        ],
+        "sourceSize": 1024
+      },
+      "Sight_ShallowRoundSeat": {
+        "crop": [
+          -32,
+          -32,
+          572,
+          576
+        ],
+        "placement": [
+          2136,
+          0,
+          572,
+          576
+        ],
+        "size": [
+          3224,
+          1152
+        ],
+        "sourceSize": 512
+      },
+      "Sight_SideRoundHead_1": {
+        "crop": [
+          -32,
+          -32,
+          544,
+          576
+        ],
+        "placement": [
+          2136,
+          576,
+          544,
+          576
+        ],
+        "size": [
+          3224,
+          1152
+        ],
+        "sourceSize": 512
+      },
+      "Sight_SideRoundHead_-1": {
+        "crop": [
+          -32,
+          -32,
+          544,
+          576
+        ],
+        "placement": [
+          2680,
+          576,
+          544,
+          576
+        ],
+        "size": [
+          3224,
+          1152
+        ],
+        "sourceSize": 512
+      }
     }
   }
 }

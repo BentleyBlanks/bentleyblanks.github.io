@@ -58,18 +58,21 @@ function CollectMeshes(root) {
     const groups = Array.isArray(material)
       ? geometry.groups.filter(({ materialIndex }) => material[materialIndex])
       : [{ start: 0, count, materialIndex: 0 }];
-    const parts = groups.map((group) => {
+    const regions = userData.hanYangPartRanges;
+    const parts = (regions || groups).map((group) => {
       const start = Math.max(range.start, group.start);
       const end = Math.min(count, range.start + range.count, group.start + group.count);
       return {
-        object, start, count: Math.max(0, end - start), slot: group.materialIndex,
-        material: Array.isArray(material) ? material[group.materialIndex] : material,
+        object, start, count: Math.max(0, end - start), slot: group.materialIndex ?? 0,
+        material: Array.isArray(material) ? material[group.materialIndex] : material, name: group.name,
       };
     }).filter((part) => part.count > 0);
     meshes.push({
-      name: userData.hanYang173RPart || userData.type38Part || object.name || `Mesh ${meshes.length + 1}`,
+      name: (regions && material.name) || userData.hanYang173RPart || userData.type38Part || object.name || `Mesh ${meshes.length + 1}`,
       vertices,
       parts,
+      submeshCount: groups.length,
+      hasRegions: Boolean(regions),
     });
   });
   return meshes;
@@ -229,7 +232,8 @@ export function ShowWeaponModelInspector(container, model, stage) {
     Field(fields, "顶点", number.format(mesh.vertices));
     Field(fields, "三角面", number.format(mesh.parts.reduce((sum, part) => sum + part.count / 3, 0)));
     const heading = Element(meshPanel, "h4", "", "texture-heading");
-    Element(heading, "span", "子网格");
+    if (mesh.hasRegions) Field(fields, "子网格", number.format(mesh.submeshCount));
+    Element(heading, "span", mesh.hasRegions ? "部件区域" : "子网格");
     Element(heading, "small", String(mesh.parts.length));
     const slots = Element(meshPanel, "ol", "", "mesh-slots");
     mesh.parts.forEach((part, index) => {
@@ -240,7 +244,7 @@ export function ShowWeaponModelInspector(container, model, stage) {
       button.setAttribute("aria-pressed", "false");
       button.title = `材质槽 ${part.slot} · ${number.format(part.count / 3)} 三角面 · ${names[materialIndex]}`;
       Element(button, "small", String(index));
-      Element(button, "span", names[materialIndex]);
+      Element(button, "span", part.name || names[materialIndex]);
       Element(button, "small", number.format(part.count / 3));
       button.addEventListener("click", () => {
         const selecting = button.getAttribute("aria-pressed") === "false";

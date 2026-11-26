@@ -34,16 +34,16 @@ try{
    const {MeasureHanYangPixels}=await import('./_import/Script_HanYang173RPixelProbe.mjs');
    const surfaces=MeasureHanYangPixels(g);g.StepFrames(1);
    return {primary:g.state.slots.primary,identity:g.state.identity.weapon,weapon:vm.weaponId,version:vm.rig.assetVersion,surfaces,
-    riggedArms:!!vm.riggedArms,parts:meshes.length,triangles:meshes.reduce((n,o)=>n+(o.geometry.index?.count||o.geometry.attributes.position.count)/3,0),
+    riggedArms:!!vm.riggedArms,drawMeshes:meshes.length,parts:meshes.reduce((sum,mesh)=>sum+(mesh.userData.hanYangPartRanges?.length||1),0),triangles:meshes.reduce((n,o)=>n+(o.geometry.index?.count||o.geometry.attributes.position.count)/3,0),
     worldTriangles:[...world.geometries.values()].reduce((n,o)=>n+(o.index?.count||o.attributes.position.count)/3,0),
     legacyDocument:g.actorFactory.meshDocs.has('HanYang'),glError:g.renderer.getContext().getError()};
   });rows.push({arms,...row,errors,requests,expectedMissing});
   assert.equal(row.primary,'HanYang');assert.equal(row.identity,'HanYang');assert.equal(row.weapon,'HanYang');
-  assert.equal(row.version,'173R-20261126R32');assert.equal(row.parts,44);assert.equal(row.triangles,79440);assert.equal(row.worldTriangles,79440);
+  assert.equal(row.version,'173R-20261127R33');assert.equal(row.parts,44);assert.equal(row.drawMeshes,13);assert.equal(row.triangles,79513);assert.equal(row.worldTriangles,79513);
   assert(row.surfaces.metal.pixels>1000&&row.surfaces.wood.pixels>1000,'authored gun is actually visible in the editor, not just loaded');
   assert.equal(row.legacyDocument,false);assert.equal(row.riggedArms,arms==='rigged');assert.equal(row.glError,0);assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);
   await page.screenshot({path:path.join(out,`Scene_${arms}.png`)});await page.close();
-  console.log(`ok default blockout ${arms}: ${row.triangles} triangles, 44 parts, no retired gun request`);
+  console.log(`ok default blockout ${arms}: ${row.triangles} triangles, 44 parts in 13 meshes, no retired gun request`);
  }
  const page=await browser.newPage(),requests=[];
  page.on('request',r=>{if(/Model_HanYang\.tzm/.test(r.url()))requests.push(r.url());});

@@ -14,7 +14,7 @@ import sys
 # BlenderMCP runs scripts from the owned worktree root.
 fineProfiles = Path.cwd()/'Taierzhuang1938/_blender'
 sys.path.insert(0,str(fineProfiles))
-from Script_HanYangFineReturns import RoundedAxialCap, RoundedPlate
+from Script_HanYangFineReturns import RearStockSaddle, RoundedAxialCap, RoundedPlate, RoundedSideDisks
 
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
@@ -98,82 +98,12 @@ def BroadenSightReturn(points):
     return points
 
 
-def CheekOutline(positions, triangles):
-    faces = positions[triangles]
-    front = faces[np.all(faces[:, :, 0] > 0., axis=1), :, 1:].astype(np.float64)
-    low, high = front.min(axis=(0, 1)), front.max(axis=(0, 1))
-    centre, extent = .5*(low+high), high-low
-    normalized = (front-centre)/extent
-    corners = normalized.reshape(-1, 2)
-    edges = (np.roll(normalized, -1, axis=1)-normalized).reshape(-1, 2)
-    angle = np.arange(40)*2.*np.pi/40
-    rays = np.column_stack((np.cos(angle), np.sin(angle)))
-    perpendicular = np.column_stack((rays[:, 1], -rays[:, 0]))
-    denominator = edges @ perpendicular.T
-    fractions = np.divide(-(corners @ perpendicular.T), denominator,
-                          out=np.full_like(denominator, np.nan), where=abs(denominator)>1e-12)
-    hit = corners[:, None, :] + fractions[:, :, None]*edges[:, None, :]
-    distance = np.einsum('sri,ri->sr', hit, rays)
-    valid = (fractions>=-1e-7)&(fractions<=1.+1e-7)&(distance>0.)
-    outer = np.max(np.where(valid, distance, -np.inf), axis=0)
-    assert np.isfinite(outer).all()
-    outline = centre + extent*outer[:, None]*rays
-    # Ease the small silhouette steps left by the old extruded profile.
-    return .90*outline + .05*(np.roll(outline,1,axis=0)+np.roll(outline,-1,axis=0))
-
-
-def RoundedCheeks(name, positions, triangles, radius):
-    """Roll the visible thin side returns into the approved side profile."""
-    outline = CheekOutline(positions, triangles)
-    edges = np.roll(outline,-1,axis=0)-outline
-    edges /= np.linalg.norm(edges, axis=1)[:, None]
-    across = np.column_stack((edges[:, 1], -edges[:, 0]))
-    bisector = across + np.roll(across,1,axis=0)
-    bisector /= np.einsum('ij,ij->i', bisector, across)[:, None]
-    positive = positions[positions[:,0]>0.,0]
-    low, high = positive.min(), positive.max()
-    quarter = (1.-math.sqrt(.5))*radius
-    rows = [(low,radius), (low+quarter,quarter), (low+radius,0.),
-            (high-radius,0.), (high-quarter,quarter), (high,radius)]
-    points, faces, weights = [], [], []
-    count = len(outline)
-    for side in (-1.,1.):
-        base = len(points)
-        for x, inset in rows:
-            points.extend(np.column_stack((np.full(count, side*x), outline-inset*bisector)))
-        for row in range(len(rows)-1):
-            start = base+row*count
-            for i in range(count):
-                j = (i+1)%count
-                faces.append((start+i,start+j,start+j+count,start+i+count))
-                weights.append(.22 if row==2 else 1.)
-        faces.extend((tuple(range(base,base+count)),tuple(range(base+5*count,base+6*count))))
-        weights.extend((0.,0.))
-    mesh = bpy.data.meshes.new(name+' rolled side returns')
-    mesh.from_pydata((np.asarray(points)*1000).tolist(), [], faces)
-    mesh.update()
-    edit = bmesh.new()
-    try:
-        edit.from_mesh(mesh)
-        edit.faces.ensure_lookup_table()
-        rounded = edit.faces.layers.float.new('rounded')
-        for face, weight in zip(edit.faces,weights):
-            face[rounded] = weight
-            face.smooth = True
-        bmesh.ops.recalc_face_normals(edit, faces=list(edit.faces))
-        bmesh.ops.triangulate(edit, faces=list(edit.faces), quad_method='BEAUTY', ngon_method='BEAUTY')
-        edit.to_mesh(mesh)
-    finally:
-        edit.free()
-    mesh.update()
-    print(name, len(triangles), '->', len(mesh.polygons), 'triangles on rolled side returns')
-    return mesh
-
-
 def RoundedMesh(name, source, width):
     positions, triangles = source(name)
     if name == 'RearOuterCover_RoundedSideReturn':
-        return RoundedCheeks(name,positions,triangles,width)
+        return RearStockSaddle(name)
+    if name in ('MiddleSideDisk','SideWoodButton'):
+        return RoundedSideDisks(name,positions,width)
     if name in ('Sight_ShallowRoundSeat','Sight_LowContinuousLeaf_NoUnknownNumbers'):
         return RoundedPlate(name,positions,1,width)
     if name in ('RearTab','RearTopExternalLever'):
@@ -348,6 +278,8 @@ plans = [('ReceiverOuterCollar', approved, .00034),
          ('RearCockingExterior', base, .00034),
          ('LowerPlateGuard_FlatSideNarrowReturn', approved, .00020),
          ('RearOuterCover_RoundedSideReturn', base, .00029),
+         ('MiddleSideDisk', approved, .00036),
+         ('SideWoodButton', approved, .00024),
          ('FrontBandSideStrip', approved, .00023)]
 selection = list(bpy.context.selected_objects)
 active = bpy.context.view_layer.objects.active
