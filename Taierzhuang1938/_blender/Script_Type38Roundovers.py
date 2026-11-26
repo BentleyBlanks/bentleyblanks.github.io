@@ -23,9 +23,10 @@ EDGES = {
     'Exterior_Guard02': (.35, 3, 33, 'all'),
     'T38_407F_VisualSkin_Exterior_FrontBandLowerStep78': (.38, 3, 26, 'all'),
     'T38_430B_ContinuousLowerFacing_VisualOnly': (.43, 3, 36, 'all'),
-    'T38_430B_IndependentLeftCoverSkin': (.30, 3, 33, 'ends'),
-    'T38_430B_RetainedRightCoverHalf': (.30, 3, 35, 'ends'),
-    'T38_433E_VisibleSideBlockRimInset': (.34, 3, 32, 'all'),
+    'T38_430B_IndependentLeftCoverSkin': (.42, 3, 22, 'ends'),
+    'T38_430B_RetainedRightCoverHalf': (.41, 3, 23, 'rearCover'),
+    'T38_433E_VisibleSideBlockRimInset': (.45, 3, 24, 'all'),
+    'T38_435F2_IndependentTailNeckExterior': (.26, 2, 20, 'ends'),
     'T38_460G_WoodGroove_VisualCandidate': (.52, 3, 40, 'ends'),
 }
 
@@ -138,6 +139,12 @@ def RoundPart(values, settings):
         limits = 1000*np.array([points[:,2].min(),points[:,2].max()])
         bounds = limits + np.diff(limits)*[.12,-.12] if scope=='ends' else None
         edges = [edge for edge in topology.edges if Exposed(edge,width,math.radians(angle),bounds)]
+        if scope=='rearCover':
+            rear = limits[1]-.13*np.diff(limits)[0]
+            def MarkedRim(edge):
+                side,up,along = (edge.verts[0].co+edge.verts[1].co)*.5
+                return along>rear or (-124<along<-101 and side>14 and up>45)
+            edges = [edge for edge in edges if MarkedRim(edge)]
         selected = len(edges)
         if not selected:
             return None

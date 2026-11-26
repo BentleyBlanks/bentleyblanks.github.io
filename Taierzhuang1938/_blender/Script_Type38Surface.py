@@ -244,7 +244,7 @@ def ShapeHandle(doc, views, primitive):
     segments = 32
     # A simplified visible link shares the handle's display mesh and fills
     # the void between the two moving surfaces throughout the game animation.
-    phase = np.array([-.118,-.089,-.052,-.019,.006,.02,.035,.055,.083,.12,.17,.22,.27,.32,.37,.41,.45,.49,
+    phase = np.array([-.118,-.089,-.052,-.019,.006,.011,.02,.035,.047,.055,.083,.12,.17,.22,.27,.32,.37,.41,.45,.49,
                       .53,.57,.61,.65,.69,.73,.77,.81,.85,.88,.91,.935,.957,.975,.988,.997])
     profile = PchipInterpolator([-.12,-.053,-.019,.006,.03,.075,.13,.30,.39,.46,.50,.56,.64,.74,.80,.87,.92,.96,.985,1],
                                 [.44,.52,.59,.67,.72,.54,.43,.42,.45,.49,.60,.83,1.05,1.16,1.17,1.12,.97,.75,.49,0])
@@ -472,7 +472,7 @@ def ShapeRearMedallion(doc, views, primitive):
     direction = np.column_stack((np.cos(angles),np.sin(angles)))
     ear = RearOutline(angles)
     crown = [(0.045,.028),(.10,.030),(.143,.051),(.175,.099),(.201,.106),
-             (.225,.092),(.285,.081),(.43,.072),(.62,.056),(.79,.037),(.93,.012),(.975,0)]
+             (.225,.092),(.285,.081),(.43,.072),(.62,.056),(.79,.037),(.93,.013),(.954,.006),(.975,0)]
     positions,texcoords,indices = [],[],[]
     def Ring(xy,depth,chart):
         first = len(positions)
@@ -496,7 +496,7 @@ def ShapeRearMedallion(doc, views, primitive):
         indices.append((faceCenter,faceRings[0][segment],faceRings[0][segment+1]))
     for inner,outer in zip(faceRings,faceRings[1:]):
         Connect(inner,outer)
-    shoulder = [(0,.975,1),(.018,.995,1),(.047,1,1),(.11,.994,.95),
+    shoulder = [(0,.975,1),(.016,.989,1),(.034,.998,1),(.057,1,.99),(.11,.994,.95),
                 (.26,.937,.69),(.39,.901,.30),(.57,.90,0),(.83,.89,0),(1,.87,0)]
     sideRings = []
     for advance,scale,tab in shoulder:
@@ -580,6 +580,67 @@ def MedallionRelief(doc, views, primitive, field, valid, padded):
     tangentSpace = np.column_stack((np.sum(target*frameT,axis=1),np.sum(target*frameB,axis=1),np.sum(target*frameN,axis=1)))
     weight = Ramp(.56,.83,frameN[:,2])*Ramp(-.053,-.0519,field[rows,cols,2])
     return rows,cols,tangentSpace,weight
+
+
+def WoodSeat(side, up, length):
+    along = Ramp(-.075,-.066,length)*(1-Ramp(-.059,-.050,length))
+    shoulder = 1-Ramp(.0095,.019,np.abs(side))
+    return along*shoulder*Ramp(.023,.029,up)
+
+
+def EaseVisibleWoodSeat(doc, views, primitive):
+    attrs = primitive['attributes']
+    points = Attribute(doc,views,attrs['POSITION'],3)
+    normals = Attribute(doc,views,attrs['NORMAL'],3)
+    tangents = Attribute(doc,views,attrs['TANGENT'],4)
+    uv = Attribute(doc,views,attrs['TEXCOORD_0'],2)
+    faces = Attribute(doc,views,primitive['indices'],3)
+    depth = .0019
+    moved = points.copy()
+    moved[:,1] -= depth*WoodSeat(*points.T)
+    # Transform the original normal and tangent by the local deformation.
+    # The wood chart stays in place while the visible cut eases into the wrist.
+    steps = np.eye(3)*.00002
+    gradient = np.column_stack([(WoodSeat(*(points+step).T)-WoodSeat(*(points-step).T))/.00004 for step in steps])
+    basis = np.repeat(np.eye(3)[None,:,:],len(points),axis=0)
+    basis[:,1] -= depth*gradient
+    normalMap = np.linalg.inv(basis).swapaxes(1,2)
+    normal = np.einsum('nij,nj->ni',normalMap,normals)
+    normal /= np.linalg.norm(normal,axis=1,keepdims=True)
+    tangent = np.einsum('nij,nj->ni',basis,tangents[:,:3])
+    tangent -= normal*np.sum(normal*tangent,axis=1,keepdims=True)
+    tangent /= np.linalg.norm(tangent,axis=1,keepdims=True)
+    WriteAttributes(doc,views,primitive,moved,normal,np.column_stack((tangent,tangents[:,3])),uv,faces)
+
+
+def RearEdgeWear(part, field, width):
+    side,up,length,normalSide,normalUp,normalLength,bend = np.moveaxis(field,2,0)
+    axis = np.abs(normalLength)
+    turn = Ramp(.12,.64,axis)*(1-Ramp(.86,.994,axis))
+    curve = Ramp(.065,.42,bend)
+    if part in ('T38_430B_IndependentLeftCoverSkin','T38_430B_RetainedRightCoverHalf'):
+        rear = Ramp(-.076,-.0693,length)*np.maximum(turn,.72*curve)
+        if part == 'T38_430B_RetainedRightCoverHalf':
+            notch = Ramp(-.126,-.119,length)*(1-Ramp(-.096,-.087,length))
+            notch *= Ramp(.009,.016,side)*Ramp(.038,.051,up)
+            rear = np.maximum(rear,notch*np.maximum(curve,.37*turn))
+        return rear
+    if part == 'Exterior_HandleOval08':
+        across = (np.arange(width,dtype='f')+.5)/width
+        root = Ramp(.006,.023,across)*(1-Ramp(.076,.133,across))
+        return root*np.maximum(curve,Ramp(.14,.68,np.abs(normalSide)))
+    if part == 'T38_435F2_IndependentTailNeckExterior':
+        front = np.exp(-((length+.0668)/.0021)**2)
+        rear = np.exp(-((length+.0534)/.0018)**2)
+        return np.maximum(front,rear)*np.maximum(turn,.78*curve)
+    if part == 'T38_435F2_VisualBackingRearEnd':
+        return Ramp(-.073,-.068,length)*np.maximum(turn,.58*curve)
+    if part == 'T38_433E_VisibleSideBlockRimInset':
+        return curve*Ramp(.014,.030,up)
+    if part == 'T38_440D2_IndependentVisibleRecess':
+        across = (np.arange(width,dtype='f')+.5)/width
+        return Ramp(.745,.752,across)*(1-Ramp(.778,.802,across))
+    return 0
 
 
 def PoreField(length, transverse):
@@ -801,6 +862,8 @@ def Build(cache, output=None):
         if shape is not None:
             WriteAttributes(doc,views,primitive,shape[:,:3],shape[:,3:6],shape[:,6:10],
                             shape[:,10:12],roundovers[part+'_indices'])
+        if part == 'T38_460G_WoodGroove_VisualCandidate':
+            EaseVisibleWoodSeat(doc,views,primitive)
         delta = doc['accessors'][primitive['indices']]['count']//3-before
         if delta:
             profileDeltas[part] = delta
@@ -1033,6 +1096,14 @@ def Build(cache, output=None):
             fineFilm = 1 if separate else 1-Ramp(.08,.44,np.maximum(glazeFill,recess))
             varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.18*fineFilm*openPores))
             filmRoughness = varnish[:,:,1]+fineFilm*(17*openPores-4*np.maximum(ridges,0))
+            if not separate:
+                shelteredSeat = WoodSeat(side,up+.0019,length)*timber
+                cutWood = Tint([59,29,15],[117,68,39],.37+.28*fibre+.14*stain)
+                color = Blend(color,cutWood,.72*shelteredSeat)
+                rough += 37*shelteredSeat
+                relief *= 1-.29*shelteredSeat
+                varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.85*shelteredSeat))
+                filmRoughness += 53*shelteredSeat
             varnish[:,:,1] = np.where(padded,np.clip(filmRoughness,31,173),0)
             Store(coat['clearcoatTexture'], varnish)
         else:
@@ -1235,6 +1306,19 @@ def Build(cache, output=None):
                 color *= (1+detail*(.037*lines-.062*dents))[:,:,None]
                 rough += detail*(8*lines+21*dents-6*edge*np.maximum(lines,0))
                 relief += detail*(.17*lines-.24*dents)
+            coverRim = part in ('T38_430B_IndependentLeftCoverSkin','T38_430B_RetainedRightCoverHalf')
+            if coverRim or handle or collar or backing or disk or part=='T38_433E_VisibleSideBlockRimInset':
+                rim = RearEdgeWear(part,field,width)
+                burnish = rim*np.clip(.62+.23*stain+.13*grainSteel,.27,.90)
+                rimTone = Tint([99,96,90],[145,141,133],.41+.18*flow+.075*brush)
+                color = Blend(color,rimTone,burnish*.63)
+                rough += burnish*(85+7*flow-rough)*.97
+                metal += burnish*(248-metal)*.70
+                relief *= 1-.62*burnish
+                if coverRim:
+                    local = Ramp(-.141,-.083,length)
+                    rough += 8*local*(1-burnish)
+                    relief *= 1-.16*local
         if exposedTube:
             name = 'Texture_Type38ForeSteelNormal'
             normalSlot = dict(index=len(doc['textures']),scale=.43)
@@ -1279,7 +1363,7 @@ def Build(cache, output=None):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_ForeFinish22'
+    doc['asset']['extras']['version'] = 'Type38_RearRims23'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1287,7 +1371,7 @@ def Build(cache, output=None):
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=24, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=25, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])

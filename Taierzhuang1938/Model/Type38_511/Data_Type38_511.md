@@ -1,14 +1,20 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v22
+## 当前交付版 v23
 
-游戏使用 `511-fore-finish-22`。近景 78,414 三角，普通 NPC 73,806 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+游戏使用 `511-rear-rims-23`。近景 79,894 三角，普通 NPC 75,286 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 后部圆角和接缝露木 · 2026-11-26
+
+按用户标记的近景重做覆面后缘、槽口唇边、柄根、后钢环、侧板以及尾盘外缘的可见圆角。磨光分布按原网格的转折方向烘进粗糙度和底色，在主灯、反向灯和掠射光下核对边缘高光。 [后部实物照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [侧斜实物照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)
+
+局部收顺接缝里突出的露木，保留木纹坐标并重烘遮蔽处的旧木底色和漆层。实机检查用同一张木托贴图对照接缝内的低光泽木面与外露木面。
 
 ## 上护木和前段钢色 · 2026-11-26
 

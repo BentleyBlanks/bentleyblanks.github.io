@@ -84,8 +84,16 @@ try{
     };
     const sideValues=mesh.userData.type38Part.includes('WoodGroove')?
      [[.1005,.539,.1307,.5377],[.0938,.5167,.1239,.5154],[.0872,.4944,.1171,.4931]].map(([insideU,insideV,belowU,belowV])=>[colorPatch(insideU,insideV),colorPatch(belowU,belowV)]):[];
-    const lacquerReflection=[],filmRoughness=[];
+    const lacquerReflection=[],filmRoughness=[],seatFinish=[];
     if(sideValues.length){
+     for(const [u,v] of [[.922,.8454],[.679,.362]]){
+      const strength=[],roughness=[];
+      for(let row=-3;row<=3;row++)for(let col=-3;col<=3;col++){
+       const i=4*((Math.round(v*canvas.height)+row)*canvas.width+Math.round(u*canvas.width)+col);
+       strength.push(pixels[i]);roughness.push(pixels[i+1]);
+      }
+      seatFinish.push({strength:strength.sort((a,b)=>a-b)[24],roughness:roughness.sort((a,b)=>a-b)[24]});
+     }
      const spec=mat.specularIntensityMap.image;
      ctx.clearRect(0,0,canvas.width,canvas.height);
      ctx.drawImage(spec,0,0,canvas.width,canvas.height);
@@ -101,7 +109,7 @@ try{
       filmRoughness.push(rough.sort((one,two)=>one-two)[12]);
      }
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,seatFinish,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
@@ -109,6 +117,9 @@ try{
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
+  const [shelteredSeat,exposedWrist]=lower.seatFinish;
+  assert(shelteredSeat.strength<exposedWrist.strength*.52&&shelteredSeat.roughness>exposedWrist.roughness+7,
+   'the cut wood at the rear seam must show a more satin finish than the exposed wrist');
   assert(lower.meanRed>upper.meanRed*1.17&&lower.meanGreen>upper.meanGreen*1.09,
    'the darker upper lacquer must retain contrast with the amber lower wood');
   assert(upper.meanRed>85&&upper.meanRed<125&&upper.meanGreen>upper.meanRed*.44&&upper.meanGreen<upper.meanRed*.63&&

@@ -192,7 +192,7 @@ for(let index=0;index<gripPoints.count;index++){
  if(phase>.32&&phase<.38)angles.add(Math.round(Math.atan2(gripNormals.getZ(index),gripNormals.getY(index))*100));
 }
 assert(angles.size>=28,'handle neck must give a continuous round highlight, not the old four-flat silhouette');
-assert.equal(grip.index.count/3,2176);
+assert.equal(grip.index.count/3,2304);
 const rearShell=fps.meshes.find(mesh=>mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess').geometry;
 rearShell.computeBoundingBox();
 const shellBox=rearShell.boundingBox,shellRadius=(shellBox.max.y-shellBox.min.y)/2;
@@ -210,7 +210,7 @@ for(let index=0;index<rearShell.attributes.position.count;index++){
  if(radius<.06)surfaceDepth.push(depth);
  if(radius>.16&&radius<.19)rimDepth.push(depth);
 }
-assert.equal(rearShell.index.count/3,2880);
+assert.equal(rearShell.index.count/3,3168);
 assert(rearBaseRadius>.73&&rearBaseRadius<.79,'the visible rear face must flare beyond its narrower sidewall');
 assert(lowerLeftTip>1.20&&lowerLeftTip<1.35&&upperLeftReach<1,'rear exterior needs one lower-left outward lobe, not an upper notch');
 assert(surfaceDepth.length&&rimDepth.length&&Math.max(...rimDepth)-Math.max(...surfaceDepth)>shellRadius*.023,
