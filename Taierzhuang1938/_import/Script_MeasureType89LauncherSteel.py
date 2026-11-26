@@ -2,13 +2,14 @@
 
 import argparse
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import binary_erosion, gaussian_filter
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
@@ -174,6 +175,74 @@ def BarrelSteelIslands(image, projection, halfSpan):
     return np.rint(bright * pale * 100).astype(int).tolist()
 
 
+def BarrelCalibrationIdentity(barrel):
+    return {"photoSha256": barrel["source"]["sha256"],
+            "projection": barrel["source"]["projection"], "footprint": barrel["footprint"]}
+
+
+def RegisteredBarrelView(photo, barrel, folder, shape):
+    payloads = {name: (folder / name).read_bytes() for name in ("beauty.png", "uvHi.png", "uvLo.png")}
+    images = {}
+    for name, data in payloads.items():
+        with Image.open(BytesIO(data)) as frame:
+            images[name] = np.asarray(frame.convert("RGB"))
+    hi, lo = (images[name].astype(np.int32) for name in ("uvHi.png", "uvLo.png"))
+    u, v = ((hi[..., :2] * 256 + lo[..., :2]) / 65535).transpose(2, 0, 1)
+    visible = (hi[..., 2] == 255) & (lo[..., 2] == 255)
+    interior = binary_erosion(visible & (u > .08) & (u < .92) & (v > .09) & (v < .91), iterations=3)
+    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
+    weights = np.array([.2126, .7152, .0722])
+    wanted = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
+    observed = images["beauty.png"].astype(float) @ weights
+    valid = interior & (u > .54) & (v > .33) & (wanted > 25) & (wanted < 242) & (observed > 22)
+    if np.count_nonzero(valid) < 1000:
+        raise ValueError(f"The registered barrel patch is missing from {folder}")
+
+    rows, columns = shape
+    cells = np.floor(u[valid] * rows).astype(int) * columns + np.floor(v[valid] * columns).astype(int)
+    residual = np.log((wanted[valid] + 14) / (observed[valid] + 14))
+    size = rows * columns
+    counts = np.bincount(cells, minlength=size).reshape(shape).astype(float)
+    signals = np.bincount(cells, weights=residual, minlength=size).reshape(shape)
+    bright = np.clip((wanted[valid] - 133) / 40, 0, 1)
+    peaks = np.bincount(cells, weights=np.clip(residual, 0, .55) * bright, minlength=size).reshape(shape)
+
+    def Average(values, sigma):
+        support = gaussian_filter(counts, sigma)
+        return gaussian_filter(values, sigma) / np.maximum(support, .2), support
+
+    local, support = Average(signals, (1.25, 1.4))
+    broad, _ = Average(signals, (6.9, 5.9))
+    peak, _ = Average(peaks, (1.05, 1.1))
+    hashes = {name: sha256(data).hexdigest() for name, data in payloads.items()}
+    return local - broad, support, peak, local, hashes
+
+
+def BarrelCalibration(photo, barrel, evidence):
+    # Retain shared local residuals across the two fixed-light captures and remove the broad lighting field.
+    views = ("V38BarrelFinalDirect", "V38BarrelFinalFixedRake", "V38BarrelDefaultControl")
+    shape = (93, 59)
+    direct, oblique, default = [RegisteredBarrelView(photo, barrel, evidence / view, shape) for view in views]
+    face, faceSupport, frontPeak, _, faceHashes = direct
+    side, sideSupport, sidePeak, _, sideHashes = oblique
+    _, defaultSupport, defaultPeak, defaultResidual, defaultHashes = default
+    samples = np.clip(np.minimum(faceSupport, sideSupport) / 1.8, 0, 1)
+    agreement = np.exp(-.5 * ((face - side) / .15)**2)
+    contrast = np.clip(.63 * face + .37 * side, -.37, .37) * samples * agreement
+    peaks = np.minimum(frontPeak, sidePeak) * samples
+    # Limit the corrections where the default light already makes the same steel brighter or darker.
+    defaultWeight = np.clip(defaultSupport / 1.8, 0, 1)
+    support = np.clip(np.sign(contrast) * defaultResidual / (np.abs(contrast) + .015), 0, 1)
+    relief = np.where(contrast < 0, .76, .80) * (1 - support) * defaultWeight
+    contrast *= 1 - relief
+    peakSupport = np.clip((defaultPeak + .008) / (peaks + .008), 0, 1)
+    peaks *= 1 - .58 * (1 - peakSupport) * defaultWeight
+    hashes = (faceHashes, sideHashes, defaultHashes)
+    return {**BarrelCalibrationIdentity(barrel), "frameSha256": dict(zip(views, hashes)),
+            "contrast": np.rint(contrast * 1000).astype(int).tolist(),
+            "highlights": np.rint(peaks * 1000).astype(int).tolist()}
+
+
 def BarrelDetail(image, projection, halfSpan, stampTrace):
     # Hold out the punch marks while keeping the steel grain beside the grooves.
     untracedMarks = [[148, 291, 197, 353], [756, 284, 811, 346]]
@@ -199,7 +268,7 @@ def BarrelDetail(image, projection, halfSpan, stampTrace):
             "maskFeatherPixels": feather, "registrationOffsetInFootprint": [.003937, -.005615]}
 
 
-def BarrelFinish(folder):
+def BarrelFinish(folder, *, evidence=None, priorCalibration=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -238,8 +307,17 @@ def BarrelFinish(folder):
             [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
         ],
     }
+    calibration = None
+    if evidence is not None:
+        calibration = BarrelCalibration(image, result, evidence)
+    elif priorCalibration is not None:
+        identity = BarrelCalibrationIdentity(result)
+        if all(priorCalibration.get(key) == value for key, value in identity.items()):
+            calibration = priorCalibration
     result["detail"] = BarrelDetail(image, projection, halfSpan, result["stampTrace"])
     result["exposedSteelIslands"] = BarrelSteelIslands(image, projection, halfSpan)
+    if calibration is not None:
+        result["registeredCalibration"] = calibration
     return result
 
 
@@ -887,10 +965,13 @@ def ShoulderFinish(folder):
 def Main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
+    options.add_argument("--barrel-evidence", type=Path, help="V38 Evidence directory containing fixed-light views and the default-light control")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
+    priorCalibration = record.get("closeups", {}).get("Barrel", {}).get("registeredCalibration")
+    barrel = BarrelFinish(args.photos, evidence=args.barrel_evidence, priorCalibration=priorCalibration)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
-    record["closeups"] = {"Barrel": BarrelFinish(args.photos), "CollarRing": CollarFinish(args.photos),
+    record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": SleeveFinish(args.photos),
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}

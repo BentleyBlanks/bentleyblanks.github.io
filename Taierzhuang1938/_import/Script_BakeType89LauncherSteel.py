@@ -598,6 +598,18 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             metal += .075 * bareSteel
             diffuseGain += (1.17 + .56 * steelIslands**2) * bareSteel - .28 * matte
         linear *= (1 + diffuseGain)[..., None]
+        calibration = closeup.get("registeredCalibration")
+        if barrelSampling is not None and calibration is not None:
+            if (calibration["photoSha256"] != closeup["source"]["sha256"]
+                    or calibration["projection"] != closeup["source"]["projection"]
+                    or calibration["footprint"] != closeup["footprint"]):
+                raise ValueError("The barrel calibration does not match the source photo and projection")
+            # Apply local contrast and polished-steel response on the registered surface.
+            oxideContrast = ReferenceField(calibration, xx, vv, "contrast") / 1000
+            steelPeaks = ReferenceField(calibration, xx, vv, "highlights") / 1000
+            linear *= np.exp(1.85 * oxideContrast)[..., None]
+            linear *= np.exp(2.58 * steelPeaks)[..., None]
+            rough -= .09 * np.clip(steelPeaks / .32, 0, 1)
     if name == "CollarRing":
         oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
         exposed = .56 * ReferenceField(closeup, xx, vv, "exposedSteelCoverage") / 100
