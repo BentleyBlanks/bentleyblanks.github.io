@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 20,
+  "version": 21,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "d238aec2e7bc4970644d09fbca5a211c5ca204f22163504b1d2b435c588f431c",
+  "runtimeSha256": "16f8afbc735f3b96e4e569c7eaf1f025d7db0889a22cf0a95b18ab8ba9d79f6b",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 74412,
@@ -34,86 +34,86 @@
     {
       "index": 0,
       "name": "Texture_Type38Sample00Normal",
-      "bytes": 112165,
-      "sha256": "07605a3d2da0c1fd46f32357c01c8c41084e56213ef9d360b767ba92d0b1f6f5"
+      "bytes": 114414,
+      "sha256": "ea94d4363dbb304dea62b086e6b2303b8367fe7ecd1281939c6d6e6568d32b5d"
     },
     {
       "index": 1,
       "name": "Texture_Type38Sample00Base",
-      "bytes": 230110,
-      "sha256": "19d4e5fc03c1d5123b7de123678edefae3e369eba2002025b8bb8af5952d2d4d"
+      "bytes": 212737,
+      "sha256": "24f4fd98d078162f4feabb3388426a8f2021bafbbf511f1cdfdd462c17f4d919"
     },
     {
       "index": 2,
       "name": "Texture_Type38Sample00Orm",
-      "bytes": 164113,
-      "sha256": "5ca9330549821706572b854d12dd89cef25460b28d61103ef934b9907bc1100b"
+      "bytes": 164610,
+      "sha256": "9e67e67cd2d6c666519ba73446edf93111f0f0783fe18ba09419917b980acd58"
     },
     {
       "index": 3,
       "name": "Texture_Type38Sample01Base",
-      "bytes": 536931,
-      "sha256": "cebe8ced22cb5910304756dbfdb20f299ac1af4100d013e16442885f8b8068bb"
+      "bytes": 492611,
+      "sha256": "b225051db3df6afe25c251e97c8d8baf2bdfbef2f38b4a34ec8a000934e640ad"
     },
     {
       "index": 4,
       "name": "Texture_Type38Sample01Orm",
-      "bytes": 544371,
-      "sha256": "b393e319cb98c96521df540d93c8ee4c672733dba25c7b3b4f3d8c2418d7b899"
+      "bytes": 488526,
+      "sha256": "7bc4c1e39d01583320f4b59f219e0dd944cd741087b7cb1ff29f552981e820f2"
     },
     {
       "index": 5,
       "name": "Texture_Type38Sample02Base",
-      "bytes": 219900,
-      "sha256": "6e96561625988664e3969c5b23a698a054c94c762d04d3c5859aa80cd6a6f913"
+      "bytes": 198183,
+      "sha256": "c81d611b8e57c9251c94bb73f66720e36af50cc386cbd579da1a9bc92fc7e24a"
     },
     {
       "index": 6,
       "name": "Texture_Type38Sample02Orm",
-      "bytes": 195378,
-      "sha256": "963499938ea94b237526dc6f7141812b879376fe4724aa4a1050bed98b136ac8"
+      "bytes": 197734,
+      "sha256": "d391e6114d9f47b5aa14a95e4f7fa4ee4562b1ab1bc5b6fc2cb3306b37256009"
     },
     {
       "index": 7,
       "name": "Texture_Type38Sample03Normal",
-      "bytes": 304885,
-      "sha256": "1959c31db8c0c12dac62343e8f3022b66a0095de1f6078e6a2a64945c30737e4"
+      "bytes": 317440,
+      "sha256": "0b75af614fd48f6feed589a7fc32eadf1d1dde697287224948f35b25bc366dce"
     },
     {
       "index": 8,
       "name": "Texture_Type38Sample03Base",
-      "bytes": 536557,
-      "sha256": "44fc82a3368f2571dcff84ed32aca7ead57760dd732e4af6453afa1c87bb893e"
+      "bytes": 481871,
+      "sha256": "827b7d49e65632682804ed68f1e44e78a5f9ab4eab2a09a8b55296e649001822"
     },
     {
       "index": 9,
       "name": "Texture_Type38Sample03Orm",
-      "bytes": 429902,
-      "sha256": "c46a5803d2621eab205f21355fdb74fd6d076b50aaa595368497b5a97aa93042"
+      "bytes": 369533,
+      "sha256": "6ea7ac8af55cc374af8aaa1c943170e2ded2fe274cd969fdb08fbf4541df514a"
     },
     {
       "index": 10,
       "name": "Texture_Type38Sample04Normal",
-      "bytes": 248042,
-      "sha256": "98389250d9478199c4f77018e982862aa88a7450f014ee07c85fc54b3e1aba3f"
+      "bytes": 259978,
+      "sha256": "3d041f9afc5f0f737a1cab624948d4a51fbdaaf38a174a4986dcb6ce1d06a260"
     },
     {
       "index": 11,
       "name": "Texture_Type38Sample04Base",
-      "bytes": 295483,
-      "sha256": "a8a2dc4d6d468598282289b34a9ecbcdc6557e737ee1608885e862fca8626153"
+      "bytes": 288194,
+      "sha256": "7a2841aeb162dd29e3f438ce388c37fa628d57b2515782f626c79dda43ddebeb"
     },
     {
       "index": 12,
       "name": "Texture_Type38Sample04Orm",
-      "bytes": 208838,
-      "sha256": "6b72b9d1be441f2e2c799f58e7b1f95bd3fe7848f32fbe1e4c9efabd1976bf96"
+      "bytes": 218642,
+      "sha256": "48e80826ef04cde295cf30ab1d20b4a52891f93e08dc7ca66533e8b1b83c8dd9"
     },
     {
       "index": 13,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 537526,
-      "sha256": "20bb6470cf66213851baeea258f3441b07612d11dec0d02bd8e95019066060c9"
+      "bytes": 506839,
+      "sha256": "28aab3c3f77e8117aef66efa677e0621d677067c95eada4422b25f5cacc875d3"
     },
     {
       "index": 14,
@@ -124,404 +124,404 @@
     {
       "index": 15,
       "name": "Texture_Type38Sample05Normal",
-      "bytes": 398785,
-      "sha256": "840f4888b71a39b2a61d8633692cb2210f476e50bdfc91c7d3f8cea5a9ae4ae6"
+      "bytes": 509759,
+      "sha256": "a4ce1bf14be4121dcb030f964ddcff8b3cd9e1584f7fe7e094ec7886142595b1"
     },
     {
       "index": 16,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 566715,
-      "sha256": "b0225fbed9af7312c53d3b7fc39f9df02acb424a44317fb6204511ac2ad4c812"
+      "bytes": 560993,
+      "sha256": "29e7331412b8dcc58c2746d5e305935e6b1be9954f798ddbd0d25ca0e5b4b740"
     },
     {
       "index": 17,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 337389,
-      "sha256": "b6808303ba3ae385aa467186549bcaf4040d2ad171ce2298996c4390e2564111"
+      "bytes": 340796,
+      "sha256": "619d0523d7d4957c6db1f53fac60c6e3cb961c693d346846d636abcfe28c55d0"
     },
     {
       "index": 18,
       "name": "Texture_Type38Sample06Normal",
-      "bytes": 117564,
-      "sha256": "30496ef488c920125078f7aca91ec0542996b5795e45cc541fc15c4c43772aa4"
+      "bytes": 119057,
+      "sha256": "ef8d7690f075dab3fc1720612cbb9aafa88e570451bdd23138ebffe483e15682"
     },
     {
       "index": 19,
       "name": "Texture_Type38Sample06Base",
-      "bytes": 213641,
-      "sha256": "36593a28392077063c6131489aeec59829e972571ad287163fb2cd1aa6ecb7f1"
+      "bytes": 195801,
+      "sha256": "e04e99d3ff2b9838babd3104b219276cfc44c49ff501437eb5cd0699d29c9d6c"
     },
     {
       "index": 20,
       "name": "Texture_Type38Sample06Orm",
-      "bytes": 167765,
-      "sha256": "e2afc9c93dc9fa9e5220815ef8b160e4473859902c207b9fe1dd41f7784d472e"
+      "bytes": 136776,
+      "sha256": "5de9b52c324232456b9d08aa60eaa232c2818c795ecfe83555b0e839430fdc21"
     },
     {
       "index": 21,
       "name": "Texture_Type38Sample07Base",
-      "bytes": 279256,
-      "sha256": "e0b0f9b158e6defdc95affc6ebc968e2fcdadec7eb29d7a95f3be7cfcb87028f"
+      "bytes": 249864,
+      "sha256": "45d3676021fd9a0e175e72ba24efbaa5580354635450b58d82945c6cf2ee54a2"
     },
     {
       "index": 22,
       "name": "Texture_Type38Sample07Orm",
-      "bytes": 243793,
-      "sha256": "0ad03cf64b4d44da8cd7494da6dcd3d45073fc0034a42deaa1b2bbbe8092421c"
+      "bytes": 201912,
+      "sha256": "513f353721bb3329fcf20275610b5941ef4afbbca2df06191dae6a539d57ddd7"
     },
     {
       "index": 23,
       "name": "Texture_Type38Sample08Base",
-      "bytes": 212552,
-      "sha256": "a4b1ca827c04a9089d558197313f6a978153c1ed0b14872b1e3377feefdd1b18"
+      "bytes": 196820,
+      "sha256": "0c19cd3c34edaf8571a911c00716899f8e93540e3151e5427364c70b1fd26225"
     },
     {
       "index": 24,
       "name": "Texture_Type38Sample08Orm",
-      "bytes": 149549,
-      "sha256": "6a70512d757e45d037fb4b968138fd843c7d5b51c606112e8577ea603544293b"
+      "bytes": 123062,
+      "sha256": "6254c89ad0f36ee1b2a55b5b0313e55f3f92472d19bdd02c32068a31e734960a"
     },
     {
       "index": 25,
       "name": "Texture_Type38Sample09Base",
-      "bytes": 158647,
-      "sha256": "d234f484a33636c429282a0c0121e0db462f3cb18e849dbf00c45dfae6091eb6"
+      "bytes": 141511,
+      "sha256": "9ab76d5cca80ba8291b7214f07e925065c6683c024bcb5ccccbd17260dc82174"
     },
     {
       "index": 26,
       "name": "Texture_Type38Sample09Orm",
-      "bytes": 125160,
-      "sha256": "d87477e0c6f4f83651a5c26be87b0d8c3377b9adea0df429ede17bb6dea0dcc2"
+      "bytes": 84611,
+      "sha256": "00836c9f7f0ed6f578c42a257d98b73dccd80d833becca4188774c93542b6670"
     },
     {
       "index": 27,
       "name": "Texture_Type38Sample10Base",
-      "bytes": 158647,
-      "sha256": "d234f484a33636c429282a0c0121e0db462f3cb18e849dbf00c45dfae6091eb6"
+      "bytes": 141511,
+      "sha256": "9ab76d5cca80ba8291b7214f07e925065c6683c024bcb5ccccbd17260dc82174"
     },
     {
       "index": 28,
       "name": "Texture_Type38Sample10Orm",
-      "bytes": 125160,
-      "sha256": "d87477e0c6f4f83651a5c26be87b0d8c3377b9adea0df429ede17bb6dea0dcc2"
+      "bytes": 84611,
+      "sha256": "00836c9f7f0ed6f578c42a257d98b73dccd80d833becca4188774c93542b6670"
     },
     {
       "index": 29,
       "name": "Texture_Type38Sample11Base",
-      "bytes": 99191,
-      "sha256": "b1241d297154e6a30781fc9730b48ac1a7aa66bf1b951d3f0ce1f4c651be0941"
+      "bytes": 90013,
+      "sha256": "a2c5c81a266aadc911d24779a30f50c4e11bfe198d7af8dd34bef3dbfccbd04c"
     },
     {
       "index": 30,
       "name": "Texture_Type38Sample11Orm",
-      "bytes": 78599,
-      "sha256": "2cf5ac6ab968c68b3d56b3c8948f864f9e985f39d8f29afeb9b841a3fec2061c"
+      "bytes": 57992,
+      "sha256": "1810a852aea5429ebf9c9037537f6c69ae873d7c91d17f2c5a2bccbaed9001ba"
     },
     {
       "index": 31,
       "name": "Texture_Type38Sample12Base",
-      "bytes": 213264,
-      "sha256": "84bb1539aef6c946e1902b2f6c0148fcb1d6002bf2284a038f15974c2fcb3f6b"
+      "bytes": 189337,
+      "sha256": "c9f5b776e210e3c1d95e1518f7b03673dfc17ca26ebaedaae5eb53bea9caee9b"
     },
     {
       "index": 32,
       "name": "Texture_Type38Sample12Orm",
-      "bytes": 192643,
-      "sha256": "5ef42ebeedc20bdd0a0510e796b7d642b32a637d3809fbd21502600d7e596db0"
+      "bytes": 167161,
+      "sha256": "8f20a96a90f7e9ffe292d72801bd6477a6b574f48f9dfe0cb02fd241d59d9038"
     },
     {
       "index": 33,
       "name": "Texture_Type38Sample13Base",
-      "bytes": 225547,
-      "sha256": "200ddb31ba056684c546523d9d21a806b1bbd23c0fbd74fe706811059a0dc0df"
+      "bytes": 207630,
+      "sha256": "cff7551e687f267ee9d10f75185fb49b972225f1eb1c6e6c6f15783e8ffdae5e"
     },
     {
       "index": 34,
       "name": "Texture_Type38Sample13Orm",
-      "bytes": 203004,
-      "sha256": "b2c85f8e28e4064015700854e7746e80711fa770132c194c63ec73d4069ee12b"
+      "bytes": 191476,
+      "sha256": "c1878912d0e5dd973326f75b0e637561e43c24bcc328f2849ba7ef98ac947087"
     },
     {
       "index": 35,
       "name": "Texture_Type38Sample14Normal",
-      "bytes": 338494,
-      "sha256": "072a0c3a49e6af377757e4c65e86ca345e1b6527c1afcf12c9a1c5e05068f575"
+      "bytes": 347346,
+      "sha256": "a0a184b78965482990ad410b14292d1b579b343dee1c5aef1c96174aad6a25dd"
     },
     {
       "index": 36,
       "name": "Texture_Type38Sample14Base",
-      "bytes": 743402,
-      "sha256": "55f0d3b601e26cd9d53d66030ded60e74d623023dc93cfb5e1e4b00efaf2da34"
+      "bytes": 667735,
+      "sha256": "9f3118e85198001defdc0dcb76e4455bd37c0b645ce919ead85bae0dfb5ac8d8"
     },
     {
       "index": 37,
       "name": "Texture_Type38Sample14Orm",
-      "bytes": 557117,
-      "sha256": "0be30246c0e6980b88ded50a5e7d29dcddf151aa5758849132ace422a8cedaab"
+      "bytes": 440809,
+      "sha256": "1c7a4d07c97d18a00f807a6ab941b1fc02cf080710e76d615d81ebcc669d376a"
     },
     {
       "index": 38,
       "name": "Texture_Type38Sample15Base",
-      "bytes": 228521,
-      "sha256": "a0b980685dd17c6dc65d715205832b60282c89fd528f07f47b61e4e9bad7f9e6"
+      "bytes": 204095,
+      "sha256": "97dfbd1e66be7d9665ef9e0a83f18a80c90f1cf8be29cc731ab11e10ed205f40"
     },
     {
       "index": 39,
       "name": "Texture_Type38Sample15Orm",
-      "bytes": 232361,
-      "sha256": "28704b5e5b3ef7166151831cce4cbf862b410cf9a611284fb0a3a4fab33142ca"
+      "bytes": 202678,
+      "sha256": "348bf4aff8047628b75273cec1e6455b9d396b034d0d64174c1a71057ebea60c"
     },
     {
       "index": 40,
       "name": "Texture_Type38Sample16Normal",
-      "bytes": 112924,
-      "sha256": "b6d4de3f86f7435b1364bf71ad333ff773c34180c2324c2b754e5deeae133e6a"
+      "bytes": 114870,
+      "sha256": "3070f71cdee8468ecf8b1b0386979a9a0be3f6664b5807d7fff557236c6ca5da"
     },
     {
       "index": 41,
       "name": "Texture_Type38Sample16Base",
-      "bytes": 243865,
-      "sha256": "4b62b795aa7fb43a1caed27ca17249f5c9eb59f7db2c16b7dc36131de5f9174c"
+      "bytes": 219551,
+      "sha256": "f9b3eb7c8516efeb54c743abe5aca47193883529e55af691e8614a956684e3b8"
     },
     {
       "index": 42,
       "name": "Texture_Type38Sample16Orm",
-      "bytes": 200116,
-      "sha256": "f8556ce441f43165ec1c1b1ae4bf0f48b03c85418bce9acaecfc86722a910274"
+      "bytes": 165696,
+      "sha256": "8269ea147d8ce89daa919a75bc19b1d8fbbd85701405763fa931237065fd7844"
     },
     {
       "index": 43,
       "name": "Texture_Type38Sample17Normal",
-      "bytes": 701130,
-      "sha256": "169ba66bf17f162233f0f0e7913f4b6ff8002cad5019b8db15bbe4e388403a8d"
+      "bytes": 715350,
+      "sha256": "2e8b2e80eff202c48ae429816ffef0910c693cb460c159f18ee750dbc7a2047a"
     },
     {
       "index": 44,
       "name": "Texture_Type38Sample17Base",
-      "bytes": 1899069,
-      "sha256": "1bee39307f8b78c1139a5faa57360ac85d352cbd97c9b7a57f4303e7d07c14ba"
+      "bytes": 1688144,
+      "sha256": "187d92565b085e7205605dc6171667e72df593c625666dd691281d73b977f405"
     },
     {
       "index": 45,
       "name": "Texture_Type38Sample17Orm",
-      "bytes": 1336417,
-      "sha256": "38d349f3f11bde713941640640899f56b5d3ce322c95d90eff65188a68ddba92"
+      "bytes": 1161064,
+      "sha256": "95a62c76418cd87934aaa230a3330ccd7a8723f4f76d6b7f0d0c0b12b2e5e2bd"
     },
     {
       "index": 46,
       "name": "Texture_Type38Sample18Base",
-      "bytes": 334751,
-      "sha256": "e5169b0767c20c5fd2cb7c7449f03c662122dd77ff30bf9fa4187e083f7cff1a"
+      "bytes": 297612,
+      "sha256": "e3dd872eca517eb4486c69d3d9cd4f3b60fcef6f63e5b2a7e2354ffc4ae68cdc"
     },
     {
       "index": 47,
       "name": "Texture_Type38Sample18Orm",
-      "bytes": 333715,
-      "sha256": "065f17bd2f84266f26faa8565955d7314620b9148d6c9306c948334903842da6"
+      "bytes": 236017,
+      "sha256": "990b41e75b897c99ed7b879fc18f07806ea701dbe108862a109500db9a248b50"
     },
     {
       "index": 48,
       "name": "Texture_Type38Sample19Base",
-      "bytes": 199521,
-      "sha256": "bf0281c183a67615db38f082e074bfae481529089475517588d104d09d664ad3"
+      "bytes": 174017,
+      "sha256": "5d65ef94e6355dcb9ef23ab7215d7fc722bc7a2a60ad08133a804813c19e1642"
     },
     {
       "index": 49,
       "name": "Texture_Type38Sample19Orm",
-      "bytes": 149669,
-      "sha256": "d81cae5c247fa925938779db3f31fe4f6d119d1bc7a2a3d30922ca91034766b8"
+      "bytes": 111117,
+      "sha256": "d1faf6b3e0448b7274ad0670a64991752ad1391e22428ca7ee194f3cc1741176"
     },
     {
       "index": 50,
       "name": "Texture_Type38Sample20Base",
-      "bytes": 203910,
-      "sha256": "74096bd23f40d6b6922745b0571abbbbac9a135b5ab27909278daf94ed42479d"
+      "bytes": 176073,
+      "sha256": "1f6ad786d142f4f8812281293bed42c40da565ecc5d5d10681c78d0cfc85d79b"
     },
     {
       "index": 51,
       "name": "Texture_Type38Sample20Orm",
-      "bytes": 141602,
-      "sha256": "5ca7f91ce5acff96deaadddb654db045b03d9374a938c397aa07d4b79d863851"
+      "bytes": 108655,
+      "sha256": "18d658aac9d1f53050a9d03ad13e4b02df88724c5355b9fa1809b3df8f1ca34e"
     },
     {
       "index": 52,
       "name": "Texture_Type38Sample21Base",
-      "bytes": 131177,
-      "sha256": "75d8cf335e39e45dd1efe1a027f533f664f2883ac8a13250d31a161e355961e7"
+      "bytes": 116963,
+      "sha256": "b6ebef88837101639afde9a23fe6143fe4fbf32b6af193e9169310a432c8d6a5"
     },
     {
       "index": 53,
       "name": "Texture_Type38Sample21Orm",
-      "bytes": 150896,
-      "sha256": "5969fd23683895d0117f037893bf63102995717af9d848c345c535392c8ba5c5"
+      "bytes": 106559,
+      "sha256": "7623323a61920c1891913b10118aa706ee321f34dc26c42ff3c96d6cdf609426"
     },
     {
       "index": 54,
       "name": "Texture_Type38Sample22Base",
-      "bytes": 198912,
-      "sha256": "86a0a3c12ae493b10860c8440b1ae2cc862f2cc5b431c76136536b950c0dbf8f"
+      "bytes": 179868,
+      "sha256": "3803291baecda246f3ad920837ea521b435f9ca00c4c82be66fde6180b5e0f82"
     },
     {
       "index": 55,
       "name": "Texture_Type38Sample22Orm",
-      "bytes": 146162,
-      "sha256": "f8d8a2f01d57f3cf94e99f33370fa3f5a93f6f0d4d4994abc90b9d10df5d232e"
+      "bytes": 115759,
+      "sha256": "9f40a4ce4af99c46a06c70bd3acd58dd0f15ec8fbef8366a087f88dfb608d160"
     },
     {
       "index": 56,
       "name": "Texture_Type38Sample25Base",
-      "bytes": 228894,
-      "sha256": "29bc4faa35ae2054f30929daf7c934eff91b7d395494ca7b2df0edf7c6739b7b"
+      "bytes": 204856,
+      "sha256": "00b1efa7a273f9a75294102369522bd76cc16f2847392b28e5013645bcbb50e1"
     },
     {
       "index": 57,
       "name": "Texture_Type38Sample25Orm",
-      "bytes": 186914,
-      "sha256": "7ca601600f017f9bfa497445cda191d0e99dc2a6a359aaefd0ae69ce6fa731a8"
+      "bytes": 153808,
+      "sha256": "bc4a56c509792252979d1d1a54e0f77a43abc953ef8643cba56f97a73640fa87"
     },
     {
       "index": 58,
       "name": "Texture_Type38Sample26Base",
-      "bytes": 219512,
-      "sha256": "4f69483ca89fd82a272456b6ba71083315e15f8e2f3cc74cd4176be0432d3b65"
+      "bytes": 193470,
+      "sha256": "f6fe83faeebd939ed8a50f2aae988930b2a9fa243e963c7493f48f721ef1df3c"
     },
     {
       "index": 59,
       "name": "Texture_Type38Sample26Orm",
-      "bytes": 160232,
-      "sha256": "8bdc6a54de9c281c868dc2acccad0863b3e3c3c3e9471c205882088451e801ed"
+      "bytes": 122514,
+      "sha256": "4403f9b2072272143af007e4bb2ffea03863cc7926da5a3b915032577f1965cb"
     },
     {
       "index": 60,
       "name": "Texture_Type38Sample27Base",
-      "bytes": 577573,
-      "sha256": "3704e438845685585013e2fcf27932690b04448098da3e188c0a0f9dd2223507"
+      "bytes": 519193,
+      "sha256": "de429e115ac5f1c68825cbe693f8b56d3105ce64786ef5666c7696607415b97a"
     },
     {
       "index": 61,
       "name": "Texture_Type38Sample27Orm",
-      "bytes": 423296,
-      "sha256": "4b1397475123d15781f24be269125bf2c1fd9227b141cd8335fe35b04dc4c842"
+      "bytes": 275506,
+      "sha256": "1ebcca4633ac9c5cc647e413ef054555e611e1642e886169b59f7543f605d05e"
     },
     {
       "index": 62,
       "name": "Texture_Type38Sample28Normal",
-      "bytes": 248413,
-      "sha256": "01c05710e1614ba2b344dd69a82af62319432c5c0a1274536f15bc4ba6c651d0"
+      "bytes": 253089,
+      "sha256": "775a68046c8edd00563aa90e536bcbe0590cac81b56aa7e2f026b7b87149b46c"
     },
     {
       "index": 63,
       "name": "Texture_Type38Sample28Base",
-      "bytes": 508750,
-      "sha256": "237d2c3eac250aa72e53765a7bd716a40c4d9fcae5f0d443b0987d3c3956b6a5"
+      "bytes": 486560,
+      "sha256": "5016b38a3881a9a67a200fe8970f9a1461a4b6d1344056fd492fdacc2f50feb1"
     },
     {
       "index": 64,
       "name": "Texture_Type38Sample28Orm",
-      "bytes": 471118,
-      "sha256": "a69367efb1f64702795037937577fcefbd71273e14d0bec0405e9672ae94efc1"
+      "bytes": 456987,
+      "sha256": "810fcecfd656afadec51f664418ada11d0039bcf81b7a0ba9053196f2b23cf42"
     },
     {
       "index": 65,
       "name": "Texture_Type38Sample29Normal",
-      "bytes": 331923,
-      "sha256": "0cd0ae3cecc58b3236863caa01ae235b6d6d65d533c83d2289fdfcc40191a0da"
+      "bytes": 344002,
+      "sha256": "8b9964b00aa3a55aa5b11986e4e5c3e90289dac0f86182af2bc27c902de24c76"
     },
     {
       "index": 66,
       "name": "Texture_Type38Sample29Base",
-      "bytes": 366497,
-      "sha256": "a527532e8ad073215502573e8cdc87c976ee5820a59a4ea9649bdf4dedf4bc53"
+      "bytes": 332333,
+      "sha256": "d2795ce7e006d8b680816525b0e15e222379edd72b3f20f428d533cc62c00654"
     },
     {
       "index": 67,
       "name": "Texture_Type38Sample29Orm",
-      "bytes": 358452,
-      "sha256": "d40029c6d4570f70ecfc37738030f70b13f34fe292f531dd6e94ed0afda9ebf0"
+      "bytes": 340910,
+      "sha256": "f30f9af244c1d826e0dd889c4e808f2411518fa4873b3e5ba77588bd0da5672d"
     },
     {
       "index": 68,
       "name": "Texture_Type38Sample30Normal",
-      "bytes": 540650,
-      "sha256": "f0bd341a33e244006c523d6bc531d824cbedebb9401d4a216d08101fb43cfaef"
+      "bytes": 552588,
+      "sha256": "4ed75b02c83df1a0ad59debf8a794cc01e5fdad032d0d24fab0e4f900a95d9e9"
     },
     {
       "index": 69,
       "name": "Texture_Type38Sample30Base",
-      "bytes": 585349,
-      "sha256": "d06d5118e3a227f973edf8dbffce45c74675d30657b550a23b6e6d7cc0d5af65"
+      "bytes": 532875,
+      "sha256": "927767a60d731013156bb5fae7a3dbbf936e8fffa39b23112195dba99cad28f0"
     },
     {
       "index": 70,
       "name": "Texture_Type38Sample30Orm",
-      "bytes": 581499,
-      "sha256": "d72a34565bf5b1b60b4a17fb876db687df2aec48c45d2a3261e993af53353834"
+      "bytes": 553675,
+      "sha256": "24278b7e0b69c41ebc55d13ec196223020821b19cf37fc99dc733ed357d5e082"
     },
     {
       "index": 71,
       "name": "Texture_Type38Sample31Normal",
-      "bytes": 70751,
-      "sha256": "ce4b01b38e7e4f497de08947e4fef4020e3e61b5f218a865634ee94a65855d3b"
+      "bytes": 72099,
+      "sha256": "9f4f7081f8aad90510543a2273f178a21eeb60af735c9963804b99edb43d907a"
     },
     {
       "index": 72,
       "name": "Texture_Type38Sample31Base",
-      "bytes": 119513,
-      "sha256": "eb7aaee86952595f653c436612ab87705ac219f21faa1a3b18d224dbb6eef0d2"
+      "bytes": 107449,
+      "sha256": "11d4d77c5230fc12b5b1ae2b9758f375dc80c4551af91ed94b91506dca47d415"
     },
     {
       "index": 73,
       "name": "Texture_Type38Sample31Orm",
-      "bytes": 86562,
-      "sha256": "eeb05f9d48d53a037bf31443862538997f353e1846263e3954e86918892a14b9"
+      "bytes": 70357,
+      "sha256": "e7334511e67256735ac5d1c9a025fc77b8cf019914e48d82699dd794206c8e62"
     },
     {
       "index": 74,
       "name": "Texture_Type38Sample32Normal",
-      "bytes": 1798260,
-      "sha256": "1600ff072bccd2801c6f050e14c174725b5645778b7d9ef214645abb00f90852"
+      "bytes": 1817317,
+      "sha256": "a500490b8f1f4b6c23535eafed8f8098bc60d220afffc9af1b02a4860f28d40f"
     },
     {
       "index": 75,
       "name": "Texture_Type38Sample32Base",
-      "bytes": 3898654,
-      "sha256": "d4402f839bdbb30a99869135da0c69596cfc8325a9e27616a090fc34388ac63a"
+      "bytes": 3532934,
+      "sha256": "61dc9e943207bfb46c8d4a2762d86a3d669205f15c3abbbd2abfb023d20c866c"
     },
     {
       "index": 76,
       "name": "Texture_Type38Sample32Orm",
-      "bytes": 2546991,
-      "sha256": "76aabde75c272779a79c8f7e39f437e5f8f025181d12291eb8f0b0a996cf5e93"
+      "bytes": 1990563,
+      "sha256": "027016f77e1d80dedf355207b89879a94199e2ed263c461e6c6470d5de55ab55"
     },
     {
       "index": 77,
       "name": "Texture_Type38Sample33Base",
-      "bytes": 788311,
-      "sha256": "cbe7f1b9c188413242376632f810e7bd5147cf5f21eab7ff40779477a2533f2c"
+      "bytes": 749054,
+      "sha256": "495caa751b5c2e0a9786396d4088b11f288e302b45f222c8592380bbfec098e9"
     },
     {
       "index": 78,
       "name": "Texture_Type38Sample33Orm",
-      "bytes": 595361,
-      "sha256": "1891c709e18cf236d9e2bb64ab1af50830051a4585a2a8af35833b8afe684553"
+      "bytes": 577055,
+      "sha256": "0d1395c09c2524b440dbc4e57f2615f0b993e86743dfd5dfb1f9256058fa65b2"
     },
     {
       "index": 79,
       "name": "Texture_Type38Sample34Normal",
-      "bytes": 91918,
-      "sha256": "6ef4ce2c29e4aff30ed953c9bd5fc1794e73ea56523a31c7330fd4e93923906d"
+      "bytes": 93381,
+      "sha256": "c29296cc3ac05459c2714cc7e673a8b162c1d4c3e1220802ddecc74624f7df46"
     },
     {
       "index": 80,
       "name": "Texture_Type38Sample34Base",
-      "bytes": 182457,
-      "sha256": "587628edd34750d4bd9e11f551e5dc872136eff3c7de759a27799534d03006a8"
+      "bytes": 164341,
+      "sha256": "f07f54d89e882360b6611fd3dec15d28f5c56f32f5bbee95596e1283025a11a9"
     },
     {
       "index": 81,
       "name": "Texture_Type38Sample34Orm",
-      "bytes": 127984,
-      "sha256": "ac1a2d073e04a5ddf5bdd55fc6aa7ddbe0ecebd966a6c34bec4b91915c262833"
+      "bytes": 103196,
+      "sha256": "6a5c64a7174f3bcec7e821c276fd9c9ffd54869483c8e78d9b7739a1e9433b3f"
     },
     {
       "index": 82,
@@ -538,38 +538,38 @@
     {
       "index": 84,
       "name": "Texture_Type38Sample35Normal",
-      "bytes": 161271,
-      "sha256": "37920d0722033d20623b5c971a5dee57593700fb8360f27c1c07f49985867024"
+      "bytes": 163287,
+      "sha256": "df2bde6eecfb1173cc23eaf0b4495ec08adb496ded0b7fd916c5b89d535155a6"
     },
     {
       "index": 85,
       "name": "Texture_Type38Sample35Base",
-      "bytes": 163392,
-      "sha256": "561737e4a010c496bb6167b374ebe6ad83cbe67a16265a2ca1b73cf2e800300e"
+      "bytes": 144725,
+      "sha256": "3d3905e71b730ba180c667c31757c0c70e43387c3c71a1d44301b03faf2eda09"
     },
     {
       "index": 86,
       "name": "Texture_Type38Sample35Orm",
-      "bytes": 146324,
-      "sha256": "8d4febc917b57bd6efa8e628675084c4ba9eb3f541321df8862f11ca4348e07f"
+      "bytes": 130438,
+      "sha256": "364d58c2decfc84fe7859dee0e883074f8cbe3a0fec2a38aeab67d17b9dee7a6"
     },
     {
       "index": 87,
       "name": "Texture_Type38Sample36Normal",
-      "bytes": 335663,
-      "sha256": "942e88f7795918ac76152890a5786c354ae31980d16e27f3410dc073fbcbd5b9"
+      "bytes": 346088,
+      "sha256": "18ab31d5f684fdd536f1ed905cbccaea30a884c3012c3eff5a5cf12ead092e08"
     },
     {
       "index": 88,
       "name": "Texture_Type38Sample36Base",
-      "bytes": 625923,
-      "sha256": "a56baf27e6666ce32968b16f78c4388f8e041f69528b52c94b763105ac67771a"
+      "bytes": 555845,
+      "sha256": "a5271ff69384994c47e63a20d8bf2bb20850946c98859f3f04549b4066c3b3e1"
     },
     {
       "index": 89,
       "name": "Texture_Type38Sample36Orm",
-      "bytes": 569385,
-      "sha256": "e189a97c20100ef325dd9b6b1bec57fb40656c7ac95bb2807040b716add2b735"
+      "bytes": 475292,
+      "sha256": "bee8aea56dbb0b2e48cb690908757aeda99e28e22e3eeb9af115aa51c4b469a9"
     },
     {
       "index": 90,
@@ -586,146 +586,146 @@
     {
       "index": 92,
       "name": "Texture_Type38Sample37Normal",
-      "bytes": 194993,
-      "sha256": "0805c9bb5d388b455b492f8a628b0cf443b80651c4a808a27c65191d1d22e1c3"
+      "bytes": 195722,
+      "sha256": "26973ebd52a6fa11e225b8026bc637d806f2036520215554fefcc9d6b0e3c127"
     },
     {
       "index": 93,
       "name": "Texture_Type38Sample37Base",
-      "bytes": 176716,
-      "sha256": "80104fc97c998458dfa087f55850a7128c6942f1f20d31211b86eb032d054623"
+      "bytes": 193728,
+      "sha256": "2107a0bc6810612fb1bf6a937ff07d97d835af09e02002a9f21741ae665d0f26"
     },
     {
       "index": 94,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 168368,
-      "sha256": "066f3e5f1825b5f83bcecb9f123bf4a70cfbdff85ff05401ea037be0fca43a28"
+      "bytes": 163092,
+      "sha256": "2c12282a3e7be1602866a99c8ff7ec28ab25b028739a801649d0f5673da1307f"
     },
     {
       "index": 95,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 1947741,
-      "sha256": "4759fc82814e7b51404f6618a33717d821aad7c03a3c921a310924ff8720c6c3"
+      "bytes": 2055722,
+      "sha256": "a56eecc5224f51299c5a2974f32d91758292bc657533d278b16914e1b6abffa1"
     },
     {
       "index": 96,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 90887,
-      "sha256": "acab33c1bcc507432de2c03b63d48e4e1dccbcb951c8d37ab83790233edc3130"
+      "bytes": 89819,
+      "sha256": "531a72f6e51ec1dcddb0fcee81799e4f33e5842bd61e5eed91689c2927b35e38"
     },
     {
       "index": 97,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 1791944,
-      "sha256": "0aea0ec69460cd3e571952f187468824c2989f6064e1bb3c9cfe3a26c0a2dadd"
+      "bytes": 1683892,
+      "sha256": "7fd1b9115905ddfce2e139ccf4cf5fa4f66b0cd84df946d78f56bf19227cdbb8"
     },
     {
       "index": 98,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2088394,
-      "sha256": "ce6b8928a22084d5121a7a010fb110fbbc7c578f217fb67c0b434bcad2c7b3e4"
+      "bytes": 2303727,
+      "sha256": "4f23b5f0d4bf3152dacba5968e996b8f76c230c1e515ae138ee9f2a213428f59"
     },
     {
       "index": 99,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 1287594,
-      "sha256": "acbaa445270f272763ed2b2c62a906e5a068e416a4d95f2e782d6125030ec7a9"
+      "bytes": 1376291,
+      "sha256": "c7cb67a07378721368a6993d5a6cad1c0a58468249e39e29d42bd2e23f9daafe"
     },
     {
       "index": 100,
       "name": "Texture_Type38Sample39Base",
-      "bytes": 183570,
-      "sha256": "94f8d665f8d9f6d043d5f3f67ba5d358c0f98a936da17e67a92163889bc3b2c7"
+      "bytes": 167460,
+      "sha256": "27a2bbf14587a94cc2ec32ead95eb0907afe7e585b11acddd33d1a4951247262"
     },
     {
       "index": 101,
       "name": "Texture_Type38Sample39Orm",
-      "bytes": 139984,
-      "sha256": "dced310e9540004a42c48ebf8f3b52e70db0e66becb0a6995ab611584a483da8"
+      "bytes": 107196,
+      "sha256": "13131e72e5429909484faea389d0428db29ecec7917c869f009eb54df814d36a"
     },
     {
       "index": 102,
       "name": "Texture_Type38Sample40Normal",
-      "bytes": 760811,
-      "sha256": "43dc2c6ea59ebfc2adaaed4c53c7cabc7b47cb78b6cba824a97f23367da3ef38"
+      "bytes": 769634,
+      "sha256": "d6a7cdbc1898b22a9f9da3311647f0070d735e11e810d32e489663efec656266"
     },
     {
       "index": 103,
       "name": "Texture_Type38Sample40Base",
-      "bytes": 1271176,
-      "sha256": "d97e950708e82731f181e982bd6b50bc58c8f11540f96aae39195fe2415d992c"
+      "bytes": 1125918,
+      "sha256": "e829e4615936af833913c0aaa42617a1cd198ba06aa2bdf2b9bb5cbc12c6a3b3"
     },
     {
       "index": 104,
       "name": "Texture_Type38Sample40Orm",
-      "bytes": 1115209,
-      "sha256": "b8e8b7019dae772686daf9443771207a61bfb24ea87719f5e063c39c28e10b5f"
+      "bytes": 897101,
+      "sha256": "228b6cf394770fc24470c5df1f52494eb617ebe0d9d35b5f957911ece3f3ecfa"
     },
     {
       "index": 105,
       "name": "Texture_Type38Sample41Normal",
-      "bytes": 119833,
-      "sha256": "207df7f02dd84acd1814d36ef840e704291f2b857890168e0f7207ea655fcd36"
+      "bytes": 120973,
+      "sha256": "3266b9b03ed74a4962e60b233c75d609a4a4e597ab10b8c76a059193e54a8e4a"
     },
     {
       "index": 106,
       "name": "Texture_Type38Sample41Base",
-      "bytes": 180070,
-      "sha256": "e127ce5487b94c530347f7fedc42b6d58979a1c313f8c6042869ccd0b1fd6760"
+      "bytes": 159839,
+      "sha256": "ae83f52319ab802d0404f8924c36b984b0500e80e898bd2a6c6367f74e32c96e"
     },
     {
       "index": 107,
       "name": "Texture_Type38Sample41Orm",
-      "bytes": 130056,
-      "sha256": "0c4583af6f7347511fb86abda75f6a4161ba284deeacb0c861152e43a9a539aa"
+      "bytes": 119578,
+      "sha256": "24293608061298e5e9640712f527c5bbe363765cbd6055e6ca0bf37831ba93ae"
     },
     {
       "index": 108,
       "name": "Texture_Type38Sample42Normal",
-      "bytes": 54163,
-      "sha256": "ac88b812512b05f9c7f4ad4053f9531d99f3199f86de2c3c5cb7950f536c095c"
+      "bytes": 55156,
+      "sha256": "a0982f5d3b0b8f338b3e4084d532d917df8cfa8d69bdef118fb9164952ffbe8b"
     },
     {
       "index": 109,
       "name": "Texture_Type38Sample42Base",
-      "bytes": 69480,
-      "sha256": "cc73ced364275647096dd73433adcd9ec7be2ad66134fc12d1e54d84684145ea"
+      "bytes": 59192,
+      "sha256": "0a295a1f9cfff43841e167855150c98314a040427fd7b05f972f663ad9ab8f28"
     },
     {
       "index": 110,
       "name": "Texture_Type38Sample42Orm",
-      "bytes": 72846,
-      "sha256": "1e074158da81ca72d394a879d157b72d61ddb4af7b52331731aa00c774771289"
+      "bytes": 64768,
+      "sha256": "7292c9054f3a98d5ab58a417a5f5f1093b82ac1fdb39628ef47b1dbfac5af6b5"
     },
     {
       "index": 111,
       "name": "Texture_Type38Sample43Normal",
-      "bytes": 77025,
-      "sha256": "9129e8b2a10e52e34f4e594e411d80c5f87d1b6227a25c91d6834c18b54e170c"
+      "bytes": 76398,
+      "sha256": "3f811bdc7f805ff3731805502a8dc6a8fa6e625f9ab7f580d86a8410d2b24f42"
     },
     {
       "index": 112,
       "name": "Texture_Type38Sample43Base",
-      "bytes": 107385,
-      "sha256": "549eedc8ce47ab6441a7418739206c66075158a8e263837b1733a1f405aa46c7"
+      "bytes": 88560,
+      "sha256": "54d53c83e983857700fedb5eb49db67c978cb7e3a8c77eaf342c867241b16048"
     },
     {
       "index": 113,
       "name": "Texture_Type38Sample43Orm",
-      "bytes": 92063,
-      "sha256": "a3651355510b3bd190284e9bc364c4d05e28d6de31b81fa0f64f47c6a2201c84"
+      "bytes": 74981,
+      "sha256": "73125a203309f592fdcedeed3e1be3b11227ceee18f09d13291095526086b8cc"
     },
     {
       "index": 114,
       "name": "Texture_Type38Sample44Base",
-      "bytes": 124883,
-      "sha256": "115cf847fff13394c21900a698fa350beea216656ee8eb34d9ca2214888fdcf2"
+      "bytes": 112325,
+      "sha256": "1ece5475e778f8ce9738a081c41109c09ee4a3e0df6f527b813546252c7abb87"
     },
     {
       "index": 115,
       "name": "Texture_Type38Sample44Orm",
-      "bytes": 97802,
-      "sha256": "622524f3407d984f21a9ba4819c7612013c4cbbb45c76118b4dc67668b13580b"
+      "bytes": 80941,
+      "sha256": "7e97f2da4ec6d10229164c6e8e91bba98a59dfafedeb99c5feca7b3bb115554e"
     }
   ],
   "exteriorBaselineSha256": "77768c563db9fe7a3db3b0fd937279b4b6d05eb058cc441cafb3bcda0e668ad5",
@@ -745,229 +745,229 @@
   },
   "finishRoughnessP10P50P90": {
     "Mesh_Type38_adsNear_3": [
-      87.9,
-      96.6,
-      105.6
+      88.1,
+      95.4,
+      103.0
     ],
     "Exterior_ButtCap04": [
-      125.7,
-      132.4,
-      138.5
+      126.5,
+      132.7,
+      138.4
     ],
     "Exterior_SeatedTang05": [
-      89.0,
-      98.2,
-      108.4
+      88.1,
+      95.4,
+      102.8
     ],
     "Exterior_FoldedFrame12": [
-      109.2,
-      149.8,
-      177.6
+      110.4,
+      148.9,
+      177.7
     ],
     "Exterior_HandleOval08": [
-      61.1,
-      69.5,
-      103.6
+      75.4,
+      91.8,
+      119.3
     ],
     "Wood_UpperFittedCrown05": [
-      84.3,
-      101.0,
-      118.9
+      80.9,
+      102.1,
+      123.5
     ],
     "Exterior_Guard02": [
-      91.8,
-      102.0,
-      111.8
+      94.5,
+      102.3,
+      110.4
     ],
     "Exterior_LongRound44": [
-      60.9,
-      73.4,
-      88.8
+      58.3,
+      72.0,
+      89.6
     ],
     "Exterior_FoldedShortBridge47": [
-      94.2,
-      101.9,
-      109.4
+      91.5,
+      98.1,
+      105.4
     ],
     "Exterior_FoldedRoundShoulder47_-1": [
-      96.5,
-      104.0,
-      111.3
+      97.8,
+      105.3,
+      112.8
     ],
     "Exterior_FoldedRoundShoulder47_1": [
-      96.5,
-      104.0,
-      111.3
+      97.8,
+      105.3,
+      112.8
     ],
     "Exterior_RearTransverseRelief49": [
-      93.1,
-      101.0,
-      109.1
+      93.7,
+      101.5,
+      111.2
     ],
     "Exterior_FrontWindowBacking49": [
-      123.5,
-      133.1,
-      143.2
+      128.6,
+      136.9,
+      145.6
     ],
     "Exterior_MiddleBand57": [
-      78.3,
-      92.2,
-      106.8
+      76.9,
+      90.9,
+      107.4
     ],
     "Exterior_LowRoundedSupport70": [
-      92.2,
-      102.4,
-      112.4
+      93.8,
+      102.7,
+      111.2
     ],
     "Exterior_ShortTransverseHead71": [
-      117.7,
-      126.4,
-      135.7
+      121.1,
+      129.1,
+      137.3
     ],
     "Exterior_VisibleLowerWall72": [
-      92.9,
-      104.7,
+      100.7,
+      108.4,
       115.6
     ],
     "Exterior_RetainedImportedBody74": [
-      78.6,
-      85.0,
+      80.0,
+      85.4,
       131.2
     ],
     "Exterior_FrontOuterTube76": [
-      81.8,
-      86.4,
-      91.3
+      83.0,
+      86.6,
+      90.2
     ],
     "Exterior_FrontUpperDetail76_Neg": [
-      93.0,
-      101.9,
-      112.7
+      98.0,
+      105.4,
+      111.7
     ],
     "Exterior_FrontUpperDetail76_Pos": [
-      92.4,
-      101.9,
-      112.7
+      99.2,
+      106.9,
+      113.3
     ],
     "Exterior_FrontBandEnd78": [
-      91.6,
-      101.3,
-      113.7
+      98.5,
+      105.8,
+      113.1
     ],
     "Exterior_FrontUpperRoot80": [
-      92.3,
-      101.2,
-      112.1
+      92.7,
+      101.6,
+      111.6
     ],
     "T38_407F_VisualSkin_Exterior_FrontBandBody78": [
-      86.9,
-      97.8,
-      111.6
+      89.3,
+      98.3,
+      110.6
     ],
     "T38_407F_VisualSkin_Exterior_FrontBandLowerStep78": [
-      91.8,
-      99.8,
-      108.9
+      93.8,
+      100.7,
+      107.7
     ],
     "T38_432_VisualExposedSlimStrip": [
-      91.0,
-      100.3,
-      109.1
+      96.1,
+      102.7,
+      109.7
     ],
     "T38_430B_ContinuousLowerFacing_VisualOnly": [
-      96.9,
-      108.1,
-      119.6
+      90.2,
+      101.3,
+      112.4
     ],
     "T38_430B_IndependentLeftCoverSkin": [
-      88.2,
-      103.5,
-      118.1
+      86.7,
+      101.1,
+      115.8
     ],
     "T38_430B_RetainedRightCoverHalf": [
-      89.3,
-      103.7,
-      116.1
+      87.6,
+      102.9,
+      116.7
     ],
     "T38_430J_Exterior_ComplementaryPlateSkin72": [
-      86.8,
-      95.8,
-      105.2
+      98.0,
+      105.8,
+      113.8
     ],
     "T38_430J_Exterior_ImportedRemainder_Plate72": [
-      86.0,
-      94.8,
-      104.6
+      88.3,
+      96.6,
+      107.9
     ],
     "T38_430L_VisibleUpperShoulderCoordination": [
-      67.1,
-      80.2,
-      91.2
+      67.5,
+      79.5,
+      89.5
     ],
     "T38_433E_VisibleSideBlockRimInset": [
-      86.3,
-      95.6,
-      104.9
+      97.2,
+      104.9,
+      112.8
     ],
     "T38_435F2_IndependentTailNeckExterior": [
-      133.3,
-      148.5,
-      158.7
+      131.3,
+      149.3,
+      158.5
     ],
     "T38_435F2_VisualBackingRearEnd": [
-      121.4,
-      127.7,
-      131.6
+      122.5,
+      127.9,
+      131.3
     ],
     "T38_440D2_IndependentVisibleRecess": [
-      115.0,
-      135.7,
-      179.5
+      114.6,
+      135.9,
+      181.3
     ],
     "T38_460G_WoodGroove_VisualCandidate": [
-      85.1,
-      104.1,
-      123.3
+      83.9,
+      107.8,
+      130.5
     ],
     "T38_462_TriggerTip_VisualCandidate": [
-      93.9,
-      102.8,
-      111.6
+      98.6,
+      104.6,
+      111.7
     ],
     "T38_463C_FrontPad_VisualCandidate": [
-      90.3,
-      100.0,
-      109.6
+      92.9,
+      102.1,
+      110.8
     ],
     "T38_463C_FrontSlottedHead_Cosmetic": [
-      89.0,
-      97.9,
-      107.5
+      93.5,
+      101.3,
+      109.1
     ],
     "SightDetail335_CentralVisibleBacking_ART_ASSUMED_DEPTH": [
-      85.2,
-      92.6,
-      99.1
+      84.9,
+      89.4,
+      94.0
     ],
     "SightDetailV3_DecorativeConvexRoundSurface": [
-      80.1,
-      89.4,
-      104.5
+      82.0,
+      88.0,
+      105.3
     ],
     "SightDetailV3_ShallowVisibleEdgeFacets_ART_ONLY": [
-      77.3,
-      84.8,
-      93.4
+      80.4,
+      87.3,
+      92.9
     ],
     "T38_340_VisibleStaticSkin_Nonfunctional": [
-      102.3,
-      109.9,
-      118.1
+      102.1,
+      110.1,
+      118.7
     ],
     "T38_349_OpaqueExteriorWeb_VisualOnly": [
-      102.3,
-      109.9,
-      118.1
+      102.1,
+      110.1,
+      118.9
     ]
   },
   "surfaceSources": {

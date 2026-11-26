@@ -1,14 +1,22 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v18
+## 当前交付版 v19
 
-游戏使用 `511-aged-rear-steel-18`。近景 74,412 三角，普通 NPC 69,804 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+游戏使用 `511-natural-materials-19`。近景 74,412 三角，普通 NPC 69,804 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 木纹与旧钢 · 2026-11-26
+
+木料的底色、毛孔与漆层粗糙度共用沿木纹分布的扫描区域，邻近区域连续相接。托尾保留红棕木色和细纹，护木与长枪托各自使用一套纹样。漆层在磨过的位置形成窄反光，凹处和旧漆较暗。 [实物全长侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG) · [实物前段近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+钢面的拉丝、细坑与粗糙度依照表面方向连续变化。覆面另有低频的氧化层变化。栓柄和后钢环采用更深的暖灰钢色，接触处的磨亮反光和底色分开。尾盘点纹保留局部磨亮，凹部使用暗钢。 [后视参考](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [侧斜参考](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)
+
+在烘焙图上沿旧重复间隔比较，枪托粗糙度样区的相关性从 0.42 降到 0.07，覆面底色样区从 0.30 降到 0.02。验收同时比较枪托两侧、护木全长和后部钢件的换灯效果。
 
 ## 栓柄、后钢环和尾盘的旧钢质感 · 2026-11-26
 
