@@ -1655,6 +1655,7 @@ async function Boot() {
     hanYangAsset: actorFactory.hanYang173R,
     grenadeAsset,
   });
+  viewmodel.SetVfx(vfx);
   camera.add(viewmodel.root);
   viewmodel.onBoltStart = PlayRecordedBoltCycle;
   viewmodel.onBoltCue = PlayRecordedBoltCue;
@@ -1845,6 +1846,17 @@ async function Boot() {
         if (bladed) vfx?.BloodBurst?.(at, bloodOut, died ? 1.85 : 1.15);
         if (attacker === player) {
           ConfirmHit(died);
+          const isBayonetHit = !bladed && !!state.bayonetFixed;
+          if (bladed || isBayonetHit) {
+            viewmodel.RecordBladeHit?.({
+              weaponId: attackerWeapon?.id || currentWeapon,
+              bayonet: isBayonetHit,
+              kind: contact.corpse ? "corpse" : kind,
+              kill: died,
+              corpse: !!contact.corpse,
+              sweep: contact.sweep || 0,
+            });
+          }
           // 这是砍出去的击杀回执，不是玩家受伤：只认统一白刃伤害链里由玩家
           // 亲手造成的日军死亡。推架零伤害、QTE、枪击与友军误伤都不会进来。
           if (died && target.side === "ija") hud.MeleeKillBlood();
@@ -1882,6 +1894,9 @@ async function Boot() {
         const slashStep = new THREE.Vector3(-into.z, -0.35, into.x).normalize().multiplyScalar(0.085);
         target.actor?.AddBulletWound?.("torso", into, { point: at.clone().add(slashStep), radiusM: 0.13, ageS: 1.8 });
         vfx?.BloodBurst?.(at, away, 1.35);
+        if (actor === player) {
+          viewmodel.RecordBladeHit?.({ weaponId: currentWeapon, bayonet: false, kind: "lodge", sweep: event.sweep || 0 });
+        }
         meleeCombat._lodgeSpurt = AttachWoundSpurt(target, at, away, { seconds: 3.6, rate: 28, speed: [0.55, 1.75], spread: 0.48, decals: 6 });
       }
       // 卡刀拔出来那一下（白刃实验场的卡刀玩法）：从刀口位置沿拔刀反方向猛甩出一蓬血，并留下后续渗血。
@@ -1894,6 +1909,9 @@ async function Boot() {
         target.actor?.AddBulletWound?.("torso", pull.clone().negate(), { point: at.clone(), radiusM: 0.17, ageS: 2.2 });
         vfx?.Blood(at, pull, 0.95);
         vfx?.BloodBurst?.(at, pull, 1.95);
+        if (actor === player) {
+          viewmodel.RecordBladeHit?.({ weaponId: currentWeapon, bayonet: false, kind: "yank", sweep: event.sweep || 0 });
+        }
         AttachWoundSpurt(target, at, pull, { seconds: 1.9, rate: 22, speed: [0.7, 2.1], spread: 0.52, decals: 5 });
       }
       if (meleeCombat?.EnhancedFeel && actor === player) {
@@ -1933,6 +1951,7 @@ async function Boot() {
             : (target?.position ? target.position.clone().add(new THREE.Vector3(0, 1.25, 0)) : null);
           const dir = target?.position ? new THREE.Vector3().subVectors(target.position, player.position).setY(0.22).normalize() : new THREE.Vector3(0, 0, -1);
           if (at) vfx?.BloodBurst(at, dir, 1.35);
+          viewmodel.RecordBladeHit?.({ weaponId: currentWeapon, bayonet: false, kind: "cleave", sweep: event.sweep || 0 });
           FlinchTarget(1.25, "flesh");
           firePunch = Math.max(firePunch, MELEE_FEEL.fleshFovPunch);
           player?.shake?.Impulse({ pitch: MELEE_FEEL.fleshKickPitchRad, roll: side * MELEE_FEEL.fleshKickRollRad });
@@ -5607,6 +5626,7 @@ function RespawnPlayer(initial = false) {
   state.meleeCharge = null;
   // Equip(null) 是合法的：Viewmodel 会把 rig 清空（空着手）。
   // 第一关「还没捡到枪」与第六关「脱离战斗」都要走这条。
+  viewmodel.ResetBladeBlood?.();
   viewmodel.Equip(SANDBOX_STARTUP?.sceneryOnly ? null : currentWeapon, SlotWeaponVariant(state.activeSlot));
   SyncBayonet();
   viewmodel.root.visible = true;

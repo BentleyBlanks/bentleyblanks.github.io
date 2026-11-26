@@ -35,6 +35,7 @@ import * as THREE from "three";
 import { FPS_RIFLE_VIEW } from "./Data_FpsRifleView.mjs";
 import { RifleViewDepthScale, RifleActionFraming } from "./Script_FpsRifleView.mjs";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
+import { BladeBloodController } from "./Script_BladeBlood.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
 import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
 import { FPS_GRENADE_BUNDLE_THROW } from "./Data_FpsGrenadeBundleThrow.mjs";
@@ -1827,6 +1828,27 @@ export class Viewmodel {
     this._tmpVec2 = new THREE.Vector3();
     this._tmpVec3 = new THREE.Vector3();
     this._tmpQuat = new THREE.Quaternion();
+    this.bladeBlood = new BladeBloodController(this, library, { seed: "Taierzhuang.Viewmodel.BladeBlood" });
+  }
+
+  /** Connect world VFX system so blade blood drips & swing flings fall through world space. */
+  SetVfx(vfx) {
+    this.bladeBlood?.SetVfx(vfx);
+  }
+
+  /** Record a flesh slash/stab/lodge/yank/cleave/rip on the active melee blade or fixed bayonet. */
+  RecordBladeHit(options) {
+    return this.bladeBlood?.RecordHit(options) ?? null;
+  }
+
+  /** Reset blade blood on one weapon or all player blades (respawn / restart / level change). */
+  ResetBladeBlood(weaponId = null, options = undefined) {
+    this.bladeBlood?.Reset(weaponId, options);
+  }
+
+  /** Read blade blood coverage/wetness/drip diagnostics for Debug API and automated tests. */
+  BladeBloodState(weaponId = null, options = undefined) {
+    return this.bladeBlood?.State(weaponId, options) ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -2188,6 +2210,7 @@ export class Viewmodel {
       this.riggedArms?.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
         this.gripContactRight, this.gripContactLeft,
         [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft], null);
+      this.bladeBlood?.Attach(null, null);
       this.markForegroundPrepass();
       return this;
     }
@@ -2316,6 +2339,7 @@ export class Viewmodel {
 
     // 掏枪动画
     this.equipSpring.Set(instant ? 1 : 0);
+    this.bladeBlood?.Attach(weaponId, this.rig, { bayonetFixed: this.bayonetFixed });
     // 每次换枪都会重建整棵 rig：新建出来的网格必须重新接进前景预通道口径。
     // 漏了的后果不是“预通道多画一遍”那么轻：枪把自己 0.1—0.9 m 的真实深度
     // 写进法线深度图，SSAO 就在枪所在的那块屏幕区域算出几乎全遮蔽，
@@ -2827,6 +2851,7 @@ export class Viewmodel {
     const a = this._StartAction("fixBayonet", 0.95);
     a.fix = !!fix;
     this.bayonetFixed = !!fix;
+    this.bladeBlood?.SetBayonetFixed(this.bayonetFixed);
     this._RecomputeCompensation(this._lastWorldFov || 60);
     return true;
   }
@@ -2837,6 +2862,7 @@ export class Viewmodel {
     if (this.rig && this.rig.parts.bayonet) {
       this.rig.parts.bayonet.visible = this.bayonetFixed && !!(this.weapon && this.weapon.bayonet);
     }
+    this.bladeBlood?.SetBayonetFixed(this.bayonetFixed);
     this._RecomputeCompensation(this._lastWorldFov || 60);
   }
 
@@ -3406,6 +3432,7 @@ export class Viewmodel {
       parent, (this.root.visible || !!input.carryBodyVisible) && !(input.meleeCameraDrop > 0.05));
     this._UpdateSleeves();
     this._PlaceFlash();
+    this.bladeBlood?.Update(step);
   }
 
   /**
@@ -5354,6 +5381,7 @@ export class Viewmodel {
 
   Dispose() {
     this.ClearWounds();
+    this.bladeBlood?.Dispose();
     this._ClearRig();
     for(const rig of Object.values(this.armRigs))rig.Dispose();
     this.body?.Dispose();

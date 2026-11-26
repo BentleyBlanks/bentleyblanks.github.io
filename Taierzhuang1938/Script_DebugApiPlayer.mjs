@@ -266,6 +266,12 @@ export function PlayerDebugApi(ctx) {
           document.exitPointerLock();
         }
       },
+      // 刀刃沾血/滴血/甩血状态与测试触发口（Script_BladeBlood）
+      BladeBlood: {
+        State: (weaponId, options) => ctx.viewmodel?.BladeBloodState?.(weaponId, options) ?? null,
+        Hit: (options) => ctx.viewmodel?.RecordBladeHit?.(options) ?? null,
+        Reset: (weaponId, options) => { ctx.viewmodel?.ResetBladeBlood?.(weaponId, options); return true; },
+      },
       // 「仗有没有真的在打」只能从运行时取证：全场开火累计（AI + 玩家）、
       // AI 的状态分布、两侧的阵亡计数。读源码是推断不出来的。
       FireCount: () => ctx.ai.fireCount + ctx.state.playerShots,

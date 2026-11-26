@@ -120,6 +120,8 @@ const AIRCRAFT_DITCH_TERRAIN_BYTES = 650 * 1024;
 const TIMED_GRENADE_ASSETS_BYTES = 256 * 1024;
 // The direct-hit PNG and its source note add less than 20 KiB to a full texture directory.
 const HUD_DAMAGE_ARC_BYTES = 20 * 1024;
+// First-person blade blood stain + gravity rivulet 1024² RGBA packed detail map (287 KiB, lazy only, 0 boot payload).
+const BLADE_BLOOD_DETAIL_BYTES = 300 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -139,14 +141,15 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES + TIMED_GRENADE_ASSETS_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES + TIMED_GRENADE_ASSETS_BYTES + BLADE_BLOOD_DETAIL_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
   totalBytes: 62 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES
     + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
     + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
-    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES + HUD_DAMAGE_ARC_BYTES,
+    + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES
+    + HUD_DAMAGE_ARC_BYTES + BLADE_BLOOD_DETAIL_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -1280,6 +1283,23 @@ export const TEXTURE_MANIFEST = Object.freeze([
     ],
     files: [
       ["Texture_IjaUniformWoolDetail.webp", "Detail", 512, 512],
+    ],
+  },
+  {
+    id: "BladeBlood", kind: "detail", tier: "lazy",
+    packing: "R=横向无缝刀面血迹涂抹与刃口附着遮罩, G=可平铺细密动脉溅血飞沫, B=液膜厚度/弯月面高度图, A=重力下淌血丝与垂滴通道（线性 NoColorSpace）",
+    bake: "_import/Script_BakeBladeBloodTexture.mjs",
+    source: {
+      provider: "imagegen", date: "2026-11-27",
+      prompt: "_import/Prompts/Texture_BladeBloodDetail.txt",
+      note: "两张 1024×1024 纯白底正交实拍级血迹源图（涂抹飞溅 + 重力垂流）经 Script_BakeBladeBloodTexture.mjs 提取光学密度并打进单张 1024 RGBA WebP，源图留 _shots/BladeBloodSource（不入库）。",
+    },
+    consumers: [
+      { file: "Data_Tuning_BladeBlood.mjs", token: "Texture_BladeBloodDetail" },
+      { file: "Script_BladeBlood.mjs", token: "uBladeBloodMap" },
+    ],
+    files: [
+      ["Texture_BladeBloodDetail.webp", "Detail", 1024, 1024],
     ],
   },
   {

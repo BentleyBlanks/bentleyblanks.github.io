@@ -352,6 +352,7 @@ export const SURFACE_RECIPES = {
   Steel: { detailWeight: 0.5, detailTile: 10, microShadow: 0.6 },
   // Authored weapon atlases already contain micron-scale relief. Applying the
   // shared tiled detail a second time makes the machined faces look hammered.
+  DadaoPbr: { detailWeight: 0, detailTile: 1, microShadow: 0.6 },
   Zb26VeteranSteel: { detailWeight: 0, detailTile: 1, microShadow: 0.6 },
   Zb26VeteranWood: { detailWeight: 0, detailTile: 1, microShadow: 0.8 },
   SteelHelmet: { detailWeight: 0.5, detailTile: 10, microShadow: 0.6 },

@@ -92,6 +92,7 @@ function StartMeleeScenario(id) {
   ctx.ApplyDebugOptions();
   ctx.state.slots.primary = "HanYang"; ctx.state.slots.melee = "Dadao";
   ctx.viewmodel.action = null; ctx.state.meleeCharge = null;
+  ctx.viewmodel.ResetBladeBlood?.();
   ctx.state.activeSlot = spec.weapon === "Dadao" ? "melee" : "primary";
   ctx.currentWeapon = ctx.SlotWeaponId(ctx.state.activeSlot);
   ctx.state.ammo = ctx.state.mags[ctx.state.activeSlot]?.ammo || 0;
