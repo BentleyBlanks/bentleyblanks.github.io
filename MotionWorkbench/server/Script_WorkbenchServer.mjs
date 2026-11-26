@@ -58,8 +58,11 @@ const SCHEDULE_PATH = path.join(WORKSPACE_DIR, "schedule.json");
 const DEFAULT_SCHEDULE = {
   enabled: true,
   runTime: "06:00", // 北京时间 06:00（美国低峰窗口 06:00~11:00）
+  fallbackRunTime: "14:00", // 06:00 重试 3 次仍失败时自动延后至当日 14:00 午后窗口
+  autoDeferToAfternoon: true,
   autoStopAfterBatch: true,
   lastTriggeredDate: null,
+  lastTriggeredSlots: {},
   runningBatch: false,
   items: [],
 };
@@ -201,23 +204,46 @@ function localTimeHHMM(d = new Date()) {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function parseHHMMToMinutes(str, fallbackMin = 360) {
+  const [hh, mm] = String(str || "").split(":").map(Number);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return fallbackMin;
+  return hh * 60 + mm;
+}
+
 function computeNextRunText(sch) {
   if (!sch.enabled) return "已暂停自动触发（仍可手动点「立即执行队列」）";
-  const pending = (sch.items || []).filter((x) => x.status === "pending").length;
+  const pendingItems = (sch.items || []).filter((x) => x.status === "pending");
   if (sch.runningBatch) return "正在执行错峰队列…";
-  if (!pending) return `已开启每日 ${sch.runTime} 错峰自动触发（队列当前为空）`;
+  if (!pendingItems.length) return `已开启每日 ${sch.runTime} 错峰自动触发（队列当前为空）`;
   const now = new Date();
-  const [hh, mm] = String(sch.runTime || "06:00").split(":").map(Number);
-  const target = new Date(now);
-  target.setHours(Number.isFinite(hh) ? hh : 6, Number.isFinite(mm) ? mm : 0, 0, 0);
-  if (target.getTime() <= now.getTime() || sch.lastTriggeredDate === localDateKey(now)) {
-    target.setDate(target.getDate() + 1);
+  const today = localDateKey(now);
+  const triggeredSlots = sch.lastTriggeredSlots || {};
+  const slotMap = new Map();
+  for (const it of pendingItems) {
+    const slot = it.scheduledTime || sch.runTime || "06:00";
+    slotMap.set(slot, (slotMap.get(slot) || 0) + 1);
   }
-  const diffMin = Math.max(1, Math.round((target.getTime() - now.getTime()) / 60000));
+
+  let best = null;
+  for (const [slot, cnt] of slotMap.entries()) {
+    const [hh, mm] = String(slot).split(":").map(Number);
+    const target = new Date(now);
+    target.setHours(Number.isFinite(hh) ? hh : 6, Number.isFinite(mm) ? mm : 0, 0, 0);
+    const alreadyTriggeredToday =
+      triggeredSlots[slot] === today || (!Object.keys(triggeredSlots).length && slot === sch.runTime && sch.lastTriggeredDate === today);
+    if (target.getTime() <= now.getTime() || alreadyTriggeredToday) {
+      target.setDate(target.getDate() + 1);
+    }
+    if (!best || target.getTime() < best.target.getTime()) {
+      best = { slot, cnt, target };
+    }
+  }
+  const diffMin = Math.max(1, Math.round((best.target.getTime() - now.getTime()) / 60000));
   const dh = Math.floor(diffMin / 60);
   const dm = diffMin % 60;
-  const isToday = target.getDate() === now.getDate();
-  return `下次触发：${isToday ? "今天" : "明天"} ${sch.runTime}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，待跑 ${pending} 项）`;
+  const isToday = best.target.getDate() === now.getDate();
+  const hasDeferred = pendingItems.some((x) => (x.scheduledTime || sch.runTime) === best.slot && x.deferredFrom);
+  return `下次触发：${isToday ? "今天" : "明天"} ${best.slot}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，待跑 ${best.cnt} 项${hasDeferred ? " · 含早间延后" : ""}）`;
 }
 
 function hydrateScheduleForClient() {
@@ -421,16 +447,44 @@ function launchColabMocapRun(task, { take, precisionPreset = "standard_l4" }) {
   return { run, donePromise };
 }
 
-async function runScheduledBatch(triggerReason = "定时触发") {
+async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = null } = {}) {
   if (state.schedule.runningBatch) return { started: false, reason: "定时队列已在执行中" };
-  const pendingAll = (state.schedule.items || []).filter((x) => x.status === "pending");
+  const defaultSlot = state.schedule.runTime || "06:00";
+  const pendingAll = (state.schedule.items || []).filter((x) => {
+    if (x.status !== "pending") return false;
+    if (!targetSlot) return true;
+    return (x.scheduledTime || defaultSlot) === targetSlot;
+  });
   if (!pendingAll.length) return { started: false, reason: "队列中没有等待执行的任务" };
+
+  const fallbackSlot = state.schedule.fallbackRunTime || "14:00";
+  const fallbackMin = parseHHMMToMinutes(fallbackSlot, 14 * 60);
+  const canDeferItem = (item) => {
+    if (state.schedule.autoDeferToAfternoon === false) return false;
+    if (item.deferredFrom) return false;
+    const itemSlot = targetSlot || item.scheduledTime || defaultSlot;
+    const itemMin = parseHHMMToMinutes(itemSlot, 6 * 60);
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    // Only auto-defer morning/pre-14:00 runs when today's 14:00 window is still ahead
+    return itemMin < fallbackMin && nowMin < fallbackMin;
+  };
+  const deferItemToAfternoon = (item, reasonText) => {
+    const prevSlot = targetSlot || item.scheduledTime || defaultSlot;
+    item.status = "pending";
+    item.deferredFrom = prevSlot;
+    item.scheduledTime = fallbackSlot;
+    item.deferredAt = Date.now();
+    item.finishedAt = null;
+    item.message = `${prevSlot} 重试 3 次仍失败，已自动延后至今日 ${fallbackSlot} 队列（${String(reasonText || "").slice(0, 120)}）`;
+    pushSystemLog(`[错峰定时队列] ${item.beatCode} (${item.kind}) 在 ${prevSlot} 批次失败，已自动延后至今日 ${fallbackSlot} 队列`);
+  };
 
   state.schedule.runningBatch = true;
   await saveSchedule();
   pushSystemLog(`[错峰定时队列] ${triggerReason}：开始执行 ${pendingAll.length} 项任务（按 MiniMax-H3 → Colab 提骨分组复用热机）`);
 
   (async () => {
+    const deferredH3TaskIds = new Set();
     try {
       // Phase 1: All MiniMax-H3 video tasks together (reuse warm G4 96G weights across the entire batch)
       const h3Items = pendingAll.filter((x) => x.kind === "stage3_h3");
@@ -459,9 +513,15 @@ async function runScheduledBatch(triggerReason = "定时触发") {
           item.message = "MiniMax-H3 视频已生成并回传本地";
           item.finishedAt = Date.now();
         } catch (err) {
-          item.status = "failed";
-          item.message = String(err?.message || err).slice(0, 220);
-          item.finishedAt = Date.now();
+          const errMsg = String(err?.message || err);
+          if (canDeferItem(item)) {
+            deferItemToAfternoon(item, errMsg);
+            deferredH3TaskIds.add(item.taskId);
+          } else {
+            item.status = "failed";
+            item.message = errMsg.slice(0, 220);
+            item.finishedAt = Date.now();
+          }
         }
         await saveSchedule();
       }
@@ -488,9 +548,13 @@ async function runScheduledBatch(triggerReason = "定时触发") {
           task.stage3?.takes?.find((t) => t.id === task.stage3.selectedTakeId && t.status === "succeeded") ||
           task.stage3?.takes?.find((t) => t.status === "succeeded");
         if (!take?.localPath) {
-          item.status = "failed";
-          item.message = "该任务尚无可用成片视频，跳过提骨";
-          item.finishedAt = Date.now();
+          if (deferredH3TaskIds.has(item.taskId) && canDeferItem(item)) {
+            deferItemToAfternoon(item, "依赖的 MiniMax-H3 视频已延后至今日 14:00，提骨同步顺延");
+          } else {
+            item.status = "failed";
+            item.message = "该任务尚无可用成片视频，跳过提骨";
+            item.finishedAt = Date.now();
+          }
           await saveSchedule();
           continue;
         }
@@ -510,56 +574,55 @@ async function runScheduledBatch(triggerReason = "定时触发") {
           item.finishedAt = Date.now();
         } catch (err) {
           const errMsg = String(err?.message || err);
-          if (item.fallbackToModal && /503|暂不可用|满载|Service Unavailable|超时/i.test(errMsg)) {
-            if (state.config.modalBaseUrl) {
-              pushSystemLog(`[错峰定时队列] ${item.beatCode} Colab 满载，自动回退至 Modal Serverless GPU…`);
-              item.message = "Colab 满载，已自动切换 Modal Serverless GPU 提交提骨…";
-              await saveSchedule();
-              try {
-                const submitted = await submitModalMocapJob({
-                  modalBaseUrl: state.config.modalBaseUrl,
-                  apiToken: state.config.modalApiToken,
-                  videoPath: take.localPath,
-                  cameraMode: "static",
-                  useContactIk: true,
-                  exportFbxAndGlb: true,
-                });
-                const mRun = {
-                  jobId: submitted.jobId,
-                  backend: "modal_serverless",
-                  takeId: take.id,
-                  status: "queued",
-                  stage: "queued",
-                  stageLabel: "Colab 满载已自动回退至 Modal Serverless GPU，正在按需冷启…",
-                  progress: 4,
-                  createdAt: Date.now(),
-                  files: {},
-                  telemetry: null,
-                  containerState: "starting_gpu",
-                  logs: [`[错峰回退 Modal] ${path.basename(take.localPath)} -> Modal Job ${submitted.jobId}`],
-                };
-                task.stage4.runs.unshift(mRun);
-                task.stage4.activeRunId = mRun.jobId;
-                task.updatedAt = Date.now();
-                await saveTasks();
-                startModalPoller(task, mRun);
-                item.status = "succeeded";
-                item.message = `Colab 满载，已自动回退提交至 Modal (${submitted.jobId})`;
-                item.finishedAt = Date.now();
-              } catch (mErr) {
-                item.status = "failed";
-                item.message = `Colab 满载且 Modal 回退失败：${String(mErr?.message || mErr).slice(0, 180)}`;
-                item.finishedAt = Date.now();
-              }
+          let handledByModal = false;
+          if (item.fallbackToModal && /503|暂不可用|满载|Service Unavailable|超时/i.test(errMsg) && state.config.modalBaseUrl) {
+            pushSystemLog(`[错峰定时队列] ${item.beatCode} Colab 满载，自动回退至 Modal Serverless GPU…`);
+            item.message = "Colab 满载，已自动切换 Modal Serverless GPU 提交提骨…";
+            await saveSchedule();
+            try {
+              const submitted = await submitModalMocapJob({
+                modalBaseUrl: state.config.modalBaseUrl,
+                apiToken: state.config.modalApiToken,
+                videoPath: take.localPath,
+                cameraMode: "static",
+                useContactIk: true,
+                exportFbxAndGlb: true,
+              });
+              const mRun = {
+                jobId: submitted.jobId,
+                backend: "modal_serverless",
+                takeId: take.id,
+                status: "queued",
+                stage: "queued",
+                stageLabel: "Colab 满载已自动回退至 Modal Serverless GPU，正在按需冷启…",
+                progress: 4,
+                createdAt: Date.now(),
+                files: {},
+                telemetry: null,
+                containerState: "starting_gpu",
+                logs: [`[错峰回退 Modal] ${path.basename(take.localPath)} -> Modal Job ${submitted.jobId}`],
+              };
+              task.stage4.runs.unshift(mRun);
+              task.stage4.activeRunId = mRun.jobId;
+              task.updatedAt = Date.now();
+              await saveTasks();
+              startModalPoller(task, mRun);
+              item.status = "succeeded";
+              item.message = `Colab 满载，已自动回退提交至 Modal (${submitted.jobId})`;
+              item.finishedAt = Date.now();
+              handledByModal = true;
+            } catch (mErr) {
+              pushSystemLog(`[错峰定时队列] ${item.beatCode} Modal 回退失败：${mErr.message}`);
+            }
+          }
+          if (!handledByModal) {
+            if (canDeferItem(item)) {
+              deferItemToAfternoon(item, errMsg);
             } else {
               item.status = "failed";
-              item.message = "Colab 满载（503），且 Modal 尚未完成部署配置，无法自动回退";
+              item.message = errMsg.slice(0, 220);
               item.finishedAt = Date.now();
             }
-          } else {
-            item.status = "failed";
-            item.message = errMsg.slice(0, 220);
-            item.finishedAt = Date.now();
           }
         }
         await saveSchedule();
@@ -584,20 +647,30 @@ function startScheduleTicker() {
   setInterval(() => {
     const sch = state.schedule;
     if (!sch?.enabled || sch.runningBatch) return;
-    const hasPending = (sch.items || []).some((x) => x.status === "pending");
-    if (!hasPending) return;
+    const pendingItems = (sch.items || []).filter((x) => x.status === "pending");
+    if (!pendingItems.length) return;
     const now = new Date();
     const today = localDateKey(now);
-    const [th, tm] = String(sch.runTime || "06:00").split(":").map(Number);
-    const targetMin = (Number.isFinite(th) ? th : 6) * 60 + (Number.isFinite(tm) ? tm : 0);
     const nowMin = now.getHours() * 60 + now.getMinutes();
-    // 15-minute grace window so a brief timer drift or wake-up at 06:01 still fires reliably
-    if (nowMin >= targetMin && nowMin < targetMin + 15 && sch.lastTriggeredDate !== today) {
-      sch.lastTriggeredDate = today;
-      saveSchedule().catch(() => {});
-      runScheduledBatch(`定时 ${sch.runTime} 自动触发`).catch((err) => {
-        pushSystemLog(`[错峰定时队列] 触发异常：${err.message}`);
-      });
+    sch.lastTriggeredSlots = sch.lastTriggeredSlots || {};
+    const defaultSlot = sch.runTime || "06:00";
+
+    const slots = [...new Set(pendingItems.map((x) => x.scheduledTime || defaultSlot))];
+    for (const slot of slots) {
+      const targetMin = parseHHMMToMinutes(slot, 360);
+      const alreadyTriggeredToday =
+        sch.lastTriggeredSlots[slot] === today ||
+        (!Object.keys(sch.lastTriggeredSlots).length && slot === defaultSlot && sch.lastTriggeredDate === today);
+      // 15-minute grace window so a brief timer drift or wake-up at 06:01 / 14:01 still fires reliably
+      if (nowMin >= targetMin && nowMin < targetMin + 15 && !alreadyTriggeredToday) {
+        sch.lastTriggeredDate = today;
+        sch.lastTriggeredSlots[slot] = today;
+        saveSchedule().catch(() => {});
+        runScheduledBatch(`定时 ${slot} 自动触发`, { targetSlot: slot }).catch((err) => {
+          pushSystemLog(`[错峰定时队列] ${slot} 触发异常：${err.message}`);
+        });
+        break;
+      }
     }
   }, 15_000);
 }
@@ -1088,6 +1161,7 @@ async function handleApi(req, res, urlObj) {
     const body = await readJsonBody(req);
     if (typeof body.enabled === "boolean") state.schedule.enabled = body.enabled;
     if (typeof body.autoStopAfterBatch === "boolean") state.schedule.autoStopAfterBatch = body.autoStopAfterBatch;
+    if (typeof body.autoDeferToAfternoon === "boolean") state.schedule.autoDeferToAfternoon = body.autoDeferToAfternoon;
     if (typeof body.runTime === "string") {
       const t = body.runTime.trim();
       if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t)) {
@@ -1096,6 +1170,8 @@ async function handleApi(req, res, urlObj) {
       if (state.schedule.runTime !== t) {
         state.schedule.runTime = t;
         state.schedule.lastTriggeredDate = null;
+        state.schedule.lastTriggeredSlots = { ...(state.schedule.lastTriggeredSlots || {}) };
+        delete state.schedule.lastTriggeredSlots[t];
       }
     }
     await saveSchedule();
@@ -1120,8 +1196,9 @@ async function handleApi(req, res, urlObj) {
         duration: Number(opts.duration || task.durationSec || 6),
         precisionPreset: opts.precisionPreset || task.stage4?.precisionPreset || "standard_l4",
         fallbackToModal: Boolean(opts.fallbackToModal),
+        scheduledTime: opts.scheduledTime || state.schedule.runTime || "06:00",
         status: "pending",
-        message: `等待 ${state.schedule.runTime} 错峰自动启动`,
+        message: `等待 ${opts.scheduledTime || state.schedule.runTime || "06:00"} 错峰自动启动`,
         createdAt: Date.now(),
         startedAt: null,
         finishedAt: null,

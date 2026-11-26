@@ -907,6 +907,10 @@
           <input id="schAutoStop" type="checkbox" checked>
           <span>整批跑完立刻执行 <code>colab stop</code> 停表，绝不空转烧算力</span>
         </label>
+        <label class="mwSchCheck">
+          <input id="schAutoDefer" type="checkbox" checked>
+          <span>06:00 重试 3 次仍失败时，自动延后至当日 <code>14:00</code> 午后窗口再跑</span>
+        </label>
         <div id="schNextRunText" class="mwSchHint">—</div>
       </div>
 

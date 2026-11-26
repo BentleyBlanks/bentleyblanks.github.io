@@ -510,8 +510,9 @@ function renderTaskList() {
     const schItems = (appState.schedule?.items || []).filter(
       (x) => x.taskId === task.id && (x.status === "pending" || x.status === "running")
     );
+    const schSlot = schItems[0]?.scheduledTime || appState.schedule?.runTime || "06:00";
     const schBadgeHtml = schItems.length
-      ? `<span class="mwCoverSchBadge" title="已加入定时队列">定时 ${escapeHtml(appState.schedule?.runTime || "06:00")} · ${schItems
+      ? `<span class="mwCoverSchBadge" title="已加入定时队列">定时 ${escapeHtml(schSlot)} · ${schItems
           .map((x) => (x.kind === "stage4_mocap" ? "提骨" : "H3"))
           .join("+")}</span>`
       : "";
@@ -1685,6 +1686,7 @@ function renderScheduleUI() {
 
   if ($("#schEnabled")) $("#schEnabled").checked = Boolean(sch.enabled);
   if ($("#schAutoStop")) $("#schAutoStop").checked = sch.autoStopAfterBatch !== false;
+  if ($("#schAutoDefer")) $("#schAutoDefer").checked = sch.autoDeferToAfternoon !== false;
   if ($("#schRunTime") && document.activeElement !== $("#schRunTime")) $("#schRunTime").value = runTime;
   $$(".mwSchPreset").forEach((b) => b.classList.toggle("active", b.dataset.time === runTime));
   if ($("#schNextRunText")) $("#schNextRunText").textContent = sch.nextRunText || "—";
@@ -1713,7 +1715,16 @@ function renderScheduleUI() {
       it.kind === "stage4_mocap"
         ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}${it.fallbackToModal ? " → Modal兜底" : ""}`
         : `H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
-    const stText = isRun ? "运行中" : isDone ? "已完成" : isErr ? "失败" : `待 ${runTime}`;
+    const itemSlot = it.scheduledTime || runTime;
+    const stText = isRun
+      ? "运行中"
+      : isDone
+      ? "已完成"
+      : isErr
+      ? "失败"
+      : it.deferredFrom
+      ? `待 ${itemSlot} · 早间延后`
+      : `待 ${itemSlot}`;
     row.innerHTML = `
       <div class="mwSchItemMain">
         <div class="mwSchItemTop">
@@ -2409,6 +2420,7 @@ async function saveScheduleConfig(patch) {
 }
 $("#schEnabled").onchange = (e) => saveScheduleConfig({ enabled: Boolean(e.target.checked) });
 $("#schAutoStop").onchange = (e) => saveScheduleConfig({ autoStopAfterBatch: Boolean(e.target.checked) });
+$("#schAutoDefer").onchange = (e) => saveScheduleConfig({ autoDeferToAfternoon: Boolean(e.target.checked) });
 $("#schRunTime").onchange = (e) => {
   if (e.target.value) saveScheduleConfig({ runTime: e.target.value });
 };
