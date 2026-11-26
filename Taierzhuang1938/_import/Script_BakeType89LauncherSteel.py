@@ -716,6 +716,16 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         linear += (bareRim - linear) * wheelWear[..., None]
         rough += (.327 - rough) * wheelWear
         metal += (.82 - metal) * wheelWear
+    if name == "Sleeve":
+        calibration = closeup.get("registeredCalibration")
+        if calibration is not None:
+            if (calibration["photoSha256"] != closeup["source"]["sha256"]
+                    or calibration["sampleRails"] != closeup["source"]["sampleRails"]
+                    or calibration["footprint"] != closeup["footprint"]):
+                raise ValueError("The sleeve calibration does not match the source photo and projection")
+            # Restore photographed local contrast shared by both lighting conditions.
+            contrast = ReferenceField(calibration, xx, vv, "contrast") / 1000
+            linear *= np.exp(1.65 * contrast)[..., None]
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
     if name in ("Tab", "TabBack"):

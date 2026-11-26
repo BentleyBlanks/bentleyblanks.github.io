@@ -180,7 +180,7 @@ def BarrelCalibrationIdentity(barrel):
             "projection": barrel["source"]["projection"], "footprint": barrel["footprint"]}
 
 
-def RegisteredBarrelView(photo, barrel, folder, shape):
+def ReadRegisteredFrame(folder):
     payloads = {name: (folder / name).read_bytes() for name in ("beauty.png", "uvHi.png", "uvLo.png")}
     images = {}
     for name, data in payloads.items():
@@ -189,11 +189,17 @@ def RegisteredBarrelView(photo, barrel, folder, shape):
     hi, lo = (images[name].astype(np.int32) for name in ("uvHi.png", "uvLo.png"))
     u, v = ((hi[..., :2] * 256 + lo[..., :2]) / 65535).transpose(2, 0, 1)
     visible = (hi[..., 2] == 255) & (lo[..., 2] == 255)
+    hashes = {name: sha256(data).hexdigest() for name, data in payloads.items()}
+    return u, v, visible, images["beauty.png"].astype(float), hashes
+
+
+def RegisteredBarrelView(photo, barrel, folder, shape):
+    u, v, visible, render, hashes = ReadRegisteredFrame(folder)
     interior = binary_erosion(visible & (u > .08) & (u < .92) & (v > .09) & (v < .91), iterations=3)
     x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
     weights = np.array([.2126, .7152, .0722])
     wanted = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
-    observed = images["beauty.png"].astype(float) @ weights
+    observed = render @ weights
     valid = interior & (u > .54) & (v > .33) & (wanted > 25) & (wanted < 242) & (observed > 22)
     if np.count_nonzero(valid) < 1000:
         raise ValueError(f"The registered barrel patch is missing from {folder}")
@@ -214,7 +220,6 @@ def RegisteredBarrelView(photo, barrel, folder, shape):
     local, support = Average(signals, (1.25, 1.4))
     broad, _ = Average(signals, (6.9, 5.9))
     peak, _ = Average(peaks, (1.05, 1.1))
-    hashes = {name: sha256(data).hexdigest() for name, data in payloads.items()}
     return local - broad, support, peak, local, hashes
 
 
@@ -440,7 +445,61 @@ def ShoeFinish(folder):
     return field
 
 
-def SleeveFinish(folder):
+def SleeveCalibrationIdentity(sleeve):
+    return {"photoSha256": sleeve["source"]["sha256"],
+            "sampleRails": sleeve["source"]["sampleRails"], "footprint": sleeve["footprint"]}
+
+
+def RegisteredSleeveView(photo, sleeve, folder, shape):
+    u, v, visible, render, hashes = ReadRegisteredFrame(folder)
+    footprint = sleeve["footprint"]
+    center, half = footprint["uCenter"], footprint["uHalfSpan"]
+    first, last = footprint["vRange"]
+    u0, u1 = center - half, center + half
+    stations, top, bottom = np.asarray(sleeve["source"]["sampleRails"]).T
+    x = stations[0] + (stations[-1] - stations[0]) * np.clip((v - first) / (last - first), 0, 1)
+    lo, hi = (np.interp(x, stations, rail) for rail in (top, bottom))
+    y = lo + (hi - lo) * np.clip((u - u0) / (u1 - u0), 0, 1)
+    weights = np.array([.2126, .7152, .0722])
+    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
+    observed = render @ weights
+    inside = visible & (u > u0) & (u < u1) & (v > first) & (v < last)
+    s, t = (u - center + half) / (2 * half), (v - first) / (last - first)
+    valid = binary_erosion(inside, iterations=3) & (source >= 13) & (source <= 120) & (observed >= 10)
+    valid &= (s > 0) & (s < 1) & (t > 0) & (t < 1)
+    if np.count_nonzero(valid) < 1200:
+        raise ValueError(f"The registered sleeve patch is missing from {folder}")
+
+    rows, columns = shape
+    cells = np.floor(s[valid] * rows).astype(int) * columns + np.floor(t[valid] * columns).astype(int)
+    residual = np.log((source[valid] + 9) / (observed[valid] + 9))
+    counts = np.bincount(cells, minlength=rows * columns).reshape(shape).astype(float)
+    values = np.bincount(cells, weights=residual, minlength=rows * columns).reshape(shape)
+
+    def Average(sigma):
+        weights = gaussian_filter(counts, sigma)
+        return gaussian_filter(values, sigma) / np.maximum(weights, .18), weights
+
+    local, support = Average((.82, .95))
+    broad, _ = Average((4.5, 8.5))
+    return local - broad, support, hashes
+
+
+def SleeveCalibration(photo, sleeve, evidence):
+    # Sample near the native resolution of the overview photo so interpolated grain does not drive the fit.
+    views = ("V39SleeveCurrent", "V39SleeveDefaultControl")
+    shape = (49, 185)
+    museum, default = [RegisteredSleeveView(photo, sleeve, evidence / view, shape) for view in views]
+    museumContrast, museumSupport, museumHashes = museum
+    defaultContrast, defaultSupport, defaultHashes = default
+    support = np.clip(np.minimum(museumSupport, defaultSupport) / 1.5, 0, 1)
+    agreement = np.exp(-.5 * ((museumContrast - defaultContrast) / .105)**2)
+    contrast = np.clip(.67 * museumContrast + .33 * defaultContrast, -.28, .28) * support * agreement
+    return {**SleeveCalibrationIdentity(sleeve), "frameSha256": dict(zip(views, (museumHashes, defaultHashes))),
+            "contrast": np.rint(contrast * 1000).astype(int).tolist()}
+
+
+def SleeveFinish(folder, *, evidence=None, priorCalibration=None):
     image, source = Photo(folder, 1)
     rails = [[1149, 593, 642], [1164, 593, 648], [1183, 593, 640],
              [1260, 594, 639], [1334, 594, 639], [1354, 595, 641]]
@@ -474,6 +533,13 @@ def SleeveFinish(folder):
         "exposedSteelCoverage": np.rint(100 * np.clip((.37 - endWarmth) / .34, 0, 1)).astype(int).tolist(),
     }
 
+    calibration = None
+    if evidence is not None:
+        calibration = SleeveCalibration(image, field, evidence)
+    elif priorCalibration is not None:
+        if all(priorCalibration.get(key) == value for key, value in SleeveCalibrationIdentity(field).items()):
+            calibration = priorCalibration
+
     tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=5.4)
     columns = np.arange(image.shape[1])
     rows = np.arange(image.shape[0])[:, None]
@@ -489,6 +555,8 @@ def SleeveFinish(folder):
     upper, lower = (np.interp(x, photoX, rail) for rail in (top, bottom))
     field["detail"] = SaveDetailPlate(tone, warmth, confidence, x, upper + us * (lower - upper),
                                      SLEEVE_DETAIL, halfSize=False)
+    if calibration is not None:
+        field["registeredCalibration"] = calibration
     return field
 
 
@@ -966,13 +1034,17 @@ def Main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
     options.add_argument("--barrel-evidence", type=Path, help="V38 Evidence directory containing fixed-light views and the default-light control")
+    options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
-    priorCalibration = record.get("closeups", {}).get("Barrel", {}).get("registeredCalibration")
-    barrel = BarrelFinish(args.photos, evidence=args.barrel_evidence, priorCalibration=priorCalibration)
+    prior = record.get("closeups", {})
+    barrel = BarrelFinish(args.photos, evidence=args.barrel_evidence,
+                          priorCalibration=prior.get("Barrel", {}).get("registeredCalibration"))
+    sleeve = SleeveFinish(args.photos, evidence=args.sleeve_evidence,
+                          priorCalibration=prior.get("Sleeve", {}).get("registeredCalibration"))
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
-                          "Stem": StemFinish(args.photos), "Sleeve": SleeveFinish(args.photos),
+                          "Stem": StemFinish(args.photos), "Sleeve": sleeve,
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
