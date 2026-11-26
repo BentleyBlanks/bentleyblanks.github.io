@@ -3,7 +3,7 @@ import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_
 import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
 import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
-import { BuildGroundPaint, HydrateGroundPaint, RasterizeBackdropPaint } from "../Script_EditorBlockoutLevels.mjs";
+import { BuildGroundPaint, HydrateGroundPaint, RasterizeBackdropPaint } from "../Script_GroundPaint.mjs";
 import { MakeRoadPath, SampleRun } from "../Script_RoadPath.mjs";
 import { SCENE_GROUND_CLASSES, SCENE_GROUND_SURFACE } from "../Data_SceneGroundLayers.mjs";
 import { TERRAIN_RUTS } from "../Data_Tuning_Terrain.mjs";
@@ -226,24 +226,43 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
   const geoCtx=BeishaheGeoContext(scene,bounds);
   const paintSettings={cellM:FLOW_RENDERING.terrainSurface.texelM,maxCells:FLOW_RENDERING.terrainSurface.maxPixels};
-  const groundPaint = prepared?HydrateGroundPaint(prepared.groundPaint):BuildGroundPaint(scene.paint, bounds, paintSettings);
   const backdropPaint = prepared?prepared.backdropPaint:RasterizeBackdropPaint(scene.backdrop, FLOW_RENDERING.backdropPaint);
-  const localBackdropPaint = prepared?prepared.localBackdropPaint:RasterizeBackdropPaint(scene.backdrop, {
-    maxPx:FLOW_RENDERING.terrainSurface.maxTexturePx, minTexelM:FLOW_RENDERING.terrainSurface.texelM,
-    padM:FLOW_RENDERING.terrainSurface.paddingM, bounds,
-  });
+  // Software-fallback color rasters (86+ MB combined) are only needed when SurfaceColorAt()
+  // or legacy software scene color maps are explicitly requested; WebGL2 uses splat/macroTint.
+  let groundPaintReady = !!prepared?.groundPaint;
+  let groundPaint = groundPaintReady ? HydrateGroundPaint(prepared.groundPaint) : null;
+  const GetGroundPaint = () => {
+    if (!groundPaintReady) { groundPaintReady = true; groundPaint = BuildGroundPaint(scene.paint, bounds, paintSettings); }
+    return groundPaint;
+  };
+  let localBackdropReady = !!prepared && Object.hasOwn(prepared, "localBackdropPaint");
+  let localBackdropPaint = localBackdropReady ? prepared.localBackdropPaint : null;
+  const GetLocalBackdropPaint = () => {
+    if (!localBackdropReady) {
+      localBackdropReady = true;
+      localBackdropPaint = RasterizeBackdropPaint(scene.backdrop, {
+        maxPx: FLOW_RENDERING.terrainSurface.maxTexturePx, minTexelM: FLOW_RENDERING.terrainSurface.texelM,
+        padM: FLOW_RENDERING.terrainSurface.paddingM, bounds,
+      });
+    }
+    return localBackdropPaint;
+  };
   const fieldColors = Object.fromEntries(Object.entries(FLOW_FIELD_COLORS).map(([kind, hex]) =>
     [kind, [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16) / 255)]));
   const fields = (map.fields || []).map(field => ({...field,
     cosine:Math.cos(field.angleDeg * Math.PI / 180), sine:Math.sin(field.angleDeg * Math.PI / 180),
     polygon:map.fieldZones.find(zone => zone.id === field.zone).poly}));
-  const routePaint = prepared
-    ? HydrateGroundPaint(prepared.routePaint)
-    : BuildSplineRoadPaint(map.roads, map.footpaths, map.floors, bounds, paintSettings);
+  let routePaintReady = !!prepared?.routePaint;
+  let routePaint = routePaintReady ? HydrateGroundPaint(prepared.routePaint) : null;
+  const GetRoutePaint = () => {
+    if (!routePaintReady) { routePaintReady = true; routePaint = BuildSplineRoadPaint(map.roads, map.footpaths, map.floors, bounds, paintSettings); }
+    return routePaint;
+  };
   const SurfaceColorAt = (x, z) => {
     const color = [198 / 255, 207 / 255, 169 / 255];
-    const paint = localBackdropPaint && x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ
-      ? localBackdropPaint : backdropPaint;
+    const localPaint = GetLocalBackdropPaint();
+    const paint = localPaint && x >= bounds.minX && x <= bounds.maxX && z >= bounds.minZ && z <= bounds.maxZ
+      ? localPaint : backdropPaint;
     if (paint) {
       const { minX, minZ, texelM, width, height, data } = paint;
       const gx = (x - minX) / texelM - 0.5, gz = (z - minZ) / texelM - 0.5;
@@ -292,8 +311,8 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       }
       break;
     }
-    groundPaint?.Blend(x, z, color);
-    routePaint?.Blend(x, z, color);
+    GetGroundPaint()?.Blend(x, z, color);
+    GetRoutePaint()?.Blend(x, z, color);
     return color.map(channel => channel * 255);
   };
   const SceneHeightAt=(x,z)=>{
@@ -373,10 +392,25 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       ?ix*131072+iz:`${x},${z}`;
   };
   const radius=6144,rootSize=256,rootColumns=2*radius/rootSize;
+  const compactPrepared = prepared?.format === 3;
   const PreparedHeight=(x,z)=>{
     if(!prepared||x< -radius||z< -radius||x>=radius||z>=radius) return undefined;
-    const data=prepared.nodes;
     let node=Math.floor((z+radius)/rootSize)*rootColumns+Math.floor((x+radius)/rootSize);
+    if(compactPrepared) {
+      const coords=prepared.nodeCoords,firsts=prepared.nodeFirstChild,heights=prepared.nodeHeights;
+      while(node>=0) {
+        const cAt=node*3,left=coords[cAt],top=coords[cAt+1],half=coords[cAt+2]/2;
+        const dx=x-left,dz=z-top;
+        const hAt=node*9;
+        if(dx===half&&dz===half) return heights[hAt+7];
+        if((dx===0||dx===half*2)&&(dz===0||dz===half*2)) return heights[hAt+3+(dz===0?(dx===0?0:1):(dx===0?3:2))];
+        const first=firsts[node];
+        if(first<0) return undefined;
+        node=first+(dz<half?(dx<half?0:1):(dx<half?3:2));
+      }
+      return undefined;
+    }
+    const data=prepared.nodes;
     while(node>=0) {
       const at=node*15,left=data[at],top=data[at+1],half=data[at+2]/2;
       const dx=x-left,dz=z-top;
@@ -482,15 +516,26 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     cell.radius=Math.hypot(size/Math.SQRT2,(cell.maxHeight-cell.minHeight)/2);
     return cell;
   };
-  const restoredNodes=prepared?new Array(prepared.nodes.length/15):null;
+  const preparedNodeCount = prepared ? (compactPrepared ? prepared.nodeCoords.length / 3 : prepared.nodes.length / 15) : 0;
+  const restoredNodes=prepared?new Array(preparedNodeCount):null;
   class SnapshotCell {
     constructor(index) {
-      const data=prepared.nodes,at=index*15;
-      this.nodeIndex=index;this.x=data[at];this.z=data[at+1];this.size=data[at+2];
-      this.minHeight=data[at+3];this.maxHeight=data[at+4];this.heightError=data[at+5];
-      this.near=!!data[at+6];this.painted=!!data[at+7];this.firstChild=data[at+8];
-      this.corners=[data[at+9],data[at+10],data[at+11],data[at+12]];this.centerHeight=data[at+13];
-      this.exactHeightError=data[at+14]>=0?data[at+14]:undefined;
+      this.nodeIndex=index;
+      if(compactPrepared) {
+        const cAt=index*3,hAt=index*9,coords=prepared.nodeCoords,flags=prepared.nodeFlags[index],heights=prepared.nodeHeights;
+        this.x=coords[cAt];this.z=coords[cAt+1];this.size=coords[cAt+2];
+        this.minHeight=heights[hAt];this.maxHeight=heights[hAt+1];this.heightError=heights[hAt+2];
+        this.near=!!(flags&1);this.painted=!!(flags&2);this.firstChild=prepared.nodeFirstChild[index];
+        this.corners=[heights[hAt+3],heights[hAt+4],heights[hAt+5],heights[hAt+6]];this.centerHeight=heights[hAt+7];
+        this.exactHeightError=heights[hAt+8]>=0?heights[hAt+8]:undefined;
+      } else {
+        const data=prepared.nodes,at=index*15;
+        this.x=data[at];this.z=data[at+1];this.size=data[at+2];
+        this.minHeight=data[at+3];this.maxHeight=data[at+4];this.heightError=data[at+5];
+        this.near=!!data[at+6];this.painted=!!data[at+7];this.firstChild=data[at+8];
+        this.corners=[data[at+9],data[at+10],data[at+11],data[at+12]];this.centerHeight=data[at+13];
+        this.exactHeightError=data[at+14]>=0?data[at+14]:undefined;
+      }
       this.center=[this.x+this.size/2,(this.minHeight+this.maxHeight)/2,this.z+this.size/2];
       this.radius=Math.hypot(this.size/Math.SQRT2,(this.maxHeight-this.minHeight)/2);
       this.childNodes=null;
@@ -514,7 +559,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     }
     rootGroups.push({start,end,center:lo.map((v,i)=>(v+hi[i])/2),extent:lo.map((v,i)=>(hi[i]-v)/2)});
   }
-  const gridStep=prepared?prepared.leafIds.reduce((step,id)=>Math.min(step,prepared.nodes[id*15+2]),Infinity):
+  const gridStep=prepared?prepared.leafIds.reduce((step,id)=>Math.min(step,compactPrepared?prepared.nodeCoords[id*3+2]:prepared.nodes[id*15+2]),Infinity):
     cells.reduce((step,c)=>Math.min(step,c.size),Infinity);
   const VisitBoundaryPoints=(cell,visit,delta)=>{
     if(cell.perimeter) {
@@ -716,11 +761,39 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   };
   // Bake color independently of relief tessellation. Pixel centers correspond
   // to world grid samples, so adjacent LOD cells use exactly the same paint.
-  // In addition to the legacy software-fallback color map (`scene`), bake a
-  // physically grounded Splat control map (`splat`: track / spoil / stubble /
-  // signed road rut coord) and a low-frequency `macroTint` map for WebGL2
-  // multi-layer texture splatting (reusing MissionPlain).
-  let surfaceMaps=prepared?.surfaceMaps;
+  // Bake the physically grounded Splat control map (`splat`: track / spoil /
+  // stubble / signed road rut coord) and low-frequency `macroTint` map for WebGL2.
+  // The legacy software-fallback color map (`scene`) is computed lazily on first
+  // access so WebGL2 builds skip ~5s of CPU work and ~10.8 MB of snapshot bytes.
+  const AttachLazySceneMap = (maps) => {
+    if (!maps || Object.getOwnPropertyDescriptor(maps, "scene")?.value) return maps;
+    const grid = maps.splat;
+    if (!grid) return maps;
+    Object.defineProperty(maps, "scene", {
+      enumerable: true,
+      configurable: true,
+      get() {
+        const { minX, minZ, texelM, width, height } = grid;
+        const data = new Uint8Array(width * height * 4);
+        for (let row = 0; row < height; row++) {
+          const z = minZ + row * texelM;
+          const rowOff = row * width;
+          for (let column = 0; column < width; column++) {
+            const x = minX + column * texelM;
+            const offset = (rowOff + column) * 4;
+            const color = SurfaceColorAt(x, z), soilMix = SoilMixAt(x, z);
+            for (let axis = 0; axis < 3; axis++) data[offset + axis] = Math.round(color[axis] + ([184, 164, 128][axis] - color[axis]) * soilMix);
+            data[offset + 3] = 255;
+          }
+        }
+        const built = { minX, minZ, texelM, width, height, data };
+        Object.defineProperty(maps, "scene", { value: built, enumerable: true, configurable: true, writable: true });
+        return built;
+      },
+    });
+    return maps;
+  };
+  let surfaceMaps = prepared?.surfaceMaps ? AttachLazySceneMap({ ...prepared.surfaceMaps }) : null;
   const SurfaceMaps = () => {
     if (surfaceMaps) return surfaceMaps;
     const settings = FLOW_RENDERING.terrainSurface;
@@ -732,7 +805,6 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     const width = Math.ceil((bounds.maxX - bounds.minX) / texelM) + 1;
     const height = Math.ceil((bounds.maxZ - bounds.minZ) / texelM) + 1;
     const total = width * height;
-    const data = new Uint8Array(total * 4);
     const splatData = new Uint8Array(total * 4);
     const macroTintData = new Uint8Array(total * 4);
 
@@ -803,11 +875,6 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         const x = bounds.minX + column * texelM;
         const idx = rowOff + column;
         const offset = idx * 4;
-
-        // Legacy software-fallback / test color map
-        const color = SurfaceColorAt(x, z), soilMix = SoilMixAt(x, z);
-        for (let axis = 0; axis < 3; axis++) data[offset + axis] = Math.round(color[axis] + ([184, 164, 128][axis] - color[axis]) * soilMix);
-        data[offset + 3] = 255;
 
         // Physically grounded splat weights & low-frequency macro tint
         let track = 0, spoil = 0, stubble = 0.55;
@@ -895,13 +962,12 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
         macroTintData[offset + 3] = Math.round(Clamp(authored, 0, 1) * 255);
       }
     }
-    surfaceMaps = {
-      scene: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data },
+    surfaceMaps = AttachLazySceneMap({
       backdrop: backdropPaint,
       splat: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: splatData },
       macroTint: { minX: bounds.minX, minZ: bounds.minZ, texelM, width, height, data: macroTintData },
       geo: geoCtx ? { riverZShift: geoCtx.riverZShift, isMerged: geoCtx.isMerged } : null,
-    };
+    });
     return surfaceMaps;
   };
   // One colour cache per light setting, so viewports with different skies (day and dusk) keep their own colours.
@@ -968,7 +1034,7 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   // Textured LODs share world-grid positions and normals. Retain each vertex
   // once, and change only triangle indices when a camera or neighbour changes.
   const cornerCount=[...fullBoundaries.rows.values()].reduce((sum,line)=>sum+line.length,0);
-  const nodeCount=prepared?prepared.nodes.length/15:(4*cells.length-roots.length)/3;
+  const nodeCount=prepared?preparedNodeCount:(4*cells.length-roots.length)/3;
   const bakedCount=prepared?.nativeHeights?.length||0;
   const nativePool={capacity:cornerCount+nodeCount,data:new Float32Array(Math.max(9216,bakedCount*9)),count:bakedCount};
   const nativeIds=new Map();
@@ -1366,20 +1432,27 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       quadVertexIds.push(...QuadIds(cell,normals));packedIds.push(indices.get(cell));
       quadTopology.push(QuadTopology(cell,normals));HeightErrorForCell(cell,FLOW_RENDERING.terrainDetailHeightErrorM);
     }
-    const nodes=new Float64Array(all.length*15);
-    for(const [index,cell] of all.entries()) nodes.set([cell.x,cell.z,cell.size,cell.minHeight,cell.maxHeight,cell.heightError,
-      Number(cell.near),Number(cell.painted),childIndices[index],...cell.corners,cell.centerHeight,cell.exactHeightError??-1],index*15);
+    const count=all.length;
+    const nodeCoords=new Float32Array(count*3),nodeFlags=new Uint8Array(count),nodeFirstChild=new Int32Array(count),nodeHeights=new Float64Array(count*9);
+    for(let index=0;index<count;index++) {
+      const cell=all[index],cAt=index*3,hAt=index*9;
+      nodeCoords[cAt]=cell.x;nodeCoords[cAt+1]=cell.z;nodeCoords[cAt+2]=cell.size;
+      nodeFlags[index]=(cell.near?1:0)|(cell.painted?2:0);
+      nodeFirstChild[index]=childIndices[index];
+      nodeHeights[hAt]=cell.minHeight;nodeHeights[hAt+1]=cell.maxHeight;nodeHeights[hAt+2]=cell.heightError;
+      nodeHeights[hAt+3]=cell.corners[0];nodeHeights[hAt+4]=cell.corners[1];nodeHeights[hAt+5]=cell.corners[2];nodeHeights[hAt+6]=cell.corners[3];
+      nodeHeights[hAt+7]=cell.centerHeight;nodeHeights[hAt+8]=cell.exactHeightError??-1;
+    }
     const SerializeLines=lines=>{
-      const keys=new Float64Array(lines.size),offsets=new Uint32Array(lines.size+1);
-      const values=new Float64Array([...lines.values()].reduce((count,row)=>count+row.length,0));
+      const keys=new Float32Array(lines.size),offsets=new Uint32Array(lines.size+1);
+      const values=new Float32Array([...lines.values()].reduce((sum,row)=>sum+row.length,0));
       let index=0,offset=0;
       for(const [key,row] of lines) {keys[index]=key;offsets[index++]=offset;values.set(row,offset);offset+=row.length;}
       offsets[index]=offset;return {keys,offsets,values};
     };
-    const Raster=raster=>{if(!raster) return null;const {Blend,...data}=raster;return data;};
     const keys=[...normalCache.keys()];
     const normalKeys=keys.every(key=>typeof key==="number")?Float64Array.from(keys):keys;
-    const normalValues=new Float64Array(keys.length*3);
+    const normalValues=new Float32Array(keys.length*3);
     const nativeHeights=new Float32Array(nativePool.count),nativeNormalIds=new Uint32Array(nativePool.count);
     normalKeys.forEach((key,index)=>{
       normalValues.set(normalCache.get(key),index*3);
@@ -1394,9 +1467,11 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
       for(const child of state.pending) errorPending.push(indices.get(child));
       errorOffsets.push(errorPending.length);
     }
-    return {format:2,rootCount,nodes,leafIds:new Uint32Array(cells.map(cell=>indices.get(cell))),
+    const maps=SurfaceMaps();
+    const packedSurfaceMaps={backdrop:maps.backdrop,splat:maps.splat,macroTint:maps.macroTint,geo:maps.geo};
+    return {format:3,rootCount,nodeCoords,nodeFlags,nodeFirstChild,nodeHeights,leafIds:new Uint32Array(cells.map(cell=>indices.get(cell))),
       rows:SerializeLines(fullBoundaries.rows),columns:SerializeLines(fullBoundaries.columns),
-      groundPaint:Raster(groundPaint),routePaint:Raster(routePaint),backdropPaint,localBackdropPaint,surfaceMaps:SurfaceMaps(),normalKeys,normalValues,
+      backdropPaint,surfaceMaps:packedSurfaceMaps,normalKeys,normalValues,
       errorIds:new Uint32Array(errorIds),errorValues:new Float64Array(errorValues),errorOffsets:new Uint32Array(errorOffsets),errorPending:new Uint32Array(errorPending),
       packedIds:new Uint32Array(packedIds),quadVertexIds:new Uint32Array(quadVertexIds),nativeHeights,nativeNormalIds,quadTopology:new Uint8Array(quadTopology)};
   };
@@ -1414,7 +1489,7 @@ export async function LoadEncounterTerrain(scene,sceneUrl,map,options) {
   let bytes=options?.resolvedBytes;
   if(!bytes) {
     const urls=[new URL(scene.terrain.file,sceneUrl),...(scene.trenches?.datum?.file?[new URL(scene.trenches.datum.file,sceneUrl)]:[])];
-    const responses=await Promise.all(urls.map((url)=>fetch(url,{cache:"no-store"})));
+    const responses=await Promise.all(urls.map((url)=>fetch(url,{cache:"no-cache"})));
     for(const response of responses) if(!response.ok) throw new Error(`场景地形读取失败 ${response.status}`);
     bytes=await Promise.all(responses.map((response)=>response.arrayBuffer()));
   }

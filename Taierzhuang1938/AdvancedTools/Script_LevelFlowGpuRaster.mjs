@@ -752,10 +752,22 @@ class GpuRaster {
             vec4 paint=texture(distantColor,distantUv);
             surface=mix(surface,paint.rgb,paint.a);
           }
-          vec2 groundSize=vec2(textureSize(groundColor,0));
           vec2 groundUv=(worldPosition.xz-groundBounds.xy)/groundBounds.zw;
           if(all(greaterThanEqual(groundUv,vec2(0.0)))&&all(lessThanEqual(groundUv,vec2(1.0)))) {
-            surface=texture(groundColor,(groundUv*(groundSize-1.0)+0.5)/groundSize).rgb;
+            vec2 groundSize=vec2(textureSize(groundColor,0));
+            if(groundSize.x>1.5) {
+              surface=texture(groundColor,(groundUv*(groundSize-1.0)+0.5)/groundSize).rgb;
+            } else {
+              vec2 splatSize=vec2(textureSize(splatMap,0));
+              if(splatSize.x>1.5) {
+                vec2 uv=(groundUv*(splatSize-1.0)+0.5)/splatSize;
+                vec4 sp=texture(splatMap,uv);
+                vec4 mt=texture(macroTintMap,uv);
+                float wT=sp.r,wSp=sp.g*(1.0-wT),wRest=max(0.0,1.0-wT-wSp);
+                vec3 baseCol=vec3(0.62,0.56,0.44)*wRest*(1.0-sp.b)+vec3(0.68,0.61,0.48)*wT+vec3(0.58,0.62,0.44)*wRest*sp.b+vec3(0.56,0.47,0.36)*wSp;
+                surface=clamp(baseCol*(mt.rgb*(255.0/128.0)),0.0,1.0);
+              }
+            }
           }
           float diffuse=max(0.0,dot(geomN,sun));
           surface*=lightBalance.x+lightBalance.y*diffuse;
@@ -1012,8 +1024,9 @@ class GpuRaster {
         }
         return texture;
       };
+      const sceneMap=Object.getOwnPropertyDescriptor(surface,"scene")?.value||null;
       const textures=[
-        UploadMap(surface.scene||{width:1,height:1,data:new Uint8Array(4)},true),
+        UploadMap(sceneMap||{width:1,height:1,data:new Uint8Array(4)},true),
         UploadMap(surface.backdrop||{width:1,height:1,data:new Uint8Array(4)},true),
         // Splat map keeps linear filtering without mipmap bleeding across signed rut coordinates
         UploadMap(surface.splat,false),
@@ -1022,15 +1035,19 @@ class GpuRaster {
       this.surfaceTextures.set(surface,textures);
     }
     const textures=this.surfaceTextures.get(surface);
-    for(const [index,map] of [surface.scene,surface.backdrop].entries()) {
+    const sceneMap=Object.getOwnPropertyDescriptor(surface,"scene")?.value||null;
+    const groundMeta=sceneMap||surface.splat;
+    for(const [index,map] of [groundMeta,surface.backdrop].entries()) {
       gl.activeTexture(gl.TEXTURE1+index);gl.bindTexture(gl.TEXTURE_2D,textures[index]);
       gl.uniform1i(index?uniforms.distantColor:uniforms.groundColor,1+index);
       const extent=map?[map.minX,map.minZ,(map.width-(index?0:1))*map.texelM,(map.height-(index?0:1))*map.texelM]:[0,0,1,1];
       gl.uniform4fv(index?uniforms.distantBounds:uniforms.groundBounds,extent);
     }
-    if(layered) {
+    if(surface.splat) {
       gl.activeTexture(gl.TEXTURE3);gl.bindTexture(gl.TEXTURE_2D,textures[2]||this.blank2d);
       gl.activeTexture(gl.TEXTURE4);gl.bindTexture(gl.TEXTURE_2D,textures[3]||this.blank2d);
+    }
+    if(layered) {
       const pack=layerGpu.pack;
       gl.uniform4fv(uniforms.layerTileNear,pack.tileNear);
       gl.uniform4fv(uniforms.layerTileFar,pack.tileFar);
@@ -1432,13 +1449,14 @@ class GpuRaster {
     const surface=raster.terrainSurface,terrain=surface?this.surfaceTextures.get(surface):null;
     const slot=terrain?.indexOf(texture);
     if(slot>=0) {
+      const sceneMap=Object.getOwnPropertyDescriptor(surface,"scene")?.value||null;
       const entries=[
-        ["场景地表",surface.scene],
+        ["场景地表",sceneMap],
         ["远景地表",surface.backdrop],
         ["地表权重图",surface.splat],
         ["地表宏观色",surface.macroTint],
       ];
-      const [label,map]=entries[slot]||["场景地表",surface.scene];
+      const [label,map]=entries[slot]||["场景地表",sceneMap];
       return {name:label,format:"RGBA8",width:map?.width||1,height:map?.height||1,flipY:false};
     }
     if(this.layerTextures) {

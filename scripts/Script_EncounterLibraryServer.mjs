@@ -17,12 +17,13 @@ export function PrepareEncounterLibraryRequest(root) {
   const script=path.join(tools,"Script_EncounterLibrary.mjs"),index=path.join(tools,"Library/Data_Cast.json");
   const jobs=new Map(),terrainChecks=new Map();
   let castRevision,closeWatch;
-  function Import(type) {
-    if(!jobs.has(type)){
-      const job=Run(process.execPath,[script,type],{cwd:root,windowsHide:true});
-      jobs.set(type,job.finally(()=>jobs.delete(type)));
+  function Import(type,extraArgs=[]) {
+    const jobKey=extraArgs.length?`${type}:${extraArgs.join(":")}`:type;
+    if(!jobs.has(jobKey)){
+      const job=Run(process.execPath,[script,type,...extraArgs],{cwd:root,windowsHide:true});
+      jobs.set(jobKey,job.finally(()=>jobs.delete(jobKey)));
     }
-    return jobs.get(type);
+    return jobs.get(jobKey);
   }
   async function CastInputStamp() {
     const files=[script,path.join(project,"Data_Tuning_EncounterPlayStartup.mjs"),
@@ -59,10 +60,11 @@ export function PrepareEncounterLibraryRequest(root) {
       if(revision!==castRevision)throw Error("Character inputs changed during import");
       return true;
     }
-    if(/^\/Taierzhuang1938\/AdvancedTools\/Library\/Terrain\/[a-f0-9]{64}\.bin\.gz$/.test(route)){
+    const terrainMatch=/^\/Taierzhuang1938\/AdvancedTools\/Library\/Terrain\/([a-f0-9]{64})\.bin\.gz$/.exec(route);
+    if(terrainMatch){
       const stamp=await Stamp(file).catch(()=>null);
       if(!stamp||terrainChecks.get(file)!==stamp){
-        await Import("terrain");
+        await Import("terrain",["--key",terrainMatch[1]]);
         const verified=await Stamp(file).catch(()=>null);
         if(!verified)return false;
         terrainChecks.set(file,verified);

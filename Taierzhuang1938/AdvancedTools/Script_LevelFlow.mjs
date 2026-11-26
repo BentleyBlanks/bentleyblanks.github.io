@@ -484,7 +484,7 @@ async function SwitchVariant(variantId) {
     : fallbackBeat.start;
 
   const nextProject = MakeProject(target);
-  const focus = target.evaluate(nextTime, nextProject.value).player;
+  const focus = target.evaluate(0, target.defaultDocument).player;
   const sceneChanged = target.spec.scene !== activeVariant.spec.scene;
   if (sceneChanged) {
     Element("mapLoading").textContent = `切换空间底图 · ${target.spec.title}…`;
@@ -822,7 +822,7 @@ async function Start() {
   PopulateVariantPicker();
   PopulateTimeline();
   const [loadedMap] = await Promise.all([
-    EnsureVariantMap(activeVariant, frame.player),
+    EnsureVariantMap(activeVariant, activeVariant.evaluate(0, activeVariant.defaultDocument).player),
     PreloadEncounterTerrainLayers(() => {
       if (!workspace) return;
       for (const entry of workspace.entries) { entry.map.baseKey = ""; entry.map.staticKey = ""; }

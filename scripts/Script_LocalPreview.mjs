@@ -159,11 +159,22 @@ const SKIP_DIRS = new Set([
 
 // ---------------------------------------------------------------- 静态服
 
-function SendFile(request, response, filePath, stat) {
+// 内容寻址或冻结第三方资源（文件名含 SHA-256 哈希或 vendor 目录）：允许长缓存，二次打开零往返。
+const IMMUTABLE_ROUTE_RE = /^\/Taierzhuang1938\/(?:vendor\/.+|AdvancedTools\/Library\/(?:Cast\/[a-f0-9]{64}\.glb|Terrain\/[a-f0-9]{64}\.bin\.gz))$/;
+
+function SendFile(request, response, filePath, stat, route = "") {
+  const size = Number(stat.size);
+  const mtimeNs = typeof stat.mtimeNs === "bigint" ? stat.mtimeNs : BigInt(Math.round(stat.mtimeMs * 1e6));
+  const etag = `"${size.toString(16)}-${mtimeNs.toString(16)}"`;
+  const lastModified = new Date(Number(stat.mtimeMs)).toUTCString();
+  const immutable = IMMUTABLE_ROUTE_RE.test(route);
   const headers = {
     "Content-Type": MIME[path.extname(filePath).toLowerCase()] ?? "application/octet-stream",
-    // 本地预览的全部意义就是「改完刷新立刻看到」，所以永远不缓存。
-    "Cache-Control": "no-store",
+    // 非不可变文件走 no-cache + 强 ETag（mtimeNs + size）：改完刷新立刻拿 200 新内容，
+    // 没改的文件毫秒级返回 304 并保留浏览器磁盘与 V8 字节码缓存。
+    "Cache-Control": immutable ? "public, max-age=31536000, immutable" : "no-cache",
+    "ETag": etag,
+    "Last-Modified": lastModified,
     "Accept-Ranges": "bytes",
   };
   // 唯一一处与线上不同的响应头：只开 JS 采样接口（滕县 Profiler 面板「采样」页的
@@ -171,28 +182,32 @@ function SendFile(request, response, filePath, stat) {
   // 只是让开发期能在游戏里做函数级采样；Pages 发不了这个头，线上那一页显示「不可用」。
   if (/\.html?$/i.test(filePath)) headers["Document-Policy"] = "js-profiling";
   const range = request.headers.range;
+  if (!range && request.headers["if-none-match"] === etag) {
+    response.writeHead(304, headers).end();
+    return;
+  }
   if (range) {
     const match = /^bytes=(\d*)-(\d*)$/.exec(range);
     if (!match || (!match[1] && !match[2])) {
-      response.writeHead(416, { ...headers, "Content-Range": `bytes */${stat.size}` }).end();
+      response.writeHead(416, { ...headers, "Content-Range": `bytes */${size}` }).end();
       return;
     }
-    const start = match[1] ? Number(match[1]) : Math.max(0, stat.size - Number(match[2]));
-    const end = match[1] ? (match[2] ? Math.min(Number(match[2]), stat.size - 1) : stat.size - 1) : stat.size - 1;
-    if (start > end || start >= stat.size) {
-      response.writeHead(416, { ...headers, "Content-Range": `bytes */${stat.size}` }).end();
+    const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+    const end = match[1] ? (match[2] ? Math.min(Number(match[2]), size - 1) : size - 1) : size - 1;
+    if (start > end || start >= size) {
+      response.writeHead(416, { ...headers, "Content-Range": `bytes */${size}` }).end();
       return;
     }
     response.writeHead(206, {
       ...headers,
-      "Content-Range": `bytes ${start}-${end}/${stat.size}`,
+      "Content-Range": `bytes ${start}-${end}/${size}`,
       "Content-Length": end - start + 1,
     });
     if (request.method === "HEAD") { response.end(); return; }
     fs.createReadStream(filePath, { start, end }).pipe(response);
     return;
   }
-  response.writeHead(200, { ...headers, "Content-Length": stat.size });
+  response.writeHead(200, { ...headers, "Content-Length": size });
   if (request.method === "HEAD") { response.end(); return; }
   fs.createReadStream(filePath).pipe(response);
 }
@@ -500,6 +515,29 @@ function CreateServer(rootDir, context) {
       setImmediate(() => ShutdownAllServers(server));
       return;
     }
+    if (route === "/__encounter/stamp" && (request.method === "GET" || request.method === "HEAD")) {
+      const search = new URLSearchParams(query || "");
+      const rawPaths = (search.get("paths") || "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 64);
+      const txRoot = path.resolve(rootDir, "Taierzhuang1938");
+      const stamps = {};
+      for (const rel of rawPaths) {
+        const clean = rel.replace(/\\/g, "/").replace(/^\/+/, "");
+        const abs = path.resolve(txRoot, clean);
+        const relCheck = path.relative(txRoot, abs);
+        if (!clean || relCheck === ".." || relCheck.startsWith(`..${path.sep}`) || path.isAbsolute(relCheck)) {
+          stamps[rel] = null;
+          continue;
+        }
+        try {
+          const st = fs.statSync(abs, { bigint: true });
+          stamps[rel] = st.isFile() ? `${st.size}:${st.mtimeNs}` : null;
+        } catch {
+          stamps[rel] = null;
+        }
+      }
+      SendJson(response, 200, { ok: true, stamps });
+      return;
+    }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
     if (route.startsWith("/__model-workbench/")) { await handleModelWorkbench(request, response); return; }
     if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
@@ -619,7 +657,7 @@ function CreateServer(rootDir, context) {
         response.writeHead(503,{"Cache-Control":"no-store"}).end();return;
       }
     }
-    fs.stat(filePath, (error, stat) => {
+    fs.stat(filePath, { bigint: true }, (error, stat) => {
       if (error) {
         response.writeHead(404, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         response.end(PageShell("404", `<h1>404</h1><p class="dim">${EscapeHtml(route)}</p><p><a href="/__preview/">← 回索引</a></p>`));
@@ -631,13 +669,13 @@ function CreateServer(rootDir, context) {
           return;
         }
         const indexFile = path.join(filePath, "index.html");
-        fs.stat(indexFile, (indexError, indexStat) => {
+        fs.stat(indexFile, { bigint: true }, (indexError, indexStat) => {
           if (indexError) SendDirectoryIndex(response, rootDir, route, filePath);
-          else SendFile(request, response, indexFile, indexStat);
+          else SendFile(request, response, indexFile, indexStat, `${route}index.html`);
         });
         return;
       }
-      SendFile(request, response, filePath, stat);
+      SendFile(request, response, filePath, stat, route);
     });
   });
   server.on("close",()=>libraryRequest?.close());

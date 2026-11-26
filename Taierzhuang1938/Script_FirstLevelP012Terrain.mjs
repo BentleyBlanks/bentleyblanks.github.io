@@ -22,16 +22,20 @@ export function CreateP012Terrain(layout) {
   const heights = new Float32Array(width * (rows + 1));
   // At least a cell diagonal of level apron keeps interpolation flat even at
   // rotated road edges. The following eight metres blend into the surrounding soil.
+  // Blockout scenes (`sampler`) and authored mission terrains (`layout.terrainSpec`)
+  // bring their own heights and never consult `buckets`, so skip indexing ~6k blocks.
   const apron = Math.hypot(stepX, stepZ) + .2, blend = 8, bucketM = 32, buckets = new Map();
-  for (const block of [...layout.blocks, ...layout.gates]) {
-    const c = Math.cos(block.ry || 0), s = Math.sin(block.ry || 0);
-    const pad = {x:block.x, z:block.z, hx:block.w/2, hz:block.d/2, c, s};
-    const ax = Math.abs(c)*pad.hx + Math.abs(s)*pad.hz + apron + blend;
-    const az = Math.abs(s)*pad.hx + Math.abs(c)*pad.hz + apron + blend;
-    for (let iz=Math.floor((pad.z-az)/bucketM); iz<=Math.floor((pad.z+az)/bucketM); iz++)
-      for (let ix=Math.floor((pad.x-ax)/bucketM); ix<=Math.floor((pad.x+ax)/bucketM); ix++) {
-        const key=`${ix},${iz}`; if(!buckets.has(key))buckets.set(key,[]); buckets.get(key).push(pad);
-      }
+  if (!sampler && !layout.terrainSpec) {
+    for (const block of [...layout.blocks, ...layout.gates]) {
+      const c = Math.cos(block.ry || 0), s = Math.sin(block.ry || 0);
+      const pad = {x:block.x, z:block.z, hx:block.w/2, hz:block.d/2, c, s};
+      const ax = Math.abs(c)*pad.hx + Math.abs(s)*pad.hz + apron + blend;
+      const az = Math.abs(s)*pad.hx + Math.abs(c)*pad.hz + apron + blend;
+      for (let iz=Math.floor((pad.z-az)/bucketM); iz<=Math.floor((pad.z+az)/bucketM); iz++)
+        for (let ix=Math.floor((pad.x-ax)/bucketM); ix<=Math.floor((pad.x+ax)/bucketM); ix++) {
+          const key=`${ix},${iz}`; if(!buckets.has(key))buckets.set(key,[]); buckets.get(key).push(pad);
+        }
+    }
   }
   for (let iz=0; iz<=rows; iz++) for (let ix=0; ix<=cols; ix++) {
     const px=minX+ix*stepX, pz=minZ+iz*stepZ;
@@ -76,28 +80,44 @@ export function CreateP012Terrain(layout) {
   const textureTileM = layout.terrainSpec?.textureTileM || 8;
   const textureZSign = layout.terrainSpec?.textureTileM ? -1 : 1;
   function* Chunks() {
-    const fx=stepX/sub,fz=stepZ/sub;
+    const fx=stepX/sub,fz=stepZ/sub,invTile=1/textureTileM,invTileZ=textureZSign/textureTileM;
+    const inv8StepX=1/(8*stepX),inv8StepZ=1/(8*stepZ);
     for(let z0=0;z0<rows;z0+=chunkCells)for(let x0=0;x0<cols;x0+=chunkCells){
       const nx=Math.min(chunkCells,cols-x0),nz=Math.min(chunkCells,rows-z0),stride=nx+1;
       let refined=0;
       if(cellOf)for(let j=0;j<nz;j++)for(let i=0;i<nx;i++)if(cellOf[(z0+j)*cols+x0+i]>=0)refined++;
       const vertices=stride*(nz+1)+refined*fineCount;
-      const positions=new Float32Array(vertices*3),normals=new Float32Array(positions.length),uvs=new Float32Array(vertices*2),indices=[];
-      for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){
-        const ix=x0+i,iz=z0+j,at=j*stride+i,px=minX+ix*stepX,pz=minZ+iz*stepZ;
-        positions.set([px,NodeHeight(ix,iz),pz],at*3);uvs.set([px/textureTileM,textureZSign*pz/textureTileM],at*2);
-        // Global 3x3 Sobel neighbours give identical, sawtooth-free lighting on diagonal slopes & chunk edges.
-        const hNW=NodeHeight(ix-1,iz-1),hN=NodeHeight(ix,iz-1),hNE=NodeHeight(ix+1,iz-1);
-        const hW=NodeHeight(ix-1,iz),hE=NodeHeight(ix+1,iz);
-        const hSW=NodeHeight(ix-1,iz+1),hS=NodeHeight(ix,iz+1),hSE=NodeHeight(ix+1,iz+1);
-        const dx=((hNE+2*hE+hSE)-(hNW+2*hW+hSW))/(8*stepX);
-        const dz=((hSW+2*hS+hSE)-(hNW+2*hN+hNE))/(8*stepZ);
-        const len=Math.hypot(dx,1,dz);
-        normals.set([-dx/len,1/len,-dz/len],at*3);
-        if(i<nx&&j<nz&&!(cellOf&&cellOf[iz*cols+ix]>=0)) {
-          const qa=NodeHeight(ix,iz),qb=NodeHeight(ix+1,iz),qc=NodeHeight(ix,iz+1),qe=NodeHeight(ix+1,iz+1);
-          if(Math.abs(qa-qe)<Math.abs(qb-qc)) indices.push(at,at+stride,at+stride+1,at,at+stride+1,at+1);
-          else indices.push(at,at+stride,at+1,at+1,at+stride,at+stride+1);
+      const positions=new Float32Array(vertices*3),normals=new Float32Array(positions.length),uvs=new Float32Array(vertices*2);
+      const totalIndexCount=((nx*nz-refined)+refined*sub*sub)*6;
+      const indices=new Array(totalIndexCount);
+      let idxOut=0;
+      for(let j=0;j<=nz;j++){
+        const iz=z0+j,pz=minZ+iz*stepZ,izPrev=iz>0?iz-1:0,izNext=iz<rows?iz+1:rows;
+        const rowPrev=izPrev*width,rowCur=iz*width,rowNext=izNext*width,uvV=pz*invTileZ;
+        for(let i=0;i<=nx;i++){
+          const ix=x0+i,at=j*stride+i,px=minX+ix*stepX,ixPrev=ix>0?ix-1:0,ixNext=ix<cols?ix+1:cols;
+          const hC=heights[rowCur+ix];
+          const p3=at*3,p2=at*2;
+          positions[p3]=px; positions[p3+1]=hC; positions[p3+2]=pz;
+          uvs[p2]=px*invTile; uvs[p2+1]=uvV;
+          // Global 3x3 Sobel neighbours give identical, sawtooth-free lighting on diagonal slopes & chunk edges.
+          const hNW=heights[rowPrev+ixPrev],hN=heights[rowPrev+ix],hNE=heights[rowPrev+ixNext];
+          const hW=heights[rowCur+ixPrev],hE=heights[rowCur+ixNext];
+          const hSW=heights[rowNext+ixPrev],hS=heights[rowNext+ix],hSE=heights[rowNext+ixNext];
+          const dx=((hNE+2*hE+hSE)-(hNW+2*hW+hSW))*inv8StepX;
+          const dz=((hSW+2*hS+hSE)-(hNW+2*hN+hNE))*inv8StepZ;
+          const invLen=1/Math.hypot(dx,1,dz);
+          normals[p3]=-dx*invLen; normals[p3+1]=invLen; normals[p3+2]=-dz*invLen;
+          if(i<nx&&j<nz&&!(cellOf&&cellOf[iz*cols+ix]>=0)) {
+            const qa=hC,qb=hE,qc=hS,qe=hSE;
+            if(Math.abs(qa-qe)<Math.abs(qb-qc)) {
+              indices[idxOut++]=at; indices[idxOut++]=at+stride; indices[idxOut++]=at+stride+1;
+              indices[idxOut++]=at; indices[idxOut++]=at+stride+1; indices[idxOut++]=at+1;
+            } else {
+              indices[idxOut++]=at; indices[idxOut++]=at+stride; indices[idxOut++]=at+1;
+              indices[idxOut++]=at+1; indices[idxOut++]=at+stride; indices[idxOut++]=at+stride+1;
+            }
+          }
         }
       }
       // Refined cells carry their own vertex grid; normals come from the refined surface itself.
@@ -108,14 +128,20 @@ export function CreateP012Terrain(layout) {
         const first=next;
         for(let q=0;q<=sub;q++)for(let p=0;p<=sub;p++,next++){
           const px=minX+(ix*sub+p)*fx,pz=minZ+(iz*sub+q)*fz;
-          positions.set([px,fine[slot*fineCount+q*fineWidth+p],pz],next*3);
-          uvs.set([px/textureTileM,textureZSign*pz/textureTileM],next*2);
-          const dx=(SampleHeight(px+fx,pz)-SampleHeight(px-fx,pz))/(2*fx),dz=(SampleHeight(px,pz+fz)-SampleHeight(px,pz-fz))/(2*fz),len=Math.hypot(dx,1,dz);
-          normals.set([-dx/len,1/len,-dz/len],next*3);
+          const p3=next*3,p2=next*2;
+          positions[p3]=px; positions[p3+1]=fine[slot*fineCount+q*fineWidth+p]; positions[p3+2]=pz;
+          uvs[p2]=px*invTile; uvs[p2+1]=pz*invTileZ;
+          const dx=(SampleHeight(px+fx,pz)-SampleHeight(px-fx,pz))/(2*fx),dz=(SampleHeight(px,pz+fz)-SampleHeight(px,pz-fz))/(2*fz),invLen=1/Math.hypot(dx,1,dz);
+          normals[p3]=-dx*invLen; normals[p3+1]=invLen; normals[p3+2]=-dz*invLen;
           if(p<sub&&q<sub){
             const at=first+q*fineWidth+p,fa=fine[slot*fineCount+q*fineWidth+p],fb=fine[slot*fineCount+q*fineWidth+p+1],fc=fine[slot*fineCount+(q+1)*fineWidth+p],fe=fine[slot*fineCount+(q+1)*fineWidth+p+1];
-            if(Math.abs(fa-fe)<Math.abs(fb-fc)) indices.push(at,at+fineWidth,at+fineWidth+1,at,at+fineWidth+1,at+1);
-            else indices.push(at,at+fineWidth,at+1,at+1,at+fineWidth,at+fineWidth+1);
+            if(Math.abs(fa-fe)<Math.abs(fb-fc)) {
+              indices[idxOut++]=at; indices[idxOut++]=at+fineWidth; indices[idxOut++]=at+fineWidth+1;
+              indices[idxOut++]=at; indices[idxOut++]=at+fineWidth+1; indices[idxOut++]=at+1;
+            } else {
+              indices[idxOut++]=at; indices[idxOut++]=at+fineWidth; indices[idxOut++]=at+1;
+              indices[idxOut++]=at+1; indices[idxOut++]=at+fineWidth; indices[idxOut++]=at+fineWidth+1;
+            }
           }
         }
       }

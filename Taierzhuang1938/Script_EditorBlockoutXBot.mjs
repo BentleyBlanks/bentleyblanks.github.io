@@ -390,12 +390,12 @@ export class XBotSkins {
     this.loading = null;
   }
 
-  Load() {
-    if (!this.loading) this.loading = this._Load().catch((error) => { this.failed = error; console.warn("[XBot] load failed", error); });
+  Load({ preloadClips = [] } = {}) {
+    if (!this.loading) this.loading = this._Load(preloadClips).catch((error) => { this.failed = error; console.warn("[XBot] load failed", error); });
     return this.loading;
   }
 
-  async _Load() {
+  async _Load(preloadClips = []) {
     const [gltf, library, derived] = await Promise.all([
       this.loader.loadAsync(this.base + XBOT.model),
       fetch(this.base + "Data_MixamoLibrary.json").then(r => r.json()),
@@ -420,7 +420,11 @@ export class XBotSkins {
     // 每种人物一套（模型、头高、身体胶囊、初始骨头）；X Bot 之外的按阵营表读，读不到不影响 X Bot
     this.kits = new Map([["xbot", { key: "xbot", def: XBOT_CHARACTERS.xbot, source: this.source, headY: this.headY, bodyVolumes: this.bodyVolumes, restBones: this.restBones }]]);
     const keys=this.characterKeys||[...new Set([...Object.keys(XBOT_FACTION_CHARACTERS).flatMap(FactionCharacterKeys), ...Object.values(XBOT_CAST_CHARACTERS)])];
-    await Promise.all([this._CalibrateRifle(), this._LoadAimOffsetGrid(), ...keys.map(key => this._LoadKit(key))]);
+    // Start combat/death clip preloads in parallel with the 15 character GLBs once XBot rest pose & manifest are ready.
+    const clipTasks = preloadClips.length ? preloadClips.map((file) => this.Clip(file).catch((reason) => {
+      console.warn("[XBot] Preload clip failed; retaining fallback pose", file, reason);
+    })) : [];
+    await Promise.all([this._CalibrateRifle(), this._LoadAimOffsetGrid(), ...keys.map(key => this._LoadKit(key)), ...clipTasks]);
     this.ready = true;
   }
 

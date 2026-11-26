@@ -1,5 +1,21 @@
-import {watch} from "node:fs";
+import {existsSync,watch} from "node:fs";
 import path from "node:path";
+
+const TERRAIN_MODULES = new Set([
+  "Script_EncounterLibrary.mjs", "Script_LevelFlowTerrain.mjs", "Script_LevelFlowTerrainKey.mjs",
+  "Script_LevelFlowTerrainWorker.mjs", "Script_LevelFlowTerrainCache.mjs", "Script_LevelFlowTerrainLoader.mjs",
+  "Script_LevelFlowGeometry.mjs", "Script_LevelFlowMap.mjs", "Script_TerrainSnapshot.mjs",
+  "Script_GroundPaint.mjs", "Script_SceneDoc.mjs", "Script_SceneTrenches.mjs", "Script_SceneSurface.mjs",
+  "Script_SceneInherit.mjs", "Script_RoadPath.mjs", "Script_EncounterFarmland.mjs", "Script_BeishaheGeography.mjs",
+  "Script_EncounterVariants.mjs", "Data_EncounterVariants.mjs", "Data_Tuning_LevelFlow.mjs",
+  "Data_SceneGroundLayers.mjs", "Data_Tuning_Terrain.mjs", "Data_LevelFlow.mjs",
+  "Data_EditorBlockoutFirstLevel0105Space.mjs", "Data_EditorBlockoutFirstLevel0610Space.mjs",
+]);
+
+const CAST_MODULES = new Set([
+  "Script_EncounterLibrary.mjs", "Script_StrictTexturePublish.mjs", "Script_PublishAssetPaths.mjs",
+  "Data_XBotCharacters.mjs", "Data_Tuning_EncounterPlayStartup.mjs",
+]);
 
 // One set of native file notifications per active preview. Debounce saves and
 // remember edits arriving while an importer is still running.
@@ -23,15 +39,23 @@ export function WatchEncounterImports(project,importData) {
     for(const watcher of watchers)watcher.close();
   }
   try {
-    for(const dir of ["Model/Character","Scenes/FirstLevelEncounter","AdvancedTools","."]){
-      const watcher=watch(path.join(project,dir),(_event,file)=>{
+    const watchDirs=[
+      ["Model/Character",true],
+      ["Scenes/FirstLevelEncounter",true],
+      ["Scenes/FirstLevelMerged",false],
+      ["AdvancedTools",true],
+      [".",true],
+    ];
+    for(const [dir,required] of watchDirs){
+      const targetDir=path.join(project,dir);
+      if(!required&&!existsSync(targetDir))continue;
+      const watcher=watch(targetDir,(_event,file)=>{
         if(!file)return;
         if(dir==="Model/Character"&&file.endsWith(".glb"))pending.add("cast");
-        if(dir==="Scenes/FirstLevelEncounter"&&/\.(?:bin|json|mjs)$/.test(file))pending.add("terrain");
+        if((dir==="Scenes/FirstLevelEncounter"||dir==="Scenes/FirstLevelMerged")&&/\.(?:bin|json|mjs)$/.test(file))pending.add("terrain");
         if((dir==="."||dir==="AdvancedTools")&&file.endsWith(".mjs")){
-          pending.add("terrain");
-          if(["Script_EncounterLibrary.mjs","Script_StrictTexturePublish.mjs","Script_PublishAssetPaths.mjs",
-            "Data_XBotCharacters.mjs","Data_Tuning_EncounterPlayStartup.mjs"].includes(file))pending.add("cast");
+          if(TERRAIN_MODULES.has(file))pending.add("terrain");
+          if(CAST_MODULES.has(file))pending.add("cast");
         }
         if(pending.size){clearTimeout(timer);timer=setTimeout(Drain,350);}
       });

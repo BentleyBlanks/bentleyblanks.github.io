@@ -17,7 +17,10 @@ import {TerrainLibraryKey} from "./Script_LevelFlowTerrainKey.mjs";
 import {PackTerrainSnapshot} from "./Script_TerrainSnapshot.mjs";
 import {BuildEncounterMap} from "./Script_LevelFlowMap.mjs";
 import {BuildEncounterTerrain} from "./Script_LevelFlowTerrain.mjs";
-import {EvaluateFlow} from "./Script_LevelFlowModel.mjs";
+import {ENCOUNTER_VARIANTS,CompileEncounterVariant} from "../Script_EncounterVariants.mjs";
+import {SceneDir,SceneFileName,DecodeSceneHeights,FlatSceneHeights,IsFlatTerrain} from "../Script_SceneDoc.mjs";
+import {DecodeTrenchDatum} from "../Script_SceneTrenches.mjs";
+import {ResolveInheritedScene,EncodeResolvedSceneBinary} from "../Script_SceneInherit.mjs";
 
 const project=fileURLToPath(new URL("../",import.meta.url)), library=path.join(project,"AdvancedTools/Library");
 const Hash=bytes=>createHash("sha256").update(bytes).digest("hex");
@@ -89,22 +92,68 @@ async function BuildCast() {
   console.log("Cast:",built,"imported,",Object.keys(models).length-built,"cached");
 }
 
-async function BuildTerrain() {
+async function ReadSingleSceneNode(sceneId) {
+  const dir=path.join(project,SceneDir(sceneId));
+  const doc=JSON.parse(await fs.readFile(path.join(dir,SceneFileName(sceneId)),"utf8"));
+  const heightBuf=IsFlatTerrain(doc.terrain)?null:await fs.readFile(path.join(dir,doc.terrain.file));
+  const heights=heightBuf?DecodeSceneHeights(heightBuf.buffer.slice(heightBuf.byteOffset,heightBuf.byteOffset+heightBuf.byteLength),doc.terrain):FlatSceneHeights(doc.terrain);
+  const datumBuf=doc.trenches?.datum?.file?await fs.readFile(path.join(dir,doc.trenches.datum.file)):null;
+  const datum=datumBuf?DecodeTrenchDatum(doc.trenches.datum,datumBuf.buffer.slice(datumBuf.byteOffset,datumBuf.byteOffset+datumBuf.byteLength)):[];
+  return {doc,heights,datum,heightBuf,datumBuf};
+}
+
+async function ReadResolvedSceneNode(sceneId) {
+  const own=await ReadSingleSceneNode(sceneId);
+  if(!own.doc.inherit) {
+    const bytes=[own.heightBuf,...(own.datumBuf?[own.datumBuf]:[])];
+    return {doc:own.doc,bytes};
+  }
+  const base=await ReadSingleSceneNode(own.doc.inherit.scene);
+  const resolved=ResolveInheritedScene(own.doc,own.heights,own.datum,base);
+  const {heightBytes,datumBytes}=EncodeResolvedSceneBinary(resolved);
+  const bytes=[Buffer.from(heightBytes.buffer,heightBytes.byteOffset,heightBytes.byteLength),
+    ...(datumBytes?[Buffer.from(datumBytes.buffer,datumBytes.byteOffset,datumBytes.byteLength)]:[])];
+  return {doc:resolved.doc,bytes};
+}
+
+async function PruneStaleTerrain(dir,keepKeys) {
+  let entries=[];
+  try {entries=await fs.readdir(dir);} catch {return;}
+  for(const name of entries) {
+    const match=/^([a-f0-9]{64})\.bin\.gz(?:\.json)?$/.exec(name);
+    if(match&&!keepKeys.has(match[1])) await fs.rm(path.join(dir,name),{force:true}).catch(()=>{});
+  }
+}
+
+async function BuildTerrain({onlyKey=null}={}) {
   const dir=path.join(library,"Terrain");await fs.mkdir(dir,{recursive:true});
-  const sceneDir=path.join(project,"Scenes/FirstLevelEncounter");
-  const scene=JSON.parse(await fs.readFile(path.join(sceneDir,"Scene_FirstLevelEncounter.json"),"utf8"));
-  const map=BuildEncounterMap(scene);
-  map.source={scene:"Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json",sha256:Hash(JSON.stringify(map))};
-  const bytes=await Promise.all([scene.terrain.file,scene.trenches?.datum?.file].filter(Boolean).map(file=>fs.readFile(path.join(sceneDir,file))));
-  const focus=EvaluateFlow(0).player;
-  const key=await TerrainLibraryKey(scene,bytes,map,focus,url=>fs.readFile(url,"utf8"));
-  const target=path.join(dir,key+".bin.gz"),recordFile=target+".json";
-  if(await Valid(target,await ReadRecord(recordFile))){console.log("Terrain: cached",key);return;}
-  const terrain=BuildEncounterTerrain(scene,bytes[0],bytes[1],map);
-  const chunks=PackTerrainSnapshot(terrain.prepareSnapshot(focus));
-  await Atomic(target,tmp=>pipeline(Readable.from(chunks),createGzip({level:1}),createWriteStream(tmp)));
-  await WriteRecord(recordFile,{bytes:(await fs.stat(target)).size,sha256:await DigestFile(target)});
-  console.log("Terrain: imported",key);
+  const seenScenes=new Set(),targets=[];
+  for(const spec of ENCOUNTER_VARIANTS) {
+    if(seenScenes.has(spec.scene))continue;
+    seenScenes.add(spec.scene);
+    const variant=CompileEncounterVariant(spec.id);
+    const {doc:scene,bytes}=await ReadResolvedSceneNode(spec.scene);
+    const map=BuildEncounterMap(scene,{sceneId:spec.scene,variantSpec:spec});
+    map.source={scene:`${SceneDir(spec.scene)}/${SceneFileName(spec.scene)}`,sha256:Hash(JSON.stringify(map))};
+    const focus=variant.evaluate(0,variant.defaultDocument).player;
+    const key=await TerrainLibraryKey(scene,bytes,map,focus,url=>fs.readFile(url,"utf8"));
+    targets.push({sceneId:spec.scene,scene,bytes,map,focus,key});
+  }
+  const activeKeys=new Set(targets.map(item=>item.key));
+  const selected=onlyKey?targets.filter(item=>item.key===onlyKey):targets;
+  if(onlyKey&&!selected.length){console.log("Terrain: unmatched key",onlyKey);return;}
+  for(const {sceneId,scene,bytes,map,focus,key} of selected) {
+    const target=path.join(dir,key+".bin.gz"),recordFile=target+".json";
+    if(await Valid(target,await ReadRecord(recordFile))){console.log("Terrain: cached",sceneId,key);continue;}
+    const heightAb=bytes[0].buffer.slice(bytes[0].byteOffset,bytes[0].byteOffset+bytes[0].byteLength);
+    const datumAb=bytes[1]?bytes[1].buffer.slice(bytes[1].byteOffset,bytes[1].byteOffset+bytes[1].byteLength):null;
+    const terrain=BuildEncounterTerrain(scene,heightAb,datumAb,map);
+    const chunks=PackTerrainSnapshot(terrain.prepareSnapshot(focus));
+    await Atomic(target,tmp=>pipeline(Readable.from(chunks),createGzip({level:1}),createWriteStream(tmp)));
+    await WriteRecord(recordFile,{bytes:(await fs.stat(target)).size,sha256:await DigestFile(target)});
+    console.log("Terrain: imported",sceneId,key);
+  }
+  if(!onlyKey)await PruneStaleTerrain(dir,activeKeys);
 }
 
 // Optional companion for ordinary static file servers. Start watching first so
@@ -124,10 +173,12 @@ async function WatchLibrary() {
 
 if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url) {
   const type=process.argv[2]||"all";
-  if(!["all","cast","terrain","watch"].includes(type))throw Error("Usage: node Script_EncounterLibrary.mjs [all|cast|terrain|watch]");
+  const keyArgIndex=process.argv.indexOf("--key");
+  const onlyKey=keyArgIndex>=0?process.argv[keyArgIndex+1]||null:null;
+  if(!["all","cast","terrain","watch"].includes(type))throw Error("Usage: node Script_EncounterLibrary.mjs [all|cast|terrain|watch] [--key <sha256>]");
   if(type==="watch")await WatchLibrary();
   else {
     if(type!=="terrain")await BuildCast();
-    if(type!=="cast")await BuildTerrain();
+    if(type!=="cast")await BuildTerrain({onlyKey});
   }
 }

@@ -3,7 +3,7 @@ import {ENCOUNTER_PLAY_STARTUP} from "../Data_Tuning_EncounterPlayStartup.mjs";
 const indexUrl=new URL("./Library/Data_Cast.json",import.meta.url);
 let index;
 export async function ReadCastLibrary() {
-  const response=await fetch(indexUrl,{cache:"no-store"});
+  const response=await fetch(indexUrl,{cache:"no-cache"});
   if(!response.ok)return null;
   const data=await response.json();
   if(data.version!==1||data.maxSize!==ENCOUNTER_PLAY_STARTUP.castTextureMaxSize||!data.models)return null;

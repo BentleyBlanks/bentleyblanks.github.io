@@ -5,6 +5,8 @@ export const ENCOUNTER_PLAY_STARTUP = {
   craterDebris:true,
   pbrSets:["Steel","WoodStock","GrenadePbr","DadaoPbr","Ground","GroundRubble","CraterScorched","Type89Armor","Type89Track",
     "HandcartWood","WoodCrate","LugouqiaoType11AmmoBox","LugouqiaoType11Body","LugouqiaoType11BodyAlt","LugouqiaoType11Fore"],
+  // Procedural recipes only used by legacy town chapters or unrequested fallback weapons.
+  skipBakeRecipes:["WoodDoor","ShopDoorPbr","StoneWellOriginal","StoneMillOriginal","LugouqiaoOfficerSword"],
   // Scene BGM is on-demand and remains available; legacy music/voice packs are not used.
   audio:{voice:false,ambience:false,music:false},
   shaderSubmitBatch:32,

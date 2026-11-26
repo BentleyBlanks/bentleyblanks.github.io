@@ -721,7 +721,11 @@ export class MaterialLibrary {
   Get(name, options = {}) {
     const key = `${name}|${JSON.stringify(options)}`;
     if (this.materials.has(key)) return this.materials.get(key);
-    const set = this.baked.get(name);
+    let set = this.baked.get(name);
+    if (!set && Object.hasOwn(RECIPES, name)) {
+      for (const _ of this.PrepareSteps([name])) { /* On-demand bake for recipes skipped by sandbox startup profiles. */ }
+      set = this.baked.get(name);
+    }
     if (!set) throw new Error(`材质未烘焙：${name}`);
     const repeat = options.repeat ?? 1;
     const clone = (texture) => {

@@ -301,13 +301,14 @@ export class FirstLevelWhiteboxField {
     const sink = new BuildSink();
     sink.SetSector("FirstLevelWhitebox");
     const ground = this.layout.ground;
-    if (this.terrain) {
+      if (this.terrain) {
       for (const chunk of this.terrain.Chunks()) {
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute("position", new THREE.BufferAttribute(chunk.positions, 3));
         geometry.setAttribute("normal", new THREE.BufferAttribute(chunk.normals, 3));
         geometry.setAttribute("uv", new THREE.BufferAttribute(chunk.uvs, 2));
-        geometry.setIndex(chunk.indices);
+        geometry.setIndex(chunk.indices instanceof Uint32Array || chunk.indices instanceof Uint16Array
+          ? new THREE.BufferAttribute(chunk.indices, 1) : chunk.indices);
         sink.SetSector(`P012Terrain_${chunk.id}`);
         sink.Add(ground.semantic || "Whitebox", geometry);
         this.stats.groundTris += chunk.indices.length / 3;
@@ -319,18 +320,22 @@ export class FirstLevelWhiteboxField {
     }
     // Keep the physical soil separate from structural boxes so the shared crater
     // adapter can replace its surface without touching walls or elevated floors.
+    const SrgbToLinear = (c) => (c <= 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4));
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
       mesh.name = "FirstLevelWhitebox_Ground"; mesh.userData.deformableTerrain = true;
       if (this.SampleGroundSurface) {
         // One corridor walk per vertex yields the layered tint and the splat weights.
-        const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
-        const layers=new Float32Array(positions.count*4), rgb=[0,0,0], weights=[0,0,0,1];
-        const color=new THREE.Color();
-        for(let i=0;i<positions.count;i++) {
+        const positions=mesh.geometry.attributes.position, posArr=positions.array, count=positions.count;
+        const colors=new Float32Array(count*3), layers=new Float32Array(count*4), rgb=[0,0,0], weights=[0,0,0,1];
+        const sample=this.SampleGroundSurface;
+        for(let i=0,p3=0,l4=0;i<count;i++,p3+=3,l4+=4) {
           weights[3]=1;
-          this.SampleGroundSurface(positions.getX(i),positions.getZ(i),rgb,weights);
-          color.setRGB(rgb[0],rgb[1],rgb[2],THREE.SRGBColorSpace).toArray(colors,i*3);
-          layers[i*4]=weights[0]; layers[i*4+1]=weights[1]; layers[i*4+2]=weights[2]; layers[i*4+3]=weights[3];
+          sample(posArr[p3],posArr[p3+2],rgb,weights);
+          const r=rgb[0],g=rgb[1],b=rgb[2];
+          colors[p3]=r===1?1:SrgbToLinear(r);
+          colors[p3+1]=g===1?1:SrgbToLinear(g);
+          colors[p3+2]=b===1?1:SrgbToLinear(b);
+          layers[l4]=weights[0]; layers[l4+1]=weights[1]; layers[l4+2]=weights[2]; layers[l4+3]=weights[3];
         }
         mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
         // Float32 on purpose: the crater cutter copies every attribute into Float32 arrays.
@@ -338,11 +343,12 @@ export class FirstLevelWhiteboxField {
         mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,4));
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
       } else if (this.layout.SampleGroundColor) {
-        const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
-        const color=new THREE.Color();
-        for(let i=0;i<positions.count;i++) {
-          const sample=this.layout.SampleGroundColor(positions.getX(i),positions.getZ(i));
-          color.setRGB(...sample,THREE.SRGBColorSpace).toArray(colors,i*3);
+        const positions=mesh.geometry.attributes.position, posArr=positions.array, count=positions.count;
+        const colors=new Float32Array(count*3);
+        const sample=this.layout.SampleGroundColor;
+        for(let i=0,p3=0;i<count;i++,p3+=3) {
+          const s=sample(posArr[p3],posArr[p3+2]);
+          colors[p3]=SrgbToLinear(s[0]); colors[p3+1]=SrgbToLinear(s[1]); colors[p3+2]=SrgbToLinear(s[2]);
         }
         mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);

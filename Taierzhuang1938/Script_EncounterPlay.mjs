@@ -236,24 +236,24 @@ export class EncounterPlay {
       this.host.audio.LoadPacks?.();
     }
     this.ReportStep(T("boot.step.encounterCast"),0.06);
+    const combatClipFiles=[...new Set([
+      ...Object.values(XBOT_DEATHS).map(entry=>entry?.file),
+      ...XBOT_DEATH_FALLS.map(entry=>entry.file),
+      ...Object.values(XBOT_NATIVE).map(entry=>entry?.file),
+      ...Object.values(XBOT_TURN_IN_PLACE).map(entry=>entry?.file),
+      ...Object.values(XBOT_LOCOMOTION_4WAY).flatMap(group=>Object.values(group||{}).map(entry=>entry?.file)),
+    ].filter(Boolean))];
     const openingLoad=this.opening&&this.pendingOpening
       ?this.opening.Load().catch(error=>{console.warn("[EncounterPlay] Opening timeline unavailable, falling back to 02g",error);this.pendingOpening=false;this.combatStarted=true;})
       :null;
-    await Promise.all([this.puppets.xbot.Load(),PreloadDeathLibrary(),sfxWarm,openingLoad,this.puppets.LoadTankette()]);
+    await Promise.all([this.puppets.xbot.Load({preloadClips:combatClipFiles}),PreloadDeathLibrary(),sfxWarm,openingLoad,this.puppets.LoadTankette()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits,(done,total)=>
       this.ReportStep(T("boot.step.encounterTextures",{done,total}),0.06+(done/total)*0.08));
     await this.castTexturesReady;
     this.ReportStep(T("boot.step.encounterDeaths"),0.16);
-    const combatClipFiles=new Set([
-      ...Object.values(XBOT_DEATHS).map(entry=>entry?.file),
-      ...XBOT_DEATH_FALLS.map(entry=>entry.file),
-      ...Object.values(XBOT_NATIVE).map(entry=>entry?.file),
-      ...Object.values(XBOT_TURN_IN_PLACE).map(entry=>entry?.file),
-      ...Object.values(XBOT_LOCOMOTION_4WAY).flatMap(group=>Object.values(group||{}).map(entry=>entry?.file)),
-    ].filter(Boolean));
-    const clipWarmups=await Promise.allSettled([...combatClipFiles].map(file=>this.puppets.xbot.Clip(file)));
+    const clipWarmups=await Promise.allSettled(combatClipFiles.map(file=>this.puppets.xbot.Clip(file)));
     for(const result of clipWarmups)if(result.status==="rejected")console.warn("[EncounterPlay] Combat/death clip warmup failed; retaining fallback poses",result.reason);
     for(const key of ["fireStand","fireCrouch","fireProne"]) {
       const file=XBOT_NATIVE[key]?.file;
@@ -472,6 +472,17 @@ export class EncounterPlay {
     debris.position.copy(host.player.EyePosition);
     for(const mesh of debris.children)mesh.frustumCulled=false;
     group.add(debris);
+    const shadowBatch=host.ctx.shadowCasterBatch;
+    const warmShadowBatch=!retained&&shadowBatch?.enabled&&host.renderer.shadowMap.enabled&&host.ctx.lights?.csm?.active;
+    const shadowProxy=warmShadowBatch?shadowBatch.WarmProxy():null;
+    const prevShadowBypass=shadowBatch?.bypass??false;
+    if(shadowProxy) {
+      shadowProxy.name="ShadowBatchBootWarmProxy";
+      shadowProxy.position.set(host.player.position.x,host.player.position.y+1,host.player.position.z);
+      shadowProxy.traverse(mesh=>{if(mesh.isMesh)mesh.frustumCulled=false;});
+      group.add(shadowProxy);
+      shadowBatch.bypass=true;
+    }
     host.scene.add(group);host.state.warming=true;
     const options={submitBatch:ENCOUNTER_PLAY_STARTUP.shaderSubmitBatch,
       drawBatch:ENCOUNTER_PLAY_STARTUP.shaderDrawBatch,revealBatch:ENCOUNTER_PLAY_STARTUP.meshRevealBatch,excluded,overlapLink:true,
@@ -493,12 +504,18 @@ export class EncounterPlay {
         this.ReportStep(T("boot.step.encounterActorShaders"),0.24);
         await PaintFrame();
         actorProgramsSubmitted=SubmitEncounterActorPrograms(host);
+        if(shadowProxy) host.ctx.lights.csm.ForceUpdate();
         await host.ctx.WarmupShaders(host.scene,onStep,null,options);
         host.viewmodel.DrawActionWarmup(()=>host.ctx.RenderScene(0));
       }
     } catch(error) {
       this.error=String(error.stack||error);this.ready=false;this.Send("error",{message:String(error.message||error)});throw error;
     } finally {
+      if(shadowProxy) {
+        shadowBatch.bypass=prevShadowBypass;
+        shadowBatch.DisposeWarmProxy(shadowProxy);
+        host.ctx.lights.csm.ForceUpdate();
+      }
       host.viewmodel.root.visible=prevVmVisible;
       group.removeFromParent();
       for(const mesh of hiddenHair)mesh.visible=false;
@@ -516,15 +533,15 @@ export class EncounterPlay {
     const ready=host.state.ready;
     const warming=host.state.warming;
     const prevWarmVmVisible=host.viewmodel.root.visible;
-    const DrawWarmFrame=()=>{
+    const DrawWarmFrame=(sync=false)=>{
       host.ctx.StepFrames(1,ENCOUNTER_PLAY_STARTUP.settleDt,true);
-      host.renderer.getContext().finish();
+      if(sync) host.renderer.getContext().finish();
     };
     try{
       host.state.ready=true;host.state.warming=false;host.viewmodel.root.visible=true;
       this.ReportStep(T("boot.step.encounterWarmFrames",{done:1,total:ENCOUNTER_PLAY_STARTUP.settleFrames}),0.95);
       // Update the actual camera and blood distance-culling eye first.
-      DrawWarmFrame();
+      DrawWarmFrame(false);
       // Restart reconstructs actors and their batch membership even when the
       // programs are retained. Draw their actual passes before releasing input.
       shadowBatchPrimed=host.ctx.shadowCasterBatch?.Prime()||0;
@@ -545,13 +562,13 @@ export class EncounterPlay {
       const prevAds=host.player.ads,prevWantAds=host.player.wantAds,prevFovT=host.ctx.adsFovT;
       try {
         host.player.ads=1;host.player.wantAds=true;host.ctx.adsFovT=1;
-        DrawWarmFrame();
+        DrawWarmFrame(false);
       } finally {
         host.player.ads=prevAds;host.player.wantAds=prevWantAds;host.ctx.adsFovT=prevFovT;
       }
       for(let i=1;i<ENCOUNTER_PLAY_STARTUP.settleFrames;i++){
         this.ReportStep(T("boot.step.encounterWarmFrames",{done:i+1,total:ENCOUNTER_PLAY_STARTUP.settleFrames}),0.95+((i+1)/ENCOUNTER_PLAY_STARTUP.settleFrames)*0.05);
-        DrawWarmFrame();
+        DrawWarmFrame(i===ENCOUNTER_PLAY_STARTUP.settleFrames-1);
       }
     }finally{
       host.viewmodel.root.visible=prevWarmVmVisible;

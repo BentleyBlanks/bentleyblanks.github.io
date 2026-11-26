@@ -1,5 +1,4 @@
 import {BuildEncounterTerrain} from "./Script_LevelFlowTerrain.mjs";
-import {WriteTerrainCache} from "./Script_LevelFlowTerrainCache.mjs";
 
 function TransferBuffers(value,buffers=new Set(),seen=new Set()) {
   if(!value||typeof value!=="object"||seen.has(value)) return buffers;
@@ -16,7 +15,7 @@ self.onmessage=async({data})=>{
     const terrain=BuildEncounterTerrain(data.scene,data.heights,data.datum,data.map);
     const prepared=terrain.prepareSnapshot(data.focus);
     const buildMs=performance.now()-started;
-    const cached=data.key?await WriteTerrainCache(data.key,prepared).catch(error=>{console.warn("[EncounterTerrain] Cache write failed",error.message);return false;}):false;
-    self.postMessage({prepared,buildMs,cached},[...TransferBuffers(prepared)]);
+    // Return immediately so the editor renders first; IndexedDB persistence runs asynchronously on the caller side.
+    self.postMessage({prepared,buildMs,cached:false},[...TransferBuffers(prepared)]);
   } catch(error) {self.postMessage({error:error.message});}
 };

@@ -1487,12 +1487,60 @@ async function Boot() {
    *
    * 别把这里改成"全烘一遍保平安"：那正是这段代码要删掉的东西。
    */
+  // 开机流水线并行化：在纹理 Worker 烘焙与外部 PBR 下载期间，同步启动 Rapier WASM 编译与
+  // 首关场景 JSON/高度图下载，避免纯网络/WASM 任务排在 CPU 烘焙之后串行空等。
+  const physicsReady = InitPhysics();
+  const initialPhase = PHASE_TABLE[state.phaseIndex];
+  const initialPrepare = initialPhase?.blockout?.Prepare?.() ?? initialPhase?.sceneAsset?.Prepare?.() ?? null;
+  if (initialPrepare) {
+    initialPrepare.catch(() => {});
+    pendingPhasePrepares.set(initialPhase, initialPrepare);
+  }
+
+  const pbrQueue = PBR_SETS.filter(set => !SANDBOX_STARTUP?.pbrSets || SANDBOX_STARTUP.pbrSets.includes(set.name));
   const pbrOverridden = new Set(PBR_SETS.map((set) => set.name));
-  for (const set of PBR_SETS) if (set.fallback) pbrOverridden.delete(set.fallback);
-  const bakeNames = Object.keys(RECIPES).filter((name) => !pbrOverridden.has(name));
+  // 只有当前启动实际会加载的 fallback 套才需要保留其程序化底材；炮坑碎石需要 Stone。
+  for (const set of pbrQueue) if (set.fallback) pbrOverridden.delete(set.fallback);
+  if (!SANDBOX_STARTUP || SANDBOX_STARTUP.craterDebris !== false) pbrOverridden.delete("Stone");
+  const skipBake = new Set(SANDBOX_STARTUP?.skipBakeRecipes || []);
+  const bakeNames = Object.keys(RECIPES).filter((name) => !pbrOverridden.has(name) && !skipBake.has(name));
+
+  // 不依赖程序化 fallback 的外部 PBR 与程序化烘焙完全独立，提前并行下载；需要 fallback ORM 的套等烘焙完再装。
+  const independentPbr = pbrQueue.filter((set) => !set.fallback);
+  const fallbackPbr = pbrQueue.filter((set) => !!set.fallback);
+  const pbrTotal = pbrQueue.length;
+  const pbrFailed = [];
+  let pbrDone = 0;
+  const RunPbrPool = (list, reportProgress = false) => {
+    const queue = list.slice();
+    const laneCount = Math.min(PBR_LANES, Math.max(1, queue.length));
+    const RunLane = async () => {
+      for (;;) {
+        const set = queue.shift();
+        if (!set) return;
+        try {
+          if (set.fallback) await library.LoadExternalBaseNormal(set.name, set.fallback, set);
+          else await library.LoadExternalSet(set.name, set);
+        } catch (error) {
+          for await (const _ of library.PrepareStepsAsync([set.name])) { await NextFrame(); }
+          pbrFailed.push(set.name);
+          console.warn(`[Main] 外部 PBR「${set.name}」没读到，退回程序化：`
+            + String(error).slice(0, 160));
+        }
+        pbrDone += 1;
+        if (reportProgress) {
+          setStep(T("boot.step.loadPbrProgress", { done: pbrDone, total: pbrTotal }),
+            BootProgress(BOOT.progress.loadPbr, pbrDone / pbrTotal));
+        }
+      }
+    };
+    return Promise.all(Array.from({ length: laneCount }, RunLane));
+  };
+  const independentPbrTask = RunPbrPool(independentPbr, false);
 
   setStep(T("boot.step.bakeTextures"), BOOT.progress.bakeTextures.from);
   let baked = 0;
+  let lastBakeYield = performance.now();
   // 细节法线与皮肤 LUT 是全场共用的两张图，由 PrepareSteps 排在配方前面先烘；
   // 进度条的分母要把它们算进去，否则第一格就跳到 13%。
   const total = bakeNames.length + library.PendingShadingSteps();
@@ -1500,36 +1548,14 @@ async function Boot() {
     baked += 1;
     setStep(T("boot.step.bakeTexturesProgress", { done: baked, total, name }),
       BootProgress(BOOT.progress.bakeTextures, baked / total));
-    await NextFrame();
+    if (performance.now() - lastBakeYield >= 16) {
+      await NextFrame();
+      lastBakeYield = performance.now();
+    }
   }
 
-
   setStep(T("boot.step.loadPbr"), BOOT.progress.loadPbr.from);
-  const pbrQueue = PBR_SETS.filter(set => !SANDBOX_STARTUP?.pbrSets || SANDBOX_STARTUP.pbrSets.includes(set.name));
-  const pbrTotal = pbrQueue.length;
-  const pbrFailed = [];
-  let pbrDone = 0;
-  const RunPbrLane = async () => {
-    for (;;) {
-      const set = pbrQueue.shift();
-      if (!set) return;
-      try {
-        if (set.fallback) await library.LoadExternalBaseNormal(set.name, set.fallback, set);
-        else await library.LoadExternalSet(set.name, set);
-      } catch (error) {
-        // 这一套退回程序化 PBR，别的套不受影响。开机时它被跳过了（见 bakeNames
-        // 那段账），现在才在 Worker 补烘这一套，失败不影响其余材质。
-        for await (const _ of library.PrepareStepsAsync([set.name])) { await NextFrame(); }
-        pbrFailed.push(set.name);
-        console.warn(`[Main] 外部 PBR「${set.name}」没读到，退回程序化：`
-          + String(error).slice(0, 160));
-      }
-      pbrDone += 1;
-      setStep(T("boot.step.loadPbrProgress", { done: pbrDone, total: pbrTotal }),
-        BootProgress(BOOT.progress.loadPbr, pbrDone / pbrTotal));
-    }
-  };
-  await Promise.all(Array.from({ length: PBR_LANES }, RunPbrLane));
+  await Promise.all([independentPbrTask, RunPbrPool(fallbackPbr, true)]);
   if (pbrFailed.length) {
     console.warn(`[Main] 共 ${pbrFailed.length}/${pbrTotal} 套外部 PBR 走了程序化退路：`
       + pbrFailed.join("、"));            // @text-ok console.warn 的续行，是诊断输出
@@ -1541,10 +1567,9 @@ async function Boot() {
   // 拉不到时 Unlock 之后的 LoadPacks 会照原路再来一次。
   if (!SANDBOX_STARTUP) audio.PrefetchPacks?.();
 
-  // 物理引擎的 wasm（2.8 MB，本地 vendor 里）。**必须排在建关之前** ——
-  // BuildField 末尾就要拿它建碰撞体了。
+  // 物理引擎的 wasm（2.8 MB，本地 vendor 里）已在 Boot 开头启动，这里只等就绪。
   setStep(T("boot.step.physics"), BOOT.progress.physics);
-  await Promise.all([InitPhysics(), SANDBOX_STARTUP && !SANDBOX_STARTUP.craterDebris ? null : PrepareCraterDebris(library)]);
+  await Promise.all([physicsReady, SANDBOX_STARTUP && !SANDBOX_STARTUP.craterDebris ? null : PrepareCraterDebris(library)]);
 
   const phase = PHASE_TABLE[state.phaseIndex];
   const preset = sky.Apply(phase.sky);
@@ -1580,14 +1605,16 @@ async function Boot() {
     const y = battlefield ? battlefield.GroundHeight(x, z) : 0;
     return { y, normal: FLAT_NORMAL, tag: "terrain" };
   };
-  // 人和枪的模型必须在造第一个 Actor 之前读完：KindGeometry / WeaponGeometry 是同步的
-  // （它们在 Actor 构造函数里被调），拿不到文档就一律退回程序化方块几何。
-  // 十四个 .tzm.json 加起来不到 300 KB，这一步的成本远小于"跑起来才发现没换模"。
-  const meshes = SANDBOX_STARTUP?.sceneryOnly ? actorFactory.meshReport
-    : await actorFactory.PreloadMeshes({
-        weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false,
-        minimalCharacterRig: !!SANDBOX_STARTUP?.minimalCharacterRig,
-      });
+  // 人和枪的模型与手榴弹/担架/香烟 GLB 并行下载，减少串行网络等待。
+  const [meshes, grenadeAsset] = await Promise.all([
+    SANDBOX_STARTUP?.sceneryOnly ? Promise.resolve(actorFactory.meshReport)
+      : actorFactory.PreloadMeshes({
+          weaponsOnly: !!SANDBOX_STARTUP && SANDBOX_STARTUP.weaponsOnly !== false,
+          minimalCharacterRig: !!SANDBOX_STARTUP?.minimalCharacterRig,
+        }),
+    SANDBOX_STARTUP?.sceneryOnly ? Promise.resolve(null) : LoadGrenadeAsset(),
+    ...(SANDBOX_STARTUP ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()]),
+  ]);
   await NextFrame();
   // 白刃全身动画库（每阵营 7.7 MB）正常开机不等它：主菜单出现后才在后台拉
   // （OpenMenu），进关前基本能到。白刃实验室与它的测试要一开机就能摆姿势，等。
@@ -1598,12 +1625,6 @@ async function Boot() {
   }
   setStep(T("boot.step.actorsProgress", { loaded: meshes.loaded, requested: meshes.requested }),
     BOOT.progress.actorMeshes);
-  // 担架 GLB 与手榴弹一起等：CreateStretcherGeometry 是同步的，进关前得已经在手里；读不到就开机失败。
-  const [grenadeAsset] = await Promise.all([
-    SANDBOX_STARTUP?.sceneryOnly ? null : LoadGrenadeAsset(),
-    ...(SANDBOX_STARTUP ? [] : [LoadStretcherAsset(), LoadCigaretteAsset()]),
-  ]);
-  await NextFrame();
   // Start the lab sound queue after the required models have finished downloading.
   if (SANDBOX_STARTUP) audio.PrefetchPacks?.();
   vfx = new VfxSystem(scene, library, {
@@ -3145,10 +3166,18 @@ function RegisterSandboxDebug() {
   if (sandbox?.debugName && sandbox.api && window.Taierzhuang?.Debug) window.Taierzhuang.Debug[sandbox.debugName] = sandbox.api;
 }
 
+const pendingPhasePrepares = new WeakMap();
+
 /** 建一片关卡切片。**换关一定要先把上一片拆掉**，不然七关跑下来会攒七座城。 */
 async function BuildField(phase, setStep, base, span, yieldFrame = NextFrame) {
-  // 白盒关卡编辑器 / 独立测试场景：文件场景在这里读进来（布局、边界、出生点都可能随之更新）。
-  await (phase.blockout?.Prepare?.() ?? phase.sceneAsset?.Prepare?.());
+  // 白盒关卡编辑器 / 独立测试场景：文件场景在这里读进来（若 Boot 已提前预拉，直接复用同一次 Promise）。
+  const prefetched = pendingPhasePrepares.get(phase);
+  if (prefetched) {
+    pendingPhasePrepares.delete(phase);
+    await prefetched;
+  } else {
+    await (phase.blockout?.Prepare?.() ?? phase.sceneAsset?.Prepare?.());
+  }
   // 场景的环境（区域 + 预设）跟着场景走：EnterLevel 套完 phase.sky 之后由它接管天光
   await SyncPhaseEnvironment(phase);
   // 拆旧场地释放的材质先记着，EnterLevel 预热完再真释放（Script_DeferredMaterialDispose 抬头）。
@@ -4080,9 +4109,9 @@ async function EnterLevel(index, { initial = false, stageJump = null } = {}) {
     } catch (error) {
       console.warn("[Main] 关卡预热失败（退回用到时现编）", error);
     }
-  } else {
-    // Legacy world chapters do not run the first-level weapon/actor warmup.
-    // Their static shadow batches still need real depth programs before joining.
+  } else if (!(sandbox?.Warmup && shadowCasterBatch.warmedDepth.size > 0 && shadowCasterBatch.stats.members > 0)) {
+    // Legacy world chapters (and sandboxes whose warmup did not already warm & prime
+    // static shadow batches) still need real depth programs before joining.
     try {
       await WarmStaticShadowBatch(phase);
     } catch (error) {

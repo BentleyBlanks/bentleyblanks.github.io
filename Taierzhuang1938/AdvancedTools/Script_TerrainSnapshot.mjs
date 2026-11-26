@@ -1,6 +1,6 @@
 // JSON metadata followed by aligned buffers. Hydration creates typed views over
 // the decompressed file, preserving shared buffers and the exact height samples.
-const types = {Float32Array, Float64Array, Uint8Array, Uint32Array};
+const types = {Float32Array, Float64Array, Int32Array, Uint8Array, Uint32Array};
 const Align = n => Math.ceil(n/8)*8;
 export function PackTerrainSnapshot(snapshot) {
   const buffers = [], offsets = new Map();
@@ -33,6 +33,7 @@ export function UnpackTerrainSnapshot(buffer) {
        !Number.isSafeInteger(item.length)||item.length<0)throw Error("Invalid terrain array");
     return new types[item.typed](buffer,start+item.offset,item.length);
   });
-  if(data?.format!==2||!data.nodes?.length||!data.leafIds?.length)throw Error("Invalid terrain snapshot");
+  const validNodes = data?.format === 3 ? !!data.nodeCoords?.length : data?.format === 2 && !!data.nodes?.length;
+  if(!validNodes||!data.leafIds?.length)throw Error("Invalid terrain snapshot");
   return data;
 }

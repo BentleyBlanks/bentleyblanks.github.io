@@ -20,7 +20,7 @@ export const FLOW_RENDERING = {
   navigation: {wheelSettleMs:120},
   depthReadback: {tilePixels:8, sampleWidth:256},
   residentGeometry: {initialBytes:8388608, maxBytes:134217728, owners:2},
-  terrainBuild: {prewarmRadiusM:512, prewarmBytes:16777216, cacheEntries:1, cacheChunkBytes:8388608},
+  terrainBuild: {prewarmRadiusM:512, prewarmBytes:16777216, cacheEntries:4, cacheChunkBytes:8388608},
   mapTerrain: {tileCells:128,maxTiles:96,minStepM:0.5,maxLevel:7},
   sky: {zenith:"#517f9c", horizon:"#a6bdc5", below:"#879b9f", sun:"#ead6a8", sunDirection:[0.35,0.6,-0.72]},
   lighting: {

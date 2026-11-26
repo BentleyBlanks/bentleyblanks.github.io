@@ -1,7 +1,7 @@
 import {FLOW_RENDERING} from "../Data_Tuning_LevelFlow.mjs";
 
 let database;
-const constructors={Float32Array,Float64Array,Uint8Array,Uint32Array};
+const constructors={Float32Array,Float64Array,Int32Array,Uint8Array,Uint32Array};
 
 async function OpenCache() {
   if(typeof indexedDB==="undefined") return null;

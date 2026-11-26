@@ -82,13 +82,32 @@ export class LevelFlowPlay {
       "Environment/EnvPreset_FirstLevelEncounter.json","Environment/EnvPreset_FirstLevelEncounterDusk.json",
       "Scenes/FirstLevelEncounter/Data_Play.mjs","Scenes/FirstLevelEncounter/Data_LevelFlow.mjs",
       "Scenes/FirstLevelEncounter/Data_LevelFlowBeishahe.mjs","Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs"];
-    const hashes=paths.map(async path=>{
-      const response=await fetch(new URL("../"+path,import.meta.url),{cache:"no-store"});
+    const castPromise=ReadCastLibrary().then(library=>JSON.stringify(library?.data.models||null)).catch(()=>"null");
+    // Fast path: LocalPreview returns stat (size + mtimeNs) for every path in <1 ms instead of downloading & hashing ~14 MB.
+    try {
+      const res=await fetch(`/__encounter/stamp?paths=${encodeURIComponent(paths.join(","))}`,{cache:"no-store"});
+      if(res.ok) {
+        const data=await res.json();
+        if(data?.ok&&data.stamps&&paths.every(p=>typeof data.stamps[p]==="string"&&data.stamps[p].length>0)) {
+          const castStamp=await castPromise;
+          return `${variant?.id||ENCOUNTER_DEFAULT_VARIANT_ID}:${paths.map(p=>data.stamps[p]).join(":")}:${castStamp}`;
+        }
+      }
+    } catch { /* Fall back to HTTP HEAD / GET hashing on plain static servers. */ }
+    const hashes=paths.map(async rel=>{
+      const url=new URL("../"+rel,import.meta.url);
+      const head=await fetch(url,{method:"HEAD",cache:"no-cache"}).catch(()=>null);
+      if(head?.ok) {
+        const tag=head.headers.get("etag")||head.headers.get("last-modified");
+        const len=head.headers.get("content-length")||"";
+        if(tag) return `${tag}:${len}`;
+      }
+      const response=await fetch(url,{cache:"no-cache"});
       if(!response.ok)throw new Error("场景读取失败："+response.status);
       const hash=await crypto.subtle.digest("SHA-256",await response.arrayBuffer());
       return [...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,"0")).join("");
     });
-    hashes.push(ReadCastLibrary().then(library=>JSON.stringify(library?.data.models||null)).catch(()=>"null"));
+    hashes.push(castPromise);
     return `${variant?.id||ENCOUNTER_DEFAULT_VARIANT_ID}:${(await Promise.all(hashes)).join(":")}`;
   }
   Start(mode="current") {

@@ -8,12 +8,12 @@ try {
   } else if (IsMenuStartup(params)) {
     await import('./Script_MenuStartup.mjs');
   } else {
-    // Preserve the flat development preload graph only for a real game/developer entry.
-    // Production skips this loop and loads the separately stamped game bundle.
-    const map = JSON.parse(document.querySelector('script[type="importmap"]').textContent);
+    // Development loads only the real imported module graph on demand (with ETag/304 caching
+    // from LocalPreview), avoiding flooding HTTP/1.1 with 900+ unused editor/test modules.
+    // Production skips this block and loads the separately stamped game bundle.
     if (!document.querySelector('meta[name="tengxian-bundle"]')) {
-      for (const href of new Set(Object.values(map.imports))) {
-        if (href.includes('KTX2Loader')) continue;
+      const map = JSON.parse(document.querySelector('script[type="importmap"]').textContent);
+      for (const href of [map.imports?.three, './Script_Main.mjs'].filter(Boolean)) {
         const link = document.createElement('link'); link.rel = 'modulepreload'; link.href = href;
         document.head.appendChild(link);
       }
