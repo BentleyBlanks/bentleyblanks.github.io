@@ -391,6 +391,25 @@ try {
     assert.equal(await page.evaluate(() => localStorage.getItem("tengxian1938_encounter_sidebar_width_v1")), String(expectedWidth));
   }
   await page.evaluate(() => inspectorResizeProbe.restore());
+  // Inspector can expand past the old 720px cap up to window.innerWidth - 300.
+  const wideHandle = await page.locator("#inspectorResizeHandle").boundingBox();
+  await page.mouse.move(wideHandle.x + 3, wideHandle.y + 150); await page.mouse.down();
+  await page.mouse.move(100, wideHandle.y + 150, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.body.classList.contains("lfResizingInspector"));
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 980, "inspector expands beyond 720px up to innerWidth - 300");
+  assert.equal(await page.locator("#inspectorResizeHandle").getAttribute("aria-valuemax"), "980");
+  await page.setViewportSize({ width: 1600, height: 720 });
+  await page.waitForFunction(() => document.querySelector("#inspectorResizeHandle").getAttribute("aria-valuemax") === "1300");
+  const ultraWideHandle = await page.locator("#inspectorResizeHandle").boundingBox();
+  await page.mouse.move(ultraWideHandle.x + 3, ultraWideHandle.y + 150); await page.mouse.down();
+  await page.mouse.move(200, ultraWideHandle.y + 150, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForFunction(() => !document.body.classList.contains("lfResizingInspector"));
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 1300, "inspector scales with wider screens");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.waitForFunction(() => document.querySelector("#inspectorResizeHandle").getAttribute("aria-valuemax") === "980");
+  assert.equal((await page.locator(".lfInspector").boundingBox()).width, 980, "shrinking window clamps inspector without overflow");
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("Home");
   for (let step = 0; step < 10; step++) await page.keyboard.press("ArrowLeft");
   await page.locator("#inspectorResizeHandle").focus(); await page.keyboard.press("ArrowRight");

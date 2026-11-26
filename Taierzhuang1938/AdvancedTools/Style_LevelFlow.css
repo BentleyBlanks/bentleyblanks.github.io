@@ -579,6 +579,7 @@ textarea { resize: vertical; min-height: 64px; }
 .lfInspectorResize { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; z-index: 6; cursor: col-resize; touch-action: none; outline: none; }
 .lfInspectorResize:hover, .lfInspectorResize:focus-visible, .lfResizingInspector .lfInspectorResize { background: #c4ac6755; box-shadow: inset 2px 0 #b49d64; }
 .lfResizingInspector, .lfResizingInspector * { cursor: col-resize !important; user-select: none !important; }
+.lfResizingInspector .lfPlayHost iframe { pointer-events: none; }
 @media (max-width: 650px) { .lfInspectorResize { display: none; } }
 
 .lfWorkspace[data-inspector-collapsed="true"] { grid-template-columns: minmax(0, 1fr) 48px; }

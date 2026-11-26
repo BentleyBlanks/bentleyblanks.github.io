@@ -172,14 +172,18 @@ export class EncounterChat {
     const workspace = document.querySelector(".lfWorkspace");
     const inspector = document.querySelector(".lfInspector");
     const key = "tengxian1938_encounter_sidebar_width_v1";
+    const minWidth = 280;
+    const minViewportReserve = 300;
     let preferred = 390, drag = null, resizeFrame = 0;
     try { preferred = Number(localStorage.getItem(key)) || preferred; } catch { /* Storage is optional. */ }
-    const SetWidth = (width, persist = false) => {
-      preferred = Math.max(280, Math.min(720, Math.round(width)));
-      const maximum = Math.max(280, Math.min(720, window.innerWidth - 300));
-      const actual = Math.min(preferred, maximum);
+    const MaxWidth = () => Math.max(minWidth, Math.round(window.innerWidth - minViewportReserve));
+    const SetWidth = (width, persist = false, { updatePreferred = true } = {}) => {
+      const maximum = MaxWidth();
+      if (updatePreferred) preferred = Math.max(minWidth, Math.min(maximum, Math.round(width)));
+      else preferred = Math.max(minWidth, Math.round(width));
+      const actual = Math.max(minWidth, Math.min(preferred, maximum));
       workspace.style.setProperty("--lf-inspector-width", `${actual}px`);
-      handle.setAttribute("aria-valuemin", "280");
+      handle.setAttribute("aria-valuemin", String(minWidth));
       handle.setAttribute("aria-valuemax", String(maximum));
       handle.setAttribute("aria-valuenow", String(actual));
       if (persist) { try { localStorage.setItem(key, String(preferred)); } catch { /* Keep this window's width. */ } }
@@ -219,8 +223,8 @@ export class EncounterChat {
       event.preventDefault(); event.stopPropagation();
       SetWidth(event.key === "Home" ? 390 : inspector.getBoundingClientRect().width + (event.key === "ArrowLeft" ? 20 : -20), true);
     });
-    window.addEventListener("resize", () => SetWidth(preferred));
-    SetWidth(preferred);
+    window.addEventListener("resize", () => SetWidth(preferred, false, { updatePreferred: false }));
+    SetWidth(preferred, false, { updatePreferred: false });
   }
 
   Error(message = "") {
