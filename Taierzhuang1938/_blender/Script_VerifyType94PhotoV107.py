@@ -14,7 +14,7 @@ from mathutils.bvhtree import BVHTree
 import numpy as np
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, acceptance, highBlend, modelDir, root
+from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, acceptance, highBlend, modelDir, revision, root
 from Script_Type94Export import TriangulatedCopy
 from Script_VerifyType94Sweep import VerifyScene
 
@@ -184,7 +184,8 @@ report = dict(file=str(file),sha256=Sha(file),passed=ok,meshOwners=len(meshes),n
 if isGlb:
     report["sampledSurfaces"] = CompareSurfaces()
     report["highSourceSha256"] = Sha(highBlend)
-WriteJson(acceptance/("Data_Type94ActualMotionV107.json" if isGlb else "Data_Type94SourceMotionV107.json"),report)
+motionReport = f"Data_Type94{'Actual' if isGlb else 'Source'}Motion{revision}.json"
+WriteJson(acceptance/motionReport,report)
 print(json.dumps(dict(passed=ok,failures=[r for r in holes+running+[gate]+motion["checks"] if not r["passed"]]),indent=2),flush=True)
 if not ok:
     raise ValueError("Type94 rigid assembly or aperture acceptance failed")

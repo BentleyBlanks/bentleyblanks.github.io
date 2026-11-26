@@ -2,7 +2,7 @@ export const TYPE94_TANKETTE_ASSET = Object.freeze({
   id: "Type94Tankette",
   catalogId: "type94Tankette",
   label: "九四式轻装甲车",
-  url: "./Model/Type94Tankette/Model_Type94Tankette.glb?v=20261126PhotoV107-1756ed44",
+  url: "./Model/Type94Tankette/Model_Type94Tankette.glb?v=20261126PhotoV108-efe237d2",
 });
 
 // Optional reference vehicles load only when selected in the asset library.

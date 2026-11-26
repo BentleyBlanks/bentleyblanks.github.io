@@ -10,15 +10,18 @@ from mathutils import Matrix, Vector
 
 
 base = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
-root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/"PhotoReconstructionV107"))
+revision = os.environ.get("TYPE94_PHOTO_REVISION","V107")
+if revision not in {"V107","V108"}:
+    raise ValueError(f"Unknown Type 94 photo revision {revision}")
+root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/f"PhotoReconstruction{revision}"))
 out = Path(os.environ.get("TYPE94_PHOTO_RENDER_OUT",root/"Acceptance"/"Renders"))
 out.mkdir(parents=True,exist_ok=True)
-model = Path(os.environ.get("TYPE94_PROBE_BLEND",root/"Scene_Type94TanketteHighV107.blend"))
+model = Path(os.environ.get("TYPE94_PROBE_BLEND",root/f"Scene_Type94TanketteHigh{revision}.blend"))
 familyPath = Path(os.environ.get("TYPE94_PHOTO_CAMERAS",base/"ReferenceV93/Inputs/Data_ReferenceCamerasV93.json"))
 family = json.loads(familyPath.read_text(encoding="utf-8"))
-referenceData = Path(__file__).resolve().parents[1]/"Model/Type94Tankette/Data_ReferenceViewsV107.json"
-if referenceData.exists():
-    study = json.loads(referenceData.read_text(encoding="utf-8"))
+referenceDir = Path(__file__).resolve().parents[1]/"Model"/"Type94Tankette"
+for studyRevision in dict.fromkeys(["V107",revision]):
+    study = json.loads((referenceDir/f"Data_ReferenceViews{studyRevision}.json").read_text(encoding="utf-8"))
     for key,record in study["addedCameras"].items():
         family["images"][key] = record["image"]
         family["cameras"][key] = record["camera"]

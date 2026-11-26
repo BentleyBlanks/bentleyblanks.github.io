@@ -1,0 +1,389 @@
+{
+  "schema": "Type94ReferenceReviewV108",
+  "baseStudy": "Data_ReferenceViewsV107.json",
+  "sources": [
+    {
+      "id": "3",
+      "pathWithinSource": "References/PatriotOfficial/Reference_PatriotOfficial3.jpg",
+      "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b"
+    },
+    {
+      "id": "4",
+      "pathWithinSource": "References/PatriotOfficial/Reference_PatriotOfficial4.jpg",
+      "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba"
+    },
+    {
+      "id": "6",
+      "pathWithinSource": "References/PatriotOfficial/Reference_PatriotOfficial6.jpg",
+      "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0"
+    }
+  ],
+  "addedCameras": {
+    "3": {
+      "image": {
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "9d22a0c8024f6ca901e2c4c8d7de82de139efda81b9c6c06c320423e4f17ab3b"
+      },
+      "camera": {
+        "k": [
+          [
+            1423.5377693854534,
+            0,
+            720.0
+          ],
+          [
+            0,
+            1423.5377693854534,
+            480.0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "distortion": [
+          -0.029707312552649193,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotationCameraFromBlender": [
+          [
+            -0.6613642404455549,
+            0.7464186650684623,
+            0.0738682468811141
+          ],
+          [
+            -0.09604045684722157,
+            0.013400520372318078,
+            -0.9952872232186688
+          ],
+          [
+            -0.7438908334617731,
+            -0.6653417185861458,
+            0.06282376461485505
+          ]
+        ],
+        "translationCameraFromBlender": [
+          0.2710661293721554,
+          0.9174123430807557,
+          4.277623779999751
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "4": {
+      "image": {
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "fd538683bc72f5f2e6686909c84a7b6d49b92a7918eb2a206b2a6086a55822ba"
+      },
+      "camera": {
+        "k": [
+          [
+            1405.8847200661185,
+            0,
+            720
+          ],
+          [
+            0,
+            1405.8847200661185,
+            480
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "distortion": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "rotationCameraFromBlender": [
+          [
+            0.7696009059370232,
+            0.6363451879256332,
+            -0.05271856774234279
+          ],
+          [
+            -0.10358375514131274,
+            0.04295166580582149,
+            -0.9936928902207813
+          ],
+          [
+            -0.630067338664478,
+            0.7702077357495156,
+            0.09897066504710589
+          ]
+        ],
+        "translationCameraFromBlender": [
+          1.831922658321353,
+          0.9766492385975436,
+          6.20003221895131
+        ],
+        "turretYawRadians": 0.0
+      }
+    },
+    "6": {
+      "image": {
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "309602423310491cc49dcf61e9881e5d43744901e5bf9e53182db4554a978bf0"
+      },
+      "camera": {
+        "k": [
+          [
+            1510.1444060547535,
+            0,
+            720
+          ],
+          [
+            0,
+            1510.1444060547535,
+            480
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ],
+        "distortion": [
+          -0.0015707589671832606,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotationCameraFromBlender": [
+          [
+            0.7423285026207074,
+            -0.6673071483859612,
+            -0.06041162065278205
+          ],
+          [
+            -0.05441141438730612,
+            0.029827440027975938,
+            -0.9980730042465584
+          ],
+          [
+            0.6678231743367938,
+            0.7441851204736458,
+            -0.01416736688146375
+          ]
+        ],
+        "translationCameraFromBlender": [
+          -1.6548207083188717,
+          0.7609129783577077,
+          6.364088916718722
+        ],
+        "turretYawRadians": 0.0
+      }
+    }
+  },
+  "3": {
+    "method": "Visible outer rubber silhouettes and two fixed front features. A leave-one-wheel-out check evaluates the rear road wheel; the unobscured turret flank is out of fit.",
+    "photoWidth": 1440,
+    "trackedTreadScopes": "Four near tyres, with partial visibility",
+    "oldWheelRmsPx": {
+      "RightRoad0": 10.492,
+      "RightRoad1": 8.642,
+      "RightRoad2": 10.973,
+      "RightRoad3": 13.512
+    },
+    "newWheelRmsPx": {
+      "RightRoad0": 3.11,
+      "RightRoad1": 5.12,
+      "RightRoad2": 3.73,
+      "RightRoad3": 1.881
+    },
+    "heldOutRearWheelRmsPx": 1.768,
+    "heldOutTurretFlankRmsPx": 3.666,
+    "limits": "The central ball joint is partly obscured and the background barrel has a different owner. The tentative centre correspondence is archived with its residual, and was excluded from the accepted camera fit."
+  },
+  "4And6": {
+    "method": "Align the rear-door aperture, visible tyre silhouettes and matched image pairs through a shared epipolar fit. Retain the rear turret as an independent region, and omit one rear wheel in each image, the visible ring in 6, and the lower fitting in 4.",
+    "armsLengthReferenceIsConditional": true,
+    "sameExhibitSceneOnlyStereoSource": "Acceptance/CameraStudyV28/Data_RearBridgeV28.json",
+    "reprojection": {
+      "TankRearHull": {
+        "count": 37,
+        "medianAbsPx": 0.45815786719443996,
+        "rmsPx": 0.643672369709692
+      },
+      "TrailerRearWall": {
+        "count": 7,
+        "medianAbsPx": 1.0691423546683192,
+        "rmsPx": 1.621891953467556
+      },
+      "TankRearTurret": {
+        "count": 10,
+        "medianAbsPx": 0.6427414144952923,
+        "rmsPx": 0.649170626917322
+      }
+    },
+    "rearWheel4RmsPx": 6.815,
+    "rearWheel6RmsPx": 9.944,
+    "leftDoorRing6VectorPx": [
+      2.07382166882536,
+      1.0992526438898267
+    ],
+    "limits": "View 6's previously transferred bottom-fittings coordinate is probe-only. Side length, rear bend depth and the exact terminal point remain conditional; trailer matches contribute only to camera estimation."
+  },
+  "outerMudguardFold": {
+    "method": "Same-view ground-space projection of the angled outer-side triangles of the actual mesh; fenders excluded from camera fit",
+    "photoLandmarks": {
+      "3": {
+        "sign": 1,
+        "shoulder": [
+          371,
+          525
+        ],
+        "tip": [
+          361,
+          548
+        ],
+        "sigma": 5
+      },
+      "4": {
+        "sign": 1,
+        "shoulder": [
+          1157,
+          548
+        ],
+        "tip": [
+          1148,
+          575
+        ],
+        "sigma": 7
+      },
+      "6": {
+        "sign": -1,
+        "shoulder": [
+          281,
+          506
+        ],
+        "tip": [
+          296,
+          535
+        ],
+        "sigma": 5
+      }
+    },
+    "actualMeshVerification": {
+      "V107": {
+        "3": {
+          "edgeToShoulderPixels": 29.693640908165207,
+          "edgeToLowerLipPixels": 48.110303912249094,
+          "actualTerminalXYZ": [
+            0.8090000152587891,
+            -1.4783509969711304,
+            0.7216131687164307
+          ],
+          "actualTerminalNative": [
+            323.3481224458098,
+            510.1898112694919
+          ],
+          "terminalToPickedLowerLipPixels": 53.35985621412764
+        },
+        "4": {
+          "edgeToShoulderPixels": 36.30025358694286,
+          "edgeToLowerLipPixels": 64.76050639101783,
+          "actualTerminalXYZ": [
+            0.8090000152587891,
+            -1.4783509969711304,
+            0.7216131687164307
+          ],
+          "actualTerminalNative": [
+            1168.7321018043897,
+            513.6361421942254
+          ],
+          "terminalToPickedLowerLipPixels": 64.77146817878149
+        },
+        "6": {
+          "edgeToShoulderPixels": 19.76668375844009,
+          "edgeToLowerLipPixels": 42.67452582987426,
+          "actualTerminalXYZ": [
+            -0.8090000152587891,
+            -1.4783509969711304,
+            0.7216131687164307
+          ],
+          "actualTerminalNative": [
+            299.5200773661541,
+            492.4709016067717
+          ],
+          "terminalToPickedLowerLipPixels": 42.67452582987426
+        }
+      },
+      "V108": {
+        "3": {
+          "edgeToShoulderPixels": 16.184842123066,
+          "edgeToLowerLipPixels": 21.389806989004818,
+          "actualTerminalXYZ": [
+            0.8082306981086731,
+            -1.3654178380966187,
+            0.6197490096092224
+          ],
+          "actualTerminalNative": [
+            340.08243843094925,
+            542.3551221125008
+          ],
+          "terminalToPickedLowerLipPixels": 21.665849356990513
+        },
+        "4": {
+          "edgeToShoulderPixels": 26.373093700897744,
+          "edgeToLowerLipPixels": 46.579864848971795,
+          "actualTerminalXYZ": [
+            0.8082306981086731,
+            -1.3654178380966187,
+            0.6197490096092224
+          ],
+          "actualTerminalNative": [
+            1184.2672955601793,
+            544.830738315093
+          ],
+          "terminalToPickedLowerLipPixels": 47.17521677599159
+        },
+        "6": {
+          "edgeToShoulderPixels": 1.3224940995596508,
+          "edgeToLowerLipPixels": 13.909227447839966,
+          "actualTerminalXYZ": [
+            -0.8082307577133179,
+            -1.3654178380966187,
+            0.6197489500045776
+          ],
+          "actualTerminalNative": [
+            285.4648449166824,
+            525.2797668018162
+          ],
+          "terminalToPickedLowerLipPixels": 14.334309402849751
+        }
+      }
+    },
+    "conclusion": "Both real mesh guards now carry a short rounded downturn. The projected edge is closer to the picked fold and lower lip across all three views. Absolute endpoints remain uncertain, especially in view 4."
+  },
+  "acceptedRearArmourSlope": {
+    "modelDegrees": 19,
+    "conditionalPhotoPercentiles5To95": [
+      17.61419486436239,
+      20.167924532661
+    ],
+    "reference": "Data_RearArmorReferenceLayoutV28.json",
+    "scope": "Inclined visible rear plane and retained hatch outline. Aft underbody and blocked regions are estimated."
+  },
+  "strictWholeReferenceMatched": false,
+  "lastUnresolved": "View 4 retains a right-rear terminal projection residual and has a foreground trailer. The exact lower fitting location and obscured underside remain conditional."
+}

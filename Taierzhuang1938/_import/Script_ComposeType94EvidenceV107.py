@@ -11,7 +11,10 @@ from scipy.ndimage import map_coordinates
 
 
 base = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
-root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/"PhotoReconstructionV107"))
+revision = os.environ.get("TYPE94_PHOTO_REVISION","V107")
+if revision not in {"V107","V108"}:
+    raise ValueError(f"Unknown Type 94 photo revision {revision}")
+root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/f"PhotoReconstruction{revision}"))
 renders = root/"Acceptance"/"Renders"
 out = root/"Acceptance"/"Comparison"
 out.mkdir(parents=True,exist_ok=True)
@@ -24,8 +27,13 @@ family = json.loads(familyFile.read_text(encoding="utf-8"))
 for key,record in study["addedCameras"].items():
     family["images"][key] = record["image"]
     family["cameras"][key] = record["camera"]
+if revision == "V108":
+    rear = json.loads((repo/"Model/Type94Tankette/Data_ReferenceViewsV108.json").read_text(encoding="utf-8"))
+    for key,record in rear["addedCameras"].items():
+        family["images"][key] = record["image"]
+        family["cameras"][key] = record["camera"]
 photos = {row["id"]:row for row in study["photos"]}
-high = "Scene_Type94TanketteHighV107"
+high = f"Scene_Type94TanketteHigh{revision}"
 game = "Model_Type94Tankette"
 
 
@@ -77,6 +85,35 @@ def Board(name, images, box=(0,0,1,1), panelWidth=760):
     board.save(out/(name+".jpg"),quality=94,subsampling=0)
     board.thumbnail((640,640),Image.Resampling.LANCZOS)
     board.save(out/("Preview_"+name+".jpg"),quality=85)
+
+if revision=="V108":
+    Board("Compare_Kubinka2017V108",[
+        ("Kubinka 2017",Reference("2017")),
+        ("V108 high / museum light estimate",Render(high,"museum","2017")),
+        ("V108 game GLB / same camera",Render(game,"museum","2017")),
+    ],(.055,.018,.955,.965))
+    Board("Compare_NeutralFullV108",[
+        ("V108 high / neutral",Render(high,"neutral","2017")),
+        ("V108 game GLB / same camera",Render(game,"neutral","2017")),
+    ],(.065,.028,.945,.96))
+    Board("Finish_RearV108",[
+        ("V108 high / museum light estimate",Render(high,"museum","Rear")),
+        ("V108 high / neutral",Render(high,"neutral","Rear")),
+        ("V108 game GLB / neutral",Render(game,"neutral","Rear")),
+    ],panelWidth=700)
+    for view,box in {
+        "3":(.23,.34,.97,.86),
+        "4":(.61,.35,.99,.79),
+        "6":(.03,.30,.42,.74),
+    }.items():
+        Board(f"Compare_RearPatriot{view}V108",[
+            ("Patriot "+view,Reference(view)),
+            ("V107 high / refined camera",Render("Scene_Type94TanketteHighV107","gray",view)),
+            ("V108 high / same camera",Render(high,"gray",view)),
+            ("V108 actual game GLB",Render(game,"gray",view)),
+        ],box,690)
+    print(f"TYPE94_V108_COMPARISONS {out}")
+    raise SystemExit(0)
 
 
 Board("Compare_Kubinka2017",[

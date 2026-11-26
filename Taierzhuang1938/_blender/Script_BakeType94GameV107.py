@@ -10,7 +10,7 @@ from mathutils import Vector
 import numpy as np
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, acceptance, highBlend, lowGeometryBlend, root
+from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, acceptance, highBlend, lowGeometryBlend, revision, root
 from Script_Type94Export import ExportGltf, TriangulatedCopy
 from Script_Type94PhotoBakeV107 import (
     BakeImage, CHANNELS, EvaluateMissing, OccupiedAtlas, PackTarget, Role, ROLES, Select,
@@ -18,11 +18,11 @@ from Script_Type94PhotoBakeV107 import (
 )
 
 
-stagingFile = root/"Acceptance"/"Scene_Type94ProjectionWorkV107.blend"
-preparationFile = acceptance/"Data_Type94ProjectionPreparationV107.json"
-outputBlend = root/"Scene_Type94TanketteGameV107.blend"
+stagingFile = acceptance/f"Scene_Type94ProjectionWork{revision}.blend"
+preparationFile = acceptance/f"Data_Type94ProjectionPreparation{revision}.json"
+outputBlend = root/f"Scene_Type94TanketteGame{revision}.blend"
 textureDir = root/"Textures"/"Game"
-glb = root/"Exports"/"Model_Type94TanketteGameV107.glb"
+glb = root/"Exports"/f"Model_Type94TanketteGame{revision}.glb"
 
 
 def MeshOwners():
@@ -31,8 +31,8 @@ def MeshOwners():
 
 
 def Prepare():
-    high = ReadJson(acceptance/"Data_Type94HighV107.json")
-    low = ReadJson(acceptance/"Data_Type94LowGeometryV107.json")
+    high = ReadJson(acceptance/f"Data_Type94High{revision}.json")
+    low = ReadJson(acceptance/f"Data_Type94LowGeometry{revision}.json")
     if Sha(highBlend)!=high["sha256"] or Sha(lowGeometryBlend)!=low["sha256"] or high["sha256"]!=low["highSourceSha256"]:
         raise ValueError("The high, low and prepared reports do not describe the same source pair")
     bpy.ops.wm.open_mainfile(filepath=str(lowGeometryBlend))
@@ -47,7 +47,7 @@ def Prepare():
         mesh = obj.data
         while mesh.uv_layers:
             mesh.uv_layers.remove(mesh.uv_layers[0])
-        mesh.uv_layers.new(name="UVMap_GameV107")
+        mesh.uv_layers.new(name=f"UVMap_Game{revision}")
 
     with bpy.data.libraries.load(str(highBlend),link=False) as (available,loaded):
         if any(name not in available.objects for name in owners):
@@ -70,13 +70,13 @@ def Prepare():
             offset = Vector(((i%8)*4,(i//8)*4,0))
             targetItems.append((obj,lowFaces,offset))
             donorItems.append((donor,highFaces,offset))
-        target,bindings = StagingMesh("ProjectionTarget"+role+"V107",targetItems,False)
-        source,_ = StagingMesh("ProjectionDonor"+role+"V107",donorItems,True)
+        target,bindings = StagingMesh(f"ProjectionTarget{role}{revision}",targetItems,False)
+        source,_ = StagingMesh(f"ProjectionDonor{role}{revision}",donorItems,True)
         TemporaryMaterial(target)
         PackTarget(target,bindings,size)
         stages[role] = dict(target=target.name,donor=source.name,size=size,owners=len(bindings),
                             lowTriangles=len(target.data.polygons),highTriangles=len(source.data.polygons))
-        print("TYPE94_V107_UV_PACK",role,stages[role],flush=True)
+        print(f"TYPE94_{revision}_UV_PACK",role,stages[role],flush=True)
     for obj in donors.values():
         bpy.data.objects.remove(obj,do_unlink=True)
     bpy.context.preferences.filepaths.save_version = 0
@@ -110,7 +110,7 @@ def Bake(role):
     coverage = BakeImage(target,donor,graphs,"Coverage",size,cage,distance,0)
     missing = mask & ~np.all(coverage[:,:,:3]>.998,axis=2)
     del coverage
-    print("TYPE94_V107_RAY_COVERAGE",role,int(mask.sum()),int(missing.sum()),flush=True)
+    print(f"TYPE94_{revision}_RAY_COVERAGE",role,int(mask.sum()),int(missing.sum()),flush=True)
     patches,maxDistance = EvaluateMissing(target,donor,graphs,missing)
     images = {}
     for channel in CHANNELS:
@@ -127,13 +127,13 @@ def Bake(role):
                 raise ValueError(f"{role} contains invalid mapped tangent normals")
         if channel=="Orm" and np.ptp(valid[:,0]) < .015:
             raise ValueError(f"{role} AO channel has no meaningful occlusion range")
-        file = textureDir/f"Texture_Type94Game{role}{channel}V107.png"
+        file = textureDir/f"Texture_Type94Game{role}{channel}{revision}.png"
         WriteMap(file,pixels,channel=="Base")
         images[channel] = dict(file=str(file),sha256=Sha(file),dimensions=[size,size],
                                linearMedian=np.median(valid,axis=0).round(5).tolist())
         del pixels
-        print("TYPE94_V107_BAKED",role,channel,images[channel]["sha256"],flush=True)
-    WriteJson(acceptance/f"Data_Type94Bake{role}V107.json",dict(role=role,stagingSha256=preparation["stagingSha256"],
+        print(f"TYPE94_{revision}_BAKED",role,channel,images[channel]["sha256"],flush=True)
+    WriteJson(acceptance/f"Data_Type94Bake{role}{revision}.json",dict(role=role,stagingSha256=preparation["stagingSha256"],
         highSha256=preparation["highSha256"],usedPixels=int(mask.sum()),repairedPixels=int(missing.sum()),
         maximumRepairDistanceM=maxDistance,images=images))
 
@@ -210,7 +210,7 @@ def ReadGlbCount(file):
 
 def Finalize():
     preparation = ReadStaging()
-    reports = {role:ReadJson(acceptance/f"Data_Type94Bake{role}V107.json") for role in ROLES}
+    reports = {role:ReadJson(acceptance/f"Data_Type94Bake{role}{revision}.json") for role in ROLES}
     if any(r["stagingSha256"]!=preparation["stagingSha256"] for r in reports.values()):
         raise ValueError("PBR bakes refer to a different projection stage")
     seedMaterials = {}
@@ -248,10 +248,10 @@ def Finalize():
     triangles, owners = ReadGlbCount(glb)
     if triangles>80000 or owners!=240:
         raise ValueError(f"Exported assembly requires {triangles} triangles across {owners} mesh instances")
-    WriteJson(acceptance/"Data_Type94GameV107.json",dict(sourceBlend=str(outputBlend), sourceBlendSha256=Sha(outputBlend),
+    WriteJson(acceptance/f"Data_Type94Game{revision}.json",dict(sourceBlend=str(outputBlend), sourceBlendSha256=Sha(outputBlend),
         sourceGlb=str(glb),sha256=Sha(glb),triangles=triangles,meshOwners=owners,poseNodes=len(asset.children_recursive)+1,
         highSourceSha256=preparation["highSha256"],projection=reports,defaultSceneInstanceCount=True))
-    print("TYPE94_V107_EXPORTED",triangles,owners,Sha(glb),flush=True)
+    print(f"TYPE94_{revision}_EXPORTED",triangles,owners,Sha(glb),flush=True)
 
 
 if __name__=="__main__":

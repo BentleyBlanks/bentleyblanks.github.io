@@ -6,13 +6,15 @@ import path from "node:path";
 
 import { CompressEmbeddedTextures, InspectEmbeddedTextures, ReadGlb } from "./Script_CompressEmbeddedTextures.mjs";
 
+const revision = process.env.TYPE94_PHOTO_REVISION || "V107";
+if (!["V107", "V108"].includes(revision)) throw new Error(`Unknown Type 94 photo revision ${revision}`);
 const root = path.resolve(process.env.TYPE94_PHOTO_ROOT ||
-  "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/PhotoReconstructionV107");
+  `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette/PhotoReconstruction${revision}`);
 const acceptance = path.join(root, "Acceptance");
 const ReadJson = async file => JSON.parse(await fs.readFile(file, "utf8"));
 const Hash = bytes => createHash("sha256").update(bytes).digest("hex");
 
-const game = await ReadJson(path.join(acceptance, "Data_Type94GameV107.json"));
+const game = await ReadJson(path.join(acceptance, `Data_Type94Game${revision}.json`));
 const bytes = await fs.readFile(game.sourceGlb);
 assert.equal(Hash(bytes), game.sha256, "Raw game bake identity");
 const before = await InspectEmbeddedTextures(bytes);
@@ -38,7 +40,7 @@ await fs.writeFile(pending, compressed);
 await fs.rename(pending, output);
 const report = {
   schema: "Type94ReleasePackagingV1",
-  revision: "PhotoV107",
+  revision: `Photo${revision}`,
   sourceGlb: game.sourceGlb,
   sourceSha256: game.sha256,
   sourceBlend: game.sourceBlend,
@@ -50,5 +52,5 @@ const report = {
   triangles: game.triangles,
   meshOwners: game.meshOwners,
 };
-await fs.writeFile(path.join(acceptance, "Data_PackagingV107.json"), JSON.stringify(report, null, 2) + "\n");
+await fs.writeFile(path.join(acceptance, `Data_Packaging${revision}.json`), JSON.stringify(report, null, 2) + "\n");
 console.log(JSON.stringify({ output, bytes: after.bytes, sha256: after.sha256, triangles: game.triangles }));
