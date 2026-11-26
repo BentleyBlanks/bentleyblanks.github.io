@@ -779,6 +779,16 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
                       + ReferenceField(materialFit, xx, vv, "oxide") * (.19 - metal)) / 1000
             base = ApplyBaseLogGain(base, ReferenceField(materialFit, xx, vv, "highlightBase") / 1000)
             metal += ReferenceField(materialFit, xx, vv, "highlightMetal") * (.93 - metal) / 1000
+        marks = closeup.get("markCalibration")
+        if barrelSampling is not None and marks is not None:
+            CheckBarrelRegistration(marks, closeup)
+            path = REFERENCE.with_name(marks["file"])
+            if Sha256(path) != marks["sha256"]:
+                raise ValueError(f"Mark correction does not match the measured reference: {path}")
+            with Image.open(path) as image:
+                gain = (np.asarray(image.convert("L"), dtype=float).T - 128) / marks["gainScale"]
+            field = {"footprint": marks["footprint"], "gain": gain}
+            base = ApplyBaseLogGain(base, ReferenceField(field, xx, vv, "gain"))
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
@@ -1005,6 +1015,9 @@ def Bake():
                "knurlFlank": reference["knurl"]["flankWear"]["detail"],
                "shoulderDirect": reference["shoulder"]["Direct"]["detail"],
                "shoulderFlank": reference["shoulder"]["Flank"]["detail"]}
+    marks = reference["closeups"]["Barrel"].get("markCalibration")
+    if marks is not None:
+        details["barrelMarks"] = marks
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

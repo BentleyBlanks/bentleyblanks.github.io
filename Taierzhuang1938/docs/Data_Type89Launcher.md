@@ -62,6 +62,7 @@
 - 外套筒按第 1 张馆藏照分区校准粗糙度、金属度和底色，再按原照恢复反光中被盖住的细纹和偏蓝钢面的颜色。默认灯下中段亮度中值由 52.00 降到 45.57 个灰阶，仍亮于原照的 35.71。中性正视中值为 35.78，原图尺度的细纹相关系数由 0.908 提至 0.976，按亮度归一化的平均色差由 0.0453 降到 0.0220。另用未参与校准的近似馆藏布光和另一侧斜视复核。 [外套筒采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - BlenderMCP 按现有外套筒表面采样纹沟两侧的遮挡，取两侧都遮蔽的角度写入游戏材质。按每盏灯的方向计算直射可见性，再用原照校准细纹和颜色。默认灯下中段亮度中值从 45.57 降到 44.21 个灰阶，原照为 35.71。中性正视中值为 35.71，细纹相关系数从 0.846 提至 0.887。默认灯下原图尺度的细纹相关系数从 0.902 提至 0.909，屏幕细纹的相关系数从 0.856 降至 0.842。 [外套筒采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身按第 7 张近照的配准落点重测粗糙度、金属度和底色，分区修正钢面，再用实际回烘贴图复测露钢亮斑。中性正视下褐锈区的亮斑偏暗从 15.33 降到 11.35 个灰阶，独立柔光下从 21.10 降到 16.72。默认灯下近照覆盖面的平均亮度误差从 22.39 降到 21.11，局部最亮一成仍比原照亮 4.18 个灰阶。四组光照下细纹相关系数均提高，整段筒身另按第 1 张馆藏照复核。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 筒身刻印按第 7 张近照分别校准磨亮的字口和暗凹。以字旁钢面为亮度基准，在中性灯与默认灯下测量底色响应，回烘后再校正一次。刻印亮暗与原照的相关系数在中性正视下由 0.58 提到 0.84，默认灯下由 0.48 提到 0.82。两种灯光下的刻印平均对比误差分别降低约 35% 和 37%。独立斜视和柔光均有改善，默认灯下的刻印对比仍弱于原照。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -74,4 +75,5 @@
 - 重新推导外套筒材质响应时加 `--sleeve-response-evidence <MetalFinishV42/Evidence>`。用 `V43SleeveStudyneutral`、`V43SleeveStudydefault` 的基准、UV 和材质响应帧计算分区材质，再用 `V43RegionalNeutral`、`V43RegionalDefault`、`V43RegionalRake` 校正细纹和颜色。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 在 BlenderMCP 打开对应模型工程，运行 `_blender/Script_BakeType89LauncherSleeveHorizon.py` 生成 72×217 遮挡数据。只在八九式掷弹筒的原配材质上读取这份数据。带 `--sleeve-horizon-evidence <MetalFinishV43/Evidence>` 的照片采样命令可从 `V44RuntimeSleeveNeutral`、`V44RuntimeSleeveDefault`、`V44RuntimeSleeveRake` 重算对应的细纹与颜色修正。 [遮挡生成脚本](../_blender/Script_BakeType89LauncherSleeveHorizon.py) [材质脚本](../Script_Type89LauncherSleeveHorizon.mjs)
 - 带 `--barrel-material-evidence <MetalFinishV44/Evidence>` 的照片采样命令使用 `V45BarrelStudyDirect`、`V45BarrelStudyDefault` 重算钢面的材质分区，再用 `V45BarrelResolveDirect`、`V45BarrelResolveDefault` 校准回烘后的亮斑。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV45/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 带 `--barrel-mark-evidence <MetalFinishV46/Evidence>` 的照片采样命令从 `V46MarkStudyDirect`、`V46MarkStudyDefault` 及回烘后的 `V46MarkResolveDirect`、`V46MarkResolveDefault` 重算刻印底色修正。每组使用基准帧、UV 帧和正负线性底色增益试验帧。只重算照片时，同一照片和投影下保留这张修正图。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV46/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

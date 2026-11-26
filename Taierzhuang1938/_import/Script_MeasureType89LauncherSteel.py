@@ -9,13 +9,14 @@ import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
-from scipy.ndimage import binary_erosion, gaussian_filter, map_coordinates
+from scipy.ndimage import binary_erosion, distance_transform_edt, gaussian_filter, map_coordinates
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
+BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
@@ -659,7 +660,78 @@ def BarrelMaterialCalibration(photo, barrel, evidence):
     return {**BarrelCalibrationIdentity(barrel), "frameSha256": {**hashes, **measured}, **peaks, **highlights}
 
 
-def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None, materialEvidence=None):
+def RegisteredBarrelMarks(photo, barrel, folder, distances):
+    u, v, inside, reference, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
+    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
+    distance = map_coordinates(distances, (y, x), order=1)
+    steel = inside & (distance >= 8)
+    support = gaussian_filter(steel.astype(float), 6.5)
+    valid = inside & (support > .12) & (distance < 11)
+    luma = render @ REGISTERED_LUMA
+
+    def SurroundingSteel(signal):
+        return gaussian_filter(signal * steel, 6.5)[valid] / support[valid]
+
+    def Contrast(signal, surrounding):
+        return (signal - surrounding) / np.maximum(surrounding, 28)
+
+    wanted = reference @ REGISTERED_LUMA
+    background = SurroundingSteel(luma)
+    residual = Contrast(wanted[valid], SurroundingSteel(wanted)) - Contrast(luma[valid], background)
+    trials = [ReadRegisteredLuma(folder, name + ".png", hashes)[valid] for name in ("MarkBaseLight", "MarkBaseDark")]
+    # The sweeps measure the material response at the marks. Use the original
+    # steel baseline even though the trial varies the color across the atlas.
+    effects = (np.column_stack(trials) - luma[valid, None]) / np.maximum(background[:, None], 28)
+    return u[valid], v[valid], distance[valid], residual, effects, hashes
+
+
+def FitBarrelMarkGain(photo, barrel, folders, distances):
+    first, second = [RegisteredBarrelMarks(photo, barrel, folder, distances) for folder in folders]
+    u, v, distance, _, _, _ = first
+    if len(u) < 1000 or not np.array_equal(u, second[0]) or not np.array_equal(v, second[1]):
+        raise ValueError("The barrel mark response frames must show the same registered strokes")
+    weight = np.sqrt([.55, .45])
+    residual = np.clip(np.column_stack([first[3], second[3]]), -.7, .7) * weight
+    bright, dark = np.stack([first[4], second[4]], axis=1).transpose(2, 0, 1)
+    positive = np.sum(residual * (bright - dark) * weight, axis=1) >= 0
+    derivative = np.where(positive[:, None], bright, -dark) * weight
+    response = np.sum(derivative * residual, axis=1) / (np.sum(derivative * derivative, axis=1) + .044 ** 2)
+    response = np.where(positive, np.clip(response, 0, 1.2), np.clip(response, -1.2, 0))
+    # The trial frames vary linear base color by exp(+/-0.60). Fade the
+    # correction back into the surrounding steel while keeping the narrow rim.
+    gain = .60 * response * np.clip((10 - distance) / 6, 0, 1)
+    width, height = 584, 320
+    cells = np.rint(v * (height - 1)).astype(int) * width + np.rint(u * (width - 1)).astype(int)
+    coverage = np.bincount(cells, minlength=height * width).reshape(height, width).astype(float)
+    values = np.bincount(cells, gain, minlength=height * width).reshape(height, width)
+    smooth = (.94, .86)
+    field = gaussian_filter(values, smooth, mode="constant") / np.maximum(
+        gaussian_filter(coverage, smooth, mode="constant"), .16)
+    return field, {folder.name: row[-1] for folder, row in zip(folders, (first, second))}
+
+
+def BarrelMarkCalibration(photo, barrel, evidence):
+    trace = Image.new("L", (photo.shape[1], photo.shape[0]))
+    draw = ImageDraw.Draw(trace)
+    for width, points in barrel["stampTrace"]["strokes"]:
+        draw.line([tuple(point) for point in points], fill=255, width=width, joint="curve")
+    distances = distance_transform_edt(np.asarray(trace) == 0)
+    study = [evidence / ("V46MarkStudy" + view) for view in ("Direct", "Default")]
+    settled = [evidence / ("V46MarkResolve" + view) for view in ("Direct", "Default")]
+    first, studyHashes = FitBarrelMarkGain(photo, barrel, study, distances)
+    remaining, settledHashes = FitBarrelMarkGain(photo, barrel, settled, distances)
+    # The second capture was made with the first field quantized and baked.
+    first = (np.clip(np.rint(128 + 150 * 1.2 * first), 0, 255) - 128) / 150
+    gain = np.clip(first + .88 * remaining, -1.15, 1.15)
+    gainScale = 108
+    Image.fromarray(np.rint(128 + gainScale * gain).astype(np.uint8)).save(BARREL_MARKS)
+    return {**BarrelCalibrationIdentity(barrel), "file": BARREL_MARKS.name,
+            "sha256": sha256(BARREL_MARKS.read_bytes()).hexdigest(), "gainScale": gainScale,
+            "frameSha256": {**studyHashes, **settledHashes}}
+
+
+def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None,
+                 materialEvidence=None, markEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -704,7 +776,8 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
     for name, frames, measure in (("registeredCalibration", evidence, BarrelCalibration),
                                   ("surfaceResponseCalibration", responseEvidence, BarrelResponseCalibration),
                                   ("finishCalibration", finishEvidence, BarrelFinishCalibration),
-                                  ("materialCalibration", materialEvidence, BarrelMaterialCalibration)):
+                                  ("materialCalibration", materialEvidence, BarrelMaterialCalibration),
+                                  ("markCalibration", markEvidence, BarrelMarkCalibration)):
         prior = previous.get(name)
         if frames is not None:
             result[name] = measure(image, result, frames)
@@ -1545,6 +1618,7 @@ def Main():
     options.add_argument("--barrel-response-evidence", type=Path, help="V40 Evidence directory containing the two captures with steel response variants")
     options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
     options.add_argument("--barrel-material-evidence", type=Path, help="V44 Evidence directory with barrel material and highlight-response captures")
+    options.add_argument("--barrel-mark-evidence", type=Path, help="V46 Evidence directory with barrel stamp response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1553,7 +1627,7 @@ def Main():
     prior = record.get("closeups", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
-                          materialEvidence=args.barrel_material_evidence)
+                          materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

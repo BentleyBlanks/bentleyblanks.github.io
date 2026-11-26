@@ -3573,6 +3573,48 @@
           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
         ]
+      },
+      "markCalibration": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "projection": [509, 540, 23, 400],
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.722, 0.849]
+        },
+        "file": "Texture_Type89LauncherBarrelMarks.png",
+        "sha256": "1f6ac741c9254d070f4225bd30058a601b91a70c9ae2f80e80bf03bedaf617fb",
+        "gainScale": 108,
+        "frameSha256": {
+          "V46MarkStudyDirect": {
+            "beauty.png": "a2f4a01ec252800b963d54f281ebf5cde91e43e50551247287df1a42864bd765",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "1cf4c03705fb4083d72cdc86e19af89bdb801b39bc141f64f8afbd1e6a6820dd",
+            "MarkBaseDark.png": "05c3841b691aa950eba616e28eea014673fb41e62514bdec95aab56abdf1b770"
+          },
+          "V46MarkStudyDefault": {
+            "beauty.png": "6dc901864e9613d68afcd349ba559ce3ddddaeb23483f04e0899033c90f934c5",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "c6f7549892ab7d07e41d698720b2222fd0c2176d59e78971c77909c89ba48ce9",
+            "MarkBaseDark.png": "b954b7396cbc24fd521f8e7493a36be047fde1b97f93f205bba968e91a92c761"
+          },
+          "V46MarkResolveDirect": {
+            "beauty.png": "73706e55e51808a3762ffb37367fd7c944e45936e84a702b81f40319f31ba114",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "63669f2a29423237ad8aaaecf634b03a092b4f048cf83dfd8729bae9fdcf54b6",
+            "MarkBaseDark.png": "27040ed655ab9b83b64a1a6391f74b09778000e682c504795201315f4d85fc38"
+          },
+          "V46MarkResolveDefault": {
+            "beauty.png": "f9743d2ebf0dce4c9c6cf8411e80bebaba2cab7cf8b4aee66fe55bd63931e7d4",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "MarkBaseLight.png": "c7bc0b030a6adfb15ce6dc72e1f168d544ac5728642d4a080afddf4a123e9503",
+            "MarkBaseDark.png": "f6f32782e4113b3eacf72260faec9cac5a5f0b469df77cf095bb050f03f325a5"
+          }
+        }
       }
     },
     "CollarRing": {
