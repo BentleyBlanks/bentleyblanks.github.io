@@ -155,7 +155,7 @@ def ApplyFieldSteel(fit, source, base, normal, orm):
         surface = orm[strip * DATA_SIZE // 4:(strip + 1) * DATA_SIZE // 4]
         mask, rim, spine = BladeZones(fit, BASE_SIZE, strip)
         fine = largeGrain if strip % 2 == 0 else largeGrain[::-1]
-        tint = .492 + .143 * rim - .048 * spine + .73 * fine * (1 - .55 * rim) + .57 * largeHaze
+        tint = .518 + .117 * rim - .074 * spine + .73 * fine * (1 - .55 * rim) + .57 * largeHaze
         steel = tint[..., None] * np.array([.976, .994, 1.015], dtype=np.float32)
         color += (steel - color) * mask[..., None]
 
@@ -166,7 +166,8 @@ def ApplyFieldSteel(fit, source, base, normal, orm):
         reliefShape /= np.linalg.norm(reliefShape, axis=2, keepdims=True)
         relief += (.5 + .5 * reliefShape - relief) * mask[..., None]
         rough = .53 + .075 * spine - .235 * rim - .17 * fine + .12 * haze
-        metal = .945 + .046 * rim - .115 * spine
+        # Keep some diffuse response on the worn face under the game's side light.
+        metal = .74 + .235 * rim - .075 * spine
         surface[..., 1] += (rough - surface[..., 1]) * mask
         surface[..., 2] += (metal - surface[..., 2]) * mask
 

@@ -627,7 +627,10 @@
      0.05154,
      0.27019
     ]
-   }
+   },
+   "sourceTriangles": 9286,
+   "targetTriangles": 9286,
+   "triangleLimit": 10000
   },
   {
    "name": "OfficerSwordSet",

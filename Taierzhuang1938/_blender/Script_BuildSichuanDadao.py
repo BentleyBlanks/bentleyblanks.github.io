@@ -168,7 +168,11 @@ def BuildParts():
 def BuildDadao():
     root = Node("root")
     body = root.Child("body")
-    for _, mesh in BuildParts():
+    parts = BuildParts()
+    sourceTriangles = sum(len(face.verts) - 2 for _, mesh in parts for face in mesh.faces)
+    BuildDadao.sourceTriangles = sourceTriangles
+    BuildDadao.targetTriangles = sourceTriangles
+    for _, mesh in parts:
         body.Add("dadao", mesh, tile="sourceUv")
     body.Child("muzzle", t=(0, -0.012074, -0.626))
     body.Child("gripR", t=(0, 0, .030))
