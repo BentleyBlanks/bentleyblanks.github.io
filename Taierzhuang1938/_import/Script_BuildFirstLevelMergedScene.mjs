@@ -3129,6 +3129,13 @@ function BuildMergedScene() {
   ];
 
   const maxZ = INHERIT_MAX_Z + outRows * cellM; // 990
+  const prevJsonPath = path.join(outDir, "Scene_FirstLevelMerged.json");
+  let existingCraters = null;
+  try {
+    const prev = JSON.parse(fs.readFileSync(prevJsonPath, "utf8"));
+    if (Array.isArray(prev.craters) && prev.craters.length) existingCraters = prev.craters;
+  } catch {}
+
   const mergedDoc = {
     schema: "tengxian-scene/1",
     id: "FirstLevelMerged",
@@ -3189,6 +3196,7 @@ function BuildMergedScene() {
     },
     markers: ownMarkers,
     smokeColumns: ownSmokeColumns,
+    ...(existingCraters ? { craters: existingCraters } : {}),
     objects: ownObjects,
   };
 

@@ -14,6 +14,7 @@ import { CompileTrenchNetwork, TRENCH_PRESETS } from "./Script_TrenchPlan.mjs";
 import { TRENCH_EARTH_PROFILE } from "./Data_TrenchAppearance.mjs";
 import { TrenchDetailIssues, TRENCH_LOOKS, TRENCH_LOOK_KEYS } from "./Data_TrenchDetails.mjs";
 import { SceneSurfaceSampler } from "./Script_SceneSurface.mjs";
+import { CarveSceneCraters, CompileSceneCraterField } from "./Script_SceneCraters.mjs";
 
 export const SCENE_TRENCH_DATUM_ENCODING = "int16-cm-le";
 /** 场景里写的 earthProfile 名 → 断面档（缺省 compact = 照片 01/14 的压实手挖土）。 */
@@ -209,10 +210,11 @@ export function CarveSceneHeights(terrain, pre, plan, { natural = null, region =
   return out;
 }
 
-/** 读好的场景 → { heights（挖好的）, pre（没挖的）, plan, datum }。没有壕沟时 heights === pre。 */
+/** 读好的场景 → { heights（挖好的）, pre（没挖的）, plan, datum, craterField }。没有壕沟/地形修整/弹坑时 heights === pre。 */
 export function PrepareSceneTerrain(doc, pre, datumBytes = null) {
   const trenches = doc.trenches;
-  if (!trenches?.segments?.length && !doc.surface) return { heights: pre, pre, plan: null, datum: [] };
+  const hasCraters = Array.isArray(doc.craters) && doc.craters.length > 0;
+  if (!trenches?.segments?.length && !doc.surface && !hasCraters) return { heights: pre, pre, plan: null, datum: [], craterField: null };
   const datum = trenches?.datum && datumBytes ? DecodeTrenchDatum(trenches.datum, datumBytes) : [];
   const preSampler = GridSampler(doc.terrain, pre);
   const plan = trenches?.segments?.length ? CompileSceneTrenches(trenches, { datum, pre: preSampler }) : null;
@@ -228,7 +230,16 @@ export function PrepareSceneTerrain(doc, pre, datumBytes = null) {
     }
     heights=patched;
   }
-  return { heights, pre, plan, datum };
+  let craterField = null;
+  if (hasCraters) {
+    const protect = plan ? (x, z) => {
+      const c = plan.Corridor(x, z);
+      return !!(c && c.d < c.halfFloor + c.bank * 0.72);
+    } : null;
+    heights = CarveSceneCraters(doc.terrain, heights, doc.craters, { protect });
+    craterField = CompileSceneCraterField(doc.craters);
+  }
+  return { heights, pre, plan, datum, craterField };
 }
 
 /** 俯视图 / 地面涂色用的沟中线（控制点折线）。 */

@@ -22,6 +22,7 @@ import {
 } from "./Script_EncounterFarmland.mjs";
 import { BeishaheGeoContext, SampleBeishaheOuterHeight } from "./Script_BeishaheGeography.mjs";
 import { PrepareSceneTerrain } from "./Script_SceneTrenches.mjs";
+import { CompileSceneCraterField } from "./Script_SceneCraters.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
 import { SCENE_ASSETS } from "./Data_SceneAssets.mjs";
 import {
@@ -410,9 +411,10 @@ export function BuildSceneGroundSurface(doc, sampler) {
   });
   if (trenchClear) tintItems.push(...trenchClear.tintItems);
   const tint = tintItems.length ? BuildGroundPaint(tintItems, doc.bounds, { cellM, maxCells: S.maxCells }) : null;
-  const w = [0, 0, 0], rs = [0, 1], step = S.slope.stepM, span = S.slope.to - S.slope.from;
+  const w = [0, 0, 0], rs = [0, 1], cs = [0, 0, 0, 0], step = S.slope.stepM, span = S.slope.to - S.slope.from;
   // 场景壕沟：翻土层跟着样条的实际沟沿走，沿弃土垄再铺一层（同现行第一关 SampleMissionTerrain 那一段）
   const plan = doc.trenchPlan || null;
+  const craterField = doc.craterField || (doc.craters?.length ? CompileSceneCraterField(doc.craters) : null);
   return (x, z, color = [1, 1, 1], layers = [0, 0, 1, 1]) => {
     let track = 0, spoil = 0, stubble = 1;
     color[0] = 1; color[1] = 1; color[2] = 1;
@@ -485,6 +487,23 @@ export function BuildSceneGroundSurface(doc, sampler) {
       color[0] += (1 - color[0]) * protect;
       color[1] += (1 - color[1]) * protect;
       color[2] += (1 - color[2]) * protect;
+    }
+
+    if (craterField) {
+      craterField.SampleSurface(x, z, cs);
+      const cWear = cs[1];
+      if (cWear > 0.02) {
+        // 静态弹坑剥离田间草茬与硬路面，露出翻土/焦土，并中和田块偏绿的顶点色避免焦土发绿
+        stubble *= 1 - Math.min(1, cWear * 1.35);
+        track *= 1 - Math.min(1, cWear * 0.9);
+        if (cWear > spoil) spoil = cWear;
+        if (isEncounter) {
+          const neutralMix = Math.min(1, cWear * 1.25);
+          color[0] += (1 - color[0]) * neutralMix;
+          color[1] += (1 - color[1]) * neutralMix;
+          color[2] += (1 - color[2]) * neutralMix;
+        }
+      }
     }
 
     layers[0] = Math.max(0, Math.min(1, track));
@@ -596,6 +615,24 @@ export function LayoutFromSceneDoc(doc) {
   const trenchPlan = doc.trenchPlan || null;
   const trenchDressing = trenchPlan ? SceneTrenchDressing(trenchPlan, sampler, blocks, doc.bounds) : { blocks: [], stats: null };
   blocks.push(...trenchDressing.blocks);
+  const craterField = doc.craters?.length ? CompileSceneCraterField(doc.craters) : null;
+  const craterTmp = [0, 0, 0, 0];
+  const ApplyCraterTint = (x, z, rgb) => {
+    if (!craterField) return rgb;
+    craterField.SampleSurface(x, z, craterTmp);
+    const wear = craterTmp[1];
+    if (wear > 0.02) {
+      const scorch = craterTmp[2], water = craterTmp[3] * craterTmp[0];
+      const tr = 0.36 - scorch * 0.19 - water * 0.08;
+      const tg = 0.31 - scorch * 0.17 - water * 0.06;
+      const tb = 0.25 - scorch * 0.14 - water * 0.02;
+      const k = Math.min(0.88, wear * 0.85);
+      rgb[0] += (tr - rgb[0]) * k;
+      rgb[1] += (tg - rgb[1]) * k;
+      rgb[2] += (tb - rgb[2]) * k;
+    }
+    return rgb;
+  };
   const neutral = [1, 1, 1];
   return {
     id: `Blockout${doc.level}`,
@@ -611,9 +648,11 @@ export function LayoutFromSceneDoc(doc) {
     terrainSampler: sampler,
     // 分层地表：读不到贴图时退回平铺土，顶点色不再乘高度色带
     SampleGroundColor: layeredGround ? () => neutral : groundPaint
-      ? (x, z) => { const rgb = BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)); groundPaint.Blend(x, z, rgb); return rgb; }
-      : (x, z) => BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)),
-    SampleGroundSurface: layeredGround ? BuildSceneGroundSurface(doc, sampler) : null,
+      ? (x, z) => { const rgb = BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint)); groundPaint.Blend(x, z, rgb); return ApplyCraterTint(x, z, rgb); }
+      : (x, z) => ApplyCraterTint(x, z, BlockoutSlopeTint(sampler, x, z, tint, BlockoutTintColor(sampler(x, z), tint))),
+    SampleGroundSurface: layeredGround ? BuildSceneGroundSurface({ ...doc, craterField }, sampler) : null,
+    SampleCraterSurface: craterField ? craterField.SampleSurface : null,
+    craters: craterField ? craterField.craters : [],
     // 正式场景的道具（Prop/*）：盒子只留碰撞，FirstLevelWhiteboxField 换外部模型
     sceneProps: formal ? blocks.filter((block) => block.propModel)
       .map((block) => ({ block: block.id, asset: block.propModel, ...(block.propTile ? { tile: block.propTile } : {}) })) : null,

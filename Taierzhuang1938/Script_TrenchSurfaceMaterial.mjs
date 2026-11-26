@@ -227,12 +227,24 @@ const Evaluate = /* glsl */`
       diffuseColor.rgb=trailColor;
     }
 #endif
+#ifdef TERRAIN_STATIC_CRATERS
+    {
+      vec3 scColor=diffuseColor.rgb;
+      TerrainStaticCraterApply(scColor,vTerrainWorld,worldDx,worldDy,geomN,length(vViewPosition));
+      diffuseColor.rgb=scColor;
+    }
+    float scPool=clamp(vTerrainCrater.w,0.0,1.0)*smoothstep(0.18,0.55,vTerrainCrater.x);
+    float scDamp=clamp(vTerrainCrater.w,0.0,1.0)*smoothstep(0.05,0.35,vTerrainCrater.x)*0.85;
+#else
+    float scPool=0.0;
+    float scDamp=0.0;
+#endif
     float floorSite=spoil*trenchLow;
     vec3 wetColor=diffuseColor.rgb*mix(vec3(1.0),uTerrainMudB.xyz,spoil*trenchMud);
     TerrainWater(wetColor,vTerrainWorld.xz,geomN,
-      max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x*uTrenchWeather.x*mix(1.0,uTerrainMudA.z,trenchMud)),
-      floorSite*(uTerrainWaterD.z+trenchMud*uTerrainMudA.w),
-      max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y*uTrenchWeather.y),spoil*trenchMud*uTerrainMudA.y));
+      max(max(gTerrainWeights.y*uTerrainWaterD.x,floorSite*uTrenchWater.x*uTrenchWeather.x*mix(1.0,uTerrainMudA.z,trenchMud)),scPool*1.15),
+      floorSite*(uTerrainWaterD.z+trenchMud*uTerrainMudA.w)+scPool*0.42,
+      max(max(max(gTerrainWeights.y*mix(uTerrainWaterD.w,uTerrainMudB.w,mud),floorSite*uTrenchWater.y*uTrenchWeather.y),spoil*trenchMud*uTerrainMudA.y),scDamp));
     diffuseColor.rgb=wetColor;
     // TerrainWater 把水面的材质 AO 归 1（土块缝隙不压水面），但沟壁挡天的地平线遮蔽要留着：
     // 它经 computeSpecularOcclusion 压间接镜面，SSR 关掉时沟底水面不再照出整片天空。
@@ -277,9 +289,9 @@ const Stone = /* glsl */`
   gMaterialAo=mix(stoneS.a,gMaterialAo,gTrenchContact);
 }`;
 
-export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=false }={}) {
+export function MakeTrenchSurfacePatch(pack, quality, assets, contact, { stone=false, staticCraters=false }={}) {
   // 石材（沟边垒的石头）不会被踩：不编脚印，那一路的采样器本来就紧。
-  const patch=MakeTerrainPatch(pack,TerrainQualityOf(quality),{trails:stone?null:TerrainTrailTierOf(quality)});
+  const patch=MakeTerrainPatch(pack,TerrainQualityOf(quality),{trails:stone?null:TerrainTrailTierOf(quality),staticCraters:!stone&&staticCraters});
   patch.terrainUniforms.uTerrainTileNear.value.w=1/C.mud.baseTileM;
   patch.terrainUniforms.uTerrainNormalScale.value.w=.65;
   const bind=patch.uniforms;

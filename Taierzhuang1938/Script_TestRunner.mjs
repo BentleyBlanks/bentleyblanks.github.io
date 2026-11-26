@@ -247,6 +247,7 @@ export const testDefs = {
   TrainLibraryTest: { file: "Script_TrainLibraryTest.mjs", desc: "火车构件库：点击懒载、原 PBR、完整轮组绑定、缓存隔离与实际显示" },
   BackRifleRunTest: { file: 'Script_BackRifleRunTest.mjs', desc: '独立背枪跑步 GLB：原骨架、循环接缝、真实蒙皮接地、速度与挂点浏览器验收' },
   ExplosionRulesTest: { file: "Script_ExplosionRulesTest.mjs", desc: "爆炸配置、稀疏地形叠加/坡度/上限、返掷窗口与完整资产目录（纯 Node）" },
+  SceneCratersTest: { file: "Script_SceneCratersTest.mjs", desc: "场景声明式弹坑与升级形态：漏斗平底剖面、斜射偏置、静态挖坑坡度与继承接缝零台阶（纯 Node）" },
   DismembermentTest: { file: "Script_DismembermentTest.mjs", desc: "断肢规则层：肢体表与命中体互核、顶点分类、index 三角守恒、六类来源判定与预算 FIFO（纯 Node，毫秒级）" },
   ModelFacingTest: { file: "Script_ModelFacingTest.mjs", desc: "外部模型朝向闸：飞机 GLB 机首按 noseDir 落到 -Z、战车 tzm 炮口/车头在 -Z，全部用顶点云复量（纯 Node，秒级）" },
   KawasakiType88AssetTest: { file: "Script_KawasakiType88AssetTest.mjs", desc: "八八式二型实际 GLB：米制、预算、完整 PBR、十个轴心、推杆端点与轮动" },
@@ -839,6 +840,7 @@ export const tier0Fast = [
   "FirstPersonGaitTest",
   "EditorBlockoutConfigTest",
   "SceneDocTest",
+  "SceneCratersTest",
   "EnvSystemTest",
   "SceneEditModelTest",
   "SceneSaveTest",
@@ -1000,7 +1002,7 @@ export const domains = {
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMissionAftermathTest','FirstLevelMissionPeopleCadenceTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ProneCrawlTest','ActorLocomotionTest','BackRifleRunTest','RelaxedGaitTest','IjaAlertGaitTest','RifleHoldRunTest','RifleShoulderMarchTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest','HitReactionTest','HitReactionBrowserTest'] },
-  explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场/人物战场反应测试场", tests: ["ExplosionRulesTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest", "BlastReactionTest", "BlastStunTest", "BlastKnockbackTest", "BattleReactionRangeBrowserTest"] },
+  explosives: { label: "爆炸白盒与通用地形形变/返掷/炮击扬尘测试场/人物战场反应测试场", tests: ["ExplosionRulesTest", "SceneCratersTest", "DustFlowTest", "ExplosionRangeTest", "CraterSurfaceTest", "ShellImpactRangeTest", "ShellImpactRangeBrowserTest", "BlastReactionTest", "BlastStunTest", "BlastKnockbackTest", "BattleReactionRangeBrowserTest"] },
   // 测试场插件（Script_SandboxRanges）、玩法时钟、开机路由：改了就把九个测试场的入口各开一遍。
   sandboxRanges: { label: "测试场登记表 / 插件 / 玩法时钟 / 开机路由", tests: ["SandboxRangesTest", "MovementRangeTest", "WeaponRangeTest", "WeaponRangeStartupBrowserTest", "RangeTest", "ExplosionRangeTest", "MeleeQteTest", "MeleeLabVariantsBrowserTest", "GoreRangeTest", "ShellImpactRangeBrowserTest", "BattleReactionRangeBrowserTest", "ClothRangeBrowserTest", "MenuStartupTest", "BrowserBundleTest"] },
   // 大文件直接进 Git（没开 LFS）：改到模型 / 贴图 / 音视频就量一遍体积。
@@ -1221,7 +1223,8 @@ const changedDomainRules = [
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
   // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：痕迹靶 pass、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
-  {domain:'terrain',pattern:/TerrainTrail|Script_TerrainMaterial|Script_TerrainDeformationView/},
+  {domain:'terrain',pattern:/TerrainTrail|Script_TerrainMaterial|Script_TerrainDeformationView|Script_SceneCraters/},
+  {domain:'explosives',pattern:/Script_SceneCraters/},
   {domain:'render',pattern:/TerrainTrail/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },

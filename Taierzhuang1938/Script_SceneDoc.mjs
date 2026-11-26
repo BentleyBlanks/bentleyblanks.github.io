@@ -14,6 +14,7 @@ import { SCENE_ASSETS, SCENE_MATERIALS, SCENE_LIST, SceneInfo, SceneObjectSemant
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
 import { GridSampler, SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
 import { CompileSceneAirWalls, SceneAirWallIssues } from "./Script_SceneAirWalls.mjs";
+import { SceneCraterIssues, SliceSceneCraters } from "./Script_SceneCraters.mjs";
 import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
 import { MAX_FOG_VOLUMES } from "./Data_Tuning_Volumetrics.mjs";
 import { PARTICLE_VOLUME_ASSETS } from "./Data_ParticleVolumeAssets.mjs";
@@ -178,6 +179,7 @@ export function ValidateScene(doc) {
     }
   }
   if (doc.trenches !== undefined) SceneTrenchIssues(doc.trenches, errors);
+  if (doc.craters !== undefined) SceneCraterIssues(doc.craters, errors, "craters", ids);
   return { ok: errors.length === 0, errors, warnings };
 }
 
@@ -187,7 +189,7 @@ export function FormatSceneJson(scene) {
   const entries = Object.entries(scene);
   entries.forEach(([key, value], i) => {
     const comma = i < entries.length - 1 ? "," : "";
-    if (["objects", "airWalls", "markers", "paint"].includes(key) && Array.isArray(value)) {
+    if (["objects", "airWalls", "markers", "paint", "craters"].includes(key) && Array.isArray(value)) {
       lines.push(`  ${JSON.stringify(key)}: [`);
       value.forEach((item, j) => lines.push(`    ${JSON.stringify(item)}${j < value.length - 1 ? "," : ""}`));
       lines.push(`  ]${comma}`);
@@ -376,6 +378,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const look = { ...(scene.look || {}) };
   if (heightTint !== undefined) look.heightTint = heightTint;
   const slicePlan = SliceTrenchPlan(trenchPlan, area);
+  const craters = SliceSceneCraters(scene.craters, area);
   return {
     schema: BLOCKOUT_SCENE_SCHEMA,
     level,
@@ -422,5 +425,6 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
       trenches: [...Lines(scene.ways?.trenches), ...Lines(SceneTrenchLines(slicePlan))],
     },
     ...(slicePlan ? { trenchPlan: slicePlan } : {}),
+    ...(craters.length ? { craters: craters.map((c) => ({ ...c })) } : {}),
   };
 }

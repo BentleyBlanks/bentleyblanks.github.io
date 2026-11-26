@@ -9,6 +9,7 @@ function TerrainSceneSignature(scene) {
     bounds: scene.bounds,
     terrain: scene.terrain,
     trenches: scene.trenches,
+    craters: scene.craters,
     surface: scene.surface,
     paint: scene.paint,
     backdrop: scene.backdrop,

@@ -43,6 +43,7 @@ import { LoadFirstLevelPropDressing, AddFirstLevelPropDressing, AddScenePropMode
 import { FirstLevelVegetation, LoadFirstLevelVegetationAtlas } from "./Script_FirstLevelVegetation.mjs";
 import { BuildInteriorVolumes } from "./Script_FirstLevelInteriors.mjs";
 import { SetInteriorVolumes } from "./Script_InteriorSkyOcclusion.mjs";
+import { BuildStaticCraterDebris } from "./Script_CraterDebris.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -132,6 +133,8 @@ export class FirstLevelWhiteboxField {
     // Layered terrain (Script_TerrainMaterial) once PrepareAssets loads it; null keeps the single-PBR path.
     this.terrainLayers = null;
     this.SampleGroundSurface = null;
+    this.SampleCraterSurface = null;
+    this.staticCraterDebris = null;
     this.fortificationModels = null;
     this.fortificationPlacements = [];
     this.sharedFortificationMaterials = new Set();
@@ -231,16 +234,19 @@ export class FirstLevelWhiteboxField {
       // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
       // download falls back to the single tiled soil below; the level still builds.
       try {
-        const { LoadTerrainLayers, CreateTerrainMaterial } = await import("./Script_TerrainMaterial.mjs");
+        const { LoadTerrainLayers, CreateTerrainMaterial, CRATER_SCORCHED_LAYER } = await import("./Script_TerrainMaterial.mjs");
         const trench = !!this.TrenchPlan();
+        const staticCraters = !!this.layout.SampleCraterSurface;
         const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
           .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
         const terrainSet = this.layout.ground.terrainLayers;
         const looseLayerId = TERRAIN_SETS[terrainSet]?.trenchLooseLayer;
         const looseLayer = looseLayerId && TerrainLayerUrls(terrainSet).find(layer => layer.id === looseLayerId);
         this.terrainLayers = await LoadTerrainLayers(terrainSet,
-          { anisotropy: this.library.anisotropy, extraLayers: trench
-              ? [VersionedLayer(TRENCH_SURFACE.stoneLayer), looseLayer || VersionedLayer(TRENCH_SURFACE.looseLayer)] : [],
+          { anisotropy: this.library.anisotropy, extraLayers: [
+              ...(trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer), looseLayer || VersionedLayer(TRENCH_SURFACE.looseLayer)] : []),
+              CRATER_SCORCHED_LAYER,
+            ],
             layerOverrides: trench && terrainSet === "MissionPlain"
               ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
         if (trench) {
@@ -259,8 +265,8 @@ export class FirstLevelWhiteboxField {
         const semantic = this.layout.ground.semantic;
         this.materials.get(semantic)?.dispose();
         this.materials.set(semantic, CreateTerrainMaterial(this.library, this.terrainLayers,
-          { quality: this.quality, name: "FirstLevelMissionTerrainLayers", reflections: trench,
-            surface: trench ? MakeTrenchSurfacePatch(this.terrainLayers, this.quality, this.trenchSurface, this.terrainContact) : null }));
+          { quality: this.quality, name: "FirstLevelMissionTerrainLayers", reflections: trench, staticCraters,
+            surface: trench ? MakeTrenchSurfacePatch(this.terrainLayers, this.quality, this.trenchSurface, this.terrainContact, { staticCraters }) : null }));
         if(trench)this.materials.get(semantic).userData.terrainBlendSource=true;
         const scratch = [0, 0, 0];
         // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：脚离地多高按**地形**算（楼板、踏板、车上不算，不出印）。
@@ -268,6 +274,7 @@ export class FirstLevelWhiteboxField {
         this.trailSystem = TerrainTrailSystem;
         TerrainTrailSystem.AttachGround(this, (x, z) => this.TerrainHeight(x, z));
         this.SampleGroundSurface = this.layout.SampleGroundSurface;
+        this.SampleCraterSurface = this.layout.SampleCraterSurface || null;
         this.SampleGroundColor = (x, z, out) => this.layout.SampleGroundSurface(x, z, out, scratch);
       } catch (error) {
         console.warn("[FirstLevelWhiteboxField] terrain layers unavailable, using tiled soil", error);
@@ -327,20 +334,28 @@ export class FirstLevelWhiteboxField {
         // One corridor walk per vertex yields the layered tint and the splat weights.
         const positions=mesh.geometry.attributes.position, posArr=positions.array, count=positions.count;
         const colors=new Float32Array(count*3), layers=new Float32Array(count*4), rgb=[0,0,0], weights=[0,0,0,1];
+        const sampleCrater=this.SampleCraterSurface;
+        const craters=sampleCrater ? new Float32Array(count*4) : null, craterOut=[0,0,0,0];
         const sample=this.SampleGroundSurface;
         for(let i=0,p3=0,l4=0;i<count;i++,p3+=3,l4+=4) {
+          const px=posArr[p3], pz=posArr[p3+2];
           weights[3]=1;
-          sample(posArr[p3],posArr[p3+2],rgb,weights);
+          sample(px,pz,rgb,weights);
           const r=rgb[0],g=rgb[1],b=rgb[2];
           colors[p3]=r===1?1:SrgbToLinear(r);
           colors[p3+1]=g===1?1:SrgbToLinear(g);
           colors[p3+2]=b===1?1:SrgbToLinear(b);
           layers[l4]=weights[0]; layers[l4+1]=weights[1]; layers[l4+2]=weights[2]; layers[l4+3]=weights[3];
+          if (craters) {
+            sampleCrater(px,pz,craterOut);
+            craters[l4]=craterOut[0]; craters[l4+1]=craterOut[1]; craters[l4+2]=craterOut[2]; craters[l4+3]=craterOut[3];
+          }
         }
         mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
         // Float32 on purpose: the crater cutter copies every attribute into Float32 arrays.
         // w = rut lateral coordinate (Data_Tuning_Terrain.TERRAIN_RUTS; 1 = no road).
         mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,4));
+        if (craters) mesh.geometry.setAttribute('terrainCrater',new THREE.BufferAttribute(craters,4));
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
       } else if (this.layout.SampleGroundColor) {
         const positions=mesh.geometry.attributes.position, posArr=positions.array, count=positions.count;
@@ -392,6 +407,7 @@ export class FirstLevelWhiteboxField {
           }
           mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
           mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
+          if (this.SampleCraterSurface) mesh.geometry.setAttribute("terrainCrater", new THREE.BufferAttribute(new Float32Array(count * 4), 4));
         }
         // The crater adapter clips these details together with the original soil.
         // They never survive as a floating crust over a newly excavated crater.
@@ -401,6 +417,12 @@ export class FirstLevelWhiteboxField {
         mesh.userData.groundSurface = mesh.material === this.materials.get(ground.semantic);
         this.meshes.push(mesh);
       }
+    }
+
+    if (this.layout.craters?.length && this.library?.Get && typeof document !== "undefined") {
+      this.staticCraterDebris = BuildStaticCraterDebris(this.layout.craters, (x, z) => this.TerrainHeight(x, z),
+        this.scene, this.library, { bounds: this.bounds });
+      this.stats.staticCraterDebris = { count: this.staticCraterDebris.count, stones: this.staticCraterDebris.stones, meshes: this.staticCraterDebris.meshes.length };
     }
 
     const defenses=this.fortificationModels
@@ -1140,6 +1162,8 @@ export class FirstLevelWhiteboxField {
     SetInteriorVolumes(null);
     this.trailSystem?.DetachGround(this); this.trailSystem = null;
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
+    this.staticCraterDebris?.Dispose(); this.staticCraterDebris = null;
+    this.SampleCraterSurface = null;
     this.vegetation?.Dispose(); this.vegetation=null; this.vegetationAtlas?.dispose(); this.vegetationAtlas=null;
     this.legend?.remove(); this.legend = null;
     for(const texture of this.labelTextures||[])texture.dispose();

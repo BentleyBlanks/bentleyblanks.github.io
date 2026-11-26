@@ -18,6 +18,7 @@ import {
   DecodeTrenchDatum, CompileSceneTrenches, CarveSceneHeights, GridSampler, TrenchGroup, SegmentReachBounds, UnionBounds,
 } from "../Script_SceneTrenches.mjs";
 import { CompileSceneAirWalls } from "../Script_SceneAirWalls.mjs";
+import { CarveSceneCraters, CompileSceneCraterField } from "../Script_SceneCraters.mjs";
 import { TRENCH_PRESETS } from "../Script_TrenchPlan.mjs";
 import { TRENCH_DETAILS, TRENCH_LOOKS, EffectiveTrenchDetail } from "../Data_TrenchDetails.mjs";
 import { MISSION_LAYOUT } from "../Data_FirstLevelMissionLayout.mjs";
@@ -509,7 +510,15 @@ class SceneEditorApp {
       const bt = baseDoc.terrain;
       const splitRow = Math.min(bt.rows, Math.max(1, Math.round((inherit.maxZ - bt.minZ) / bt.cellM)));
       const northPlan = CompileSceneTrenches(baseDoc.trenches, { datum: baseDatum, pre: GridSampler(bt, basePre) });
-      const carved = CarveSceneHeights(bt, basePre, northPlan);
+      let carved = CarveSceneHeights(bt, basePre, northPlan);
+      const ownCraterIds = new Set((this.model.doc.craters || []).map((c) => c.id));
+      const excludeCraterIds = new Set(inherit.excludeIds || []);
+      const northCraters = (baseDoc.craters || []).filter((c) => !ownCraterIds.has(c.id) && !excludeCraterIds.has(c.id) && c.z < inherit.maxZ);
+      const northCraterField = northCraters.length ? CompileSceneCraterField(northCraters) : null;
+      if (northCraterField) {
+        const protect = northPlan ? (x, z) => { const c = northPlan.Corridor(x, z); return !!(c && c.d < c.halfFloor + c.bank * 0.72); } : null;
+        carved = CarveSceneCraters(bt, carved, northCraters, { protect });
+      }
       const northSampler = HeightGridSampler({ ...bt, heights: carved });
       const step = Math.max(1, Math.ceil(Math.sqrt(((bt.cols + 1) * (splitRow + 1)) / E.terrainMaxVerts)));
       const nx = Math.floor(bt.cols / step), nz = Math.floor(splitRow / step);
@@ -518,7 +527,7 @@ class SceneEditorApp {
       const tint = baseDoc.look?.heightTint || { lo: northSampler.minY, hi: Math.max(northSampler.minY + 0.5, northSampler.maxY) };
       const flatColor = typeof baseDoc.look?.groundColor === "string" ? new THREE.Color().setHex(HexInt(baseDoc.look.groundColor), THREE.SRGBColorSpace) : null;
       const paint = BuildGroundPaint(baseDoc.paint, baseDoc.bounds);
-      const rgb = [0, 0, 0], col = new THREE.Color();
+      const rgb = [0, 0, 0], cr = [0, 0, 0, 0], col = new THREE.Color();
       let k = 0;
       for (let iz = 0; iz <= nz; iz++) {
         const gz = iz === nz ? splitRow : iz * step;
@@ -526,11 +535,21 @@ class SceneEditorApp {
           const gx = ix === nx ? bt.cols : ix * step;
           const x = bt.minX + gx * bt.cellM, z = bt.minZ + gz * bt.cellM, y = carved[gz * (bt.cols + 1) + gx];
           positions[k] = x; positions[k + 1] = y; positions[k + 2] = z;
-          if (flatColor && !paint) {
+          if (flatColor && !paint && !northCraterField) {
             colors[k] = flatColor.r; colors[k + 1] = flatColor.g; colors[k + 2] = flatColor.b;
           } else {
             BlockoutTintColor(y, tint, rgb);
             if (paint) paint.Blend(x, z, rgb);
+            if (northCraterField) {
+              northCraterField.SampleSurface(x, z, cr);
+              if (cr[1] > 0.02) {
+                const mix = Math.min(0.85, cr[1] * 0.8);
+                const tr = 0.36 - cr[2] * 0.18 - cr[3] * cr[0] * 0.08;
+                const tg = 0.31 - cr[2] * 0.16 - cr[3] * cr[0] * 0.06;
+                const tb = 0.25 - cr[2] * 0.14 - cr[3] * cr[0] * 0.02;
+                rgb[0] += (tr - rgb[0]) * mix; rgb[1] += (tg - rgb[1]) * mix; rgb[2] += (tb - rgb[2]) * mix;
+              }
+            }
             col.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
             colors[k] = col.r; colors[k + 1] = col.g; colors[k + 2] = col.b;
           }
@@ -594,7 +613,7 @@ class SceneEditorApp {
 
       if (this.style === "formal" || this.model.doc.look?.terrainLayers || baseDoc.look?.terrainLayers) {
         this.DressTerrainMesh(northTerrain, {
-          doc: baseDoc, sceneId: inherit.scene, sampler: northSampler, trenchPlan: northPlan, tokenKey: "inherited",
+          doc: baseDoc, sceneId: inherit.scene, sampler: northSampler, trenchPlan: northPlan, craterField: northCraterField, tokenKey: "inherited",
           setName: baseDoc.look?.terrainLayers || this.model.doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers,
         });
       }
@@ -606,11 +625,19 @@ class SceneEditorApp {
 
   // ------------------------------------------------------------------ 壕沟（docs/Data_Scene.md §9）
 
-  /** 整张地面按壕沟重挖（读盘 / 重读时）。 */
+  /** 整张地面按壕沟与弹坑重挖（读盘 / 重读时）。 */
   CarveAll() {
     const doc = this.model.doc;
     this.trenchPlan = CompileSceneTrenches(doc.trenches, { datum: this.datum, pre: this.preSampler });
     this.heights = CarveSceneHeights(doc.terrain, this.pre, this.trenchPlan);
+    this.craterField = doc.craters?.length ? CompileSceneCraterField(doc.craters) : null;
+    if (this.craterField) {
+      const protect = this.trenchPlan ? (x, z) => {
+        const c = this.trenchPlan.Corridor(x, z);
+        return !!(c && c.d < c.halfFloor + c.bank * 0.72);
+      } : null;
+      this.heights = CarveSceneCraters(doc.terrain, this.heights, doc.craters, { protect });
+    }
     this.sampler = HeightGridSampler({ ...doc.terrain, heights: this.heights });
     this.carvedTrenches = JSON.stringify(this.model.trenchSegments);
     this.carvedRev = this.model.trenchRev;
@@ -646,6 +673,13 @@ class SceneEditorApp {
         this.heights.set(this.pre.subarray(from, to + 1), from);
       }
       if (this.trenchPlan) CarveSceneHeights(t, this.pre, this.trenchPlan, { region, into: this.heights });
+      if (doc.craters?.length) {
+        const protect = this.trenchPlan ? (x, z) => {
+          const c = this.trenchPlan.Corridor(x, z);
+          return !!(c && c.d < c.halfFloor + c.bank * 0.72);
+        } : null;
+        CarveSceneCraters(t, this.heights, doc.craters, { region, into: this.heights, protect });
+      }
     }
     this.carveRev++;
     return "terrain";
@@ -803,18 +837,29 @@ class SceneEditorApp {
     const tint = doc.look?.heightTint || { lo: this.sampler.minY, hi: Math.max(this.sampler.minY + 0.5, this.sampler.maxY) };
     const flatColor = typeof doc.look?.groundColor === "string" ? new THREE.Color().setHex(HexInt(doc.look.groundColor), THREE.SRGBColorSpace) : null;
     const paint = BuildGroundPaint(doc.paint, doc.bounds);
-    const rgb = [0, 0, 0], color = new THREE.Color();
+    const craterField = this.craterField;
+    const rgb = [0, 0, 0], cr = [0, 0, 0, 0], color = new THREE.Color();
     let k = 0;
     for (let iz = 0; iz <= nz; iz++) {
       for (let ix = 0; ix <= nx; ix++) {
         const gx = ix * step, gz = iz * step;
         const x = t.minX + gx * t.cellM, z = t.minZ + gz * t.cellM, y = h[gz * (t.cols + 1) + gx];
         positions[k] = x; positions[k + 1] = y; positions[k + 2] = z;
-        if (flatColor && !paint) {
+        if (flatColor && !paint && !craterField) {
           colors[k] = flatColor.r; colors[k + 1] = flatColor.g; colors[k + 2] = flatColor.b;
         } else {
           BlockoutTintColor(y, tint, rgb);
           if (paint) paint.Blend(x, z, rgb);
+          if (craterField) {
+            craterField.SampleSurface(x, z, cr);
+            if (cr[1] > 0.02) {
+              const mix = Math.min(0.85, cr[1] * 0.8);
+              const tr = 0.36 - cr[2] * 0.18 - cr[3] * cr[0] * 0.08;
+              const tg = 0.31 - cr[2] * 0.16 - cr[3] * cr[0] * 0.06;
+              const tb = 0.25 - cr[2] * 0.14 - cr[3] * cr[0] * 0.02;
+              rgb[0] += (tr - rgb[0]) * mix; rgb[1] += (tg - rgb[1]) * mix; rgb[2] += (tb - rgb[2]) * mix;
+            }
+          }
           color.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
           colors[k] = color.r; colors[k + 1] = color.g; colors[k + 2] = color.b;
         }
@@ -866,9 +911,10 @@ class SceneEditorApp {
     if (this.terrainPack?.setName === setName) return this.terrainPack;
     if (!this.terrainPackPromises.has(setName)) {
       const load = (async () => {
-        const { LoadTerrainLayers } = await import("../Script_TerrainMaterial.mjs");
+        const { LoadTerrainLayers, CRATER_SCORCHED_LAYER } = await import("../Script_TerrainMaterial.mjs");
         const pack = await LoadTerrainLayers(setName, {
           anisotropy: this.renderer.capabilities.getMaxAnisotropy(), assetBase: new URL("../", location.href),
+          extraLayers: [CRATER_SCORCHED_LAYER],
         });
         this.terrainPack = pack;
         return pack;
@@ -883,10 +929,10 @@ class SceneEditorApp {
 
   /**
    * 正式场景（或带 look.terrainLayers 的场景）地面同游戏里那份：四层贴图（底土 / 车道 / 翻土 / 草茬），
-   * 权重按涂色、路、沟、陡坡算（Script_EditorBlockoutLevels.BuildSceneGroundSurface）。
+   * 权重按涂色、路、沟、陡坡算（Script_EditorBlockoutLevels.BuildSceneGroundSurface），再叠加零采样器焦土弹坑。
    * 支持给本场景地面和继承北段地面共用同一套贴图包与着色器。
    */
-  async DressTerrainMesh(mesh, { doc, sceneId, sampler, trenchPlan, tokenKey = "main", setName } = {}) {
+  async DressTerrainMesh(mesh, { doc, sceneId, sampler, trenchPlan, craterField = undefined, tokenKey = "main", setName } = {}) {
     const token = (this.terrainTokens[tokenKey] = (this.terrainTokens[tokenKey] || 0) + 1);
     const targetName = setName || doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers;
     try {
@@ -898,17 +944,25 @@ class SceneEditorApp {
       ]);
       const expected = tokenKey === "main" ? this.terrain : this.inheritedTerrain;
       if (token !== this.terrainTokens[tokenKey] || mesh !== expected) return false;
-      const surface = BuildSceneGroundSurface({ ...doc, scene: sceneId, trenchPlan }, sampler);
+      const cField = craterField !== undefined ? craterField : (doc.craters?.length ? CompileSceneCraterField(doc.craters) : null);
+      const surface = BuildSceneGroundSurface({ ...doc, scene: sceneId, trenchPlan, craterField: cField }, sampler);
       const position = mesh.geometry.getAttribute("position"), n = position.count;
       const colors = new Float32Array(n * 3), layers = new Float32Array(n * 4), c = [1, 1, 1], w = [0, 0, 1, 1];
+      const cratersAttr = cField ? new Float32Array(n * 4) : null, cr = [0, 0, 0, 0];
       const color = new THREE.Color();
       for (let i = 0; i < n; i++) {
-        surface(position.getX(i), position.getZ(i), c, w);
+        const px = position.getX(i), pz = position.getZ(i);
+        surface(px, pz, c, w);
         color.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace).toArray(colors, i * 3);
         layers.set(w, i * 4);
+        if (cratersAttr) {
+          cField.SampleSurface(px, pz, cr);
+          cratersAttr.set(cr, i * 4);
+        }
       }
       mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
+      if (cratersAttr) mesh.geometry.setAttribute("terrainCrater", new THREE.BufferAttribute(cratersAttr, 4));
       if (!this.materialLibrary) {
         const shading = MakeMaterialShadingUniforms();
         shading.quality = {
@@ -918,7 +972,8 @@ class SceneEditorApp {
         this.materialLibrary = new MaterialLibrary(this.renderer, { shading });
       }
       const material = CreateTerrainMaterial(this.materialLibrary, pack, {
-        quality: "medium", name: tokenKey === "main" ? "SceneEditor_TerrainLayers" : "SceneEditor_InheritedTerrainLayers",
+        quality: "medium", staticCraters: !!cField,
+        name: tokenKey === "main" ? "SceneEditor_TerrainLayers" : "SceneEditor_InheritedTerrainLayers",
       });
       this.environment.AttachMaterial(material);
       mesh.material.dispose();
@@ -934,7 +989,7 @@ class SceneEditorApp {
 
   DressFormalTerrain(mesh) {
     return this.DressTerrainMesh(mesh, {
-      doc: this.model.doc, sceneId: this.sceneId, sampler: this.sampler, trenchPlan: this.trenchPlan, tokenKey: "main",
+      doc: this.model.doc, sceneId: this.sceneId, sampler: this.sampler, trenchPlan: this.trenchPlan, craterField: this.craterField, tokenKey: "main",
     });
   }
 

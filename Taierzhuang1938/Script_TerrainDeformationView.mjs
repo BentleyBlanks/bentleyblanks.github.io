@@ -10,6 +10,8 @@ import { CraterDebris } from "./Script_CraterDebris.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
 import { CloneMaterialBase, InsertAfterSurfacePatch } from "./Script_MaterialPatches.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
+import { CraterRimDirectionalScale } from "./Script_SceneCraters.mjs";
 
 // How many renders a crater warm-up proxy may wait for its first shadow pass
 // before it retires anyway. Only a leak guard: on a level whose cascades bake
@@ -208,11 +210,17 @@ const GROUND_OVERLAYS = /^(DirtRoad|RoadWear|RoadLitter|CartRoad|YardEarth|Field
 
 function ConfigureCraterSurface(material, source, soil) {
   const CompileSource = source.onBeforeCompile, SourceKey = source.customProgramCacheKey.bind(source);
+  const craterSlice = Number.isInteger(source?.userData?.terrainCraterSlice) ? source.userData.terrainCraterSlice : -1;
+  const useTerrainArray = craterSlice >= 0;
   material.vertexColors = true;
   material.onBeforeCompile = (shader, renderer) => {
     CompileSource.call(material, shader, renderer);
-    shader.uniforms.uCraterSoil = { value: soil.map };
-    shader.uniforms.uCraterNormal = { value: soil.normalMap };
+    if (useTerrainArray) {
+      shader.uniforms.uDynamicCraterSlice = { value: craterSlice };
+    } else {
+      shader.uniforms.uCraterSoil = { value: soil.map };
+      shader.uniforms.uCraterNormal = { value: soil.normalMap };
+    }
     shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>
       attribute vec2 terrainDelta;
       attribute vec2 terrainBlast;
@@ -226,8 +234,7 @@ function ConfigureCraterSurface(material, source, soil) {
         vTerrainBlast = terrainBlast;
         vSoilUv = (modelMatrix * vec4(position, 1.0)).xz / 1.6;`);
     shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>
-      uniform sampler2D uCraterSoil;
-      uniform sampler2D uCraterNormal;
+      ${useTerrainArray ? "uniform float uDynamicCraterSlice;" : "uniform sampler2D uCraterSoil;\n      uniform sampler2D uCraterNormal;"}
       varying vec2 vTerrainBlast;
       varying float vTerrainDelta;
       varying float vTerrainWear;
@@ -247,8 +254,9 @@ function ConfigureCraterSurface(material, source, soil) {
         float macro = CraterNoise(soilMeters * 0.73);
         float breakup = CraterNoise(soilMeters * 8.0 + 13.2);
         vec2 secondUv = mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 1.91 + 0.37;
-        vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;
-        vec3 fineSoil = texture2D(uCraterSoil, secondUv).rgb;
+        ${useTerrainArray
+          ? "vec3 soil = texture(uTerrainAlbedo, vec3(vSoilUv, uDynamicCraterSlice)).rgb;\n        vec3 fineSoil = texture(uTerrainAlbedo, vec3(secondUv, uDynamicCraterSlice)).rgb;"
+          : "vec3 soil = texture2D(uCraterSoil, vSoilUv).rgb;\n        vec3 fineSoil = texture2D(uCraterSoil, secondUv).rgb;"}
         // Non-aligned scales retain sharp fractures without an obvious square repeat.
         float layer = smoothstep(0.2, 0.8, macro) * 0.42;
         vec3 earth = mix(soil, fineSoil, layer);
@@ -286,20 +294,22 @@ function ConfigureCraterSurface(material, source, soil) {
         float soilDet = dot(soilDx, soilR1);
         vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
         normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
-#ifdef TERRAIN_TRAILS
+${useTerrainArray
+  ? "        // 分层地形已把 CraterScorched 装入纹理数组：零额外采样器直接取焦土真实微法线。\n        vec2 soilSlope = texture(uTerrainSurface, vec3(vSoilUv, uDynamicCraterSlice)).xy * 2.0 - 1.0;"
+  : `#ifdef TERRAIN_TRAILS
         // 地形材质编进了脚印采样（Script_TerrainTrails）时，坑土法线改采地形纹理数组的翻土层
         //（同一套「xy → vec3(x, 0, y)」约定），省下 uCraterNormal 这个纹理单元：
         // ANGLE-D3D11 上砸坑变体原来已经是 16/16（docs/Data_TerrainTrails.md §4）。
         vec2 soilSlope = texture(uTerrainSurface, vec3(vSoilUv, 3.0)).xy * 2.0 - 1.0;
 #else
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
-#endif
+#endif`}
         normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52 * (1.0 - ash * 0.7));`);
     shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <aomap_fragment>", `        float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
         reflectedLight.indirectDiffuse *= earthOcclusion;
         reflectedLight.indirectSpecular *= earthOcclusion;`);
   };
-  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV4`;
+  material.customProgramCacheKey = () => `${SourceKey()}|CraterSoilV4${useTerrainArray ? "Arr" : ""}`;
 }
 
 export class TerrainDeformationView {
@@ -316,6 +326,9 @@ export class TerrainDeformationView {
     // Splat weights for the layered terrain material (Script_TerrainMaterial). Only
     // fields that render with it expose SampleGroundSurface; others keep the colour path.
     this.layersOut = [0, 0, 0, 1];
+    this.craterOut = [0, 0, 0, 0];
+    this._batchDepth = 0;
+    this._flushPending = false;
     this.originalGeometry = new Map(); this.tileMeshes = new Map(); this.sourceBounds = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     this.blastPages = new Map();
@@ -399,8 +412,11 @@ export class TerrainDeformationView {
     this.RemoveWarmProxies();
     if (!renderer || !camera || !this.sources.length) return this.warmProxies;
     this.warmState = { renderer, shadowed: false, renders: 0, lastFrame: -1 };
-    const b = this.field.bounds, materials = [this.material, ...this.debris.materials, ...new Set(this.overlayMaterials.values())];
+    const b = this.field.bounds;
+    const debrisMats = new Set(this.debris.materials);
+    const materials = [this.material, ...this.debris.materials, ...new Set(this.overlayMaterials.values())];
     const group = new THREE.Group();
+    const idMat = new THREE.Matrix4(), white = new THREE.Color(1, 1, 1);
     for (const [i, material] of materials.entries()) {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1], 3));
@@ -409,8 +425,18 @@ export class TerrainDeformationView {
       geometry.setAttribute("color", new THREE.Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
       geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(8), 2));
       geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(8), 2));
+      if (this.field.SampleCraterSurface) geometry.setAttribute("terrainCrater", new THREE.BufferAttribute(new Float32Array(16), 4));
       geometry.setIndex([0, 1, 2, 2, 1, 3]);
-      const mesh = new THREE.Mesh(geometry, material); mesh.name = `TerrainWarm_${i}`;
+      let mesh;
+      if (debrisMats.has(material)) {
+        mesh = new THREE.InstancedMesh(geometry, material, 1);
+        mesh.setMatrixAt(0, idMat);
+        mesh.setColorAt(0, white);
+        AttachShadowDepth(mesh);
+      } else {
+        mesh = new THREE.Mesh(geometry, material);
+      }
+      mesh.name = `TerrainWarm_${i}`;
       mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
       mesh.position.set((b.minX + b.maxX) * 0.5, -500, (b.minZ + b.maxZ) * 0.5);
       mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.userData.terrainWarm = true;
@@ -479,7 +505,9 @@ export class TerrainDeformationView {
   // feathered disk. Repeated hits accumulate marks rather than erase them.
   StampBlast(hit) {
     const { cellM: s, tileCells: n } = this.model.config;
-    const reach = hit.radius * 1.7, phase = ValueNoise2(hit.x, hit.z, 731) * Math.PI * 2;
+    const oblique = hit.oblique || 0, dirX = hit.dirX || 0, dirZ = hit.dirZ || 0;
+    const reachScale = 1.7 + oblique * 0.4;
+    const reach = hit.radius * reachScale, phase = ValueNoise2(hit.x, hit.z, 731) * Math.PI * 2;
     const minX = Math.floor((hit.x - reach) / s), maxX = Math.ceil((hit.x + reach) / s);
     const minZ = Math.floor((hit.z - reach) / s), maxZ = Math.ceil((hit.z + reach) / s);
     for (let tz = Math.floor(minZ / n); tz <= Math.floor(maxZ / n); tz++) {
@@ -489,12 +517,14 @@ export class TerrainDeformationView {
         for (let iz = Math.max(minZ, tz * n); iz <= Math.min(maxZ, (tz + 1) * n - 1); iz++) {
           for (let ix = Math.max(minX, tx * n); ix <= Math.min(maxX, (tx + 1) * n - 1); ix++) {
             const dx = ix * s - hit.x, dz = iz * s - hit.z, r = Math.hypot(dx, dz) / hit.radius;
-            if (r >= 1.7 || !this.model.Allowed(ix, iz)) continue;
+            const dirScale = oblique > 1e-3 ? CraterRimDirectionalScale(dx, dz, dirX, dirZ, oblique) : 1;
+            const localReach = 1.7 * dirScale;
+            if (r >= localReach || !this.model.Allowed(ix, iz)) continue;
             const angle = Math.atan2(dz, dx);
             const rays = (Math.sin(angle * 17 + phase) + Math.sin(angle * 29 - phase) * 0.5 + 1.5) / 3;
             const noise = ValueNoise2(ix * 0.51, iz * 0.51, 417);
             const heat = Math.max(0, 1 - r) ** 1.5 * (0.65 + noise * 0.35);
-            const powder = (1 - r / 1.7) ** 2 * (0.18 + rays * 0.82) * (0.55 + noise * 0.45);
+            const powder = (1 - r / localReach) ** 2 * (0.18 + rays * 0.82) * (0.55 + noise * 0.45) * Math.min(1.25, dirScale);
             if (powder < 0.004 && heat < 0.004) continue;
             if (!page) { page = new Float32Array(n * n * 2); this.blastPages.set(key, page); }
             const lx = ix - tx * n, lz = iz - tz * n, at = (lz * n + lx) * 2;
@@ -628,6 +658,10 @@ export class TerrainDeformationView {
    */
   Update() {
     this.hosted = true;
+    if (this._flushPending) {
+      this._flushPending = false;
+      this.Flush();
+    }
     if (!this.debrisQueue.size) return;
     const w = this.model.config.tileCells + 3;
     let budget = DEBRIS_TILES_PER_FRAME;
@@ -638,15 +672,38 @@ export class TerrainDeformationView {
       if (--budget <= 0) break;
     }
   }
-  ApplyBlast(position, kind) {
+  BeginBatch() { this._batchDepth++; }
+  EndBatch() {
+    if (this._batchDepth > 0) this._batchDepth--;
+    if (this._batchDepth === 0 && this._flushPending) {
+      this._flushPending = false;
+      this.Flush();
+    }
+  }
+  ApplyBlasts(blasts) {
+    if (!Array.isArray(blasts) || !blasts.length) return [];
+    this.BeginBatch();
+    const hits = [];
+    try {
+      for (const b of blasts) hits.push(this.ApplyBlast(b.position, b.kind, b.options || null));
+    } finally {
+      this.EndBatch();
+    }
+    return hits;
+  }
+  ApplyBlast(position, kind, options = null) {
     // 不挖坑的局部地面（人物战场反应测试场的砖铺场院）：关卡交进来的闸，离开本关清掉
     if (this.noCraterAt?.(position.x, position.z)) return null;
     const colliders = this.field.colliders?.length ?? 0;
     if (colliders !== this.maskColliders) this.InvalidateDeformMask();
     const start = performance.now();
-    const hit = this.model.ApplyBlast(position, kind);
+    const hit = this.model.ApplyBlast(position, kind, options);
     const rulesEnd = performance.now();
-    if (hit) { this.StampBlast(hit); this.Flush(); }
+    if (hit) {
+      this.StampBlast(hit);
+      if (this._batchDepth > 0 || (options?.deferFlush && this.hosted)) this._flushPending = true;
+      else this.Flush();
+    }
     this.lastUpdateMs = { rules: rulesEnd - start, surface: performance.now() - rulesEnd };
     return hit;
   }
@@ -670,6 +727,9 @@ export class TerrainDeformationView {
         if (this.field.SampleGroundSurface) {
           // xyz splat weights, w = rut lateral coordinate (Data_Tuning_Terrain.TERRAIN_RUTS; 1 = no road).
           geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(new Float32Array(width * width * 4), 4));
+        }
+        if (this.field.SampleCraterSurface) {
+          geometry.setAttribute("terrainCrater", new THREE.BufferAttribute(new Float32Array(width * width * 4), 4));
         }
         const uv = new Float32Array(width * width * 2);
         const tileM = this.field.layout?.terrainSpec?.textureTileM || 3.4;
@@ -702,6 +762,7 @@ export class TerrainDeformationView {
       const geo = mesh.geometry, attributes = geo.attributes;
       const pos = attributes.position.array, nrm = attributes.normal.array, col = attributes.color.array, del = attributes.terrainDelta.array;
       const layerArray = attributes.terrainLayers?.array || null;
+      const craterArray = attributes.terrainCrater?.array || null;
       // The heightfield and the soil-wear lattice keep their own copy per tile:
       // Rapier and the debris pass read the whole tile, but a partial rebuild
       // only rewrites the part that moved.
@@ -737,6 +798,11 @@ export class TerrainDeformationView {
             if (rgb) this.groundColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace).toArray(col, at * 3);
             else { col[at * 3] = 1; col[at * 3 + 1] = 1; col[at * 3 + 2] = 1; }
           }
+          if (paint && craterArray) {
+            this.field.SampleCraterSurface(pos[at * 3], pos[at * 3 + 2], this.craterOut);
+            craterArray[at * 4] = this.craterOut[0]; craterArray[at * 4 + 1] = this.craterOut[1];
+            craterArray[at * 4 + 2] = this.craterOut[2]; craterArray[at * 4 + 3] = this.craterOut[3];
+          }
           let soil = Math.abs(deltas[local]);
           for (let dz = -w; dz <= w; dz += w) for (let dx = -1; dx <= 1; dx++) {
             const v = Math.abs(deltas[local + dz + dx]) * 0.85;
@@ -754,6 +820,7 @@ export class TerrainDeformationView {
       attributes.position.needsUpdate = true; attributes.normal.needsUpdate = true;
       if (paint) attributes.color.needsUpdate = true;
       if (paint && attributes.terrainLayers) attributes.terrainLayers.needsUpdate = true;
+      if (paint && attributes.terrainCrater) attributes.terrainCrater.needsUpdate = true;
       attributes.terrainDelta.needsUpdate = true;
       attributes.terrainBlast.needsUpdate = true;
       // The tile's footprint is fixed and only y moves, so the bounds come from
@@ -795,6 +862,8 @@ export class TerrainDeformationView {
     }
   }
   Reset() {
+    this._flushPending = false;
+    this._batchDepth = 0;
     this.debris.Reset();
     this.debrisQueue.clear();
     this.blastPages.clear();

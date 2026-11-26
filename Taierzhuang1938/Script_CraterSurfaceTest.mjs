@@ -30,12 +30,26 @@ try {
     // Let all fire/dust/shockwaves expire. Only permanent surface detail remains.
     t.StepFrames(600);
     t.graphics.ssao = 0; t.StepFrames(1, 0);
-    const view = field.deformation, debris = [...view.debris.tiles.values()].flatMap((tile) => tile.meshes);
+    const view = field.deformation, debris = [...new Set([...view.debris.tiles.values()].flatMap((tile) => tile.meshes))];
     let tallestFragment = 0;
     for (const mesh of debris) {
       const positions = mesh.geometry.attributes.position;
-      for (let i = 0; i < positions.count; i += 17) tallestFragment = Math.max(tallestFragment,
-        positions.getY(i) - field.GroundHeight(positions.getX(i), positions.getZ(i)));
+      if (mesh.isInstancedMesh) {
+        const a = mesh.instanceMatrix.array;
+        for (let inst = 0; inst < mesh.count; inst++) {
+          const o = inst * 16;
+          for (let i = 0; i < positions.count; i += 7) {
+            const px = positions.getX(i), py = positions.getY(i), pz = positions.getZ(i);
+            const wx = a[o] * px + a[o + 4] * py + a[o + 8] * pz + a[o + 12];
+            const wy = a[o + 1] * px + a[o + 5] * py + a[o + 9] * pz + a[o + 13];
+            const wz = a[o + 2] * px + a[o + 6] * py + a[o + 10] * pz + a[o + 14];
+            tallestFragment = Math.max(tallestFragment, wy - field.GroundHeight(wx, wz));
+          }
+        }
+      } else {
+        for (let i = 0; i < positions.count; i += 17) tallestFragment = Math.max(tallestFragment,
+          positions.getY(i) - field.GroundHeight(positions.getX(i), positions.getZ(i)));
+      }
     }
     return { left: field.GroundHeight(2595, 2576), right: field.GroundHeight(2605, 2576), state: view.State(),
       tallestFragment, receivesShadows: debris.every((mesh) => mesh.castShadow && mesh.receiveShadow),

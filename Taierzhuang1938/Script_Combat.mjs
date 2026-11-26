@@ -790,7 +790,7 @@ export class CombatSystem {
     // 摆点层摆下的可炸物件（弹药箱等，Script_BlastTargets）认领这一次爆炸。
     // 场景几何破坏系统 2026-10-31 已删，这是它原来 Blast 里留给玩法的那一行。
     BLAST_TARGETS.Blast(position, radius, damage, kind);
-    this.host.battlefield.deformation?.ApplyBlast(position, explosiveId);
+    this.host.battlefield.deformation?.ApplyBlast(position, explosiveId, { incoming: options?.incoming ?? null });
     this.host.battlefield.breakableTrees?.Blast(position, radius, damage);
     const bf = this.host.battlefield;
     const ai = this.host.ai;

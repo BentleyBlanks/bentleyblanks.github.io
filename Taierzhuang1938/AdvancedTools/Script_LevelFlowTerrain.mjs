@@ -1,5 +1,6 @@
 import { DecodeSceneHeights } from "../Script_SceneDoc.mjs";
 import { GridSampler, DecodeTrenchDatum, CompileSceneTrenches } from "../Script_SceneTrenches.mjs";
+import { CarveSceneCraters, CompileSceneCraterField } from "../Script_SceneCraters.mjs";
 import { Clamp, SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { FLOW_RENDERING, FLOW_FIELD_COLORS } from "../Data_Tuning_LevelFlow.mjs";
 import { SceneSurfaceSampler } from "../Script_SceneSurface.mjs";
@@ -223,6 +224,11 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
   const pre=DecodeSceneHeights(heightBytes,scene.terrain),preAt=GridSampler(scene.terrain,pre);
   const datum=scene.trenches?.datum&&datumBytes?DecodeTrenchDatum(scene.trenches.datum,datumBytes):[];
   const plan=CompileSceneTrenches(scene.trenches,{datum,pre:preAt});
+  const craterField=scene.craters?.length?CompileSceneCraterField(scene.craters):null;
+  const craterProtect=plan?(x,z)=>{const c=plan.Corridor(x,z);return !!(c&&c.d<c.halfFloor+c.bank*0.72);}:null;
+  const carvedPre=craterField?CarveSceneCraters(scene.terrain,pre,scene.craters,{protect:craterProtect}):pre;
+  const carvedPreAt=craterField?GridSampler(scene.terrain,carvedPre):preAt;
+  const craterSample=[0,0,0,0];
   const bounds=scene.bounds,backdrop=scene.backdrop?.ground||{y:-2.74,blendM:160};
   const geoCtx=BeishaheGeoContext(scene,bounds);
   const paintSettings={cellM:FLOW_RENDERING.terrainSurface.texelM,maxCells:FLOW_RENDERING.terrainSurface.maxPixels};
@@ -313,12 +319,26 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     }
     GetGroundPaint()?.Blend(x, z, color);
     GetRoutePaint()?.Blend(x, z, color);
+    if (craterField) {
+      craterField.SampleSurface(x, z, craterSample);
+      const wear = craterSample[1];
+      if (wear > 0.015) {
+        const cav = craterSample[0], scorch = craterSample[2], water = craterSample[3] * cav;
+        const tr = 0.40 - cav * 0.08 - scorch * 0.21 - water * 0.11;
+        const tg = 0.34 - cav * 0.07 - scorch * 0.19 - water * 0.08;
+        const tb = 0.27 - cav * 0.06 - scorch * 0.16 - water * 0.03;
+        const k = Math.min(0.92, wear * 0.88 + cav * 0.25);
+        color[0] = color[0] * (1 - k) + Math.max(0.04, tr) * k;
+        color[1] = color[1] * (1 - k) + Math.max(0.035, tg) * k;
+        color[2] = color[2] * (1 - k) + Math.max(0.03, tb) * k;
+      }
+    }
     return color.map(channel => channel * 255);
   };
   const SceneHeightAt=(x,z)=>{
     const edgeX=Clamp(x,bounds.minX,bounds.maxX),edgeZ=Clamp(z,bounds.minZ,bounds.maxZ);
     const distance=Math.hypot(x-edgeX,z-edgeZ);
-    const height=preAt(edgeX,edgeZ);
+    const height=carvedPreAt(edgeX,edgeZ);
     if(distance>0) {
       if(geoCtx) return SampleBeishaheOuterHeight(x,z,height,distance,geoCtx);
       const blend=Clamp(distance/(backdrop.blendM||160),0,1),smooth=blend*blend*(3-2*blend);
@@ -435,13 +455,13 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
     const lastColumn = Math.min(grid.cols, Math.floor((x + size - grid.minX) / grid.cellM));
     const firstRow = Math.max(0, Math.ceil((z - grid.minZ) / grid.cellM));
     const lastRow = Math.min(grid.rows, Math.floor((z + size - grid.minZ) / grid.cellM));
-    const a = preAt(x,z), b = preAt(x+size,z), c = preAt(x,z+size), d = preAt(x+size,z+size);
+    const a = carvedPreAt(x,z), b = carvedPreAt(x+size,z), c = carvedPreAt(x,z+size), d = carvedPreAt(x+size,z+size);
     for (let row = firstRow; row <= lastRow; row++) {
       const v = (grid.minZ + row * grid.cellM - z) / size;
       for (let column = firstColumn; column <= lastColumn; column++) {
         const u = (grid.minX + column * grid.cellM - x) / size;
         const expected = (a + (b-a) * u) * (1-v) + (c + (d-c) * u) * v;
-        if (Math.abs(pre[row * (grid.cols + 1) + column] - expected) > FLOW_RENDERING.terrainHeightErrorM) return true;
+        if (Math.abs(carvedPre[row * (grid.cols + 1) + column] - expected) > FLOW_RENDERING.terrainHeightErrorM) return true;
       }
     }
     return false;
@@ -949,6 +969,27 @@ export function BuildEncounterTerrain(scene,heightBytes,datumBytes,map,prepared=
           tint[1] += (1 - tint[1]) * protect;
           tint[2] += (1 - tint[2]) * protect;
           if (protect > authored) authored = protect;
+        }
+
+        if (craterField) {
+          craterField.SampleSurface(x, z, craterSample);
+          const wear = craterSample[1];
+          if (wear > 0.015) {
+            const cav = craterSample[0], scorch = craterSample[2], water = craterSample[3] * cav;
+            const crSpoil = Math.min(1, wear * 0.96);
+            if (crSpoil > spoil) spoil = crSpoil;
+            stubble *= 1 - Math.min(1, wear * 1.15);
+            track *= 1 - Math.min(0.88, cav * 0.9);
+            const neutral = Math.min(1, wear * 1.1);
+            tint[0] += (1 - tint[0]) * neutral;
+            tint[1] += (1 - tint[1]) * neutral;
+            tint[2] += (1 - tint[2]) * neutral;
+            const dark = 1 - Math.min(0.54, cav * 0.22 + scorch * 0.34 + water * 0.16);
+            tint[0] *= dark;
+            tint[1] *= dark * (1 - water * 0.03);
+            tint[2] *= dark * (1 + water * 0.06);
+            if (wear > authored) authored = wear;
+          }
         }
 
         splatData[offset] = Math.round(Clamp(track, 0, 1) * 255);

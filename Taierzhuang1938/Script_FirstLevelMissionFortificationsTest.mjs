@@ -125,8 +125,8 @@ try {
   assert.equal(report.terrainPbr.name,'FirstLevelMissionTerrainLayers');
   assert.equal(report.terrainPbr.set,'MissionPlain');
   assert.equal(report.terrainPbr.legacyMaps,0,'layered terrain must not also bind map/normalMap/roughnessMap samplers');
-  assert.deepEqual(report.terrainPbr.albedo,{array:true,size:[1024,1024,6],colorSpace:'srgb'});
-  assert.deepEqual(report.terrainPbr.surface,{array:true,size:[512,512,6],colorSpace:''});
+  assert.deepEqual(report.terrainPbr.albedo,{array:true,size:[1024,1024,7],colorSpace:'srgb'});
+  assert.deepEqual(report.terrainPbr.surface,{array:true,size:[512,512,7],colorSpace:''});
   assert.ok(report.terrainPbr.layerAttributes,'every ground chunk carries splat weights and tint');
   assert.ok(report.terrainPbr.depths.every(p=>p.depth>=1.83),'actual heightfield provides full standing cover');
   // Physical capsule traversal is local geometry evidence, separate from the campaign input gate.

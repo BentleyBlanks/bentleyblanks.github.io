@@ -289,3 +289,31 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 
 - **管线消费**：`Script_SceneDoc.BlockoutDocFromScene` 编译为标准 `tag: "airWall", visual: false` 的常驻块或动态门禁（继续走 Rapier `IG_AIR_WALL`，只挡角色不挡弹道与视线）；`Script_SceneInherit` 自动按 `points` 落在 `z < maxZ` 继承北段样条；`Script_LevelFlowMap.BuildEncounterMap` 与 `SceneEditor`（勾「编辑视口显示空气墙」）直接消费编译结果；同时保持对遗留手摆 `objects` 空气墙的完全兼容。
 - **已迁移场景**：Encounter Designer 使用的第一关两份场景 `FirstLevelEncounter`（1,124 块 `KeepIn_*` → 17 条样条）与 `FirstLevelMerged`（73 块 `Merged_KeepIn_*` / `Merged_StageGate_*` → 10 条样条）均已切为 `doc.airWalls`。
+
+## 11. 声明式弹坑（`doc.craters`，2026-11-27）
+
+场景文件顶层可选 `craters` 数组，声明持久战场弹坑。纯形态、校验、稀疏雕刻与地表掩码编译逻辑在 `Script_SceneCraters.mjs`（零 three、零 DOM，Node 与浏览器共用），并与实时爆炸形变（`Script_TerrainDeformation.mjs`）共用同一套漏斗+坑底曲线、按口径自适应土沿与斜射偏心算法。
+
+```json
+"craters": [
+  { "id": "Crater_W_001", "x": -18.4, "z": 312.6, "kind": "Shell105", "age": "weathered", "incomingDeg": 24, "seed": 10421 }
+]
+```
+
+| 字段 | 写什么 |
+| --- | --- |
+| `id` | 场景内唯一（`/^[A-Za-z0-9_]+$/`） |
+| `x` / `z` | 弹坑世界平面坐标（米） |
+| `kind` | 可选，引用 `EXPLOSIVE_SPECS` 口径（`Grenade` / `Shell50` / `Shell57` / `Shell75` / `Shell82` / `Shell105` / `Shell150` / `Bomb50kg` 等，缺省 `Shell75`） |
+| `radius` / `depth` | 可选覆盖口径默认半径 / 深度（米） |
+| `age` | 可选年陈档：`fresh`（新炸，高对比焦土与鲜明碎土沿）、`weathered`（风化旧坑，较缓土沿与降饱和焦土）、`flooded`（积水旧坑，平底微洼并驱动 `TerrainWater` 坑底雨水镜面反射），缺省 `weathered` |
+| `incomingDeg` | 可选来袭方向角（度，水平投影方向）；斜射时坑口沿弹道微拉长、远端土沿加厚 |
+| `rimScale` / `seed` | 可选土沿倍率与确定性轮廓种子 |
+| `group` / `note` | 场景编辑器分组与备注 |
+
+- **管线消费**：
+  - `Script_SceneTrenches.PrepareSceneTerrain` 在壕沟挖完后以单调不回填方式稀疏雕刻 `doc.craters`（自动受壕沟通道与 `protect` 回调约束），同时编译 16 m 空间桶 `craterField`（输出 `[cavity, wear, scorch, water]`）。
+  - `Script_SceneInherit.ResolveInheritedScene` 自动按 `z < maxZ` 合并基线北段弹坑与变体南段弹坑；`Script_SceneDoc.BlockoutDocFromScene` 按段裁切并保留边界外缘影响。
+  - 正式地形材质（`Script_TerrainMaterial.mjs` / `Script_TrenchSurfaceMaterial.mjs`）将 `CraterScorched` 直接装入地形 `DataArrayTexture` 额外切片（不新增纹理采样器），通过顶点属性 `terrainCrater` 驱动坑壁焦土与积水反射，并同步由 `Script_CraterDebris.BuildStaticCraterDebris` 以 `InstancedMesh` 合批生成半埋破土块与碎石（不受动态 `deformation.Reset()` 清除）。
+  - `SceneEditor.mjs` 与 `Script_LevelFlowTerrain.mjs`（Encounter Designer 2D / 3D）同步消费 `doc.craters` 高度雕刻、四叉树加密与地表焦土/积水着色。
+- **第一关实装**：`FirstLevelEncounter`（`z < 355`，125 处）与 `FirstLevelMerged`（`z >= 355`，118 处）共布设 243 处多口径战场弹坑，由 `_import/Script_AuthorCraterLayouts.mjs` 确定性生成并校验避开水体、建筑院落、壕沟、道路、地标与敌人视界；门禁见 `Script_SceneCratersTest.mjs` 与 `Script_SceneDocTest.mjs`。

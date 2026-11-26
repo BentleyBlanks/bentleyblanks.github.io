@@ -7,6 +7,7 @@
 // 与玩家 / 演员 rotation.y 同号（rotation.y = yawDeg·π/180）。
 
 import { TimeSpecErrors } from "./Script_EnvPreset.mjs";
+import { SceneCraterIssues } from "./Script_SceneCraters.mjs";
 
 export const BLOCKOUT_SCHEMA = "tengxian-blockout/1";
 export const BLOCKOUT_SCENE_SCHEMA = "tengxian-blockout-scene/1";
@@ -420,6 +421,7 @@ export function ValidateBlockoutScene(doc) {
   if (doc.backdrop !== undefined) BackdropIssues(doc.backdrop, errors);
   // 可选 landmarks（§2.2，2026-10-20）：地标（狗洞、门、窖、片区、物件、地名），编辑器画亮色标记
   if (doc.landmarks !== undefined) LandmarkIssues(doc.landmarks, errors, "landmarks");
+  if (doc.craters !== undefined) SceneCraterIssues(doc.craters, errors, "craters");
   return { ok: errors.length === 0, errors, warnings };
 }
 

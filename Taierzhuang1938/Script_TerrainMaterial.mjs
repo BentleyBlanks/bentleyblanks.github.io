@@ -96,21 +96,32 @@ function MakeArrayTexture(data, size, layers, srgb, anisotropy) {
   return texture;
 }
 
+/** 弹坑焦土额外图集切片：挂进 extraLayers 时零额外采样器，同时供静态 doc.craters 与动态砸坑复用。 */
+export const CRATER_SCORCHED_LAYER = Object.freeze({
+  id: "CraterScorched",
+  base: "./Texture/Texture_CraterScorchedBase.webp?v=2",
+  normal: "./Texture/Texture_CraterScorchedNormal.webp?v=2",
+  orh: "./Texture/Texture_CraterScorchedOrm.webp?v=2",
+  // Texture_CraterScorchedOrm 的 B 通道是金属度（非高度），高度改由 Base 亮度推导。
+  heightFromLuma: true,
+});
+
 /**
  * 下载并打包一套地形图层。
  *
  * 两张纹理数组：
- *   albedo  (SRGB8_ALPHA8)  rgb = 反照率，a = 高度（Orh.b 放大到反照率分辨率）
+ *   albedo  (SRGB8_ALPHA8)  rgb = 反照率，a = 高度（Orh.b 放大到反照率分辨率；ORM 图取反照率亮度）
  *   surface (RGBA8)         r,g = 切线空间法线 xy，b = 粗糙度，a = 材质 AO
  * 顺带算每层的**线性空间**均值（方差保持混合要用）。
  *
- * @returns {Promise<{setName, albedo, surface, albedoMean: Float32Array, surfaceMean: Float32Array, bytes: number}>}
+ * @returns {Promise<{setName, albedo, surface, albedoMean: Float32Array, surfaceMean: Float32Array, bytes: number, craterSlice: number}>}
  */
 export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 45000, extraLayers = [], layerOverrides = {}, assetBase } = {}) {
   const set = TERRAIN_SETS[setName];
   if (!set) throw new Error(`Unknown terrain set: ${setName}`);
   const urls = [...TerrainLayerUrls(setName).map((url, i) => layerOverrides[i] || url), ...extraLayers];
   const layers = urls.length, size = set.textureSize, dataSize = size / 2;
+  const craterSlice = urls.findIndex((u) => u.id === "CraterScorched");
   const bitmaps = await Promise.all(urls.map((u) => Promise.all([
     LoadBitmap(u.base, timeoutMs, assetBase), LoadBitmap(u.normal, timeoutMs, assetBase), LoadBitmap(u.orh, timeoutMs, assetBase),
   ])));
@@ -118,21 +129,23 @@ export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 4
   const normals = bitmaps.map(([, normal]) => PixelsOf(normal, dataSize));
   const orhs = bitmaps.map(([, , orh]) => PixelsOf(orh, dataSize));
   // 高度要跟反照率同分辨率进同一张数组：Orh 再按反照率尺寸画一遍（双线性放大）。
-  const heights = bitmaps.map(([, , orh]) => PixelsOf(orh, size));
+  const heights = bitmaps.map(([, , orh], i) => (urls[i].heightFromLuma ? null : PixelsOf(orh, size)));
   for (const set of bitmaps) for (const bitmap of set) bitmap.close?.();
   const albedoData = new Uint8Array(size * size * 4 * layers);
   const surfaceData = new Uint8Array(dataSize * dataSize * 4 * layers);
   const albedoMean = new Float32Array(4 * layers), surfaceMean = new Float32Array(4 * layers);
   for (let layer = 0; layer < layers; layer++) {
-    const base = bases[layer], height = heights[layer];
+    const base = bases[layer], height = heights[layer], fromLuma = !!urls[layer].heightFromLuma;
     const offset = size * size * 4 * layer;
     let r = 0, g = 0, b = 0, h = 0;
     for (let i = 0, n = size * size; i < n; i++) {
       const src = i * 4, dst = offset + src;
-      albedoData[dst] = base[src]; albedoData[dst + 1] = base[src + 1]; albedoData[dst + 2] = base[src + 2];
-      albedoData[dst + 3] = height[src + 2];
-      r += SRGB_TO_LINEAR[base[src]]; g += SRGB_TO_LINEAR[base[src + 1]]; b += SRGB_TO_LINEAR[base[src + 2]];
-      h += height[src + 2];
+      const br = base[src], bg = base[src + 1], bb = base[src + 2];
+      const hv = fromLuma ? Math.round(br * 0.299 + bg * 0.587 + bb * 0.114) : height[src + 2];
+      albedoData[dst] = br; albedoData[dst + 1] = bg; albedoData[dst + 2] = bb;
+      albedoData[dst + 3] = hv;
+      r += SRGB_TO_LINEAR[br]; g += SRGB_TO_LINEAR[bg]; b += SRGB_TO_LINEAR[bb];
+      h += hv;
     }
     const count = size * size;
     albedoMean.set([r / count, g / count, b / count, h / count / 255], layer * 4);
@@ -158,6 +171,7 @@ export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 4
     size,
     dataSize,
     layers,
+    craterSlice,
   };
 }
 
@@ -193,7 +207,71 @@ const GLSL_VERTEX_WORLD = /* glsl */`
 vTerrainLayers = terrainLayers;
 vTerrainWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`;
 
-function GlslCommon(quality, trails = null) {
+const GLSL_VERTEX_CRATER_COMMON = /* glsl */`
+attribute vec4 terrainCrater;
+varying vec4 vTerrainCrater;`;
+
+const GLSL_VERTEX_CRATER_WORLD = /* glsl */`
+vTerrainCrater = terrainCrater;`;
+
+const GLSL_STATIC_CRATER_HELPER = /* glsl */`
+#define TERRAIN_STATIC_CRATERS
+uniform float uTerrainCraterSlice;
+varying vec4 vTerrainCrater;
+
+// 静态场景弹坑（doc.craters）零额外采样器焦土 PBR：直接读 uTerrainAlbedo / uTerrainSurface 的
+// CraterScorched 切片，保留双旋转非对齐 UV、爆心灼黑/烟灰、微法线与腔体 AO；积水由调用方汇入 TerrainWater。
+void TerrainStaticCraterApply(inout vec3 albedo, vec3 tw, vec3 twDx, vec3 twDy, vec3 geomN, float tDist) {
+  float cWear = clamp(vTerrainCrater.y, 0.0, 1.0);
+  if (cWear < 0.004) return;
+  vec2 meters = tw.xz;
+  float macro = TerrainNoise(meters * 0.73 + 4.1);
+  float breakup = TerrainNoise(meters * 6.5 + 13.2);
+  float exposed = smoothstep(0.012, 0.24, cWear);
+  exposed = clamp(exposed + (breakup - 0.5) * exposed * (1.0 - exposed) * 0.42, 0.0, 1.0);
+  if (exposed < 0.002) return;
+  vec2 uv1 = meters / 1.6, dx1 = twDx.xz / 1.6, dy1 = twDy.xz / 1.6;
+  mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+  vec2 uv2 = rot * uv1 * 1.91 + 0.37, dx2 = rot * dx1 * 1.91, dy2 = rot * dy1 * 1.91;
+  vec4 a1 = textureGrad(uTerrainAlbedo, vec3(uv1, uTerrainCraterSlice), dx1, dy1);
+  vec4 a2 = textureGrad(uTerrainAlbedo, vec3(uv2, uTerrainCraterSlice), dx2, dy2);
+  vec4 s1 = textureGrad(uTerrainSurface, vec3(uv1, uTerrainCraterSlice), dx1, dy1);
+  vec4 s2 = textureGrad(uTerrainSurface, vec3(uv2, uTerrainCraterSlice), dx2, dy2);
+  float mixT = smoothstep(0.2, 0.8, macro) * 0.42;
+  vec3 earth = mix(a1.rgb, a2.rgb, mixT);
+  float height = mix(a1.a, a2.a, mixT);
+  float grain = dot(earth, vec3(0.333));
+  float cavity = clamp(vTerrainCrater.x, 0.0, 1.0);
+  float scorch = clamp(vTerrainCrater.z, 0.0, 1.0);
+  float charred = clamp(max(scorch * mix(0.75, 1.0, macro), cavity * scorch * 0.85), 0.0, 1.0);
+  float fissure = 1.0 - smoothstep(0.015, 0.11, grain);
+  // 与 ConfigureCraterSurface 同一套反照率标定：新鲜坑唇偏暖褐翻土、爆心转深焦褐与烟灰，旧坑趋近陈土。
+  earth *= mix(vec3(2.45, 1.98, 1.48), vec3(0.68, 0.52, 0.39), charred);
+  earth *= mix(0.82, 1.16, macro);
+  float ash = smoothstep(0.38, 0.72, TerrainNoise(meters * 1.3 + 51.7)) * charred;
+  earth = mix(earth, vec3(0.024, 0.017, 0.011) * mix(0.85, 1.15, breakup), ash * 0.68);
+  // 远处轻微收对比，避免 100 m 外高频颗粒闪烁
+  float farFade = smoothstep(uTerrainContrast.x, uTerrainContrast.y, tDist);
+  vec3 earthMean = mix(vec3(0.11, 0.088, 0.064), vec3(0.042, 0.032, 0.023), charred);
+  earth = mix(earth, earthMean, farFade * 0.35);
+  float dust = smoothstep(0.004, 0.12, cWear) * (1.0 - exposed) * 0.34;
+  albedo = mix(albedo, albedo * vec3(0.62, 0.54, 0.45), dust);
+  albedo = mix(albedo, earth, exposed);
+  float nFade = mix(1.0, uTerrainFade.x, smoothstep(uTerrainDistance.z, uTerrainDistance.w, tDist));
+  vec2 n1 = s1.rg * 2.0 - 1.0;
+  vec2 n2 = transpose(rot) * (s2.rg * 2.0 - 1.0);
+  vec2 cn = mix(n1, n2, mixT) * (0.68 * nFade * (1.0 - ash * 0.65));
+  vec3 cPerturb = vec3(cn.x, 0.0, cn.y);
+  cPerturb -= geomN * dot(geomN, cPerturb);
+  gTerrainNormalW = normalize(mix(gTerrainNormalW, normalize(geomN + cPerturb), exposed));
+  float cRough = clamp(mix(s1.b, s2.b, mixT), 0.76, 0.99);
+  gTerrainRough = mix(gTerrainRough, mix(cRough, 0.94, cavity * 0.5), exposed);
+  float cAo = clamp(mix(s1.a, s2.a, mixT), 0.38, 1.0) * (1.0 - fissure * 0.32 * (1.0 - ash * 0.7)) * mix(1.0, 0.74, cavity);
+  gMaterialAo = mix(gMaterialAo, cAo, exposed);
+  gTerrainHeight = mix(gTerrainHeight, height, exposed);
+}`;
+
+function GlslCommon(quality, trails = null, staticCraters = false) {
   return /* glsl */`
 #define TERRAIN_LAYERS 4
 ${quality.antiTile ? "#define TERRAIN_ANTI_TILE" : ""}
@@ -339,6 +417,7 @@ void TerrainLayerSample(float layer, vec2 meters, vec2 dxM, vec2 dyM, float inv,
   surface = textureGrad(uTerrainSurface, at, dx, dy);
 #endif
 }
+${staticCraters ? GLSL_STATIC_CRATER_HELPER : ""}
 ${trails ? TerrainTrailGlsl(trails.parallaxSteps) : ""}`;
 }
 
@@ -511,11 +590,20 @@ ${PerLayer((c, i) => `    if (tB.${c} > 0.0) {
   TerrainTrailApply(tOut, tw, tGeomN, tB, TerrainMudZone(txz), max(length(twDx), length(twDy)), tDist);
 #endif
 #ifndef TERRAIN_WATER_EXTERNAL
-  // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算；前沿湿泥区里翻土更暗更湿。
+#ifdef TERRAIN_STATIC_CRATERS
+  TerrainStaticCraterApply(tOut, tw, twDx, twDy, tGeomN, tDist);
+  float tCraterPool = clamp(vTerrainCrater.w, 0.0, 1.0) * smoothstep(0.18, 0.55, vTerrainCrater.x);
+  float tCraterDamp = clamp(vTerrainCrater.w, 0.0, 1.0) * smoothstep(0.05, 0.35, vTerrainCrater.x) * 0.85;
+#else
+  float tCraterPool = 0.0;
+  float tCraterDamp = 0.0;
+#endif
+  // 湿泥与积水：车道/场坪会积水；翻土层（无壕沟网时的沟底）按一半算；前沿湿泥区里翻土更暗更湿；
+  // 静态旧/积水弹坑的平缓坑底（vTerrainCrater.w × cavity）抬水位形成泥水洼。
   float tMud = TerrainMudZone(txz);
   tOut *= mix(vec3(1.0), uTerrainMudB.xyz, tB.w * tMud);
-  TerrainWater(tOut, txz, tGeomN, tB.y * uTerrainWaterD.x + tB.w * 0.5,
-    0.0, max(tB.y * mix(uTerrainWaterD.w, uTerrainMudB.w, tMud), tB.w * tMud * uTerrainMudA.y));
+  TerrainWater(tOut, txz, tGeomN, max(tB.y * uTerrainWaterD.x + tB.w * 0.5, tCraterPool * 1.15),
+    tCraterPool * 0.42, max(max(tB.y * mix(uTerrainWaterD.w, uTerrainMudB.w, tMud), tB.w * tMud * uTerrainMudA.y), tCraterDamp));
 #endif
   diffuseColor.rgb *= tOut;
 }`;
@@ -594,10 +682,12 @@ function TerrainWaterUniforms() {
  * @param {{trails?: object|null}} options trails = Data_Tuning_TerrainTrails.TerrainTrailTierOf(档位)；
  *   null 不编脚印（少一个采样器）。石材等不会被踩的变体传 null。
  */
-export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
+export function MakeTerrainPatch(pack, quality, { trails = null, staticCraters = false, craterSlice = undefined } = {}) {
   const set = TERRAIN_SETS[pack.setName];
   const stubble = set.stubble || TERRAIN_STUBBLE;
   const layers = set.layers;
+  const resolvedCraterSlice = Number.isInteger(craterSlice) ? craterSlice : (Number.isInteger(pack.craterSlice) ? pack.craterSlice : -1);
+  const useStaticCraters = !!(staticCraters && resolvedCraterSlice >= 0);
   const PerLayer = (fn) => new THREE.Vector4(...layers.map(fn));
   const uniforms = {
     uTerrainAlbedo: { value: pack.albedo },
@@ -635,18 +725,19 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
     // 全场共用一份，调试入口直接改它的 value（不重编译）
     uTerrainDebug: TERRAIN_DEBUG_UNIFORM,
     ...TerrainWaterUniforms(),
+    ...(useStaticCraters ? { uTerrainCraterSlice: { value: resolvedCraterSlice } } : {}),
     // 脚印与痕迹：同一组 uniform 对象挂进每个地形程序，帧图的 terrainTrails pass 每帧改 value
     ...(trails ? TerrainTrailUniforms : {}),
   };
   const patch = MakePatch({
-    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}:boundedWet2`,
+    key: `terrain4${quality.antiTile ? "t" : ""}${quality.biplanar ? "b" : ""}${trails ? `tr${trails.parallaxSteps}` : ""}${useStaticCraters ? "sc1" : ""}:boundedWet2`,
     uniforms: (shaderUniforms) => { Object.assign(shaderUniforms, uniforms); },
     vertex: [
-      ["#include <common>", GLSL_VERTEX_COMMON],
-      ["#include <project_vertex>", GLSL_VERTEX_WORLD],
+      ["#include <common>", useStaticCraters ? `${GLSL_VERTEX_COMMON}\n${GLSL_VERTEX_CRATER_COMMON}` : GLSL_VERTEX_COMMON],
+      ["#include <project_vertex>", useStaticCraters ? `${GLSL_VERTEX_WORLD}\n${GLSL_VERTEX_CRATER_WORLD}` : GLSL_VERTEX_WORLD],
     ],
     fragment: [
-      ["#include <common>", GlslCommon(quality, trails)],
+      ["#include <common>", GlslCommon(quality, trails, useStaticCraters)],
       ["#include <map_fragment>", Ended("#include <map_fragment>", GLSL_EVALUATE)],
       ["#include <roughnessmap_fragment>", Ended("#include <roughnessmap_fragment>", GLSL_ROUGHNESS)],
       ["#include <normal_fragment_maps>", Ended("#include <normal_fragment_maps>", GLSL_NORMAL)],
@@ -658,6 +749,8 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
   patch.providesMaterialAo = true;
   patch.terrainUniforms = uniforms;
   patch.terrainTrails = !!trails;
+  patch.terrainCraterSlice = resolvedCraterSlice;
+  patch.staticCraters = useStaticCraters;
   return patch;
 }
 
@@ -665,7 +758,7 @@ export function MakeTerrainPatch(pack, quality, { trails = null } = {}) {
  * 分层地形材质。**不进 MaterialLibrary 的缓存**：它的纹理属于关卡，关卡 Dispose 时一起还。
  * @param {MaterialLibrary} library 用它的注入口接 AO / GI / 簇光 / 着色升级
  */
-export function CreateTerrainMaterial(library, pack, { quality = "high", name = "TerrainLayers", surface = null, reflections = false } = {}) {
+export function CreateTerrainMaterial(library, pack, { quality = "high", name = "TerrainLayers", surface = null, reflections = false, staticCraters = false } = {}) {
   const tier = TerrainQualityOf(quality);
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   material.name = name;
@@ -681,9 +774,11 @@ export function CreateTerrainMaterial(library, pack, { quality = "high", name = 
   if (typeof location !== "undefined") {
     TERRAIN_DEBUG_UNIFORM.value = parseFloat(new URLSearchParams(location.search).get("terrainView") || "0") || 0;
   }
-  const patch = surface || MakeTerrainPatch(pack, tier, { trails: TerrainTrailTierOf(quality) });
+  const patch = surface || MakeTerrainPatch(pack, tier, { trails: TerrainTrailTierOf(quality), staticCraters });
   // 编进了脚印采样的材质（Script_TerrainTrails）。石材等变体的补丁不编，这里如实标。
   material.userData.terrainTrails = !!patch.terrainTrails;
+  material.userData.terrainCraterSlice = Number.isInteger(patch.terrainCraterSlice) ? patch.terrainCraterSlice : (Number.isInteger(pack.craterSlice) ? pack.craterSlice : -1);
+  material.userData.staticCraters = !!patch.staticCraters;
   library.InjectSurface(material, patch, { reflections });
   return material;
 }

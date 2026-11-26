@@ -11,6 +11,10 @@
 import { EXPLOSIVES, TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ExplosiveIdFor } from "./Script_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
+import {
+  CraterAgeParams, CraterCavityProfile, CraterContourFactor, CraterDirFromDeg,
+  CraterRimDirectionalScale, CraterRimParams, IncomingToHorizontalDir,
+} from "./Script_SceneCraters.mjs";
 
 // [dx, dz, lattice distance]. Distances are precomputed: the relaxation loops
 // visit every neighbour of every changed node.
@@ -219,7 +223,7 @@ export class TerrainDeformation {
     return w;
   }
 
-  ApplyBlast(position, kind) {
+  ApplyBlast(position, kind, options = null) {
     if (![position?.x, position?.y, position?.z].every(Number.isFinite)) return null;
     const id = ExplosiveIdFor(kind), spec = EXPLOSIVES[id];
     const surface = this.GroundHeight(position.x, position.z);
@@ -228,9 +232,18 @@ export class TerrainDeformation {
     // Allowed()/Cap() preserve every foundation node and its traversable margin.
     if (gap > spec.groundReachM) return null;
     const coupling = Math.max(0, 1 - gap / spec.groundReachM);
+    const age = options?.age || "fresh";
+    const ageParams = CraterAgeParams(age);
     const radius = spec.craterRadiusM * (0.75 + 0.25 * coupling);
-    const depth = spec.craterDepthM * coupling;
+    const depth = spec.craterDepthM * coupling * ageParams.depthScale;
     if (depth < 0.001) return null;
+    let dirX = 0, dirZ = 0, oblique = 0;
+    if (options?.incoming) {
+      ({ dirX, dirZ, oblique } = IncomingToHorizontalDir(options.incoming));
+    } else if (Number.isFinite(options?.dirDeg) && Number.isFinite(options?.oblique) && options.oblique > 0) {
+      ({ dirX, dirZ } = CraterDirFromDeg(options.dirDeg));
+      oblique = Math.max(0, Math.min(1, options.oblique));
+    }
     const { cellM: s, maxDepthM, maxAxisGrade } = this.config;
     const queue = [], changed = [], changedKeys = new Set(), caps = new Map();
     const reach = Math.ceil(maxDepthM / (maxAxisGrade * s)), step = maxAxisGrade * s;
@@ -264,18 +277,17 @@ export class TerrainDeformation {
       if (!changedKeys.has(key)) { changedKeys.add(key); changed.push(ix, iz); }
     };
     const phase = ValueNoise2(position.x * 0.71, position.z * 0.71, 8317) * Math.PI * 2;
-    for (let iz = Math.floor((position.z - radius * 1.2) / s); iz <= Math.ceil((position.z + radius * 1.2) / s); iz++) {
-      for (let ix = Math.floor((position.x - radius * 1.2) / s); ix <= Math.ceil((position.x + radius * 1.2) / s); ix++) {
-        const dx = ix * s - position.x, dz = iz * s - position.z;
-        // Broad asymmetric breakouts survive slope relaxation; fine noise alone
-        // disappeared into a smooth circular bowl after a few overlapping shells.
-        const angle = Math.atan2(dz, dx);
-        const contour = 0.96 + 0.1 * Math.sin(angle * 3 + phase) + 0.055 * Math.sin(angle * 7 - phase)
-          + 0.07 * (ValueNoise2(ix * s * 1.3, iz * s * 1.3, 8317) - 0.5);
+    const scanR = radius * (1.2 + oblique * 0.24);
+    for (let iz = Math.floor((position.z - scanR) / s); iz <= Math.ceil((position.z + scanR) / s); iz++) {
+      for (let ix = Math.floor((position.x - scanR) / s); ix <= Math.ceil((position.x + scanR) / s); ix++) {
+        const wx = ix * s, wz = iz * s, dx = wx - position.x, dz = wz - position.z;
+        // Broad asymmetric breakouts + oblique stretch survive slope relaxation;
+        // funnel+floor profile preserves a crisp wall and compact rubble sump.
+        const contour = CraterContourFactor(dx, dz, wx, wz, phase, dirX, dirZ, oblique);
         const r = Math.hypot(dx, dz) / (radius * contour);
         if (r >= 1) continue;
         const rough = 0.88 + 0.12 * ValueNoise2(ix * 0.51, iz * 0.51, 1938);
-        Lower(ix, iz, this.Node(ix, iz) + depth * (1 - r * r) ** 2 * rough);
+        Lower(ix, iz, this.Node(ix, iz) + depth * CraterCavityProfile(r, age) * rough);
       }
     }
     // Monotone relaxation: overlapping blasts can deepen and widen, never heal.
@@ -284,15 +296,24 @@ export class TerrainDeformation {
       for (const [dx, dz, dd] of NEIGHBORS) Lower(ix + dx, iz + dz, depthHere - maxAxisGrade * s * dd);
     }
     if (!changed.length) return null;
-    const rimNodes = this.RaiseRim(changed, depth);
+    const rimSpec = CraterRimParams(radius, depth, this.config, age);
+    const rimNodes = this.RaiseRim(changed, depth, {
+      width: rimSpec.width, height: rimSpec.height, cx: position.x, cz: position.z, dirX, dirZ, oblique,
+    });
     this.revision++; this.impacts++;
     this.lastImpact = { id, x: position.x, z: position.z, radius, changedNodes: changed.length / 2, rimNodes,
+      dirX, dirZ, oblique, age,
       depth: this.base(position.x, position.z) - this.GroundHeight(position.x, position.z), revision: this.revision };
     return this.lastImpact;
   }
   /** `changed` is a flat [ix, iz, ...] list of freshly excavated nodes. */
-  RaiseRim(changed, blastDepth) {
-    const { cellM: s, maxAxisGrade, maxRimM, rimWidthM } = this.config;
+  RaiseRim(changed, blastDepth, rimSpec = null) {
+    const { cellM: s, maxAxisGrade, maxRimM } = this.config;
+    const rimWidthM = rimSpec?.width ?? this.config.rimWidthM;
+    const baseRimH = rimSpec?.height ?? Math.min(maxRimM, blastDepth * 0.36);
+    if (!(baseRimH > 1e-4) || !(rimWidthM > 1e-4)) return 0;
+    const cx = rimSpec?.cx ?? 0, cz = rimSpec?.cz ?? 0;
+    const dirX = rimSpec?.dirX ?? 0, dirZ = rimSpec?.dirZ ?? 0, oblique = rimSpec?.oblique ?? 0;
     const entries = new Map(), queue = [];
     const Visit = (x, z, distance) => {
       const key = NodeKey(x, z), known = entries.get(key);
@@ -313,8 +334,9 @@ export class TerrainDeformation {
     const rim = [...entries.values()];
     for (const entry of rim) {
       const rough = 0.35 + 0.65 * ValueNoise2(entry.x * s * 2.3, entry.z * s * 2.3, 6319);
+      const dirScale = oblique ? CraterRimDirectionalScale(entry.x * s - cx, entry.z * s - cz, dirX, dirZ, oblique) : 1;
       entry.old = -this.Node(entry.x, entry.z);
-      entry.height = Math.max(entry.old, Math.min(maxRimM, blastDepth * 0.36)
+      entry.height = Math.max(entry.old, Math.min(maxRimM, baseRimH * dirScale)
         * Math.sin(Math.PI * entry.distance / rimWidthM) ** 2 * rough);
       // Neighbours are resolved once. Those outside the rim never move during
       // relaxation, so their bound folds into one constant per node.

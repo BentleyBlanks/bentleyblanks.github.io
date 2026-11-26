@@ -229,9 +229,20 @@ position / normal / color / terrainDelta / terrainBlast、Rapier 高度场、碎
 - 宏观坑形仍由共享格点同时供渲染和 Rapier 使用，空隙遮蔽只乘间接光。
   新材质随既有 Warm 入口预编译；石块加载与物理初始化并行，超时使用程序化小土块。
 
+### 2026-11-27 弹坑与地形形变通用升级
+
+在保留稀疏 CPU 高度场、不回填旧坑、地基保护与 Rapier 表面对账契约的基础上，完成五项通用升级：
+
+1. **静态+动态共源形态（`Script_SceneCraters.mjs`）**：实时 `Script_TerrainDeformation.mjs` 与场景声明式 `doc.craters` 共用漏斗+平缓坑底断面、按口径自适应土沿宽/高（`maxRimM` 提升至 `0.38 m` 供大口径重炮/航弹使用，`Shell75` 仍保持约 `0.22 m`）、斜射入射角（`Script_Combat.mjs` 透传 `incoming`）引起的坑口拉长与远端土沿加厚，以及 `fresh` / `weathered` / `flooded` 三档年陈外观。
+2. **零新增采样器焦土切片**：`CraterScorched` PBR（`CRATER_SCORCHED_LAYER`）直接装入分层地形 `DataArrayTexture` 额外切片；动态弹坑块（`CraterSoilV4Arr`）直接复用该数组切片而不再绑定独立 `uCraterSoil` / `uCraterNormal`，使第一关 `medium|gi=1` 弹坑材质采样器峰值从 `16/16` 降至 **`15/16`**；无数组贴图的独立测试场保留原独立贴图回退。
+3. **静动态叠加无缝衔接**：动态切块复制基础网格的 `terrainCrater` 顶点属性，实时炮弹落在既有声明式弹坑或其土沿上时无缝加深并叠加新焦土与放射状抛撒。
+4. **碎块 `InstancedMesh` 池化（`Script_CraterDebris.mjs`）**：动态弹坑碎块由逐块 CPU 合批（上限 48 块）改为共享模板 `InstancedMesh` 池（上限 256 块、最多 14 个 draw call），并新增 `BuildStaticCraterDebris` 为场景声明式弹坑批量生成半埋破土块与碎石（`deformation.Reset()` 不影响静态碎块）。
+5. **同帧批量合批刷新**：`TerrainDeformationView` 提供 `BeginBatch` / `EndBatch` / `ApplyBlasts` / `options.deferFlush`，多发齐射落地时在同一帧尾部统一 `Flush` 重建脏块与碰撞体。
+
 ## 验收与取证
 
 ```powershell
+node Taierzhuang1938/Script_SceneCratersTest.mjs
 node Taierzhuang1938/Script_ExplosionRulesTest.mjs
 node Taierzhuang1938/Script_ExplosionRangeTest.mjs
 node Taierzhuang1938/Script_CraterSurfaceTest.mjs
