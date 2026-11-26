@@ -63,9 +63,50 @@ def SeatReceiverHandguard(streams):
     return WarpFlank(streams,x*scale,row)
 
 
+def EaseHandguardRims(streams):
+    points = streams['POSITION'].astype(np.float64)
+    x,y,z = points.T.copy()
+
+    # The lip around the sight follows the wood's existing crown.
+    front, frontSlope = SmoothWeight((z+.394)/.016)
+    rear, rearSlope = SmoothWeight((-.305-z)/.017)
+    rise, riseSlope = SmoothWeight((y-.055)/.0045)
+    outside = abs(x)-.0080
+    rim, rimSlope = SmoothWeight(1.-abs(outside)/.0027)
+    sightDepth = .00023
+    sight = sightDepth*front*rear*rise*rim
+    dy = np.column_stack((
+        sightDepth*front*rear*rise*rimSlope*np.sign(outside)*np.sign(x)/.0027,
+        1.-sightDepth*front*rear*riseSlope*rim/.0045,
+        -sightDepth*rise*rim*(frontSlope*rear/.016-front*rearSlope/.017),
+    ))
+
+    # Ease the back of the crown into the collar along the existing contour.
+    rest, restSlope = SmoothWeight((z+.2696)/.0031)
+    crown, crownSlope = SmoothWeight((y-.042)/.010)
+    relief = .00029
+    shoulder = relief*rest*crown
+    dz = np.column_stack((np.zeros(len(points)),-relief*rest*crownSlope/.010,
+                          1.-relief*restSlope*crown/.0031))
+
+    points[:,1] -= sight
+    points[:,2] -= shoulder
+    result = {**streams, 'POSITION':points.astype('<f4')}
+    moved = (sight>0.)|(shoulder>0.)
+    frames = {key: array[moved] for key,array in streams.items() if key in ('NORMAL','TANGENT')}
+    jacobian = np.broadcast_to(np.eye(3),(np.count_nonzero(moved),3,3)).copy()
+    jacobian[:,1] = dy[moved]
+    jacobian[:,2] = dz[moved]
+    TransformSurfaceFrames(frames,jacobian)
+    for key,array in frames.items():
+        result[key] = streams[key].copy()
+        result[key][moved] = array
+    return result
+
+
 def ShapeReceiverWood(name,streams):
     if name.startswith('MainWood_'):
         return BlendReceiverStock(streams)
     if name.startswith('UpperWood_'):
-        return SeatReceiverHandguard(streams)
+        return EaseHandguardRims(SeatReceiverHandguard(streams))
     return streams

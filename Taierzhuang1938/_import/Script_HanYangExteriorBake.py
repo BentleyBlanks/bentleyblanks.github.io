@@ -24,7 +24,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261126R31'
+version = '173R-20261126R32'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -34,6 +34,13 @@ void main(){gl_Position=vec4(uv*2.-1.,0.,1.);point=pos;faceNormal=normal;basis=t
 fragmentShader=Path(__file__).with_name('Shader_HanYangMaterial.frag').read_text(encoding='utf8')
 ordinaryProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader)
 stockProgram=context.program(vertex_shader=vertexShader,fragment_shader=fragmentShader.replace('#version 330','#version 330\n#define STOCK_CREST_WEAR',1))
+
+
+fineEdges = {
+    'ReceiverOuterCollar', 'HandleRoot', 'RearTab', 'RearSmallCover', 'RearCockingExterior',
+    'RearTopExternalLever', 'Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers',
+    'Sight_LowCrossPiece',
+}
 
 
 steelDetails = {
@@ -228,6 +235,7 @@ for node in doc['nodes']:
     family=next((index for index,prefixes in [(1,('RearBand_Controlled',)),(7,('FrontBand_Continuous',)),(2,('LongOuterSteel','ReceiverOuter','HY150_VisualFrontSleeve')),(3,('LowerPlateGuard',)),(4,('Handle','RearSmall','RearCocking','RearTopExternal')),(5,('SideWoodButton','MiddleSideDisk','FrontSideBoss'))] if name.startswith(prefixes)),6)
     program['steelFamily']=family
     program['steelDetail']=steelDetails.get(name, 0)
+    program['fineEdgeFinish']=name in fineEdges
     program['finishGroup']=1 if name.startswith(('LongOuterSteel_','HY150_VisualFrontSleeve')) else 2 if name=='HandledCylinder' else 3 if name.startswith(('ReceiverOuterCollar','RearOuterCover_')) else 4 if name=='SideWoodButton' else 0
     program['seed']=(node['mesh']*.373)%13.
     for unit,(uniform,tex) in enumerate(zip(('pigmentMap','surfaceMap','detailMap'),maps['Wood' if wood else 'Steel'])):
@@ -302,7 +310,7 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R31: seated receiver joint, rounded rear steel and a shaded guard return.'
+report['rebake']='R32: eased exterior edge transitions and shared dark walnut stain.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
 report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)

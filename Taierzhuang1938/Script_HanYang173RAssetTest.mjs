@@ -44,7 +44,7 @@ for(const mesh of doc.meshes)for(const p of mesh.primitives){
   assert.equal(Math.abs(ts[i][3]),1);
  }
 }
-assert.equal(triangles,report.triangles);assert.equal(triangles,79479);
+assert.equal(triangles,report.triangles);assert.equal(triangles,79440);
 assert.equal(doc.asset.extras.gameTriangles,triangles);
 assert.equal(report.exteriorFinish.triangleLimit,80000);assert(triangles<=report.exteriorFinish.triangleLimit);
 for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
@@ -54,7 +54,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
 for(const image of doc.images){const v=doc.bufferViews[image.bufferView],raw=bin.subarray(v.byteOffset||0,(v.byteOffset||0)+v.byteLength),expected=report.texturePayloads.find(i=>i.name===image.name);assert(expected);assert.equal(createHash('sha256').update(raw).digest('hex'),expected.sha256);}
 const detailCharts=new Set(['HY150_ExteriorSideRelief_Neg','HY150_ExteriorSideRelief_Pos','HY151_LowRearShoulder','Trigger_FlatCurvedExternalStrip']);
 const heelName='RearBand_ExternalAttachmentBridge';
-const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat','HandleRoot','LowerPlateGuard_FlatSideNarrowReturn','FrontBandSideStrip','RearOuterCover_RoundedSideReturn']);
+const bevelParts=new Set(['ReceiverOuterCollar','Sight_LowContinuousLeaf_NoUnknownNumbers','Sight_LowCrossPiece','Sight_ShallowRoundSeat','HandleRoot','LowerPlateGuard_FlatSideNarrowReturn','FrontBandSideStrip','RearOuterCover_RoundedSideReturn','RearTab','RearTopExternalLever','RearSmallCover','RearCockingExterior']);
 assert.equal(doc.asset.extras.calibratedBaseColor,true);
 assert(doc.materials.every(mat=>(mat.pbrMetallicRoughness.baseColorFactor||[1,1,1,1]).every(v=>v===1)),'native albedo is stored in the texture');
 // Sample the exposed steel pigment on the mesh. Padding outside the UV islands
@@ -239,8 +239,9 @@ assert(impressed.every(([film])=>film<20),'both branches of the fork and the oth
 assert(MedianOil(impressed.map(v=>v[1]))>MedianOil(surrounding.map(v=>v[1]))+17,'abraded fibre beds remain rougher than the surrounding satin finish');
 function MedianOil(samples){return samples.sort((left,right)=>left-right)[Math.floor(samples.length/2)];}
 const baselineSurface=createHash('sha256');
+const closedFineReturns=new Set(['Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
 const rolledBands=new Set(['FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown']);
-const changedMeshes=new Set(['MainWood_ContinuousLowerShoulder','UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront','RearOuterCover_RoundedSideReturn','LowerPlateGuard_FlatSideNarrowReturn']);
+const changedMeshes=new Set(['UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront', 'ReceiverOuterCollar', 'HandleRoot', 'Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
 const frontBandPrimitive=doc.meshes[doc.nodes.find(node=>node.name==='FrontBand_ContinuousEnvelopeContact').mesh].primitives[0];
 function Payload(viewId){
  const view=doc.bufferViews[viewId],offset=view.byteOffset||0;
@@ -282,14 +283,14 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  }
 
 }
-assert.equal(baselineSurface.digest('hex'),'72f91109298ed1b96b1414e81675475492d4316c3bf416206c4e250ed181a099','parts outside the receiver and guard edits retain their R30 geometry, UVs and tangent frames');
+assert.equal(baselineSurface.digest('hex'),'ccf482ae5305f76524c51d5ee48b13c2668a1b3a3cff2129fba42a4628cb29a3','parts outside the marked R32 edge edits retain their R31 geometry, UVs and tangent frames');
 assert.deepEqual(new Set(Object.keys(report.exteriorFinish.inspectionBevels)),bevelParts);
 for(const [name,{before,after,roundedFaces}] of Object.entries(report.exteriorFinish.inspectionBevels)){
  assert(after!==before&&report.parts.find(part=>part.part===name).gameTriangles===after,name+' exports the rounded edges');
  assert(Number.isInteger(roundedFaces)&&roundedFaces>0&&roundedFaces<after,name+' identifies the faces used to bake edge wear');
 }
 assert.deepEqual(report.exteriorFinish.closedFittings,{RearBand_ExternalAttachmentBridge:{before:18,after:76},RearStock_ExternalAttachmentBridge:{before:18,after:68}});
-for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachmentBridge')||rolledBands.has(item.name)||item.name==='RearOuterCover_RoundedSideReturn')){
+for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachmentBridge')||rolledBands.has(item.name)||item.name==='RearOuterCover_RoundedSideReturn'||closedFineReturns.has(item.name))){
  const prim=doc.meshes[node.mesh].primitives[0],positions=Read(prim.attributes.POSITION),uvs=Read(prim.attributes.TEXCOORD_0),indices=doc.accessors[prim.indices],bytes=Payload(indices.bufferView),edges=new Map();
  const key=point=>point.map(value=>Math.round(value*1e7)).join(',');
  for(let offset=0;offset<indices.count;offset+=3){

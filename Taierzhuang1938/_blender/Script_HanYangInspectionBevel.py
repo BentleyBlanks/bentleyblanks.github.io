@@ -9,6 +9,12 @@ from pathlib import Path
 import bmesh
 import bpy
 import numpy as np
+import sys
+
+# BlenderMCP runs scripts from the owned worktree root.
+fineProfiles = Path.cwd()/'Taierzhuang1938/_blender'
+sys.path.insert(0,str(fineProfiles))
+from Script_HanYangFineReturns import RoundedAxialCap, RoundedPlate
 
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
@@ -54,10 +60,15 @@ def ExposedEdge(name, edge, width):
         # Ring edges on the two front steps and the rear of the raised shell.
         step = any(abs(midpoint.z - centre) < halfWidth for centre, halfWidth in
                    ((-.265, .002), (-.25855, .00044), (-.25467, .00052), (-.22125, .00063)))
-        return (step and midpoint.y > .039 and abs(first.z - second.z) < .00099
-                and math.radians(17) < turn < math.radians(122))
+        axial = abs(first.z-second.z)
+        rail = -.223 < midpoint.z < -.1198 and abs(midpoint.x)>.010 and midpoint.y>.040
+        longitudinal = axial>.75*length*.001 and length>3.5
+        trailingEnd = midpoint.z>-.124 and length>.42
+        return (math.radians(17)<turn<math.radians(122) and
+                ((step and midpoint.y>.039 and axial<.00099)
+                 or (rail and (longitudinal or trailingEnd))))
     if name == 'HandleRoot':
-        return midpoint.x > .0075 and length > 1. and turn > math.radians(21.8)
+        return midpoint.x > .0062 and length > .55 and turn > math.radians(21.)
     if name.startswith('LowerPlateGuard_'):
         if abs(midpoint.x) <= .0074 or turn >= math.radians(116):
             return False
@@ -163,6 +174,12 @@ def RoundedMesh(name, source, width):
     positions, triangles = source(name)
     if name == 'RearOuterCover_RoundedSideReturn':
         return RoundedCheeks(name,positions,triangles,width)
+    if name in ('Sight_ShallowRoundSeat','Sight_LowContinuousLeaf_NoUnknownNumbers'):
+        return RoundedPlate(name,positions,1,width)
+    if name in ('RearTab','RearTopExternalLever'):
+        return RoundedPlate(name,positions,2 if name=='RearTab' else 1,width)
+    if name in ('RearSmallCover','RearCockingExterior'):
+        return RoundedAxialCap(name,positions,width)
     if name == 'Sight_LowCrossPiece':
         positions = BroadenSightReturn(positions)
     points, remap = np.unique(np.round(positions, 6), axis=0, return_inverse=True)
@@ -320,11 +337,15 @@ def Atlas(name, source, width):
 
 base = Sources('Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
 approved = Sources('Input_ExteriorGeometry.glb', 'e125056b12391f022f7e22969bb3acdf192295be711995b6ac43b958b31f47ec')
-plans = [('ReceiverOuterCollar', approved, .00036),
-         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00037),
+plans = [('ReceiverOuterCollar', approved, .00034),
+         ('Sight_LowContinuousLeaf_NoUnknownNumbers', base, .00033),
          ('Sight_LowCrossPiece', base, .00040),
-         ('Sight_ShallowRoundSeat', base, .00033),
-         ('HandleRoot', approved, .00021),
+         ('Sight_ShallowRoundSeat', base, .00035),
+         ('HandleRoot', base, .00031),
+         ('RearTab', base, .00038),
+         ('RearTopExternalLever', base, .00028),
+         ('RearSmallCover', base, .00031),
+         ('RearCockingExterior', base, .00034),
          ('LowerPlateGuard_FlatSideNarrowReturn', approved, .00020),
          ('RearOuterCover_RoundedSideReturn', base, .00029),
          ('FrontBandSideStrip', approved, .00023)]

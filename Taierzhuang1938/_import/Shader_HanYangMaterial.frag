@@ -7,6 +7,7 @@ uniform float seed,worn;
 uniform vec2 alongRange;
 uniform int steelFamily,finishGroup,trimFinish,steelDetail;
 uniform vec2 heightRange,acrossRange;
+uniform bool fineEdgeFinish;
 uniform sampler2D pigmentMap,surfaceMap,detailMap;
 uniform sampler2D wearColor,wearSurface,wearNormal;
 layout(location=0) out vec4 base;
@@ -290,7 +291,9 @@ void main(){
   float fibreContrast=.122*(fibre-.5)+.075*(figure-.5)+.061*(grain-.5);
   float stain=(1.-(.053+.026*shade)*ring-.106*pores-.067*openGrain-.055*cutEnd+.54*scanContrast+fibreContrast)
                *(1.-.088*polish+.054*(woodExposure-.5));
-  visible=walnut*stain*vec3(.921,.867,.820);
+  // A shared, deep walnut stain. The lit flanks on the museum example
+  // are darker and less orange than the previous coat.
+  visible=walnut*stain*vec3(.742,.737,.685);
   rough=clamp(.584+.13*(surface.x-.57)+.17*(oldRough-.75)+.092*pores+.041*openGrain+.045*cutEnd-.121*polish,.420,.74);
   if(handguard)rough+=.012;
   metal=0.;
@@ -443,7 +446,8 @@ void main(){
   if(longShell)rub*=.79;
   // Real rounded faces provide the edge mask for the receiver and the sight.
   // Break up the wear with the scan and keep the surface normal at its baked scale.
-  float polish=clamp(rub+.70*edge*(.80+.20*mottling)-.14*film,0.,.93);
+  float rimPolish=fineEdgeFinish?.56*edge*(.93+.07*mottling):.70*edge*(.80+.20*mottling);
+  float polish=clamp(rub+rimPolish-.14*film,0.,.93);
   float mineral=clamp(.39*luma(agedColor)+.61*luma(color),0.,1.);
   float oxideTone=.18*cloud+.47*mineral+.35*mottling;
   vec3 oxide=mix(vec3(.145,.139,.129),vec3(.232,.221,.204),oxideTone);
@@ -464,6 +468,10 @@ void main(){
   vec3 relief=gradient*(.15+.041*film)+agedSlope*(.106+.146*film)
              +poreSlope*(.104+.149*film)+.118*cleaned*trackSlope*up;
   relief*=1.-.44*edge;
+  if(fineEdgeFinish){
+   rough=mix(rough,.405+.038*film,.62*edge);
+   relief*=1.-.49*edge;
+  }
   if(steelDetail==6){
    // Satin on the rear cheeks and cap, with the bright cast limited to their lips.
    rough=mix(rough,.510+.049*mottling,.62*(1.-edge));

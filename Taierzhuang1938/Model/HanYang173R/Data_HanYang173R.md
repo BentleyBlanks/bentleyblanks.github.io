@@ -204,6 +204,12 @@ The handguard heel sits beneath the stock flank on both sides. A local taper car
 
 The rear cheeks use closed profiles with rounded returns. The satin finish carries across the cheeks and cap, with brighter wear on their lips. The guard opening has a rounded inner lip and a continuous satin wall. Short rays into the opening add the visibility of the opposite wall to the AO bake. The R31 inspection archive captures the three areas from the feedback view in the actual game inspection bench. [Te Papa DM000453, side detail](https://media.tepapa.govt.nz/collection/131366/preview) · [Te Papa DM000453, alternate view](https://media.tepapa.govt.nz/collection/131367/preview)
 
+### R32 fine exterior returns and dark walnut
+
+The sight plate and seat follow their existing outlines with curved perimeter strips and normals that follow the cross section. The receiver shoulder, rail end, handle root and rear steel pieces have softer outside returns. The upper wood eases into the sight and collar. The new metal-edge masks follow the curved faces through their UV charts. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
+
+The three timber pieces share a darker walnut stain chosen from the lit flanks of DM000453. Grain, roughness and oil remain in their authored maps. The inspection bench captures both feedback views and the timber albedo. The runtime remains below 80,000 triangles.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
