@@ -60,7 +60,7 @@ def MeshObject(collection, name, vertices, faces, uvFaces, smooth=None):
 
 
 def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel",
-            bandTiles=None, paintBand=None, toothed=False):
+            bandTiles=None, paintBand=None, localChart=None, toothed=False):
     """Closed visual profile. The opening on the tube ends at a recessed dark face."""
     angles = [i * 2 * pi / sides for i in range(sides)]
     if paintBand is not None:
@@ -78,13 +78,19 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
     steps = [0.0]
     for (alongA, radiusA), (alongB, radiusB) in zip(profile, profile[1:]):
         steps.append(steps[-1] + hypot(alongB - alongA, radiusB - radiusA))
+    if localChart:
+        localBands = [i for i, region in bandTiles.items() if region == localChart]
+        localStart = steps[min(localBands)]
+        localLength = steps[max(localBands) + 1] - localStart
     faces, uvFaces, smooth = [], [], []
     for ring in range(len(profile) - 1):
-        v0, v1 = (steps[i] / steps[-1] for i in (ring, ring + 1))
+        bandRegion = (bandTiles or {}).get(ring, tile)
+        start, length = (localStart, localLength) if bandRegion == localChart else (0, steps[-1])
+        v0, v1 = ((steps[i] - start) / length for i in (ring, ring + 1))
         for i, angle in enumerate(angles):
             j = (i + 1) % count
             stopAngle = angles[j] if j else 2 * pi
-            band = (bandTiles or {}).get(ring, tile)
+            band = bandRegion
             if ring == paintBand and abs((angle + stopAngle) / 2 - pi / 2) < 0.032:
                 band = "Stripe"
             u0, u1 = angle / (2 * pi), stopAngle / (2 * pi)
@@ -221,7 +227,8 @@ def BuildExterior():
         (.377, .048), (.381, .051), (.385, .051), (.387, .050), (.391, .052), (.405, .052),
         (.411, .049), (.414, .045)], sides=56, tile="Collar",
         bandTiles={0: "Recess", 1: "Recess", 2: "Edge", 3: "Edge", 5: "Barrel", 6: "Barrel",
-                   7: "Barrel", 8: "Barrel", 9: "Edge", 12: "Recess"}, paintBand=7)
+                   7: "Barrel", 8: "Barrel", 9: "Edge", 12: "Recess", 13: "CollarRing", 14: "CollarRing",
+                   15: "CollarRing", 16: "CollarRing"}, paintBand=7, localChart="CollarRing")
     Revolve(collection, "CollarShoulder", [(.398, .044), (.412, .044), (.425, .0355),
         (.441, .030), (.451, .0257), (.454, .024)], sides=40, tile="Collar")
     Stem(collection)

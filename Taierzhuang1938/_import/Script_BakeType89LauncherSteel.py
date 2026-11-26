@@ -37,6 +37,7 @@ FINISHES = {
     "TabBack": (2, (169, 163, 153), (80, 74, 66), .47, (.348, .65), (.96, .43), .71),
     "RearEye": (2, (162, 150, 136), (67, 53, 43), .52, (.40, .71), (.95, .44), .67),
     "Wheel": (2, (151, 136, 120), (56, 37, 28), .66, (.45, .76), (.95, .38), .77),
+    "CollarRing": (0, (172, 171, 164), (66, 59, 52), .56, (.309, .61), (.95, .49), .56),
 }
 
 # Finish, coverage channel, roughness, metallic, blend strength and relief attenuation.
@@ -89,11 +90,11 @@ def ReferenceField(data, xx, vv, values):
     return (a * (1 - dv) + b * dv) * fade
 
 
-def BarrelGrain(closeup, xx, vv):
+def PhotographicGrain(closeup, xx, vv):
     detail = closeup["detail"]
     path = REFERENCE.with_name(detail["file"])
     if Sha256(path) != detail["sha256"]:
-        raise ValueError(f"Barrel detail does not match the measured reference: {path}")
+        raise ValueError(f"Detail does not match the measured reference: {path}")
     with Image.open(path) as image:
         tone, warmth, confidence = np.asarray(image.convert("RGB"), dtype=np.float32).T
     plate = {"footprint": closeup["footprint"], "tone": (tone - 128) / detail["toneScale"],
@@ -218,10 +219,10 @@ def BakeRegion(name, sample, size, index, reference):
     vv = 1 - yy
     # The photographed grip sample carries its original glare and perspective.
     # Use its microtexture, with the diamond scale and lighting rebuilt in UVs.
-    # U spans several teeth while V crosses the short edge. Keep the source
-    # pits compact when that strip is wrapped around the wheel.
+    # The short ring and wheel charts use shallower source crops along V.
+    vFraction = {"Wheel": .34, "CollarRing": .24}.get(name, 1)
     srgb = SampleTile(sample[0 if name == "Knurl" else sourceIndex], width, height, index,
-                      vFraction=.34 if name == "Wheel" else 1)
+                      vFraction=vFraction)
     luminance = srgb @ LUMA
     grainLuma = luminance
     if name == "Knurl":
@@ -251,7 +252,7 @@ def BakeRegion(name, sample, size, index, reference):
         # Reuse the API steel at a fine scale around the whole tube. The close
         # photo supplies local variations where its surface can be registered.
         finePits = UnitVariation(luminance, .38, 1.95)
-        photoPits, photoWarmth, photoCoverage = BarrelGrain(closeup, xx, vv)
+        photoPits, photoWarmth, photoCoverage = PhotographicGrain(closeup, xx, vv)
         apiPits = finePits * (1 - .78 * photoCoverage)
         photoPits *= photoCoverage
         photoWarmth *= photoCoverage
@@ -268,6 +269,14 @@ def BakeRegion(name, sample, size, index, reference):
         blue = np.exp(-(((xx - .397) / .14) ** 2 + ((vv - .46) / .47) ** 2))
         oxidation += .090 * blue
         warmth -= .021 * blue
+    if name == "CollarRing":
+        photoPits, photoWarmth, photoCoverage = PhotographicGrain(closeup, xx, vv)
+        apiPits = UnitVariation(luminance, .42, 2.15) * (1 - .75 * photoCoverage)
+        photoPits *= photoCoverage
+        photoWarmth *= photoCoverage
+        oxidation += .056 * medium + .072 * cloud + np.clip(.16 * photoWarmth, -.034, .044)
+        tonalDelta += 7.2 * apiPits + 204 * photoPits - 2.9 * medium
+        warmth += .34 * photoWarmth
     if name == "Sleeve":
         # The thin brown residue at the stem-side shoulder is visible on the
         # overall and side close-ups of the same object.
@@ -280,6 +289,9 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Barrel":
         heightField = strength * (.13 * detail + .036 * medium - .112 * pits) + .102 * apiPits + .38 * photoPits
         roughnessDelta += .023 * np.maximum(-apiPits, 0) + .17 * np.maximum(-photoPits, 0)
+    if name == "CollarRing":
+        heightField = strength * (.14 * detail + .031 * medium - .12 * pits) + .123 * apiPits + .41 * photoPits
+        roughnessDelta += .029 * np.maximum(-apiPits, 0) + .14 * np.maximum(-photoPits, 0)
     if name == "SaddleRim":
         # A few exposed contact marks interrupt the dark forged edge.
         exposed = np.exp(-((xx - .088) / .071) ** 2) + .7 * np.exp(-((xx - .581) / .091) ** 2)
@@ -395,6 +407,16 @@ def BakeRegion(name, sample, size, index, reference):
         # polished response there while keeping the photographed color field.
         rough += .11 * near * (1 - .64 * oxideCoverage)
         metal -= .48 * near * np.maximum(metal - .55, 0)
+    if name == "CollarRing":
+        oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
+        exposed = .56 * ReferenceField(closeup, xx, vv, "exposedSteelCoverage") / 100
+        exposed *= 1 - oxidized
+        rustColor = SrgbToLinear(np.array([95, 79, 67], dtype=np.float32) / 255)
+        steelColor = SrgbToLinear(np.array([174, 170, 163], dtype=np.float32) / 255)
+        linear += (rustColor - linear) * oxidized[..., None]
+        linear += (steelColor - linear) * exposed[..., None]
+        rough += (.666 - rough) * oxidized - .063 * exposed
+        metal += (.46 - metal) * oxidized + (.91 - metal) * exposed
     if name == "Knurl":
         # The dark bottoms retain oxide while worn metal catches light on
         # the irregular diamond shoulders.
@@ -443,7 +465,7 @@ def BakeRegion(name, sample, size, index, reference):
         ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
-    if name in ("Barrel", "Collar", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
+    if name in ("Barrel", "Collar", "CollarRing", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
         seamWidth = 6 if name in ("RearEye", "Wheel") else 24
         base = SeamBlend(base, pixels=seamWidth)
         heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
@@ -455,14 +477,24 @@ def BakeRegion(name, sample, size, index, reference):
         SeamBlend(surface.swapaxes(0, 1), pixels=10)
     rough, metal, ao = np.moveaxis(surface, -1, 0)
     relief = .00018 if name in ("RearEye", "Wheel") else .00012
-    smoothing = {"Barrel": .55, "Knurl": .50}.get(name, .72)
+    smoothing = {"Barrel": .55, "Knurl": .50, "CollarRing": .56}.get(name, .72)
     normal = NormalFromHeight(GaussianPeriodic(heightField, smoothing), relief, .12, 1.0, "gl") * .5 + .5
     orm = np.stack([ao, np.clip(rough, .17, .92), metal], axis=-1)
     return tuple(np.rint(255 * np.clip(arr, 0, 1)).astype(np.uint8) for arr in (base, normal, orm))
 
 
-def Bake():
-    reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+def ResizeSharedCollar(maps, width, height):
+    pad = ATLAS["padding"]
+    inner = (width - 2 * pad, height - 2 * pad)
+    border = ((pad, pad), (pad, pad), (0, 0))
+    output = []
+    for pixels in maps:
+        face = Image.fromarray(pixels[pad:-pad, pad:-pad]).resize(inner, Image.Resampling.LANCZOS)
+        output.append(np.pad(np.asarray(face), border, mode="edge"))
+    return output
+
+
+def BuildAtlas(reference):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
     side = min(source.size) // 2
@@ -477,14 +509,26 @@ def Bake():
     for index, (name, (x, y, width, height)) in enumerate(ATLAS["regions"].items()):
         if name == "Stripe":
             continue
-        tile = BakeRegion(name, quadrants, (width, height), index, reference)
+        if name == "Collar":
+            # Retain the earlier finish on the small components that share
+            # this chart. The outer ring now has its own measured surface.
+            previous = height + ATLAS["regions"]["CollarRing"][3]
+            tile = ResizeSharedCollar(BakeRegion(name, quadrants, (width, previous), index, reference), width, height)
+        else:
+            tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
     for atlas, pixels in zip(maps, SampleBarrelStripe(maps, (width, height))):
         atlas[y:y + height, x:x + width] = pixels
+    return maps
 
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84.5, 87)):
+
+def Bake():
+    reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+    maps = BuildAtlas(reference)
+    size = ATLAS["size"]
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 87)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)
@@ -494,9 +538,10 @@ def Bake():
     record = json.loads(recordPath.read_text(encoding="utf-8"))
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
-    detail = reference["closeups"]["Barrel"]["detail"]
-    record["reference"]["barrelDetail"] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
-                                          "sha256": detail["sha256"]}
+    for region, key in (("Barrel", "barrelDetail"), ("CollarRing", "collarDetail")):
+        detail = reference["closeups"][region]["detail"]
+        record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
+                                    "sha256": detail["sha256"]}
     recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 

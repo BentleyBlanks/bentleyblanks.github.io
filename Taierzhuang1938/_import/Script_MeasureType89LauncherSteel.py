@@ -13,6 +13,7 @@ from PIL import Image, ImageDraw, ImageFilter
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
+COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 
 
 def Photo(folder, number):
@@ -98,7 +99,7 @@ def OverallBarrelPatina(folder, footprint):
     return {"source": source, "footprint": footprint, **PatinaMap(samples)}
 
 
-def BarrelDetail(image, projection, halfSpan):
+def WriteDetailPlate(image, xs, ys, path, excluded=()):
     photo = Image.fromarray(image.astype(np.uint8))
     fine = np.asarray(photo.filter(ImageFilter.GaussianBlur(.58)), dtype=np.float32)
     surround = np.asarray(photo.filter(ImageFilter.GaussianBlur(8.0)), dtype=np.float32)
@@ -108,33 +109,37 @@ def BarrelDetail(image, projection, halfSpan):
     warmth = ((fine[..., 0] - fine[..., 2]) / np.maximum(lightness, 30)
               - (surround[..., 0] - surround[..., 2]) / np.maximum(envelope, 30))
 
-    # The marks have their own relief in the model. Exclude them from the
-    # grain so their edges are not transferred again as corrosion.
-    marks = [[135, 170, 193, 249], [274, 176, 350, 265], [472, 183, 543, 281],
-             [628, 173, 710, 273], [762, 171, 848, 269], [148, 291, 197, 353],
-             [285, 300, 345, 359], [629, 286, 716, 358], [756, 284, 811, 346]]
     valid = Image.new("L", photo.size, 255)
     draw = ImageDraw.Draw(valid)
-    for box in marks:
+    for box in excluded:
         draw.rectangle(box, fill=0)
     confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(8)), dtype=np.float32) / 255
     confidence *= np.clip((245 - lightness) / 30, 0, 1)
 
-    width, height = 292, 160
-    center, radius, first, last = projection
-    us, vs = np.meshgrid(np.linspace(0, 1, width * 2), np.linspace(0, 1, height * 2))
-    xs = center + radius * np.sin(2 * np.pi * halfSpan * (2 * us - 1))
-    ys = first + (last - first) * vs
+    height, width = xs.shape
+    us, vs = np.meshgrid(np.linspace(0, 1, width), np.linspace(0, 1, height))
     edge = np.clip(14 * np.minimum(np.minimum(us, 1 - us), np.minimum(vs, 1 - vs)), 0, 1)
     toneScale, warmthScale = 300, 520
     channels = [128 + toneScale * SampleBilinear(tone, xs, ys),
                 128 + warmthScale * SampleBilinear(warmth, xs, ys),
                 255 * edge * SampleBilinear(confidence, xs, ys)]
     encoded = np.rint(np.clip(np.stack(channels, axis=-1), 0, 255)).astype(np.uint8)
-    detail = Image.fromarray(encoded).resize((width, height), Image.Resampling.LANCZOS)
-    detail.save(BARREL_DETAIL, optimize=True)
-    return {"file": BARREL_DETAIL.name, "sha256": sha256(BARREL_DETAIL.read_bytes()).hexdigest(),
-            "toneScale": toneScale, "warmthScale": warmthScale, "excludedMarks": marks}
+    detail = Image.fromarray(encoded).resize((width // 2, height // 2), Image.Resampling.LANCZOS)
+    detail.save(path, optimize=True)
+    return {"file": path.name, "sha256": sha256(path.read_bytes()).hexdigest(),
+            "toneScale": toneScale, "warmthScale": warmthScale}
+
+
+def BarrelDetail(image, projection, halfSpan):
+    # Remove the marks from the grain. They have their own relief in the model.
+    marks = [[135, 170, 193, 249], [274, 176, 350, 265], [472, 183, 543, 281],
+             [628, 173, 710, 273], [762, 171, 848, 269], [148, 291, 197, 353],
+             [285, 300, 345, 359], [629, 286, 716, 358], [756, 284, 811, 346]]
+    center, radius, first, last = projection
+    us, vs = np.meshgrid(np.linspace(0, 1, 584), np.linspace(0, 1, 320))
+    xs = center + radius * np.sin(2 * np.pi * halfSpan * (2 * us - 1))
+    ys = first + (last - first) * vs
+    return {**WriteDetailPlate(image, xs, ys, BARREL_DETAIL, marks), "excludedMarks": marks}
 
 
 def BarrelFinish(folder):
@@ -173,6 +178,33 @@ def BarrelFinish(folder):
             [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
         ],
     }
+    return result
+
+
+def CollarFinish(folder):
+    image, source = Photo(folder, 7)
+    # Image rows remain below the curved dark seam and inside the visible ring.
+    # The short axial footprint is the portion visible in this close-up.
+    rails = [[56, 411], [130, 430], [224, 443], [350, 454], [509, 457],
+             [670, 452], [810, 441], [960, 418]]
+    rasterX = [509, 540]
+    lastY = 580
+    footprint = {"uCenter": .398, "uHalfSpan": .154, "vRange": [.18, .61]}
+    xStations, firstRows = np.asarray(rails).T
+    angles = np.linspace(-footprint["uHalfSpan"], footprint["uHalfSpan"], 27)
+    xs = rasterX[0] + rasterX[1] * np.sin(2 * np.pi * angles)
+    top = np.interp(xs, xStations, firstRows)
+    samples = np.array([[Sample(image, x, y, radius=5) for y in np.linspace(first, lastY, 15)]
+                        for x, first in zip(xs, top)])
+    source.update({"rasterX": rasterX, "sampleRails": rails, "lastY": lastY})
+    result = FinishMap(samples, source, footprint)
+    result.update(PatinaMap(samples))
+
+    us, vs = np.meshgrid(np.linspace(0, 1, 352), np.linspace(0, 1, 160))
+    xs = rasterX[0] + rasterX[1] * np.sin(2 * np.pi * footprint["uHalfSpan"] * (2 * us - 1))
+    first = np.interp(xs, xStations, firstRows)
+    ys = first + (lastY - first) * vs
+    result["detail"] = WriteDetailPlate(image, xs, ys, COLLAR_DETAIL)
     return result
 
 
@@ -439,7 +471,8 @@ def Main():
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
-    record["closeups"] = {"Barrel": BarrelFinish(args.photos), "Stem": StemFinish(args.photos),
+    record["closeups"] = {"Barrel": BarrelFinish(args.photos), "CollarRing": CollarFinish(args.photos),
+                          "Stem": StemFinish(args.photos),
                           "Saddle": ShoeFinish(args.photos), "Neck": NeckFinish(args.photos),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
