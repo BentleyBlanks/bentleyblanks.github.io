@@ -581,7 +581,7 @@ def BakeAtlases(label,target,source,graphs,scratch,roleScope=None):
     return result
 
 
-def BakedMaterial(role,files,label):
+def BakedMaterial(role,files,label,*,shareImages=False):
     material=bpy.data.materials.new('Material_Type89'+label+role)
     material.use_nodes=True;material['Type89Role']=role;material['PbrChannels']='Base(sRGB), Normal(linear OpenGL), ORM(linear R=AO G=roughness B=metallic)'
     nodes=material.node_tree.nodes;links=material.node_tree.links;nodes.clear()
@@ -591,8 +591,9 @@ def BakedMaterial(role,files,label):
         return material
     textures={}
     for channel in ['Base','Normal','Orm']:
-        image=bpy.data.images.load(files[channel],check_existing=False)
-        image.colorspace_settings.name='sRGB' if channel=='Base' else 'Non-Color';image.pack()
+        image=bpy.data.images.load(files[channel],check_existing=shareImages)
+        image.colorspace_settings.name='sRGB' if channel=='Base' else 'Non-Color'
+        if image.packed_file is None:image.pack()
         node=nodes.new('ShaderNodeTexImage');node.image=image;node.label=channel;textures[channel]=node
     links.new(textures['Base'].outputs['Color'],shader.inputs['Base Color'])
     if role=='Guard':

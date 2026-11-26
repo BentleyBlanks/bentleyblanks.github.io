@@ -1,44 +1,37 @@
 # 八九式中战车乙型（馆藏外形复原）
 
-当前交付为 **GeometryV54 / SurfaceV14**：游戏版 **417130 三角、9 材质、25 张内嵌贴图**；可编辑高源 1462012 三角、游戏源 419856 三角。运行文件 SHA-256：`5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b`。
+**GeometryV55 / SurfaceV15** 以土浦保存车的 2007 年状态为外观基准。可编辑高模有 1,465,474 三角面。游戏 GLB 有 **79,821 三角面**，按默认场景里的实际实例计数，包含两侧各 81 节履带、15 个轮组和其他可见部件。硬上限为 80,000 三角面。
 
-按用户授权作为可选资产接入。入口是「ControlCenter → 构件库预览（`AdvancedTools/Tool_PropLibrary.html`）→ 模型 → 八九式中战车乙型」，选中后才加载；`Data_VehicleAssets.mjs` 的 `campaignEnabled:false` 保留当前关卡战车配置。
+炮盾外框、炮塔下缘、车首板、侧裙和后翼子板按多视角复核，后甲板补做弧形把手并校正百叶边沿。低模保留主要履带开孔、中央减料槽、轮盘轮廓、罩板边缘和可见关节。小销眼和细铸纹由高模投射。实体排气罩的孔阵在游戏中由双面遮罩表现。9 个材质共用 9 张贴图，车体图集为 4K，履带和护网各为 1K。底色、OpenGL 切线法线和 ORM 分通道烘焙。ORM 红通道合并到位高模遮蔽与新计算的局部接触遮蔽。
 
-构件库提供「全部联动」「履带与轮组」「炮塔与主炮」「两挺机枪」「停止复位」。左右各 81 个履带节、15 个轮组保持独立节点；炮塔整周回转，主炮俯仰／后坐、两挺机枪及舱盖保留各自轴心。展示期间车体固定在展台上。
+2007 年的圆筒护套和开盖姿态用该年主照复核。2025 年照片用于核形，闭盖和不同保存状态的附件按各张照片分别理解。光照和机位为对照拟合，取不到的内构、精确倒角半径、漆膜微观粗糙度和止挡速度属于复原参数。照片与取舍见 [图证档案](Data_ReferenceArchive.json)、[图证与复原边界](Data_References.md)及[本版导出验收](Data_ExportAudit.json)。
 
-车首门打开时，车首机枪先转到避让姿态；关门后恢复独立指向。这是经过几何净空检查的展示联动，原车操作程序尚未确证。机枪止挡、演示速度、隐藏厚度和内构均为复原参数。
+## 源工程与重建
 
-装甲保留 4K 底色／8K 法线／4K ORM，细漆膜与浅铸纹缩小并收浅；保留细浅漆膜与缎面反光，并加入朝上漆面的褪色失光、实际凸棱上的断续露钢、旧底漆和接缝薄积尘。新缺口按真实凸棱及已有接触区分布，使用圆形渐软边界；金色星徽、AO 与透明护罩的有效 RGBA 按像素保护。材质使用标准 glTF 扩展；AO 修正只限侧观察盖及框的 ORM 红通道。无损打包核对实际 RGB，透明排气罩保留有效 RGBA。
+版本目录为 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV15`。根下 `Scene_Type89MediumTankHighPbr.blend` 是可编辑高源，`Maps/High` 保留高源材质贴图。`Game/Scene_Type89MediumTankGamePbr.blend` 是派生源，`Game/Runtime/Model_Type89MediumTank.glb` 是无损打包的交付件。`Review/` 保存同机位、两套光照、材质近景和运动验证。原照和冻结 G54 源分别仍可由 `References/` 与 `History/` 查阅。
 
-外形采用土浦同一保存车的 2007 年照片状态，并以 2025 年多机位照片辅助；保存车配色不代表 1938 年原漆。细颗粒、铸纹、褪色、掉漆、积尘和接触带材质属于美术推定，不代表1938年某辆实车的磨损记录。照片透视、局部比例和原厂尺寸仍有不确定性，本件不是扫描级复刻，也不证明八九式参加滕县城内攻城。详见 [参考契约](Data_ReferenceContract.json)、[来源](Data_References.md)及[活动部件依据](Data_ArticulationEvidence.json)。
-
-## 重建与源工程
-
-原工程、完整高模、原始贴图及历史版本位于 `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank`；仓库保留游戏 GLB、参数、生成器和验收脚本。验收网页、截图及诊断只留本地忽略目录。
+从仓库根运行以下命令。默认先用冻结的 SurfaceV14 高工程重建高源，再打开新保存的高源派生、烘焙和导出游戏件。用 `--stage=high` 或 `--stage=game` 可单独重跑一段。
 
 ```powershell
-node Taierzhuang1938/_blender/Script_RebuildType89PaintFinish.mjs
+node Taierzhuang1938/_blender/Script_RebuildType89Restoration.mjs
 ```
 
-此命令从 OneDrive 已冻结的完整 SurfaceV12 高／低源，按 `Data_PaintFinishProfile.json` 重建本轮材质、源工程和实际 GLB，并运行切线、几何／像素、源重开及浏览器检查。结果保存在本地候选目录，供视觉复核。需要重新制作几何和基础材质时，先用 `Script_RebuildType89MediumTank.mjs` 成对生成完整底材，再指定相同的完整源作为本轮基线；现有冻结源仍保留在 History。
+## 运行与验收
 
-## 运行接口
+构件库和控制中心的武器检视沿用 `Type89MediumTank` 可选模型。米制 Y-up，车头朝 -Z，`Data_VehicleAssets.mjs` 登记的 GLB 与 `Data_TrackPath.json` 成套使用。
 
 ```javascript
-import {Type89Motion} from './Script_Type89Motion.mjs';
-const path = await fetch('./Data_TrackPath.json').then(response => response.json());
-const motion = new Type89Motion(gltf.scene, path);
+import { Type89Motion } from './Script_Type89Motion.mjs';
+const track = await fetch('./Data_TrackPath.json').then(response => response.json());
+const motion = new Type89Motion(gltf.scene, track);
 motion.Update(deltaSeconds, leftMetersPerSecond, rightMetersPerSecond);
-motion.SetPose({turretYaw:.5, mainGunPitch:.1, bowMachineGunYaw:.1, bowMachineGunPitch:.05});
+motion.SetPose({ turretYaw: .5, mainGunPitch: .1, bowMachineGunYaw: .1 });
 motion.Reset();
 ```
 
-角度为弧度，距离为米，Y-up／-Z 车头。GLB 与履带路径必须成套使用。
-
-## 验收
+左右履带与轮组、整周炮塔、主炮俯仰与后坐、两挺机枪以及舱盖沿用现有独立轴心。车首门与机枪的避让是展示联动。运动审计在 1 毫米门槛下复核导出件。
 
 ```powershell
 node Taierzhuang1938/Script_TestRunner.mjs --domain-only=type89MediumTank --profile=prepush
+node Taierzhuang1938/Script_PropLibraryBrowserTest.mjs
 ```
-
-最终高／低 GLB 分别复测轮轨、固定件、维护姿态及机枪／车首门运动，保留 1 毫米穿入门槛；每组轮与底盘的 210 对整周净空另有连续几何证明。源工程实际重开为 9 材质／25 张 packed 图；实际导出、材质通道及浏览器加载分别核对。证据与边界记录在 [导出验收](Data_ExportAudit.json)、[几何审查](Data_GeometryReviewV3.json)和[材质审查](Data_MaterialReview.json)。

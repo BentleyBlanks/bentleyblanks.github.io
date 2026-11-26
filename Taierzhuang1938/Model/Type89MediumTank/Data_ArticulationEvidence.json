@@ -66,5 +66,14 @@
     "geometryAndRigExact": true,
     "currentBrowserChecks": 28,
     "scope": "Previous triangle-motion proofs retained by exact geometry; current actual artifact motion API rechecked"
+  },
+  "currentReleaseMotionProof": {
+    "geometryVersion": "20261126GeometryV55",
+    "runtimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+    "summary": "Data_ExportAudit.json",
+    "phaseSamples": 36,
+    "browserChecks": 28,
+    "minimumClearanceProofPairs": 210,
+    "passed": true
   }
 }

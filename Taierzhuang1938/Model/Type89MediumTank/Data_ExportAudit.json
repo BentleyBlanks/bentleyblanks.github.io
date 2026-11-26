@@ -1,709 +1,220 @@
 {
-  "schema": "Type89OptionalMaterialReleaseV14",
-  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-10-30T03:29:38.669Z",
-  "geometryVersion": "20261027GeometryV54",
-  "materialRevision": "SurfaceV14",
+  "schema": "Type89RestorationReleaseV55",
+  "reviewedOn": "2026-11-26",
+  "geometryVersion": "20261126GeometryV55",
+  "materialRevision": "SurfaceV15",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
-    "bytes": 90942948,
-    "triangles": 417130,
-    "images": 25,
+    "sha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
+    "bytes": 38921944,
+    "renderedTriangles": 79821,
+    "hardCeiling": 80000,
+    "meshInstances": 257,
+    "trackInstances": 162,
+    "trackTriangles": 33696,
+    "triangleCountMethod": "Sum triangle-list indices on every mesh node reachable from the default GLB scene",
     "materials": 9,
+    "images": 9,
+    "atlasSizes": {
+      "Body": [
+        4096,
+        4096,
+        4096
+      ],
+      "Track": [
+        1024,
+        1024,
+        1024
+      ],
+      "Guard": [
+        1024,
+        1024,
+        1024
+      ]
+    },
     "up": "+Y",
     "nose": "-Z",
-    "metres": true
+    "units": "metres"
   },
-  "sourceProjects": [
-    {
-      "quality": "Game",
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGamePbr.glb",
-      "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
-      "bytes": 90942948,
-      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankGamePbr.blend",
-      "sourceSha256": "736a1affaac7f81a37908e2edecf1557b2cc95eae049c1c3f25430b081b4f655",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankGameSourceExport.glb",
-      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankGamePbr.glb",
-      "baselineSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-      "geometryBufferViewsExact": true,
-      "removedUnusedImagePayloads": 6,
-      "imageRows": [
-        {
-          "role": "Armor",
-          "label": "Base",
-          "image": 4,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
-          "sha256": "6803f8b90388cf37679618a38cdf4107e8fe31913341028c86db367199b40840",
-          "bytes": 5438578,
-          "mime": "image/webp",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Armor",
-          "label": "Orm",
-          "image": 3,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
-          "sha256": "94c767bd1398cc967d0d0bdaa7bf4f8d0517305305b925da330227256728a407",
-          "bytes": 11085402,
-          "mime": "image/webp",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Armor",
-          "label": "MicroCoatData",
-          "image": 0,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
-          "sha256": "b7043d1589098b295937ca66bbc489d681ed5832fb4eb05d475d9f766fde226e",
-          "bytes": 6997300,
-          "mime": "image/webp",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Guard",
-          "label": "Base",
-          "image": 15,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
-          "sha256": "6e6c0e867daa4f81359cadb1b0aec48c9a61a48fc9024b5064537b14f92c92f0",
-          "bytes": 4282013,
-          "mime": "image/png",
-          "opacityPreserved": true
-        },
-        {
-          "role": "Guard",
-          "label": "Orm",
-          "image": 14,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
-          "sha256": "f2ab47928f23eb1a40dd910426516b94f89041c7980254f219b712beff102d7b",
-          "bytes": 736808,
-          "mime": "image/webp",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Guard",
-          "label": "MicroCoatData",
-          "image": 12,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
-          "sha256": "3926f968635d007f23ae97b54650fc41bed50be2401b2176d8d2eee802f53e1f",
-          "bytes": 576526,
-          "mime": "image/webp",
-          "opacityPreserved": false
+  "highSource": {
+    "blend": "Scene_Type89MediumTankHighPbr.blend",
+    "triangles": 1465474,
+    "sha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
+    "referenceSource": "SurfaceV14/Scene_Type89MediumTankHighPbr.blend",
+    "referenceSourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
+    "changes": {
+      "turret": {
+        "retainerVertices": 288,
+        "mantletVertices": 1492,
+        "mantletExtensionM": [
+          0.028,
+          0.025
+        ],
+        "lowerWallEdge": {
+          "selectedEdges": 144,
+          "bevelFaces": 432,
+          "radiusParameterM": 0.0018
         }
-      ]
-    },
-    {
-      "quality": "High",
-      "file": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighPbr.glb",
-      "sha256": "0901864be85007aafb1989ce291e1b6ad0d392ad1cd206b1d3433739ca4ba750",
-      "bytes": 189377124,
-      "source": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankHighPbr.blend",
-      "sourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
-      "sourceExport": "C:\\Users\\Bentl\\.codex\\worktrees\\6497\\bentleyblanks.github.io\\Taierzhuang1938\\_shots\\Type89MediumTank\\SurfaceV14Study\\Model_Type89MediumTankHighSourceExport.glb",
-      "baseline": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV12Release_b24618b4\\Model_Type89MediumTankHighPbr.glb",
-      "baselineSha256": "3ff008c6989b2df3e7a726c7939b95bf02dbcc777aa5d9a6cd07d640db2b3642",
-      "geometryBufferViewsExact": true,
-      "removedUnusedImagePayloads": 6,
-      "imageRows": [
-        {
-          "role": "Armor",
-          "label": "Base",
-          "image": 4,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorBase.png",
-          "sha256": "27d31dc0d5910c91cc10cb50c2d8ef59a1cbcfb3bf6ab2eab08713ba438aca5b",
-          "bytes": 8202542,
-          "mime": "image/png",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Armor",
-          "label": "Orm",
-          "image": 3,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorPoseOrm.png",
-          "sha256": "af9e3b29ae5810376d7c6d8b836a0c301ad856733063f2733415e2235be6b973",
-          "bytes": 20097405,
-          "mime": "image/png",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Armor",
-          "label": "MicroCoatData",
-          "image": 0,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighArmorMicroCoat.png",
-          "sha256": "cdd66da182a047fa02450278126a000a0d25cbc9e683bd47a2a24f6b4867ad71",
-          "bytes": 12015343,
-          "mime": "image/png",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Guard",
-          "label": "Base",
-          "image": 15,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardBase.png",
-          "sha256": "76f43381e2df9f2cc95270907085921392653094b5a74dd14084342f4df56679",
-          "bytes": 2754269,
-          "mime": "image/png",
-          "opacityPreserved": true
-        },
-        {
-          "role": "Guard",
-          "label": "Orm",
-          "image": 14,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardOrm.png",
-          "sha256": "f7f7d86aee3c8294fb87de94e22a6fac6b9fd16b2998a38b41ddee902c04827b",
-          "bytes": 1566405,
-          "mime": "image/png",
-          "opacityPreserved": false
-        },
-        {
-          "role": "Guard",
-          "label": "MicroCoatData",
-          "image": 12,
-          "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\High\\Finished\\Texture_Type89HighGuardMicroCoat.png",
-          "sha256": "ccc6bdf4539a9fc3380a04a213a35529bcfd99a792e948a29023701fca04d17f",
-          "bytes": 1104345,
-          "mime": "image/png",
-          "opacityPreserved": false
+      },
+      "hull": {
+        "rearFenderVertices": 1256,
+        "rearFenderCrownTravelM": [
+          0.055,
+          0.009
+        ],
+        "bowPlatePerimeter": {
+          "selectedEdges": 1,
+          "bevelFaces": 7,
+          "radiusParameterM": 0.0015
         }
-      ]
-    }
-  ],
-  "sourceArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\History\\GeometryV54SurfaceV14Release_5cc41a57",
-  "scriptArchive": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scripts\\GeometryV54SurfaceV14Release_5cc41a57",
-  "sourceRecipe": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
-  "materialProfileSha256": "7fb3bf1edff92e7317bbefe9def1def1c1e21fbdcc63727eeb52c3d41713ced1",
-  "texturePacking": {
-    "version": 4,
-    "method": "Six material image replacements with exact RGB/RGBA roundtrip; unreachable old images removed; every geometry/source-index buffer view retained exactly",
-    "sourceSha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-    "previousPublishedSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
-    "runtimeSha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
-    "beforeBytes": 88407696,
-    "afterBytes": 90942948,
-    "images": [
-      {
-        "role": "Armor",
-        "label": "Base",
-        "image": 4,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorBase.png",
-        "sha256": "6803f8b90388cf37679618a38cdf4107e8fe31913341028c86db367199b40840",
-        "bytes": 5438578,
-        "mime": "image/webp",
-        "opacityPreserved": false
       },
-      {
-        "role": "Armor",
-        "label": "Orm",
-        "image": 3,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorPoseOrm.png",
-        "sha256": "94c767bd1398cc967d0d0bdaa7bf4f8d0517305305b925da330227256728a407",
-        "bytes": 11085402,
-        "mime": "image/webp",
-        "opacityPreserved": false
+      "skirtEdges": {
+        "LeftFront": {
+          "selectedEdges": 64,
+          "bevelFaces": 192,
+          "radiusParameterM": 0.00115
+        },
+        "LeftRear": {
+          "selectedEdges": 41,
+          "bevelFaces": 123,
+          "radiusParameterM": 0.00115
+        },
+        "RightFront": {
+          "selectedEdges": 64,
+          "bevelFaces": 192,
+          "radiusParameterM": 0.00115
+        },
+        "RightRear": {
+          "selectedEdges": 41,
+          "bevelFaces": 123,
+          "radiusParameterM": 0.00115
+        }
       },
-      {
-        "role": "Armor",
-        "label": "MicroCoatData",
-        "image": 0,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameArmorMicroCoat.png",
-        "sha256": "b7043d1589098b295937ca66bbc489d681ed5832fb4eb05d475d9f766fde226e",
-        "bytes": 6997300,
-        "mime": "image/webp",
-        "opacityPreserved": false
-      },
-      {
-        "role": "Guard",
-        "label": "Base",
-        "image": 15,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardBase.png",
-        "sha256": "6e6c0e867daa4f81359cadb1b0aec48c9a61a48fc9024b5064537b14f92c92f0",
-        "bytes": 4282013,
-        "mime": "image/png",
-        "opacityPreserved": true
-      },
-      {
-        "role": "Guard",
-        "label": "Orm",
-        "image": 14,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardOrm.png",
-        "sha256": "f2ab47928f23eb1a40dd910426516b94f89041c7980254f219b712beff102d7b",
-        "bytes": 736808,
-        "mime": "image/webp",
-        "opacityPreserved": false
-      },
-      {
-        "role": "Guard",
-        "label": "MicroCoatData",
-        "image": 12,
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Maps\\Game\\Finished\\Texture_Type89GameGuardMicroCoat.png",
-        "sha256": "3926f968635d007f23ae97b54650fc41bed50be2401b2176d8d2eee802f53e1f",
-        "bytes": 576526,
-        "mime": "image/webp",
-        "opacityPreserved": false
+      "deck": {
+        "Left": {
+          "louvreVerticesLowered": 2692,
+          "archedGrabHandles": 2,
+          "maximumLoweringM": 0.006
+        },
+        "Right": {
+          "louvreVerticesLowered": 1254,
+          "archedGrabHandles": 2,
+          "maximumLoweringM": 0.006
+        }
       }
-    ],
-    "geometryExact": true,
-    "otherImagePayloadsExact": true
-  },
-  "runtimeBrowserAudit": {
-    "pass": true,
-    "checks": [
-      {
-        "name": "Configured vehicle is selectable and never implicitly placed in a campaign",
-        "pass": true
-      },
-      {
-        "name": "Left/right distance clocks are independent",
-        "pass": true
-      },
-      {
-        "name": "Full articulated belt loop closes",
-        "pass": true,
-        "detail": {
-          "positionError": 1.2575485182163106e-7,
-          "rotationError": 2.212979988147623e-8
-        }
-      },
-      {
-        "name": "All wheel surfaces use the same travelled distance",
-        "pass": true,
-        "detail": {
-          "wheelCount": 30,
-          "wheelError": 1.0408340855860843e-15
-        }
-      },
-      {
-        "name": "Turret Y axis and bore recoil work",
-        "pass": true
-      },
-      {
-        "name": "Fore/aft hatches open independently",
-        "pass": true
-      },
-      {
-        "name": "Round bow cover flips fully to reveal its inner badge",
-        "pass": true
-      },
-      {
-        "name": "Engine lids have separate controls",
-        "pass": true
-      },
-      {
-        "name": "Both machine guns retain working local pivots",
-        "pass": true
-      },
-      {
-        "name": "Opening the door resolves its collision-cleared gun stow pose",
-        "pass": true
-      },
-      {
-        "name": "Closing the door restores independent gun aiming",
-        "pass": true
-      },
-      {
-        "name": "Hull machine gun also elevates independently",
-        "pass": true
-      },
-      {
-        "name": "Rear machine gun also traverses independently",
-        "pass": true
-      },
-      {
-        "name": "Rear gun mounting flange stays fixed while the gun aims",
-        "pass": true
-      },
-      {
-        "name": "Open observation cover deploys its real latch pivot",
-        "pass": true
-      },
-      {
-        "name": "Other observation latch remains independently folded",
-        "pass": true
-      },
-      {
-        "name": "Latch folds clear before the cover reaches the hull",
-        "pass": true
-      },
-      {
-        "name": "Reset restores the authored folded latch",
-        "pass": true
-      },
-      {
-        "name": "Poses preserve rigid finite transforms",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameArmor",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameSteel",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameCastArmor",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameExhaust",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameGuard",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameGlass",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameRubber",
-        "pass": true
-      },
-      {
-        "name": "Real mapped PBR and correct colour spaces: Material_Type89GameTrack",
-        "pass": true
-      },
-      {
-        "name": "Glass survives loading as transmission PBR",
-        "pass": true
-      }
-    ],
-    "meshCount": 310,
-    "materials": 9,
-    "rendererTriangles": 834260,
-    "errors": [],
-    "modelUrl": "/Taierzhuang1938/_shots/Type89MediumTank/SurfaceV14Study/Model_Type89MediumTankGamePbr.glb",
-    "trackPathUrl": "/Taierzhuang1938/_shots/Type89MediumTank/SurfaceV14Study/Data_TrackPath.json",
-    "assetSha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b"
-  },
-  "paintFinishAudits": {
-    "Game": {
-      "pass": true,
-      "quality": "Game",
-      "sha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
-      "checks": 168,
-      "imageChecks": [
-        {
-          "role": "Armor",
-          "baseChanges": 5712913,
-          "roughChanges": 5750728,
-          "maxColourDelta": 59,
-          "newMetal": 61073,
-          "isolatedMetal": 0,
-          "aoChanged": 0,
-          "opacityChanged": 0,
-          "hiddenRgbChanged": 0,
-          "goldCount": 228,
-          "goldChanges": 0
-        },
-        {
-          "role": "Guard",
-          "baseChanges": 2315936,
-          "roughChanges": 633471,
-          "maxColourDelta": 87,
-          "newMetal": 11508,
-          "isolatedMetal": 0,
-          "aoChanged": 0,
-          "opacityChanged": 0,
-          "hiddenRgbChanged": 0,
-          "goldCount": 0,
-          "goldChanges": 0
-        }
-      ],
-      "geometryAndRigExact": true,
-      "allOtherImagePayloadsExact": true,
-      "detailedReview": "Data_PaintFinishReview.json"
     },
-    "High": {
-      "pass": true,
-      "quality": "High",
-      "sha256": "0901864be85007aafb1989ce291e1b6ad0d392ad1cd206b1d3433739ca4ba750",
-      "checks": 168,
-      "imageChecks": [
-        {
-          "role": "Armor",
-          "baseChanges": 5156506,
-          "roughChanges": 5240796,
-          "maxColourDelta": 45,
-          "newMetal": 42566,
-          "isolatedMetal": 0,
-          "aoChanged": 0,
-          "opacityChanged": 0,
-          "hiddenRgbChanged": 0,
-          "goldCount": 203,
-          "goldChanges": 0
-        },
-        {
-          "role": "Guard",
-          "baseChanges": 651311,
-          "roughChanges": 325301,
-          "maxColourDelta": 51,
-          "newMetal": 3034,
-          "isolatedMetal": 0,
-          "aoChanged": 0,
-          "opacityChanged": 0,
-          "hiddenRgbChanged": 0,
-          "goldCount": 0,
-          "goldChanges": 0
-        }
-      ],
-      "geometryAndRigExact": true,
-      "allOtherImagePayloadsExact": true,
-      "detailedReview": "Data_PaintFinishReview.json"
+    "packedImages": 25
+  },
+  "gameSource": {
+    "blend": "Game/Scene_Type89MediumTankGamePbr.blend",
+    "triangles": 79933,
+    "sha256": "31343413417ea739258ba7d88ded457fa347df2c109938a874ced2eefdcf7151",
+    "bakeSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
+    "exportBeforePackingSha256": "976fc9b909823ea4c37ae581640c3cf98e92eadc486ecf4c54a658b76793e030",
+    "removedByZeroAreaCleanup": 54,
+    "removedOnExplicitTriangulation": 0,
+    "facesOmittedByBlenderExporter": 58,
+    "totalDifferencesByMeshInstance": {
+      "Mesh_BowMgJacket": 56,
+      "Mesh_RoadWheelLeft01": 2,
+      "Mesh_RoadWheelLeft02": 2,
+      "Mesh_RoadWheelLeft03": 2,
+      "Mesh_RoadWheelLeft04": 2,
+      "Mesh_RoadWheelLeft05": 2,
+      "Mesh_RoadWheelLeft06": 2,
+      "Mesh_RoadWheelLeft07": 2,
+      "Mesh_RoadWheelLeft08": 2,
+      "Mesh_InboardIdlerSupportLeft": 17,
+      "Mesh_RoadWheelRight01": 1,
+      "Mesh_RoadWheelRight02": 1,
+      "Mesh_RoadWheelRight03": 1,
+      "Mesh_RoadWheelRight04": 1,
+      "Mesh_RoadWheelRight05": 1,
+      "Mesh_RoadWheelRight06": 1,
+      "Mesh_RoadWheelRight07": 1,
+      "Mesh_RoadWheelRight08": 1,
+      "Mesh_InboardIdlerSupportRight": 15
     }
   },
-  "geometryAndArticulationBaseline": {
-    "sha256": "b24618b4b24b922ae2b4869e1ae25ba7bc8310e5b8eb47737e1120ed584d429a",
-    "previousPublishedSha256": "9a9e1160ba35af82d58c04ba15698f536c96ff525b3ec30812e556ef54ceb89f",
-    "geometryAndRigExact": true,
-    "previousTriangleSweepsRetainedByExactGeometry": true
-  },
-  "optionalConfiguration": {
-    "catalogId": "type89MediumTank",
-    "campaignEnabled": false,
-    "lazyLoaded": true
-  },
-  "scopeLimitations": [
-    "Museum appearance and inferred microtexture; no original paint, factory motion-stop or hidden-construction certification.",
-    "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
-    "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
-  ],
-  "localEvidenceOnly": true,
-  "canonicalSourceAudit": {
-    "pass": true,
-    "sourceProjects": [
+  "motion": {
+    "phaseSamples": 36,
+    "independentLinks": 162,
+    "independentWheelGroups": 30,
+    "maximumWheelTrackPenetrationM": 0.0009561977640260011,
+    "maximumFixedCoverPenetrationM": 0.0,
+    "maximumHardwarePenetrationM": 9.784048597794026e-05,
+    "maximumFrontIdlerFixedPenetrationM": 0.0007579922677071993,
+    "penetrationCeilingM": 0.001,
+    "continuousFixedWheelPairs": 210,
+    "bowDoorControlInputPoses": 1775,
+    "driverShutterSweepPoses": 814,
+    "maintenanceSweepPoses": 44,
+    "runtimeBrowserChecks": 28,
+    "entryPoints": [
       {
-        "quality": "High",
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankHighPbr.blend",
-        "sha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
-        "sourceReopened": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankHighPbr.blend",
-        "activePackedImages": 25,
-        "materials": 9
+        "tool": "PropLibrary",
+        "renderedTriangles": 79821,
+        "webglError": 0
       },
       {
-        "quality": "Game",
-        "file": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\Scene_Type89MediumTankGamePbr.blend",
-        "sha256": "736a1affaac7f81a37908e2edecf1557b2cc95eae049c1c3f25430b081b4f655",
-        "sourceReopened": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type89MediumTank\\SurfaceV14\\Scene_Type89MediumTankGamePbr.blend",
-        "activePackedImages": 25,
-        "materials": 9
+        "tool": "WeaponInspection",
+        "renderedTriangles": 79821,
+        "webglError": 0
       }
     ]
   },
-  "libraryHighQualityAudit": {
-    "pass": true,
-    "checks": [
+  "photoEvidence": {
+    "matchedOriginals": [
       {
-        "name": "Lazy load uses the configured release URL",
-        "pass": true,
-        "detail": [
-          "http://127.0.0.1:7528/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261030GeometryV54SurfaceV14"
-        ]
+        "id": 2,
+        "medianManualAnchorResidualPxAt640": 4.664
       },
       {
-        "name": "Complete final tank loads with physical PBR and all moving parts",
-        "pass": true,
-        "detail": {
-          "meshes": 310,
-          "materials": 9,
-          "links": 162,
-          "wheels": 30,
-          "physical": 4,
-          "normalSize": [
-            8192
-          ]
-        }
+        "id": 16,
+        "medianManualAnchorResidualPxAt640": 7.461
       },
       {
-        "name": "履带与轮组",
-        "pass": true,
-        "detail": {
-          "before": {
-            "left": 0.016904999999995923,
-            "right": 0.016904999999995923,
-            "turret": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
-            ]
-          },
-          "after": {
-            "mode": "tracks",
-            "left": 0.19928999999999786,
-            "right": 0.19928999999999786,
-            "turret": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
-            ]
-          }
-        }
+        "id": 17,
+        "medianManualAnchorResidualPxAt640": 7.213
       },
       {
-        "name": "炮塔与主炮",
-        "pass": true,
-        "detail": {
-          "before": {
-            "left": 0,
-            "right": 0,
-            "turret": [
-              0,
-              0.007499929687698038,
-              0,
-              0.9999718751318357
-            ],
-            "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
-            ]
-          },
-          "after": {
-            "mode": "turret",
-            "left": 0,
-            "right": 0,
-            "turret": [
-              0,
-              0.07160267460371696,
-              0,
-              0.9974332343518508
-            ],
-            "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
-            ]
-          }
-        }
+        "id": 18,
+        "medianManualAnchorResidualPxAt640": 5.32
       },
       {
-        "name": "两挺机枪",
-        "pass": true,
-        "detail": {
-          "before": {
-            "left": 0,
-            "right": 0,
-            "turret": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "bow": [
-              -0.33005699081666134,
-              0.0022071680039337832,
-              -0.0007782692074297313,
-              0.9439582033213834
-            ]
-          },
-          "after": {
-            "mode": "machineGuns",
-            "left": 0,
-            "right": 0,
-            "turret": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "bow": [
-              -0.31473217131435893,
-              0.028549024854334998,
-              -0.010584393236859372,
-              0.9486921356465773
-            ]
-          }
-        }
+        "id": 19,
+        "medianManualAnchorResidualPxAt640": 4.502
       },
       {
-        "name": "全部联动",
-        "pass": true,
-        "detail": {
-          "before": {
-            "left": 0,
-            "right": 0,
-            "turret": [
-              0,
-              0,
-              0,
-              1
-            ],
-            "bow": [
-              -0.33130037784576416,
-              0,
-              0,
-              0.9435254335403442
-            ]
-          },
-          "after": {
-            "mode": "all",
-            "left": 0.1924999999999999,
-            "right": 0.13749999999999998,
-            "turret": [
-              0,
-              0.06595209443502233,
-              0,
-              0.9978227904992117
-            ],
-            "bow": [
-              -0.3150918443279125,
-              0.027956008376477312,
-              -0.0103526836569493,
-              0.9485929565799172
-            ]
-          }
-        }
+        "id": 20,
+        "medianManualAnchorResidualPxAt640": 8.786
       },
       {
-        "name": "Stop restores the authored rest pose",
-        "pass": true,
-        "detail": {
-          "Left": 0,
-          "Right": 0
-        }
+        "id": 39,
+        "medianManualAnchorResidualPxAt640": 4.074
       },
       {
-        "name": "Full high-quality renderer emits no errors",
-        "pass": true,
-        "detail": []
+        "id": 40,
+        "medianManualAnchorResidualPxAt640": 3.218
       }
     ],
-    "requests": [
-      "http://127.0.0.1:7528/Taierzhuang1938/Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261030GeometryV54SurfaceV14"
+    "detailedOriginals": [
+      35,
+      36,
+      37,
+      38,
+      41
     ],
-    "errors": []
+    "poseAndLighting": "2007 matched review pose and open-yard light approximation, plus an independent neutral area-light setup. 2025 photos compare the closed silhouette and distinguish attachment state.",
+    "photoAlignmentLimits": "Perspective and occlusion limit several component correspondences, especially around poles, cables, the far-side running gear and rear corners. The material finish is inferred from the appearance of the retained car in the photos.",
+    "detailsTransferredToMaps": [
+      "Flange pin-eye and small outer keyways",
+      "Small hardware radii",
+      "Paint film and cast metal microtexture"
+    ],
+    "evidenceLocal": "Review/Comparisons, Review/Browser, Review/Data_PhotoAlignment.json, Review/Data_GameMotionReleased.json"
   },
-  "assetCheckCount": 668,
-  "domainChecks": {
-    "passed": 5,
-    "failed": 0
-  },
-  "motionVectorChecks": {
-    "passed": 49,
-    "failed": 0
-  },
-  "historicalLedgerReview": {
-    "notionRowsUnchanged": true,
-    "existingInferredAppearanceBoundaryCoversRefinement": true
-  },
-  "blenderCleanup": {
-    "ownedRunningInstances": 0,
-    "method": "Controlled batch exits after each source operation; status --scan confirmed no owned instance"
-  }
+  "referenceArchive": "Data_ReferenceArchive.json",
+  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV15",
+  "photographsAndSourceRemainLocal": true
 }

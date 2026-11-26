@@ -54,33 +54,33 @@
   "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
-  "geometryVersion": "20261027GeometryV54",
-  "materialRevision": "SurfaceV14",
-  "runtimeTriangleTarget": 400000,
-  "runtimeTriangleCeiling": 420000,
-  "runtimeRenderedTriangles": 417130,
-  "sourceTrianglesBeforeExportCleanup": 1462012,
-  "selectedGameSourceTrianglesBeforeCleanup": 419856,
-  "selectedGameVisibleSourceTrianglesBeforeZeroAreaCleanup": 417264,
-  "exportRemovedZeroAreaTriangles": 132,
-  "exportRemovedWhollyEnclosedTriangles": 2592,
-  "budgetPolicy": "PreserveSelectedVisibleGameTopologyWithinFivePercentWithCertifiedEnclosure",
+  "geometryVersion": "20261126GeometryV55",
+  "materialRevision": "SurfaceV15",
+  "runtimeTriangleTarget": 80000,
+  "runtimeTriangleCeiling": 80000,
+  "runtimeRenderedTriangles": 79821,
+  "sourceTrianglesBeforeExportCleanup": 1465474,
+  "selectedGameSourceTrianglesBeforeCleanup": 79933,
+  "selectedGameVisibleSourceTrianglesBeforeZeroAreaCleanup": 79933,
+  "exportRemovedZeroAreaTriangles": 54,
+  "exportRemovedWhollyEnclosedTriangles": 0,
+  "budgetPolicy": "HighDerivedGameHardCeiling",
   "linksPerSide": 81,
   "castingPitchM": 0.13075591189150385,
   "materialCount": 9,
-  "activePackedImages": 25,
-  "status": "TechnicallyAndVisuallyReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-10-30T03:29:38.669Z",
-  "reviewScope": "Aged paint: bounded chips beside real convex edges, worn primer, upward fading and lower/cavity dust. Exact geometry/rig/UV/normal/AO continuity and effective opacity retained; badge protected.",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank",
+  "activePackedImages": 9,
+  "status": "AuthorReviewedWithDeclaredInferences",
+  "reviewedAt": "2026-11-26",
+  "reviewScope": "Matched 2007 appearance, five closed 2025 views and two auxiliary rear/side views. High-model local geometry and material edits, independent rigid nodes and a new full-vehicle game mesh.",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV15",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
-  "gameProject": "Scene_Type89MediumTankGamePbr.blend",
+  "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
-  "geometryRecipeSha256": "72e44ce429a524873848ec9d9772ac5c46e2b866221baf3d9ec177bc0ae715fa",
+  "geometryRecipeSha256": "9cb5a6862cea20a2365511d3efb020e15010cbf59f6c7752e89f00eede7c8335",
   "materialReview": "Data_MaterialReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "5cc41a570eb9d580b6262aeddcffde11b41bf804a2e78f99848fca327298d49b",
+  "runtimeSha256": "e63b35fddffb4cbe3e12ab9f0c03e3f39af376a849b58c59ebaecaf04729e7e3",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -90,29 +90,43 @@
   "surfaceContract": {
     "sets": [
       "Armor",
+      "CastArmor",
       "Steel",
       "Track",
       "Rubber",
       "Exhaust",
       "Glass",
       "Guard",
-      "CastArmor"
+      "Shadow"
     ],
     "channels": "sRGB Base; linear OpenGL Normal; ORM R=AO G=roughness B=metallic",
-    "armor": "4096Base/8192Normal/4096ORM",
-    "method": "Complete SurfaceV12 substrate plus retained V13 fine satin coating, with SourceV14 read-only geometric edge/context masks for inferred paint aging",
-    "microSurface": {
-      "tileRmsSlope": 0.11,
-      "filmTileM": 0.126,
-      "castTileM": 0.16,
-      "appearanceInference": true,
-      "rolledNormalScale": 0.55,
-      "castNormalScale": 0.45
+    "atlases": {
+      "Body": [
+        4096,
+        4096,
+        4096
+      ],
+      "Track": [
+        1024,
+        1024,
+        1024
+      ],
+      "Guard": [
+        1024,
+        1024,
+        1024
+      ]
     },
+    "methods": [
+      "Selected-to-active high surface projection in stable rest transforms",
+      "High assembly AO multiplied by newly baked short-range contact AO",
+      "Neutral tangent fallback at invalid or reverse-facing samples",
+      "Game exhaust sheet cutout from the high hole pattern"
+    ],
     "extensions": [
       "KHR_materials_clearcoat",
-      "KHR_materials_specular",
-      "KHR_texture_transform"
+      "KHR_materials_transmission",
+      "EXT_texture_webp"
     ]
   },
   "scopeLimitations": [
@@ -120,7 +134,7 @@
     "Photographic perspective and local form matching retain uncertainty; this is not a scan-identical replica.",
     "Door/gun stow linkage is a collision-cleared display reconstruction, not a verified original operating procedure."
   ],
-  "exportTriangulationZeroAreaTriangles": 2,
-  "paintFinishProfile": "Data_PaintFinishProfile.json",
-  "paintFinishReview": "Data_PaintFinishReview.json"
+  "exportTriangulationZeroAreaTriangles": 0,
+  "exporterOmittedTriangles": 58,
+  "highSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1"
 }

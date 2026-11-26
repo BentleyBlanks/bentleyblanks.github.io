@@ -235,7 +235,7 @@ if int(geometryVersion.split('GeometryV')[-1])>=44:
         if 'mesh'in node and i not in gunParts:
             geom=Geometry(i,fixedWorld);targets[i]=(Bvh(geom),Bounds(geom))
     lowerFoot=MaterialGeometry(mountIndex,fixedWorld,'Armor',True);assert len(lowerFoot[1])>4
-    lowerTree=Bvh(lowerFoot);contacts=[];poses=0;nearby=0
+    lowerTree=Bvh(lowerFoot);rearContacts=[];poses=0;nearby=0
     for yaw in [-10,-5,0,5,10]:
         for pitch in [-10,-5,0,5,10]:
             pose={gunIndex:static[gunIndex]@Matrix.Rotation(math.radians(yaw),4,'Y')@Matrix.Rotation(math.radians(pitch),4,'X')};world=World(pose)
@@ -243,10 +243,10 @@ if int(geometryVersion.split('GeometryV')[-1])>=44:
             for target,(targetTree,targetBounds)in targets.items():
                 if not BoundsOverlap(bounds,targetBounds):continue
                 nearby+=1;pairs=tree.overlap(targetTree)
-                if pairs:contacts.append({'yaw':yaw,'pitch':pitch,'moving':'Sheath','target':g['nodes'][target]['name'],'trianglePairs':len(pairs)})
+                if pairs:rearContacts.append({'yaw':yaw,'pitch':pitch,'moving':'Sheath','target':g['nodes'][target]['name'],'trianglePairs':len(pairs)})
             ball=MaterialGeometry(gunIndex,world,'Armor');pairs=Bvh(ball).overlap(lowerTree)
-            if pairs:contacts.append({'yaw':yaw,'pitch':pitch,'moving':'Ball','target':'LowerFixedMountRegion','trianglePairs':len(pairs)})
-    rearGunSweep={'pass':not contacts,'sampledPoses':poses,'testedNearbyPairs':nearby,'intersections':contacts,'scope':'Actual Steel sheath versus every other exported mesh; moving Armor ball versus fixed mount below localY=-114mm. Intended ball/socket contact is excluded.'}
+            if pairs:rearContacts.append({'yaw':yaw,'pitch':pitch,'moving':'Ball','target':'LowerFixedMountRegion','trianglePairs':len(pairs)})
+    rearGunSweep={'pass':not rearContacts,'sampledPoses':poses,'testedNearbyPairs':nearby,'intersections':rearContacts,'scope':'Actual Steel sheath versus every other exported mesh; moving Armor ball versus fixed mount below localY=-114mm. Intended ball/socket contact is excluded.'}
 
 # A recessed shutter must rotate behind its peeper plate without touching the
 # plate, knob, rivets or any other nearby exported mesh as the whole visor lifts.
