@@ -517,16 +517,20 @@ def BakeKnurl(quadrants, width, height, index, reference):
     sourceWidth, sourceHeight = 2 * (width - pad), 2 * (height - pad)
     maps = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference)
     first, last = ATLAS["knurlSourceV"]
-    columns = pad + 2 * np.clip(np.arange(width) - pad, 0, width - 2 * pad)
+    across = np.clip((np.arange(width) - pad) / (width - 2 * pad - 1), 0, 1)
+    columns = pad + across * (sourceWidth - 2 * pad - 1)
     fraction = np.clip((np.arange(height) - pad) / (height - 2 * pad), 0, 1)
     rows = pad + (1 - last + (last - first) * fraction) * (sourceHeight - 2 * pad)
-    lower = rows.astype(np.int32)
-    blend = (rows - lower)[:, None, None]
-    return [
-        np.rint((1 - blend) * pixels[lower[:, None], columns]
-                + blend * pixels[lower[:, None] + 1, columns]).astype(np.uint8)
-        for pixels in maps
-    ]
+    lower, left = rows.astype(np.int32), columns.astype(np.int32)
+    blendV, blendU = (rows - lower)[:, None, None], (columns - left)[None, :, None]
+    output = []
+    for pixels in maps:
+        vertical = (1 - blendV) * pixels[lower] + blendV * pixels[lower + 1]
+        tile = (1 - blendU) * vertical[:, left] + blendU * vertical[:, left + 1]
+        # Extend the matched texels through padding before WebP encoding.
+        SeamBlend(tile, pixels=3)
+        output.append(np.rint(tile).astype(np.uint8))
+    return output
 
 
 def BuildAtlas(reference):
