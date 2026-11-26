@@ -569,6 +569,15 @@ def BakeRegion(name, sample, size, index, reference):
         rough += (finishRoughness - rough) * weight
         metal += (finishMetal - metal) * weight
         heightField *= 1 - smoothing * weight
+    if name == "Stem":
+        # The brightest parts of the registered wear expose polished steel.
+        # Let them pick up the light while the surrounding scratches stay visible.
+        exposedSteel = ReferenceField(closeup, xx, vv, "rubbedCoverage") / 100
+        polished = .72 * np.clip((exposedSteel - .32) / .63, 0, 1) ** 1.15
+        polishedColor = SrgbToLinear(np.array([207, 188, 165], dtype=np.float32) / 255)
+        linear += (polishedColor - linear) * polished[..., None]
+        rough += (.345 - rough) * polished
+        metal += (.83 - metal) * polished
     if name == "RearEye":
         front, reverse = EyeWear(reference["ringFinish"], xx, vv)
         front *= (1 - .31 * darkPits)
@@ -606,7 +615,7 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Saddle":
         base += .035 * shoeCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Stem":
-        base += .031 * stemCoverage[..., None] * LUMA_NEUTRAL_WARMTH
+        base += .051 * stemCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     if name == "Knurl":
         ao *= 1 - .31 * grooves
