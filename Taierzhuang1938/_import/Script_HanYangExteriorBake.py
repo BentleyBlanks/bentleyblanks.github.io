@@ -23,7 +23,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261126R28'
+version = '173R-20261126R29'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -240,7 +240,7 @@ for node in doc['nodes']:
         if channel==0:
             mask=pixels[:,:,3]>0;coverage=float(mask.mean());assert coverage>.0001,(name,coverage)
             missing=ndimage.distance_transform_edt(~mask,return_distances=False,return_indices=True)
-        rgb=np.ascontiguousarray(pixels[missing[0],missing[1],:3]); output=io.BytesIO();Image.fromarray(rgb).save(output,'WEBP',lossless=True,method=1)
+        rgb=np.ascontiguousarray(pixels[missing[0],missing[1],:3]); output=io.BytesIO();Image.fromarray(rgb).save(output,'WEBP',lossless=True,method=4)
         content=output.getvalue();assert np.array_equal(rgb,np.asarray(Image.open(io.BytesIO(content)).convert('RGB')))
         tex=doc['textures'][slot['index']];image=doc['images'][tex['extensions']['EXT_texture_webp']['source'] if 'extensions' in tex else tex['source']]
         tex.pop('source',None);tex['extensions']={'EXT_texture_webp':{'source':doc['images'].index(image)}};tex['sampler']=0
@@ -297,8 +297,9 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R28: scanned steel patina, geometry-based rim wear, a formed rear-band rib and broader exterior bevels.'
+report['rebake']='R29: non-periodic scan patches, shaped walnut growth rings, worn oil and differentiated steel reflectance.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
+report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)
 report['exteriorFinish']['ringPresentation']=ringPresentation
 report['exteriorFinish']['frontTrimPresentation']='Underside silhouette, rigid display pose estimated from the Lu profile photograph.'
