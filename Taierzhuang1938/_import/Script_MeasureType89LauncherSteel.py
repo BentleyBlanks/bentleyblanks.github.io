@@ -113,7 +113,7 @@ def PhotoResiduals(image):
     return tone, warmth, lightness
 
 
-def SaveDetailPlate(tone, warmth, confidence, xs, ys, path):
+def SaveDetailPlate(tone, warmth, confidence, xs, ys, path, *, halfSize=True):
     height, width = xs.shape
     us, vs = np.meshgrid(np.linspace(0, 1, width), np.linspace(0, 1, height))
     edge = np.clip(14 * np.minimum(np.minimum(us, 1 - us), np.minimum(vs, 1 - vs)), 0, 1)
@@ -122,7 +122,9 @@ def SaveDetailPlate(tone, warmth, confidence, xs, ys, path):
                 128 + warmthScale * SampleBilinear(warmth, xs, ys),
                 255 * edge * SampleBilinear(confidence, xs, ys)]
     encoded = np.rint(np.clip(np.stack(channels, axis=-1), 0, 255)).astype(np.uint8)
-    detail = Image.fromarray(encoded).resize((width // 2, height // 2), Image.Resampling.LANCZOS)
+    detail = Image.fromarray(encoded)
+    if halfSize:
+        detail = detail.resize((width // 2, height // 2), Image.Resampling.LANCZOS)
     detail.save(path, optimize=True)
     return {"file": path.name, "sha256": sha256(path.read_bytes()).hexdigest(),
             "toneScale": toneScale, "warmthScale": warmthScale}
@@ -480,15 +482,16 @@ def KnurlWear(image, bounds):
     irregularTone, irregularWarmth = (signals - basis @ fitted).T.reshape(2, h, w)
 
     # This photo crop matches the visible UV window in the side inspection.
-    # U crosses the UV seam, while V follows the horizontal axis in the photo.
+    # V increases to the right and U increases down in the rotated photo.
+    # The grip sits below the stem in this orientation, across the U seam.
     center, halfSpan = .02227, .09188
     footprint = {"uCenter": center, "uHalfSpan": halfSpan, "vRange": [.44433, .69863]}
     us, vs = np.meshgrid(np.linspace(0, 1, 200), np.linspace(0, 1, 216))
     srcX = (w - 1.01) * vs
     arc = np.sin(2 * np.pi * halfSpan * (2 * us - 1)) / np.sin(2 * np.pi * halfSpan)
-    srcY = (h - 1.01) * (.5 - .5 * arc)
+    srcY = (h - 1.01) * (.5 + .5 * arc)
     confidence = np.clip((247 - lightness) / 25, 0, 1)
-    detail = SaveDetailPlate(irregularTone, irregularWarmth, confidence, srcX, srcY, KNURL_DETAIL)
+    detail = SaveDetailPlate(irregularTone, irregularWarmth, confidence, srcX, srcY, KNURL_DETAIL, halfSize=False)
     return {"footprint": footprint, "detail": detail,
             "removedFrequencies": [[round(x, 5), round(y, 5)] for x, y in frequencies]}
 

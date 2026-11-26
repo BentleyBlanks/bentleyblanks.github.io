@@ -31,9 +31,10 @@
 - 菱纹握部保留第 3 张近照量出的菱纹密度，按暗槽积色、棱部露钢和局部崩点分配底色、粗糙度与浅凹法线。以同一裁剪尺寸和机位核对两组布光的细节对比度。2K 底色与 1K ORM 编码沿用原设置，调整 2K 法线编码后整套低于 1 MiB。 [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 筒身箍圈的外环单独展开，轴向有效采样由约 27 增至 136 像素。第 7 张近照以箍圈暗缝定位采样，滤去宽反光后保留左侧露钢的点蚀和右侧褐色氧化斑。按正视、斜视和两套照明检查光泽过渡。周围小件沿用共用钢材配方。 [箍圈采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 菱纹握部从第 3 张近照滤去宽反光及主要重复频率，再把不规则崩点和积色配准到可见 UV 窗口。每格菱纹的磨平程度还从 OpenAI 钢材底图取样。以正视的两套照明和斜视复核点蚀与棱边高光，同时复测箍圈。 [磨损采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 用同一张照片中的支柱和握部轮廓校正亮斑、崩点和氧化残留的配准方向。菱面按较哑的钢表面处理，擦亮区用近照的局部色差与 OpenAI 钢材细纹共同决定。滚花独占原图集区域后，近照对应部位的纵向有效采样从约 104 增至 200 像素。检查台默认灯下，滚花正视截面的宽幅明暗差从 93 降至 67 个灰阶，细节对比度为 0.274，馆藏近照为 0.278。
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV14/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV16/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

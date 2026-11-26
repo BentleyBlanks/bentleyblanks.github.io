@@ -24,7 +24,7 @@ FINISHES = {
     "Barrel": (0, (184, 178, 162), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
     "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
-    "Knurl": (3, (150, 148, 140), (61, 55, 47), .49, (.36, .64), (.95, .44), .79),
+    "Knurl": (3, (145, 140, 135), (86, 79, 74), .49, (.392, .622), (.947, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
     "Tab": (2, (158, 149, 136), (86, 73, 60), .51, (.35, .68), (.95, .41), .73),
@@ -367,12 +367,14 @@ def BakeRegion(name, sample, size, index, reference):
         photoWarmth *= coverage
         wornHeight = np.clip(.91 + .16 * cellWear, .55, 1.11) * (1 - .10 * coverage)
         exposedArea = np.clip((diamonds - .26) / .56, 0, 1)
-        chippedCrests = exposedArea * np.clip(.60 + .16 * chip + .22 * cellWear - .13 * medium, .09, 1)
-        tonalDelta += 6.8 * chip + 3.3 * (shoulders - .45) - 5.5 * grooves + 101 * photoTone
-        heightField += 1.43 * shoulders * wornHeight + .12 * chip * shoulders + .21 * photoTone
+        polish = np.clip(.39 + .19 * chip + .29 * cellWear + .75 * photoTone
+                         - .95 * np.maximum(photoWarmth, 0), .02, 1)
+        chippedCrests = exposedArea * polish
+        tonalDelta += 6.4 * chip + 15.5 * (shoulders - .45) - 7.6 * grooves + 112 * photoTone
+        heightField += 1.56 * shoulders * wornHeight + .12 * chip * shoulders + .28 * photoTone
         oxidation += .127 * grooves + .10 * photoWarmth
         warmth += .32 * photoWarmth
-        roughnessDelta += .075 * grooves - .047 * shoulders - .11 * photoTone
+        roughnessDelta += .071 * grooves + .092 * shoulders - .14 * photoTone
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -432,17 +434,17 @@ def BakeRegion(name, sample, size, index, reference):
         rough += (.666 - rough) * oxidized - .063 * exposed
         metal += (.46 - metal) * oxidized + (.91 - metal) * exposed
     if name == "Knurl":
-        # The dark bottoms retain oxide while worn metal catches light on
-        # the irregular diamond shoulders.
+        # The groove bottoms retain oxide. Small worn patches catch sharper
+        # reflections within the satin finish on the diamond shoulders.
         dark = .83 * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
         recessColor = SrgbToLinear(np.array([40, 36, 30], dtype=np.float32) / 255)
         linear += (recessColor - linear) * dark[..., None]
         rough += (.73 - rough) * dark
         metal += (.30 - metal) * dark
-        exposed = .65 * chippedCrests
+        exposed = .77 * chippedCrests
         crestColor = SrgbToLinear(np.array([159, 152, 140], dtype=np.float32) / 255)
         linear += (crestColor - linear) * exposed[..., None]
-        rough += (.378 - rough) * exposed
+        rough += (.322 - rough) * exposed
         metal += (.94 - metal) * exposed
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
@@ -508,6 +510,25 @@ def ResizeSharedCollar(maps, width, height):
     return output
 
 
+def BakeKnurl(quadrants, width, height, index, reference):
+    # The grip chart now covers just the patterned bands. Evaluate the finish
+    # in the original coordinates so the measured diamond pitch stays fixed.
+    pad = ATLAS["padding"]
+    sourceWidth, sourceHeight = 2 * (width - pad), 2 * (height - pad)
+    maps = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference)
+    first, last = ATLAS["knurlSourceV"]
+    columns = pad + 2 * np.clip(np.arange(width) - pad, 0, width - 2 * pad)
+    fraction = np.clip((np.arange(height) - pad) / (height - 2 * pad), 0, 1)
+    rows = pad + (1 - last + (last - first) * fraction) * (sourceHeight - 2 * pad)
+    lower = rows.astype(np.int32)
+    blend = (rows - lower)[:, None, None]
+    return [
+        np.rint((1 - blend) * pixels[lower[:, None], columns]
+                + blend * pixels[lower[:, None] + 1, columns]).astype(np.uint8)
+        for pixels in maps
+    ]
+
+
 def BuildAtlas(reference):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -528,6 +549,8 @@ def BuildAtlas(reference):
             # this chart. The outer ring now has its own measured surface.
             previous = height + ATLAS["regions"]["CollarRing"][3]
             tile = ResizeSharedCollar(BakeRegion(name, quadrants, (width, previous), index, reference), width, height)
+        elif name == "Knurl":
+            tile = BakeKnurl(quadrants, width, height, index, reference)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):

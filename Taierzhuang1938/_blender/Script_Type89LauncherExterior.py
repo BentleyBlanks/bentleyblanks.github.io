@@ -237,7 +237,8 @@ def BuildExterior():
         sides=48, center=(.039, .017), tile="Wheel", toothed=True)
     Revolve(collection, "KnurledSideGrip", [(.427, .009), (.451, .009), (.455, .0165),
         (.461, .018), (.503, .018), (.508, .016), (.510, .009), (.520, .009)],
-        sides=32, center=(.046, .019), tile="Knurl", bandTiles={0: "Collar", 1: "Collar", 5: "Collar", 6: "Collar"})
+        sides=32, center=(.046, .019), tile="Collar", bandTiles={2: "Knurl", 3: "Knurl", 4: "Knurl"},
+        localChart="Knurl")
     OvalLoop(collection, "SmallSideEye", (.046, .019, .529), .008, .014, .0023)
     FlatPart(collection, "SideBracket", [(-.013, .418), (.004, .413), (.032, .417),
         (.039, .433), (.020, .442), (-.010, .446), (-.022, .436)], .012, .043, "Collar")

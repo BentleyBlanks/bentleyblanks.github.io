@@ -2,6 +2,7 @@
   "size": 2048,
   "padding": 12,
   "wheelPatterns": 4,
+  "knurlSourceV": [0.3144656123, 0.8327999897],
   "regions": {
     "Barrel": [0, 0, 960, 1280],
     "Stem": [960, 0, 544, 1280],
