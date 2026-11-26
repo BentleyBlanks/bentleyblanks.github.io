@@ -284,9 +284,15 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += 125 * neckDetail - (2.7 * detail + 1.2 * medium) * neckCoverage
         warmth += .42 * neckWarmth * neckCoverage
     if name in ("Tab", "TabBack"):
-        tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, xx, sampledV)
+        # Register the narrow photographed grain to the runtime texel centers.
+        texelU = xx + .5 / (width - 2 * padding)
+        texelV = vv - .5 / (height - 2 * padding)
+        u, lower, upper = np.asarray(closeup["outlineUV"], dtype=np.float32).T
+        bottom = np.interp(texelU[0], u, lower)
+        top = np.interp(texelU[0], u, upper)
+        tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, texelU, (texelV - bottom) / (top - bottom))
         tabDetail = tabTone * tabCoverage
-        photoGain = 94 if name == "Tab" else 103
+        photoGain = 80 if name == "Tab" else 103
         tonalDelta += photoGain * tabDetail - (2.7 * detail + 1.0 * medium) * tabCoverage
         warmth += .28 * tabWarmth * tabCoverage
     if name == "Saddle":
@@ -604,6 +610,11 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (exposed - linear) * polished[..., None]
         rough += (gloss - rough) * polished
         metal += (metalFinish - metal) * polished
+        if name == "Tab":
+            # The oxidized steel has a softer, dimmer reflection between the rub marks.
+            matteFinish = tabCoverage * (1 - wear)
+            rough += .08 * matteFinish
+            metal += .065 * matteFinish
     if name == "RearEye":
         front, reverse = EyeWear(reference["ringFinish"], xx, vv)
         front *= (1 - .31 * darkPits)
@@ -627,6 +638,9 @@ def BakeRegion(name, sample, size, index, reference):
     if name in ("Tab", "TabBack"):
         coolTab = .017 if name == "Tab" else .009
         base -= coolTab * tabCoverage[..., None] * LUMA_NEUTRAL_WARMTH
+        if name == "Tab":
+            brightWear = np.clip((measuredTone - 4) / 24, 0, 1) * tabCoverage
+            base += .110 * brightWear[..., None]
     if name == "Barrel":
         coolPatina = .029 * near * (.40 + .60 * oxideCoverage)
         base -= coolPatina[..., None] * LUMA_NEUTRAL_WARMTH

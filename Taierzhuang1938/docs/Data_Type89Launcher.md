@@ -8,6 +8,7 @@
 | --- | --- |
 | 美国水手博物馆 1946.0037.000001，8 张真品照片 | 第 1 张和馆藏旧照 `af178` 用于校准长短比例、第 2 和 5 张核对后段拨片与小环、第 3 和 4 张核对筒尾箍、侧面旋钮与窄槽、第 6 和 7 张核对钢表面。以同件展品的多角度照片为主要依据。 [馆藏照片](https://catalogs.marinersmuseum.org/object/CL2830) |
 | 澳大利亚战争纪念馆 026541、026542，Thomas Fisher 摄，1942-09-07 | 两张战时黑白原照用于复核筒身、支柱和驻钣的轮廓与当时的深色表面。 [026541](https://www.awm.gov.au/collection/C10175) [026542](https://www.awm.gov.au/collection/C10176) |
+| 澳大利亚战争纪念馆 082306，1944-10-31 | 战时黑白照片，作为筒身深色轮廓的补充参照。原图归档为 `ReferencePhotos/AWM082306.jpg`。 [082306](https://www.awm.gov.au/collection/C81503) |
 | 澳大利亚战争纪念馆 RELAWM35524、RELAWM28924、RELAWM24923 | 馆藏登记核对同型实物、总长口径、全钢外观及个体标记差异。 [C151935](https://collection.awm.gov.au/C151935) [C145319](https://collection.awm.gov.au/C145319) [C141658](https://www.awm.gov.au/collection/C141658) |
 | 小郡驻屯地、函馆驻屯地与哈巴罗夫斯克展品照片 | 补看日方和俄方展示的同型物件，核对收窄支柱、筒尾外轮廓和弧形驻钣。 [小郡](https://ki43.on.coocan.jp/injapan/heiki9/ogori/ogori.html) [函馆](https://ki43.on.coocan.jp/injapan/heiki/hakodate/hakodate.html) [哈巴罗夫斯克](https://ki43.on.coocan.jp/oversea/khaba/khaba.html) |
 | 维基共享资源的两张公开影印照 | 核对驻钣在更接近正面的投影以及筒身可见的细线。 [静物影印](https://commons.wikimedia.org/wiki/File:Japanese_Type_89_grenade_discharger.gif) [人物影印](https://commons.wikimedia.org/wiki/File:Japanese50mmGrenadeMortar.jpg) |
@@ -50,9 +51,10 @@
 - 按筒尾肩部侧面在固定机位中的表面坐标校准第 4 张近照的细纹落点。校正用于侧面高密度底色采样，原始照片采样与查找偏移可由生成脚本重建。细纹位置相关系数在固定补光下由 0.247 升至 0.524，在掠射光与默认灯光下分别升至 0.528 和 0.515，四个局部区域均有改善。固定补光下侧面细纹对比度为 0.0867，近照为 0.0861。 [肩部采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身冲压区按第 7 张近照校准深氧化的漫反射、露钢亮部和细点蚀的对比度。固定中性灯下，暗部亮度第 10 百分位从 56.5 提至 64.6，近照为 68.7。中间调从 96.6 提至 102.3，近照为 102.5。细纹对比度由 0.124 降至 0.102，近照为 0.098。另以斜视、柔光及第 1 张整段照复核。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 拨片正反面分别按第 5 和第 2 张近照校准局部磨亮钢面、氧化暗部和暖色。中间调对齐的补光下，背面暗部从 79.6 降至 73.1，亮部从 155.5 升至 166.6，近照分别为 73.4 和 168.1。正面归一化红蓝差从 0.356 降至 0.290，近照为 0.290。斜视和默认灯光已复测，正面斜视亮度仍有偏差。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 拨片正反面按实际纹素中心重采样点蚀与擦痕，并按磨亮钢面和氧化层分别校准光泽。固定补光下正视细纹相关系数由 0.65 提至 0.80，背面由 0.80 提至 0.87。固定灯光的斜视正面亮度中值由 85.6 降至 82.4 个灰阶，近照配准区为 80.2。游戏仍使用同一套 2K 底色、2K 法线和 1K ORM。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV34/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV35/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
