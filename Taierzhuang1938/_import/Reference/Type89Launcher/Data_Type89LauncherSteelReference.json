@@ -3690,6 +3690,60 @@
           }
         }
       },
+      "facetCalibration": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "projection": [509, 540, 23, 400],
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.722, 0.849]
+        },
+        "file": "Texture_Type89LauncherBarrelFacets.png",
+        "sha256": "5439a69e74e34ee6e4684de16143cc41a5e4be1cd3f5222b05b4a0eaced1c3d3",
+        "scale": 120000,
+        "frameSha256": {
+          "V49BrdfDirect": {
+            "beauty.png": "95de8cefc4a2daeb57150a80bd60604dd8d7b7700f0069429c1ea501926e4c2a",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "ProbeZero.png": "95de8cefc4a2daeb57150a80bd60604dd8d7b7700f0069429c1ea501926e4c2a",
+            "AcrossPlus.png": "7184b17a114ab10027335cfdd377fb5fd9b32e3d540384314bbc41fae23d56bd",
+            "AcrossMinus.png": "a50e42ef07f766b30b278f3ddc62311f8f02c3a5e4c8faede220ba0deb7b5860",
+            "BasePlus.png": "8f059d4ec516416605417e7598759354e750b8d63e6f8eb60c665226719cc65f",
+            "BaseMinus.png": "9ad8772e319336d15f4f29bad3ed8ed9784c8df23f13f4c71d7fa49cae27a60e"
+          },
+          "V49BrdfDefault": {
+            "beauty.png": "ff25e03cdeefe369b820bf631e6b4f7bfeb598913ec3d34b486e7097889050e4",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "ProbeZero.png": "ff25e03cdeefe369b820bf631e6b4f7bfeb598913ec3d34b486e7097889050e4",
+            "AcrossPlus.png": "b83fe174b9198a8932f86ea40a9beece0cfb687ca9fa0d3b2012fdab8b25d4b0",
+            "AcrossMinus.png": "ca6e287d047623d799279f67269ca6f69db486d0d98e6bc9c1d0b88c16a0b025",
+            "BasePlus.png": "b9e89ac91ca67f17919d1634050809f6667ecdc62ccdcb1eb54e7202954e0652",
+            "BaseMinus.png": "1e4e38b4262ce6b87bde3bccaddcd7f951295119037f08891cde963302aca504"
+          },
+          "V49FacetSettleDirect": {
+            "beauty.png": "5b158b7074fa14c4d4f3cfb33a4c913fb3edd37a7993832e7e011176742023db",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "ProbeZero.png": "5b158b7074fa14c4d4f3cfb33a4c913fb3edd37a7993832e7e011176742023db",
+            "AcrossPlus.png": "2c593a60ad59f3412c5170ecf3bc1b0e380545826e416a0b8b0a408367d9d3f7",
+            "AcrossMinus.png": "e127cf78a92a9f48064ee1ede6b347276deb3021ca04d10313e84053954c4f37",
+            "BasePlus.png": "1e7dea0d72b4bb7cc0c5ba44202c6c85879729a742e30de32486093d7528c4ed",
+            "BaseMinus.png": "4555765d5dad03e131c80e0949f7d6f1bfea822e6d165c02215967a54846320d"
+          },
+          "V49FacetSettleDefault": {
+            "beauty.png": "1a1c4179622740de2f9c7d4b4468d7a687d9d97d42d1c2a1e6f92d2ebbc02326",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "ProbeZero.png": "1a1c4179622740de2f9c7d4b4468d7a687d9d97d42d1c2a1e6f92d2ebbc02326",
+            "AcrossPlus.png": "66ae2a6b060f145db93b1dc6852b28567b228bc0d74e0b91390f46588241fa28",
+            "AcrossMinus.png": "b0bca799709d2514f8dd8cd449c807ae22738fdade4e19827e00b708d485ed5b",
+            "BasePlus.png": "9ebfaf15cf036260634fe9b78c5d70945ec9291c32ac2a155403aa9f876ce807",
+            "BaseMinus.png": "98806140486f96933852351184649180eb1705a4d352d918be4f4baf5414c1a7"
+          }
+        }
+      },
       "smallMarkCalibration": {
         "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
         "projection": [509, 540, 23, 400],

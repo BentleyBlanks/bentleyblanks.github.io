@@ -113,6 +113,38 @@ def ApplyBaseLogGain(base, logGain):
     return np.where((logGain != 0)[..., None], corrected, base)
 
 
+def BarrelTexelCenters(width, height, sampling):
+    padding = ATLAS["padding"]
+    arc, packed = np.asarray(sampling["angularCurve"]).T
+    first, last = sampling["activeV"]
+    column = np.clip((np.arange(width) + .5 - padding) / (width - 2 * padding), 0, 1)
+    row = np.clip((np.arange(height) + .5 - padding) / (height - 2 * padding), 0, 1)
+    return np.meshgrid(np.interp(column, packed, arc), last - row * (last - first))
+
+
+def ApplyBarrelFacets(tile, closeup, calibration):
+    CheckBarrelRegistration(calibration, closeup)
+    path = REFERENCE.with_name(calibration["file"])
+    if Sha256(path) != calibration["sha256"]:
+        raise ValueError(f"Steel facet correction does not match the measured reference: {path}")
+    with Image.open(path) as image:
+        encoded = (np.asarray(image, dtype=float) - 32768) / calibration["scale"]
+    if encoded.ndim != 2 or encoded.shape[1] % 2:
+        raise ValueError(f"Invalid steel facet fields: {path}")
+    base, normal, _ = tile
+    height, width = base.shape[:2]
+    uu, vv = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
+    tilt, gain = (ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
+                  for field in np.split(encoded, 2, axis=1))
+    base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
+    # Bias the tangent direction of the existing relief before normalizing it.
+    active = abs(tilt) > 1e-8
+    vector = normal[active].astype(float) / 127.5 - 1
+    vector[:, 0] += tilt[active] * vector[:, 2]
+    unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
+    normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
+
+
 def PhotographicGrain(closeup, xx, vv):
     detail = closeup["detail"]
     path = REFERENCE.with_name(detail["file"])
@@ -781,9 +813,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             metal += ReferenceField(materialFit, xx, vv, "highlightMetal") * (.93 - metal) / 1000
         if barrelSampling is not None:
             # The registered marks follow the texel centers addressed by the renderer.
-            widthAxis = np.clip((np.arange(width) + .5 - padding) / (width - 2 * padding), 0, 1)
-            heightAxis = np.clip((np.arange(height) + .5 - padding) / (height - 2 * padding), 0, 1)
-            markU, markV = np.meshgrid(np.interp(widthAxis, packedU, oldU), top - heightAxis * (top - bottom))
+            markU, markV = BarrelTexelCenters(width, height, barrelSampling)
             gain = np.zeros_like(markU)
             for key in ("markCalibration", "smallMarkCalibration"):
                 marks = closeup.get(key)
@@ -987,6 +1017,10 @@ def BuildAtlas(reference):
             denseTile = BakeRegion(name, quadrants, (width, height), index, reference,
                                    barrelSampling=ATLAS["barrelSampling"])
             tile = RepackBarrelTile(denseTile, oldTile, reference)
+            closeup = reference["closeups"]["Barrel"]
+            facets = closeup.get("facetCalibration")
+            if facets is not None:
+                ApplyBarrelFacets(tile, closeup, facets)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
@@ -1023,10 +1057,11 @@ def Bake():
                "knurlFlank": reference["knurl"]["flankWear"]["detail"],
                "shoulderDirect": reference["shoulder"]["Direct"]["detail"],
                "shoulderFlank": reference["shoulder"]["Flank"]["detail"]}
-    for key, name in (("markCalibration", "barrelMarks"), ("smallMarkCalibration", "smallBarrelMarks")):
-        mark = reference["closeups"]["Barrel"].get(key)
-        if mark is not None:
-            details[name] = mark
+    for key, name in (("markCalibration", "barrelMarks"), ("smallMarkCalibration", "smallBarrelMarks"),
+                      ("facetCalibration", "barrelFacets")):
+        calibration = reference["closeups"]["Barrel"].get(key)
+        if calibration is not None:
+            details[name] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

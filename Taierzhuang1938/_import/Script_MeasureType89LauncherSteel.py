@@ -18,6 +18,7 @@ RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
+BARREL_FACETS = RECORD.with_name("Texture_Type89LauncherBarrelFacets.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
@@ -661,6 +662,89 @@ def BarrelMaterialCalibration(photo, barrel, evidence):
     return {**BarrelCalibrationIdentity(barrel), "frameSha256": {**hashes, **measured}, **peaks, **highlights}
 
 
+def BarrelStampDistances(photo, strokes):
+    trace = Image.new("L", (photo.shape[1], photo.shape[0]))
+    draw = ImageDraw.Draw(trace)
+    for width, points in strokes:
+        draw.line([tuple(point) for point in points], fill=255, width=width, joint="curve")
+    return distance_transform_edt(np.asarray(trace) == 0)
+
+
+def FitBarrelFacets(photo, barrel, evidence, distances, *, refine):
+    prefix = "V49FacetSettle" if refine else "V49Brdf"
+    names = tuple(prefix + view for view in ("Direct", "Default"))
+    u, v, inside, original, renders, read, hashes = ReadBarrelMaterialViews(photo, barrel, evidence, names)
+    startU, startV = (.53, .47) if refine else (.51, .39)
+    tiltLimit, gainLimit, gainPenalty = (.84, .34, .070) if refine else (1, .51, .08)
+    angle, projection = barrel["footprint"]["uHalfSpan"], barrel["source"]["projection"]
+    x, y = BarrelPhotoCoordinates(projection, angle, u, v)
+    valid = inside & (u > startU) & (v > startV) & (map_coordinates(distances, (y, x), order=1) >= 6)
+    valid &= (original > (113 if refine else 28)) & (original < 232) & np.all(renders > 20, axis=-1)
+    if np.count_nonzero(valid) <= 2500:
+        raise ValueError("The response views do not cover the measured barrel steel")
+    expected, baseline = original[valid], renders[valid]
+    if np.max(np.abs(read("ProbeZero", valid) - baseline)) >= .30:
+        raise ValueError("The zero-tilt response does not match the unmodified steel")
+
+    residual = np.clip(np.log(expected[:, None] + 16) - np.log(baseline + 16), -.46, .46)
+    tiltSlope, gainSlope = [.5 * (np.log(read(channel + "Plus", valid) + 16)
+                                 - np.log(read(channel + "Minus", valid) + 16))
+                           for channel in ("Across", "Base")]
+    shape = (161, 109)
+    cells = np.rint(u[valid] * (shape[0] - 1)).astype(int) * shape[1]
+    cells += np.rint(v[valid] * (shape[1] - 1)).astype(int)
+    confidence = .62 + .95 * np.clip((expected - 101) / 54, 0, 1)
+    weights = confidence[:, None] * np.array([.65, .35] if refine else [.52, .48])
+
+    def Smooth(signal):
+        values = np.bincount(cells, weights=signal, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(values, (.9, .94))
+
+    support = Smooth(confidence)
+
+    def Average(signal):
+        return Smooth(np.sum(weights * signal, axis=1)) / np.maximum(support, .30)
+
+    tiltPower = Average(tiltSlope**2) + .050**2
+    gainPower = Average(gainSlope**2) + gainPenalty**2
+    cross = Average(tiltSlope * gainSlope)
+    tiltPull, gainPull = Average(tiltSlope * residual), Average(gainSlope * residual)
+    gain = np.zeros(shape)
+    # Fit both lamps together with bounded steps. The captures use tangent
+    # slope +/-0.16 and linear base gain exp(+/-0.31).
+    for _ in range(5):
+        tilt = np.clip((tiltPull - cross * gain) / tiltPower, -tiltLimit, tiltLimit)
+        gain = np.clip((gainPull - cross * tilt) / gainPower, -gainLimit, gainLimit)
+
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    x, y = BarrelPhotoCoordinates(projection, angle, uu, vv)
+    radial = np.clip((uu - startU) / .088, 0, 1) * np.clip((.92 - uu) / .068, 0, 1)
+    axial = np.clip((vv - startV) / .096, 0, 1) * np.clip((.91 - vv) / .064, 0, 1)
+    clear = np.clip((map_coordinates(distances, (y, x), order=1) - 5) / 7, 0, 1)
+    fade = radial * axial * clear * np.clip(support / .55, 0, 1)
+    if refine:
+        rgb = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
+        fade *= np.clip((rgb @ REGISTERED_LUMA - 111) / 24, 0, 1)
+    return tuple(gaussian_filter(scale * field, (.65, .67)) * fade
+                 for scale, field in ((.16, tilt), (.31, gain))), hashes
+
+
+def BarrelFacetCalibration(photo, barrel, evidence):
+    trace = barrel["stampTrace"]
+    distances = BarrelStampDistances(photo, trace["strokes"] + trace["smallStrokes"])
+    first, studyHashes = FitBarrelFacets(photo, barrel, evidence, distances, refine=False)
+    remaining, resolveHashes = FitBarrelFacets(photo, barrel, evidence, distances, refine=True)
+    resolved = [np.clip(old + .88 * delta, -bound, bound).T
+                for old, delta, bound in zip(first, remaining, (.205, .196))]
+    # Two side-by-side 16-bit fields store the signed tangent slope and base gain.
+    scale = 120000
+    encoded = np.rint(32768 + scale * np.concatenate(resolved, axis=1)).astype(np.uint16)
+    Image.fromarray(encoded).save(BARREL_FACETS)
+    return {**BarrelCalibrationIdentity(barrel), "file": BARREL_FACETS.name,
+            "sha256": sha256(BARREL_FACETS.read_bytes()).hexdigest(), "scale": scale,
+            "frameSha256": {**studyHashes, **resolveHashes}}
+
+
 def RegisteredBarrelMarks(photo, barrel, folder, distances):
     u, v, inside, reference, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
     x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
@@ -720,11 +804,7 @@ def BarrelMarkCalibration(photo, barrel, evidence, *, small=False):
         strokes = barrel["stampTrace"]["strokes"]
         prefix, plate = "V46Mark", BARREL_MARKS
         firstScale, firstLimits, settle, limits = 150, (0, 255), .88, (4, 252)
-    trace = Image.new("L", (photo.shape[1], photo.shape[0]))
-    draw = ImageDraw.Draw(trace)
-    for width, points in strokes:
-        draw.line([tuple(point) for point in points], fill=255, width=width, joint="curve")
-    distances = distance_transform_edt(np.asarray(trace) == 0)
+    distances = BarrelStampDistances(photo, strokes)
     study = [evidence / (prefix + "Study" + view) for view in ("Direct", "Default")]
     settled = [evidence / (prefix + "Resolve" + view) for view in ("Direct", "Default")]
     first, studyHashes = FitBarrelMarkGain(photo, barrel, study, distances)
@@ -740,7 +820,7 @@ def BarrelMarkCalibration(photo, barrel, evidence, *, small=False):
 
 
 def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None,
-                 materialEvidence=None, markEvidence=None, smallMarkEvidence=None):
+                 materialEvidence=None, markEvidence=None, smallMarkEvidence=None, facetEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -795,7 +875,8 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
                                   ("surfaceResponseCalibration", responseEvidence, BarrelResponseCalibration),
                                   ("finishCalibration", finishEvidence, BarrelFinishCalibration),
                                   ("materialCalibration", materialEvidence, BarrelMaterialCalibration),
-                                  ("markCalibration", markEvidence, BarrelMarkCalibration)):
+                                  ("markCalibration", markEvidence, BarrelMarkCalibration),
+                                  ("facetCalibration", facetEvidence, BarrelFacetCalibration)):
         prior = previous.get(name)
         if frames is not None:
             result[name] = measure(image, result, frames)
@@ -1643,6 +1724,7 @@ def Main():
     options.add_argument("--barrel-material-evidence", type=Path, help="V44 Evidence directory with barrel material and highlight-response captures")
     options.add_argument("--barrel-mark-evidence", type=Path, help="V46 Evidence directory with barrel stamp response captures")
     options.add_argument("--barrel-small-mark-evidence", type=Path, help="V47 Evidence directory with the small barrel stamp response captures")
+    options.add_argument("--barrel-facet-evidence", type=Path, help="V49 Evidence directory with tangent-normal and base-color response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1652,7 +1734,7 @@ def Main():
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
-                          smallMarkEvidence=args.barrel_small_mark_evidence)
+                          smallMarkEvidence=args.barrel_small_mark_evidence, facetEvidence=args.barrel_facet_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

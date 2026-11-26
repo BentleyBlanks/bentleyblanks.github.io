@@ -19,16 +19,16 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 560492,
-      "sha256": "baad4d057811295c9f68d57e62e82982dcbae584ced2edb081f07aab0a5306d7"
+      "bytes": 560190,
+      "sha256": "94cb802b9bb99d13bb4c66f0e0402545f627e6dfc35adc7b8f0642f9f28e611a"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 399394,
-      "sha256": "d161877105825c72bdf58be6760b16f6c25e02ce0adcba925a49299d3948048d"
+      "bytes": 399442,
+      "sha256": "41e810accae61aad66450ed8a1a168b9140d4bdc0a40ca2865c09fd3ec6b9c0b"
     },
     {
       "channel": "Orm",
@@ -39,7 +39,7 @@
       "sha256": "d5f07ee3f14c9804f3f9dc714fd8c07b92138aad21e0282d71c4169c66f8c6f2"
     }
   ],
-  "totalBytes": 1011730,
+  "totalBytes": 1011476,
   "metrics": {
     "meanSrgb": [
       0.4344,
@@ -52,9 +52,9 @@
     "clipLow": 0.0001,
     "clipHigh": 0.0,
     "lowFreq": 0.1053,
-    "seam": 0.1244,
+    "seam": 0.1245,
     "interior": 0.0255,
-    "seamRatio": 4.884,
+    "seamRatio": 4.879,
     "border": 0.743,
     "swing": 0.0835,
     "texelsPerMeter": null
@@ -62,7 +62,7 @@
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "80bb3ef51b4e5dc3d88db133d19799cb21db5744c98057af10bdb6646e2f9bbc",
+    "sha256": "e5017e6975b5835d71a51c5d888f28e849090c929692c3859611e18ed088c4dc",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -118,6 +118,10 @@
     "smallBarrelMarks": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSmallBarrelMarks.png",
       "sha256": "25205c3003cc65efb51dbb07636e17306531714a72d1ccf9e53c6d3b1fe78603"
+    },
+    "barrelFacets": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelFacets.png",
+      "sha256": "5439a69e74e34ee6e4684de16143cc41a5e4be1cd3f5222b05b4a0eaced1c3d3"
     }
   }
 }
