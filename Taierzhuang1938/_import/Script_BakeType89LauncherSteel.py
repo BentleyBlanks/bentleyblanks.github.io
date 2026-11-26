@@ -271,6 +271,12 @@ def BakeRegion(name, sample, size, index, reference):
         blue = np.exp(-(((xx - .397) / .14) ** 2 + ((vv - .46) / .47) ** 2))
         oxidation += .090 * blue
         warmth -= .021 * blue
+    if name == "Stem":
+        stemTone, stemWarmth, stemCoverage = PhotographicGrain(closeup, xx, vv)
+        stemDetail = stemTone * stemCoverage
+        tonalDelta += 119 * stemDetail - (2.5 * detail + 1.25 * medium) * stemCoverage
+        warmth += .38 * stemWarmth * stemCoverage
+        oxidation += (.024 * medium - .016 * pits) * stemCoverage
     if name == "Saddle":
         # Trade the generic grain for the photographed pits and rub marks.
         finePhoto, warmPhoto, shoeCoverage = PhotographicGrain(closeup, xx, vv)
@@ -316,6 +322,11 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "CollarRing":
         heightField = strength * (.14 * detail + .031 * medium - .12 * pits) + .123 * apiPits + .41 * photoPits
         roughnessDelta += .029 * np.maximum(-apiPits, 0) + .14 * np.maximum(-photoPits, 0)
+    if name == "Stem":
+        heightField *= 1 - .54 * stemCoverage
+        heightField += .33 * stemDetail
+        roughnessDelta -= (.016 * medium + .013 * pits) * stemCoverage
+        roughnessDelta += .11 * np.maximum(-stemDetail, 0) - .089 * np.maximum(stemDetail, 0)
     if name == "Saddle":
         heightField *= 1 - .76 * shoeCoverage
         heightField += .29 * shoeDetail
@@ -546,6 +557,8 @@ def BakeRegion(name, sample, size, index, reference):
         base += shoulderTint[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Saddle":
         base += .035 * shoeCoverage[..., None] * LUMA_NEUTRAL_WARMTH
+    if name == "Stem":
+        base += .031 * stemCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     if name == "Knurl":
         ao *= 1 - .31 * grooves
@@ -654,6 +667,7 @@ def Bake():
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
+               "stemDetail": reference["closeups"]["Stem"]["detail"],
                "saddleDetail": reference["closeups"]["Saddle"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
                "knurlWear": reference["knurl"]["wear"]["detail"],

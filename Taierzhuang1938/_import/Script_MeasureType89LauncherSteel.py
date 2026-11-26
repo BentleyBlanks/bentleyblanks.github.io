@@ -15,6 +15,7 @@ RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
+STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
 
@@ -221,6 +222,28 @@ def CollarFinish(folder):
     return result
 
 
+def StemDetail(image, source):
+    left, top, right, bottom = source["sampleBounds"]
+    rail = np.asarray(source["lowerSampleEdge"])
+    columns = np.arange(left, right + 2)
+    rows = np.arange(top, bottom + 2)[:, None]
+    lower = np.interp(columns, rail[:, 0], rail[:, 1])[None, :]
+    # Continue the steel pixels to the edge of the filter. This keeps the
+    # lettering and shadow below the sampled strip out of the detail plate.
+    sampleY = np.clip(rows, top + 1, np.floor(lower - 1)).astype(int)
+    padded = image[sampleY, columns[None, :]]
+    tone, warmth, lightness = PhotoResiduals(padded, envelopeRadius=4.8)
+    margin = np.minimum(rows - top, lower - rows)
+    confidence = np.clip(margin / 4.5, 0, 1)
+    # Fade the photograph's plane transition out of the scratch layer.
+    confidence *= np.clip((np.abs(columns - 669) - 8) / 11, 0, 1)[None, :]
+    confidence *= np.clip((245 - lightness) / 30, 0, 1)
+    u, v = np.meshgrid(np.linspace(0, 1, 80), np.linspace(0, 1, 1152))
+    x = left + (right - left) * v
+    y = top + (1 - u) * (np.interp(x, rail[:, 0], rail[:, 1]) - top)
+    return SaveDetailPlate(tone, warmth, confidence, x - left, y - top, STEM_DETAIL, halfSize=False)
+
+
 def StemFinish(folder):
     image, source = Photo(folder, 4)
     # Registration in the inspection scene puts the lower side of the rubbed
@@ -238,6 +261,7 @@ def StemFinish(folder):
     exposed = np.clip((lightness - surround - 12) / 39, 0, 1)
     edge = np.clip((xs - 184) / 22, 0, 1) * np.clip((674 - xs) / 20, 0, 1)
     field["rubbedCoverage"] = np.rint(100 * exposed * edge).astype(int).tolist()
+    field["detail"] = StemDetail(image, source)
     return field
 
 

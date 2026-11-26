@@ -38,9 +38,10 @@
 - 筒尾肩部在原共用区域内划出 544×112 的独立 UV 区。参照第 3、4 张照片的肩部边缘配准两段可见弧面，分别烘焙正面的暗灰积层、侧面的褐色氧化和露钢擦痕。侧面细节仅采自避开邻接件遮挡的钢面。固定对照灯光下，正面中值由 102.5 调到 69.9 个灰阶，近照为 69.5。侧面细节对比度由 0.029 提至 0.063，近照为 0.086。 [肩部采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 用第 7 张近照的露钢和氧化区分别调节号印附近的反光。中性灯下近景的第 90 百分位亮度由 198.9 调到 170.2 个灰阶，近照为 164.3，亮度中值为 100.5，近照为 100.9。复核了柔和补光、斜视和第 1 张对应的整段筒身。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 驻钣凸面沿第 1 张照片已配准的钢面取出 336×152 的细节采样。排除边缘背景与宽反光后，把局部点蚀、擦痕和偏暖的氧化细纹烘入基色、法线和粗糙度。固定补光下，配准区细纹相关系数由约 0.07 提至 0.77，细纹对比度由 0.061 调到 0.052，近照为 0.045。另复核了默认灯光和斜视。 [驻钣采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 支柱沿第 4 张近照的配准范围提取 80×1152 的细节采样。过滤宽反光、邻面和结构交界后，把局部擦痕、点蚀和氧化细纹烘入基色、法线与粗糙度。默认灯光下，配准区细纹相关系数由 0.23 提至 0.75，细纹对比度由 0.057 调到 0.081，近照为 0.081。固定补光、斜视和驻钣对照也纳入复测。 [支柱采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV22/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV23/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
