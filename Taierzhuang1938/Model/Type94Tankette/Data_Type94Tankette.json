@@ -40,16 +40,16 @@
       "kind": "Secondary study, printed pp50-51 inspected; original JACAR scans unchecked; distinguishes surrounding fighting from city assault"
     }
   ],
-  "version": "20261126PhotoV108-efe237d2",
-  "sha256": "efe237d292ed53af98bb34d4e590bc0f1abb26811c680f37cd66026cbadd3151",
-  "bytes": 36372796,
+  "version": "20261126PhotoV109-625bc68a",
+  "sha256": "625bc68a59f0153186cc963b49b22c2f1b8ebe5fff8b998936841e41cfa14050",
+  "bytes": 36277212,
   "acceptance": {
-    "status": "New rear mudguards and improved photographic registration; verified game asset",
+    "status": "Right rear terminal sweep supported by multiple photographs; verified game asset",
     "strictReferenceMatched": false,
     "complete": false,
     "technicalRuntimeAccepted": true,
     "remaining": [
-      "Right-rear endpoint registration in Patriot view 4",
+      "Vertical interpretation of right rear rim and belt in Patriot view 4",
       "Exact lower rear-door fitting and occluded underside"
     ]
   },
@@ -74,11 +74,11 @@
   "meshNodes": 240,
   "poseNodes": 296,
   "highSourceTriangles": 633816,
-  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV108\\Scene_Type94TanketteHighV108.blend",
-  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV108\\Scene_Type94TanketteGameV108.blend",
-  "sourceHighManifest": "Data_ReleaseV108.json",
-  "sourceGameManifest": "Data_ReleaseV108.json",
-  "deliveryManifest": "Data_ReleaseV108.json",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV109\\Scene_Type94TanketteHighV109.blend",
+  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV109\\Scene_Type94TanketteGameV109.blend",
+  "sourceHighManifest": "Data_ReleaseV109.json",
+  "sourceGameManifest": "Data_ReleaseV109.json",
+  "deliveryManifest": "Data_ReleaseV109.json",
   "mechanisms": {
     "driver": "Script_Type94Mechanism.mjs",
     "linksPerSide": 80,
@@ -1566,37 +1566,37 @@
     "method": "Fresh target UVs, high-source tangent normals and PBR channel projection, local geometry AO for reconstructed pieces, lossless embedded texture packaging.",
     "images": [
       {
-        "name": "Texture_Type94GamePaintNormalV108",
+        "name": "Texture_Type94GamePaintNormalV109",
         "size": [
           4096,
           4096
         ],
-        "bytes": 4718716,
+        "bytes": 4692432,
         "mimeType": "image/webp",
-        "pixelSha256": "20eb1510a5dc514a61de036cf950e2e17b15e55b6636e246ea5d45ae66aa54b1"
+        "pixelSha256": "9136e31627dd15c076850f48a52f9b0ebba107b28aafad9b5b12cac0a82ff845"
       },
       {
-        "name": "Texture_Type94GamePaintOrmV108",
+        "name": "Texture_Type94GamePaintOrmV109",
         "size": [
           4096,
           4096
         ],
-        "bytes": 10408728,
+        "bytes": 10367888,
         "mimeType": "image/webp",
-        "pixelSha256": "cf47545657edb7c63e2ae74c525b1e30250a3ae93e12223162379eaa4b86a27b"
+        "pixelSha256": "f1a8281e0301c9c5fadddde767ba9c4f33de40abd7e826e6d2da087ea5a07c6e"
       },
       {
-        "name": "Texture_Type94GamePaintBaseV108",
+        "name": "Texture_Type94GamePaintBaseV109",
         "size": [
           4096,
           4096
         ],
-        "bytes": 6339588,
+        "bytes": 6314714,
         "mimeType": "image/webp",
-        "pixelSha256": "3ab6d94af3df8872227de4b4f459ad19ffa1948440bdf0e2e5cfcaa591d5101a"
+        "pixelSha256": "8196f875838c3057db882c74d77f71da090f6fb8e1c91aecf3406e54cc5a6a1f"
       },
       {
-        "name": "Texture_Type94GameSteelNormalV108",
+        "name": "Texture_Type94GameSteelNormalV109",
         "size": [
           2048,
           2048
@@ -1606,7 +1606,7 @@
         "pixelSha256": "a00830a96c0d57feca4310e9f96751ffb386911321bbcd37ead117347eb21283"
       },
       {
-        "name": "Texture_Type94GameSteelOrmV108",
+        "name": "Texture_Type94GameSteelOrmV109",
         "size": [
           2048,
           2048
@@ -1616,7 +1616,7 @@
         "pixelSha256": "e2c6d91af2eeef8bf7b3e7979eab18ea46456360bd34687b0ce7e9a1e6bdc6a7"
       },
       {
-        "name": "Texture_Type94GameSteelBaseV108",
+        "name": "Texture_Type94GameSteelBaseV109",
         "size": [
           2048,
           2048
@@ -1626,7 +1626,7 @@
         "pixelSha256": "91a00b49f03441afbc6eb7dd95f78721ca8df28deb0795fd287760357799fc18"
       },
       {
-        "name": "Texture_Type94GameRubberNormalV108",
+        "name": "Texture_Type94GameRubberNormalV109",
         "size": [
           1024,
           1024
@@ -1636,7 +1636,7 @@
         "pixelSha256": "1df45bf9ae897e8009dcba0c3c18796711ba83336737e5beb7fce6f2ca25077e"
       },
       {
-        "name": "Texture_Type94GameRubberOrmV108",
+        "name": "Texture_Type94GameRubberOrmV109",
         "size": [
           1024,
           1024
@@ -1646,7 +1646,7 @@
         "pixelSha256": "e0c0a644087529a117cfe01392c02dab95145cef5b37c98095579d0f1142ae24"
       },
       {
-        "name": "Texture_Type94GameRubberBaseV108",
+        "name": "Texture_Type94GameRubberBaseV109",
         "size": [
           1024,
           1024
@@ -1656,7 +1656,7 @@
         "pixelSha256": "decdbfb7d20308d2310e404851bddd9d40a1e6f594aca4857b6fb07b8d5ef10c"
       },
       {
-        "name": "Texture_Type94GameTrackNormalV108",
+        "name": "Texture_Type94GameTrackNormalV109",
         "size": [
           2048,
           2048
@@ -1666,7 +1666,7 @@
         "pixelSha256": "af572301d8e47e696925f7d7378e81e0524d862ab33e16c8acdac39c6d1704ab"
       },
       {
-        "name": "Texture_Type94GameTrackOrmV108",
+        "name": "Texture_Type94GameTrackOrmV109",
         "size": [
           2048,
           2048
@@ -1676,7 +1676,7 @@
         "pixelSha256": "9472b7b7a6729cfb7d1c23725b56ef6727d34e3f9d76abe596b43fdd09e02cdc"
       },
       {
-        "name": "Texture_Type94GameTrackBaseV108",
+        "name": "Texture_Type94GameTrackBaseV109",
         "size": [
           2048,
           2048
@@ -1688,12 +1688,12 @@
     ]
   },
   "reduction": {
-    "referenceSurface": "Saved V108 high source compared against the actual packaged game import",
+    "referenceSurface": "Saved V109 high source compared against the actual packaged game import",
     "scope": "Named mesh owners sampled at triangle vertices, edge midpoints and face centres",
     "twoDirectionSampledSurfaceMaximumM": 0.0025087681133300066
   },
   "validation": {
-    "sha256": "efe237d292ed53af98bb34d4e590bc0f1abb26811c680f37cd66026cbadd3151",
+    "sha256": "625bc68a59f0153186cc963b49b22c2f1b8ebe5fff8b998936841e41cfa14050",
     "exportChecks": 1172,
     "browserChecks": 943,
     "blenderMechanismChecks": 38,
@@ -1702,8 +1702,8 @@
     "towLatchPoses": 56,
     "openingProbes": 22,
     "prototypeAndRuntimePoseParity": {
-      "baselineSha256": "1756ed4408f0b574a148b17b7db3b0092719488d279647537fde002901931838",
-      "sha256": "efe237d292ed53af98bb34d4e590bc0f1abb26811c680f37cd66026cbadd3151",
+      "baselineSha256": "efe237d292ed53af98bb34d4e590bc0f1abb26811c680f37cd66026cbadd3151",
+      "sha256": "625bc68a59f0153186cc963b49b22c2f1b8ebe5fff8b998936841e41cfa14050",
       "nodes": 296,
       "allParentsAndControlExtrasEqual": true,
       "maximumRestTransformComponentDelta": 0,
@@ -1713,22 +1713,35 @@
     "preservedSceneryPreviewLoaded": true,
     "renderedVehicleInstancesInScenery": 2,
     "sceneryVehicleTriangles": 158356,
-    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV108\\Acceptance",
+    "geometryScope": {
+      "meshOwners": 240,
+      "unchanged": 239,
+      "changed": [
+        {
+          "owner": "Geometry_Hull_Paint",
+          "V108Tris": 6448,
+          "V109Tris": 6448
+        }
+      ],
+      "verified": true,
+      "method": "Canonical oriented position triangles per mesh owner, independent of texture and vertex-index ordering. Position quantization 1e-7 m."
+    },
+    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV109\\Acceptance",
     "passed": true
   },
   "reconstructionScope": [
     "以 2017 库宾卡小诱导轮馆藏橄榄漆照片为主，2014 同车及馆方 1–7 号补充。",
-    "保留 V107 前部与轮履修订。依据馆方 3、4、6 号重建左右后挡泥板短弧下翻并重新投射贴图。",
-    "4 号右后末端有绝对位置余差，尾门底件与被挡住的车尾下部依据现有照片推定。"
+    "V109 根据馆方 3、4、5 号收窄右后挡泥板最后一段，保持纵向断面和现有轮履构造，重新投射贴图。",
+    "4 号右后末端和履带仍有垂直投影余差，尾门底件与被挡住的车尾下部依据现有照片推定。"
   ],
   "runtimeIntegration": "Reusable asset and rigid mechanism module; this model release does not replace existing chapter placements or gameplay behavior",
   "historyCreationSync": "Existing Notion review snapshots retained; current publication merges the upstream history ledger without advancing external Notion cursors",
-  "activeGrayStudy": "Data_ReleaseV108.json",
-  "activeSurfaceStudy": "Data_ReleaseV108.json",
-  "activeCameraStudy": "Data_ReferenceViewsV108.json",
+  "activeGrayStudy": "Data_ReleaseV109.json",
+  "activeSurfaceStudy": "Data_ReleaseV109.json",
+  "activeCameraStudy": "Data_ReferenceViewsV109.json",
   "finalSourceVerification": {
-    "high": "Data_ReleaseV108.json",
-    "game": "Data_ReleaseV108.json",
-    "delivery": "Data_ReleaseV108.json"
+    "high": "Data_ReleaseV109.json",
+    "game": "Data_ReleaseV109.json",
+    "delivery": "Data_ReleaseV109.json"
   }
 }

@@ -1,0 +1,519 @@
+{
+  "schema": "Type94ReferenceReviewV109",
+  "baseStudy": "Data_ReferenceViewsV108.json",
+  "addedCameras": {
+    "5": {
+      "image": {
+        "size": [
+          1440,
+          960
+        ],
+        "sha256": "17252acad0fd8b924c83a7fb919af18ed1226964728ba3e2a7904ce539706bc9"
+      },
+      "camera": {
+        "k": [
+          [
+            1945.0178702892529,
+            0.0,
+            723.4607413217611
+          ],
+          [
+            0.0,
+            1945.0178702892529,
+            477.7326255545164
+          ],
+          [
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "distortion": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotationCameraFromBlender": [
+          [
+            0.9494870328931737,
+            0.3106307715566878,
+            -0.044529744326843285
+          ],
+          [
+            -0.04794030957359624,
+            0.003349340485755234,
+            -0.9988445868283506
+          ],
+          [
+            -0.3101227193962173,
+            0.9505247527973206,
+            0.01807189071148138
+          ]
+        ],
+        "translationCameraFromBlender": [
+          1.209193861811981,
+          0.5047051969539441,
+          6.219233230878116
+        ]
+      }
+    }
+  },
+  "camera5": {
+    "source": "References/PatriotOfficial/Reference_PatriotOfficial5.jpg",
+    "sha256": "17252acad0fd8b924c83a7fb919af18ed1226964728ba3e2a7904ce539706bc9",
+    "method": "Alignment from stationary neighbouring exhibit image points and the visible turret silhouette. The rear rim and its tip are out of fit.",
+    "backgroundAnchorCount": 14,
+    "backgroundPlaneInliers": 12,
+    "backgroundPlaneRmsMM": 3.119,
+    "holdoutChecks": {
+      "staticOnly": {
+        "sceneAnchorRmsPx": 2.04,
+        "roofRmsPx": 106.774,
+        "rightFlankRmsPx": 55.231
+      },
+      "fitTurretAll": {
+        "sceneAnchorRmsPx": 2.595,
+        "roofRmsPx": 1.31,
+        "rightFlankRmsPx": 1.594
+      },
+      "holdOutFlank": {
+        "sceneAnchorRmsPx": 2.584,
+        "roofRmsPx": 0.982,
+        "rightFlankRmsPx": 5.888
+      },
+      "holdOutRoof": {
+        "sceneAnchorRmsPx": 2.693,
+        "roofRmsPx": 16.317,
+        "rightFlankRmsPx": 3.964
+      }
+    },
+    "limitations": "The target wing is partly obscured and defocused. Its horizontal edge is usable with a wider uncertainty. Its exact vertical silhouette and depth are not a metric datum."
+  },
+  "actualRightTerminal": {
+    "method": "Same marked terminal vertex from actual V108 and V109 high files. Only its lateral position was changed.",
+    "vertices": {
+      "V108WorldM": [
+        0.8082306981086731,
+        -1.3654178380966187,
+        0.6197490096092224
+      ],
+      "V109WorldM": [
+        0.733741044998169,
+        -1.3654178380966187,
+        0.6197490096092224
+      ],
+      "vertex": 21749,
+      "V108SHA256": "3cebdbf6dca4b97bdcf0aff51d83534843e3d5a62a8d6a0b0694d39c0f096a09",
+      "V109SHA256": "1ec974cc84385fd02e9929ecaccc26b2b15ec86c900bcd70707192997bee11bc",
+      "changedVertices": 1048,
+      "rightTailPointsOnly": true,
+      "unchangedLongitudinalAndHeight": true,
+      "scope": "Same actual terminal vertex in independently saved sources"
+    },
+    "projectedNativeImages": {
+      "3": {
+        "observedNativePx": [
+          361.0,
+          548.0
+        ],
+        "V108": {
+          "projectedNativePx": [
+            340.082,
+            542.355
+          ],
+          "residualNativePx": [
+            -20.918,
+            -5.645
+          ]
+        },
+        "V109": {
+          "projectedNativePx": [
+            359.46,
+            543.802
+          ],
+          "residualNativePx": [
+            -1.54,
+            -4.198
+          ]
+        }
+      },
+      "4": {
+        "observedNativePx": [
+          1148.0,
+          575.0
+        ],
+        "V108": {
+          "projectedNativePx": [
+            1184.267,
+            544.831
+          ],
+          "residualNativePx": [
+            36.267,
+            -30.169
+          ]
+        },
+        "V109": {
+          "projectedNativePx": [
+            1162.701,
+            546.475
+          ],
+          "residualNativePx": [
+            14.701,
+            -28.525
+          ]
+        }
+      },
+      "5": {
+        "observedNativePx": [
+          1332.0,
+          414.0
+        ],
+        "V108": {
+          "projectedNativePx": [
+            1356.901,
+            411.54
+          ],
+          "residualNativePx": [
+            24.901,
+            -2.46
+          ]
+        },
+        "V109": {
+          "projectedNativePx": [
+            1324.553,
+            413.342
+          ],
+          "residualNativePx": [
+            -7.447,
+            -0.658
+          ]
+        }
+      }
+    },
+    "calibrationSensitivity": {
+      "fitTurretAll": {
+        "robustBestInsetM": 0.07899452597129994,
+        "heldout": {
+          "3": {
+            "training": [
+              "4",
+              "5"
+            ],
+            "selectedInsetM": 0.07522571658989922,
+            "heldoutResidualPx": [
+              -1.3503910750467867,
+              -4.184131240962415
+            ]
+          },
+          "4": {
+            "training": [
+              "3",
+              "5"
+            ],
+            "selectedInsetM": 0.06980322113450865,
+            "heldoutResidualPx": [
+              16.045701810186074,
+              -28.627744150881313
+            ]
+          },
+          "5": {
+            "training": [
+              "3",
+              "4"
+            ],
+            "selectedInsetM": 0.0927698205800117,
+            "heldoutResidualPx": [
+              -15.336909895660938,
+              -0.2189684075127616
+            ]
+          }
+        }
+      },
+      "holdOutFlank": {
+        "robustBestInsetM": 0.08226679744639513,
+        "heldout": {
+          "3": {
+            "training": [
+              "4",
+              "5"
+            ],
+            "selectedInsetM": 0.08538192692748706,
+            "heldoutResidualPx": [
+              1.2565100707229249,
+              -3.989597399878221
+            ]
+          },
+          "4": {
+            "training": [
+              "3",
+              "5"
+            ],
+            "selectedInsetM": 0.07529085943285932,
+            "heldoutResidualPx": [
+              14.471847545330547,
+              -28.507767260074843
+            ]
+          },
+          "5": {
+            "training": [
+              "3",
+              "4"
+            ],
+            "selectedInsetM": 0.0927698205800117,
+            "heldoutResidualPx": [
+              -10.144592813374402,
+              -0.21183151793360366
+            ]
+          }
+        }
+      },
+      "holdOutRoof": {
+        "robustBestInsetM": 0.08301828595546835,
+        "heldout": {
+          "3": {
+            "training": [
+              "4",
+              "5"
+            ],
+            "selectedInsetM": 0.08724456684622375,
+            "heldoutResidualPx": [
+              1.7337251072313506,
+              -3.953988363626081
+            ]
+          },
+          "4": {
+            "training": [
+              "3",
+              "5"
+            ],
+            "selectedInsetM": 0.0762414373160192,
+            "heldoutResidualPx": [
+              14.19945476525072,
+              -28.48700241572942
+            ]
+          },
+          "5": {
+            "training": [
+              "3",
+              "4"
+            ],
+            "selectedInsetM": 0.0927698205800117,
+            "heldoutResidualPx": [
+              -9.222961155407802,
+              9.122053182840204
+            ]
+          }
+        }
+      }
+    }
+  },
+  "source4HeightCheck": {
+    "rearTrackNativePicks": [
+      [
+        1116.0,
+        656.0,
+        64.92596834807733
+      ],
+      [
+        1117.0,
+        660.0,
+        190.42779427270983
+      ],
+      [
+        1123.0,
+        664.0,
+        96.34677566572347
+      ],
+      [
+        1123.0,
+        668.0,
+        108.77971014259087
+      ],
+      [
+        1125.0,
+        672.0,
+        137.37035080604008
+      ],
+      [
+        1130.0,
+        676.0,
+        162.27399558380648
+      ],
+      [
+        1132.0,
+        680.0,
+        178.41019982555474
+      ],
+      [
+        1135.0,
+        684.0,
+        167.91586259077988
+      ],
+      [
+        1140.0,
+        688.0,
+        192.55057396543896
+      ],
+      [
+        1141.0,
+        692.0,
+        158.93559564310334
+      ]
+    ],
+    "scope": "Independent aft silhouette of the right belt, measured against visible gravel. Both the belt outline and fender remain selected observations, while the photographed fender was excluded from all camera fits.",
+    "cameraFitSensitivity": {
+      "V108 review": {
+        "heldoutTrackErrorsPx": [
+          31.102556994512724,
+          33.178158750319426,
+          34.253760506126355,
+          33.329362261933056,
+          36.40496401773976
+        ],
+        "trackAllErrorsPx": [
+          27.446597151962578,
+          28.614056870103468,
+          25.875751727092393,
+          29.95135348289932,
+          32.02695523870602,
+          31.102556994512724,
+          33.178158750319426,
+          34.253760506126355,
+          33.329362261933056,
+          36.40496401773976
+        ],
+        "rearWheelHeldoutRmsPx": 6.814999106311799,
+        "rearTurretStereoHeldoutRmsPx": 0.649170626917322,
+        "doorRingHeldout": 2.6914713378526134,
+        "taperedEndpointErrorPx": [
+          14.68944825415042,
+          -28.5246733159521
+        ]
+      },
+      "ModerateTrack": {
+        "heldoutTrackErrorsPx": [
+          30.235841762971177,
+          32.31047766262964,
+          33.3851135622881,
+          32.459749461946785,
+          35.534385361605246
+        ],
+        "trackAllErrorsPx": [
+          25.82866467172039,
+          26.997015025685187,
+          25.011934063995568,
+          29.086569963654256,
+          31.161205863312716,
+          30.235841762971177,
+          32.31047766262964,
+          33.3851135622881,
+          32.459749461946785,
+          35.534385361605246
+        ],
+        "rearWheelHeldoutRmsPx": 5.443152781169698,
+        "rearTurretStereoHeldoutRmsPx": 1.1862866380865462,
+        "doorRingHeldout": 3.5631912083343913,
+        "taperedEndpointErrorPx": [
+          12.00515179152967,
+          -29.05625185980648
+        ]
+      },
+      "StrongTrack": {
+        "heldoutTrackErrorsPx": [
+          30.345849463045397,
+          32.41627992118197,
+          33.48671037931854,
+          32.55714083745488,
+          35.62757129559145
+        ],
+        "trackAllErrorsPx": [
+          25.97773983671891,
+          27.14388916172561,
+          25.134558088635913,
+          29.204988546772483,
+          31.275419004909054,
+          30.345849463045397,
+          32.41627992118197,
+          33.48671037931854,
+          32.55714083745488,
+          35.62757129559145
+        ],
+        "rearWheelHeldoutRmsPx": 5.519949167841744,
+        "rearTurretStereoHeldoutRmsPx": 1.1752142505003227,
+        "doorRingHeldout": 3.413601869838247,
+        "taperedEndpointErrorPx": [
+          12.219580968181617,
+          -29.040277572753894
+        ]
+      }
+    },
+    "jointNetworkDiagnostics": {
+      "V108": {
+        "stageHeldoutWallRmsPx": 109.23207887447526,
+        "stageHeldoutRearTurretRmsPx": 0.649170626917322,
+        "individualHeldoutWheelRmsPx": {
+          "3": 1.8810117463014044,
+          "4": 6.814999106311799,
+          "6": 9.944414057028808
+        },
+        "oppositeHeldoutFlankPx": 2.745142127513158,
+        "sameRearEdgeTransferPx": [
+          23.780531083461447,
+          19.91007008510895
+        ],
+        "rearRingHeldoutPx": 2.3471456472039343
+      },
+      "sceneStereoPlusGeometry": {
+        "stageHeldoutWallRmsPx": 66.23615510241308,
+        "stageHeldoutRearTurretRmsPx": 1.9389092917539423,
+        "individualHeldoutWheelRmsPx": {
+          "3": 14.024153082868473,
+          "4": 4.131983130804508,
+          "6": 10.943368262958423
+        },
+        "oppositeHeldoutFlankPx": 20.11974770612473,
+        "sameRearEdgeTransferPx": [
+          5.619955815942153,
+          0.8566500734993711
+        ],
+        "rearRingHeldoutPx": 1.93197800818779
+      },
+      "sceneStereoPlusGeometryShift": {
+        "stageHeldoutWallRmsPx": 72.79283038526805,
+        "stageHeldoutRearTurretRmsPx": 0.5326773009632024,
+        "individualHeldoutWheelRmsPx": {
+          "3": 9.50773579350624,
+          "4": 6.0193929076420565,
+          "6": 9.764511356262627
+        },
+        "oppositeHeldoutFlankPx": 21.677930552506783,
+        "sameRearEdgeTransferPx": [
+          11.162674568334307,
+          6.755513961804549
+        ],
+        "rearRingHeldoutPx": 6.122371094163614
+      },
+      "sceneStereoModerated": {
+        "stageHeldoutWallRmsPx": 77.80219719902423,
+        "stageHeldoutRearTurretRmsPx": 1.1788053558761322,
+        "individualHeldoutWheelRmsPx": {
+          "3": 5.500775226942519,
+          "4": 4.464699770930702,
+          "6": 11.28228236707824
+        },
+        "oppositeHeldoutFlankPx": 10.467768285078018,
+        "sameRearEdgeTransferPx": [
+          16.07994744102748,
+          11.512739991027537
+        ],
+        "rearRingHeldoutPx": 3.3096505527062816
+      }
+    },
+    "adoptedCamera": "Existing V108 photo 4, after testing joint and track-constrained fits against their independent landmarks."
+  },
+  "readmeScope": "The right rear rim sweeps inward and retains its fore-aft profile, axle datums and height. The camera 4 height interpretation and obscured rear panel remain conditional.",
+  "strictWholeReferenceMatched": false,
+  "lastUnresolved": "A vertical discrepancy remains at the right rear fender and belt in photo 4. Photo 5 adds support for the lateral sweep, with a defocused and partly obscured rear edge."
+}

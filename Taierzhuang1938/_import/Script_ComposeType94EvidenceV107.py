@@ -12,7 +12,8 @@ from scipy.ndimage import map_coordinates
 
 base = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
 revision = os.environ.get("TYPE94_PHOTO_REVISION","V107")
-if revision not in {"V107","V108"}:
+studies = ("V107","V108","V109")
+if revision not in studies:
     raise ValueError(f"Unknown Type 94 photo revision {revision}")
 root = Path(os.environ.get("TYPE94_PHOTO_ROOT",base/f"PhotoReconstruction{revision}"))
 renders = root/"Acceptance"/"Renders"
@@ -27,9 +28,9 @@ family = json.loads(familyFile.read_text(encoding="utf-8"))
 for key,record in study["addedCameras"].items():
     family["images"][key] = record["image"]
     family["cameras"][key] = record["camera"]
-if revision == "V108":
-    rear = json.loads((repo/"Model/Type94Tankette/Data_ReferenceViewsV108.json").read_text(encoding="utf-8"))
-    for key,record in rear["addedCameras"].items():
+for stage in studies[1:studies.index(revision)+1]:
+    supplement = json.loads((repo/"Model"/"Type94Tankette"/f"Data_ReferenceViews{stage}.json").read_text(encoding="utf-8"))
+    for key,record in supplement["addedCameras"].items():
         family["images"][key] = record["image"]
         family["cameras"][key] = record["camera"]
 photos = {row["id"]:row for row in study["photos"]}
@@ -86,33 +87,37 @@ def Board(name, images, box=(0,0,1,1), panelWidth=760):
     board.thumbnail((640,640),Image.Resampling.LANCZOS)
     board.save(out/("Preview_"+name+".jpg"),quality=85)
 
-if revision=="V108":
-    Board("Compare_Kubinka2017V108",[
+if revision in {"V108","V109"}:
+    previous = studies[studies.index(revision)-1]
+    Board(f"Compare_Kubinka2017{revision}",[
         ("Kubinka 2017",Reference("2017")),
-        ("V108 high / museum light estimate",Render(high,"museum","2017")),
-        ("V108 game GLB / same camera",Render(game,"museum","2017")),
+        (f"{revision} high / museum light estimate",Render(high,"museum","2017")),
+        (f"{revision} game GLB / same camera",Render(game,"museum","2017")),
     ],(.055,.018,.955,.965))
-    Board("Compare_NeutralFullV108",[
-        ("V108 high / neutral",Render(high,"neutral","2017")),
-        ("V108 game GLB / same camera",Render(game,"neutral","2017")),
+    Board(f"Compare_NeutralFull{revision}",[
+        (f"{revision} high / neutral",Render(high,"neutral","2017")),
+        (f"{revision} game GLB / same camera",Render(game,"neutral","2017")),
     ],(.065,.028,.945,.96))
-    Board("Finish_RearV108",[
-        ("V108 high / museum light estimate",Render(high,"museum","Rear")),
-        ("V108 high / neutral",Render(high,"neutral","Rear")),
-        ("V108 game GLB / neutral",Render(game,"neutral","Rear")),
+    Board(f"Finish_Rear{revision}",[
+        (f"{revision} high / museum light estimate",Render(high,"museum","Rear")),
+        (f"{revision} high / neutral",Render(high,"neutral","Rear")),
+        (f"{revision} game GLB / neutral",Render(game,"neutral","Rear")),
     ],panelWidth=700)
-    for view,box in {
+    windows = {
         "3":(.23,.34,.97,.86),
         "4":(.61,.35,.99,.79),
         "6":(.03,.30,.42,.74),
-    }.items():
-        Board(f"Compare_RearPatriot{view}V108",[
+    }
+    if revision=="V109":
+        windows["5"]=(.764,.31,.99,.57)
+    for view,box in windows.items():
+        Board(f"Compare_RearPatriot{view}{revision}",[
             ("Patriot "+view,Reference(view)),
-            ("V107 high / refined camera",Render("Scene_Type94TanketteHighV107","gray",view)),
-            ("V108 high / same camera",Render(high,"gray",view)),
-            ("V108 actual game GLB",Render(game,"gray",view)),
+            (f"{previous} high / refined camera",Render(f"Scene_Type94TanketteHigh{previous}","gray",view)),
+            (f"{revision} high / same camera",Render(high,"gray",view)),
+            (f"{revision} actual game GLB",Render(game,"gray",view)),
         ],box,690)
-    print(f"TYPE94_V108_COMPARISONS {out}")
+    print(f"TYPE94_{revision}_COMPARISONS {out}")
     raise SystemExit(0)
 
 

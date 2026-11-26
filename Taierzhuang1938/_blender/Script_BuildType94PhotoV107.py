@@ -19,7 +19,7 @@ repo = scriptDir.parents[1]
 modelDir = repo / "Taierzhuang1938/Model/Type94Tankette"
 defaultSource = Path("C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type94Tankette")
 revision = os.environ.get("TYPE94_PHOTO_REVISION", "V107")
-if revision not in {"V107", "V108"}:
+if revision not in {"V107", "V108", "V109"}:
     raise ValueError(f"Unknown Type 94 photo revision {revision}")
 root = Path(os.environ.get("TYPE94_PHOTO_ROOT", defaultSource / f"PhotoReconstruction{revision}")).resolve()
 acceptance = root / "Acceptance"
@@ -125,7 +125,7 @@ def Build(high):
 
 if __name__ == "__main__":
     if revision != "V107":
-        raise ValueError("Use Script_BuildType94RearPhotoV108.py for V108 geometry")
+        raise ValueError("Use Script_BuildType94RearPhotoV108.py for subsequent rear geometry")
     phase = os.environ.get("TYPE94_PHOTO_PHASE","High")
     if phase not in {"High","LowGeometry"}:
         raise ValueError(f"Unknown photo build phase {phase}")

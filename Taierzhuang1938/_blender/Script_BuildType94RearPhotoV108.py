@@ -10,38 +10,49 @@ import bpy
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from Script_BuildType94PhotoV107 import ReadJson, Sha, WriteJson, defaultSource
 from Script_Type94RearMudguardV108 import REAR_PROFILE, ReplaceRearMudguards
+from Script_Type94RearTaperV109 import SweepRearRim
 
 
-root=Path(os.environ.get("TYPE94_PHOTO_ROOT",defaultSource/"PhotoReconstructionV108"))
+revision=os.environ.get("TYPE94_PHOTO_REVISION","V108")
+if revision not in {"V108","V109"}:
+    raise ValueError(f"Unknown rear source revision {revision}")
+baseline="V107" if revision=="V108" else "V108"
+root=Path(os.environ.get("TYPE94_PHOTO_ROOT",defaultSource/f"PhotoReconstruction{revision}"))
 acceptance=root/"Acceptance"
-sourceRoot=defaultSource/"PhotoReconstructionV107"
-highBlend=root/"Scene_Type94TanketteHighV108.blend"
-lowGeometryBlend=root/"Scene_Type94TanketteGameGeometryV108.blend"
+sourceRoot=defaultSource/f"PhotoReconstruction{baseline}"
+highBlend=root/f"Scene_Type94TanketteHigh{revision}.blend"
+lowGeometryBlend=root/f"Scene_Type94TanketteGameGeometry{revision}.blend"
 
 
 def Build(high):
     acceptance.mkdir(parents=True,exist_ok=True)
-    prior=ReadJson(sourceRoot/"Acceptance"/("Data_Type94HighV107.json" if high else "Data_Type94LowGeometryV107.json"))
+    sourceKind="High" if high else "LowGeometry"
+    prior=ReadJson(sourceRoot/"Acceptance"/f"Data_Type94{sourceKind}{baseline}.json")
     seed=Path(prior["scene"])
     if Sha(seed)!=prior["sha256"]:
-        raise RuntimeError("The preserved V107 source has changed")
+        raise RuntimeError(f"The preserved {baseline} source has changed")
     if not high:
-        highProof=ReadJson(acceptance/"Data_Type94HighV108.json")
+        highProof=ReadJson(acceptance/f"Data_Type94High{revision}.json")
         if Sha(highBlend)!=highProof["sha256"]:
-            raise RuntimeError("The low recipe requires the saved V108 high source")
+            raise RuntimeError(f"The low recipe requires the saved {revision} high source")
     bpy.ops.wm.open_mainfile(filepath=str(seed))
     scene=bpy.context.scene
     asset=bpy.data.objects["Type94Tankette"]
     if scene.get("BlenderMcpTask")!="Type94Tankette":
         raise RuntimeError("This recipe requires the dedicated Type 94 source")
     poses={obj.name:obj.matrix_world.copy() for obj in [asset,*asset.children_recursive]}
-    changed=ReplaceRearMudguards(asset,high)
+    if revision=="V108":
+        changes=dict(tailPanelsReplaced=ReplaceRearMudguards(asset,high),connectedRearMudguards=2)
+        scene["RearFendersRebuiltFromViews"]="Patriot official 3 / 4 / 6"
+    else:
+        changes=SweepRearRim(asset)
+        scene["RearFenderTaperDerivedFromViews"]="Patriot views 3, 4 and 5"
     bpy.context.view_layer.update()
     for name,matrix in poses.items():
         if matrix!=bpy.data.objects[name].matrix_world:
-            raise ValueError(f"V108 moved the retained frame {name}")
-    scene["SurfaceGeometryRevision"]="PhotoExteriorV108"
-    scene["RearFendersRebuiltFromViews"]="Patriot official 3 / 4 / 6"
+            raise ValueError(f"{revision} moved the retained frame {name}")
+    changes["allRetainedNodeMatricesExact"]=True
+    scene["SurfaceGeometryRevision"]=f"PhotoExterior{revision}"
     scene["Type94PhotoSourceSeedSha256"]=prior["sha256"]
     scene["Type94PhotoGameProjectionPending"]=not high
     meshes=[obj for obj in asset.children_recursive if obj.type=="MESH"]
@@ -59,7 +70,7 @@ def Build(high):
     bpy.ops.wm.save_as_mainfile(filepath=str(destination))
     report=dict(scene=str(destination),sha256=Sha(destination),seedSha256=prior["sha256"],
         high=high,triangles=triangles,meshOwners=len(meshes),nodes=len(poses),
-        changes=dict(tailPanelsReplaced=changed,connectedRearMudguards=2,allRetainedNodeMatricesExact=True),
+        changes=changes,
         rearFenderProfileYZDerivative=REAR_PROFILE)
     if high:
         report["packedSourceImages"]=prior["packedSourceImages"]
@@ -73,8 +84,8 @@ def Build(high):
             shutil.copyfile(original,texture)
     else:
         report["highSourceSha256"]=highProof["sha256"]
-    WriteJson(acceptance/("Data_Type94HighV108.json" if high else "Data_Type94LowGeometryV108.json"),report)
-    print(f"TYPE94_V108_BUILT {destination} {triangles}",flush=True)
+    WriteJson(acceptance/f"Data_Type94{sourceKind}{revision}.json",report)
+    print(f"TYPE94_{revision}_BUILT {destination} {triangles}",flush=True)
 
 
 if __name__=="__main__":
