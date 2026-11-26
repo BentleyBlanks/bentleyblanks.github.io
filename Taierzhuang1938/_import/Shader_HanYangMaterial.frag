@@ -37,29 +37,96 @@ float flecks(vec2 coord){
 float strokeDistance(vec2 p,vec2 start,vec2 end){
  vec2 line=end-start;return length(p-start-line*clamp(dot(p-start,line)/dot(line,line),0.,1.));
 }
-// A shallow compressed bed and a broken rim from handling dents in the
-// stock photographs. The slope is the derivative of the depressed surface.
-vec4 woodImpression(vec2 panel,float phase,float wear){
- vec2 spacing=vec2(.025,.019);
- vec2 field=panel/spacing+vec2(phase,.57*phase);
+// Compressed fibres make a shallow, irregular bed with a broken ridge on
+// one side. The same profile drives both the finish and the opposite slopes.
+vec2 WoodDentProfile(vec2 q,float key){
+ float shape=length(q*vec2(1.+.18*q.y,1.))+.19*(softNoise(q*2.8+key)-.5);
+ float bed=1.-smoothstep(.13,1.,shape+.10*q.x);
+ float fibre=softNoise(q*vec2(3.2,11.7)+key);
+ float rim=(1.-smoothstep(.045,.20,abs(shape-.89)))
+           *smoothstep(-.22,.58,q.y-.21*q.x)*(.16+.84*smoothstep(.32,.73,fibre));
+ return vec2(bed,rim);
+}
+vec4 WoodDent(vec2 offset,vec2 extent,float angle,float depth,float key){
+ vec2 dir=vec2(cos(angle),sin(angle));
+ vec2 crossGrain=vec2(-dir.y,dir.x);
+ mat2 frame=transpose(mat2(dir,crossGrain));
+ vec2 q=(frame*offset)/extent;
+ if(dot(q,q)>1.72)return vec4(0.);
+ vec2 profile=WoodDentProfile(q,key);
+ const float stepAt=.000135;
+ vec2 dx=(frame*vec2(stepAt,0.))/extent;
+ vec2 dy=(frame*vec2(0.,stepAt))/extent;
+ const vec2 height=vec2(1.,-.17);
+ vec2 slope=vec2(
+  dot(height,WoodDentProfile(q+dx,key)-WoodDentProfile(q-dx,key)),
+  dot(height,WoodDentProfile(q+dy,key)-WoodDentProfile(q-dy,key))
+ )*(depth/(2.*stepAt));
+ return vec4(profile,slope);
+}
+vec4 ScatteredWoodDents(vec2 face,vec2 spacing,float phase,float wear,float size){
+ vec2 field=face/spacing+vec2(phase,.57*phase);
  vec2 cell=floor(field);
- float grainvar=hash21(cell+11.9);
- float active=smoothstep(.58,.86,hash21(cell+3.58)+.21*wear);
+ float grouping=softNoise(face*vec2(38.,70.)+phase);
+ float chance=hash21(cell+3.58)+.44*wear+.28*grouping;
+ float active=smoothstep(.64,.96,chance);
+ if(active<=0.)return vec4(0.);
  vec2 centre=.36+.28*vec2(hash21(cell+11.4),hash21(cell+31.7));
- vec2 shift=(fract(field)-centre)*spacing;
- float oblique=hash21(cell+5.87);
- float angle=mix(-.71,.71,oblique);
- vec2 direction=vec2(cos(angle),sin(angle));
- vec2 acrossGrain=vec2(-direction.y,direction.x);
- vec2 extent=vec2(mix(.0026,.0063,grainvar),mix(.00115,.00255,hash21(cell+9.18)));
- vec2 coordinates=vec2(dot(shift,direction),dot(shift,acrossGrain))/extent;
- float squared=dot(coordinates,coordinates);
- float bed=max(1.-squared,0.);
- float depth=mix(.00020,.00054,hash21(cell+23.19));
- vec2 slope=-4.*depth*bed*(coordinates.x/extent.x*direction+coordinates.y/extent.y*acrossGrain);
- float rim=smoothstep(.47,.82,squared)*(1.-smoothstep(.88,1.09,squared));
- rim*=smoothstep(-.67,.88,coordinates.y-.35*coordinates.x);
- return active*vec4(bed*bed,rim,slope);
+ vec2 offset=(fract(field)-centre)*spacing;
+ float angle=mix(-1.50,1.50,hash21(cell+5.87));
+ vec2 extent=size*vec2(mix(.0015,.0054,hash21(cell+11.9)),mix(.00078,.00255,hash21(cell+9.18)));
+ float depth=size*mix(.00011,.00043,hash21(cell+23.19));
+ return active*WoodDent(offset,extent,angle,depth,phase+61.*hash21(cell+34.6));
+}
+vec4 StockWitnessDents(vec2 face,bool reverseSide){
+ // The lit wrist and heel in the museum and Lu photographs show overlapping
+ // flat impacts, with a cleaner shoulder between them.
+ vec4 marks=vec4(0.);
+ if(reverseSide){
+  marks+=WoodDent(face-vec2(-.205,-.068),vec2(.0042,.0029),.50,.00036,8.7);
+  marks+=.81*WoodDent(face-vec2(-.193,-.064),vec2(.0067,.0021),-.39,.00040,41.4);
+  marks+=.72*WoodDent(face-vec2(-.184,-.061),vec2(.0031,.0010),.87,.00027,19.3);
+  marks+=.85*WoodDent(face-vec2(-.063,-.023),vec2(.0052,.0028),-.68,.00042,51.0);
+  marks+=.94*WoodDent(face-vec2(-.055,-.019),vec2(.0039,.0019),.37,.00036,16.1);
+  marks+=.72*WoodDent(face-vec2(.048,.021),vec2(.0059,.0015),-.72,.00029,29.4);
+  marks+=.70*WoodDent(face-vec2(.060,.014),vec2(.0035,.0022),1.13,.00035,5.1);
+ }else{
+  marks+=.80*WoodDent(face-vec2(-.173,-.050),vec2(.0057,.0028),.57,.00041,39.5);
+  marks+=.72*WoodDent(face-vec2(-.160,-.055),vec2(.0038,.0018),-1.23,.00031,21.0);
+  marks+=.83*WoodDent(face-vec2(-.047,-.021),vec2(.006,.0024),-.23,.00034,12.9);
+  marks+=.64*WoodDent(face-vec2(-.032,-.015),vec2(.0027,.0013),.68,.00029,28.9);
+ }
+ return marks;
+}
+vec4 ForewoodWitnessDents(vec2 face,bool reverseSide,bool upper){
+ // The exposed forewood photos show small dents in groups beside the long
+ // scratches and beside the band. Each side has a separate wear pattern.
+ vec4 marks=vec4(0.);
+ if(upper){
+  if(reverseSide){
+   marks+=.82*WoodDent(face-vec2(.376,.048),vec2(.0049,.0017),.77,.00037,4.9);
+   marks+=.72*WoodDent(face-vec2(.383,.045),vec2(.0027,.0016),-.56,.00025,26.4);
+   marks+=.90*WoodDent(face-vec2(.424,.052),vec2(.0060,.0023),-.48,.00042,14.2);
+   marks+=.74*WoodDent(face-vec2(.431,.047),vec2(.0039,.0014),1.29,.00028,35.2);
+  }else{
+   marks+=.89*WoodDent(face-vec2(.348,.045),vec2(.0041,.0022),-.91,.00034,9.6);
+   marks+=.74*WoodDent(face-vec2(.449,.049),vec2(.0048,.0015),.66,.00040,60.1);
+   marks+=.84*WoodDent(face-vec2(.508,.054),vec2(.0034,.0028),1.17,.00028,21.8);
+  }
+ }else if(reverseSide){
+  marks+=.82*WoodDent(face-vec2(.657,.022),vec2(.0048,.0023),-.65,.00040,11.8);
+  marks+=.69*WoodDent(face-vec2(.668,.019),vec2(.0026,.0013),-.22,.00029,16.0);
+  marks+=.90*WoodDent(face-vec2(.710,.025),vec2(.0044,.0026),.71,.00037,46.3);
+  marks+=.74*WoodDent(face-vec2(.721,.025),vec2(.0061,.0012),-1.14,.00031,22.1);
+  marks+=.95*WoodDent(face-vec2(.778,.019),vec2(.0039,.0017),.26,.00040,38.2);
+ }else{
+  marks+=.85*WoodDent(face-vec2(.629,.027),vec2(.0042,.0017),.73,.00035,12.5);
+  marks+=.73*WoodDent(face-vec2(.634,.022),vec2(.0028,.0016),.10,.00028,32.2);
+  marks+=.97*WoodDent(face-vec2(.739,.029),vec2(.0048,.0022),-.42,.00039,8.3);
+  marks+=.80*WoodDent(face-vec2(.747,.024),vec2(.0031,.0016),1.15,.00030,18.6);
+  marks+=.75*WoodDent(face-vec2(.753,.027),vec2(.0035,.0012),-.19,.00031,40.7);
+ }
+ return marks;
 }
 struct WearSample{vec3 marks;float freshness;};
 WearSample stockPatina(vec2 position,float sidePhase){
@@ -186,7 +253,7 @@ const int GRAIN_SCAN=0, WEATHERED_STEEL_SCAN=1, PLATE_SCAN=2;
 
 struct ScanSample {
  vec3 pigment;
- vec2 surface;
+ vec3 surface;
  vec2 slope;
 };
 
@@ -208,7 +275,7 @@ ScanSample SampleScan(sampler2D colorMap,sampler2D properties,sampler2D normals,
  vec3 weight=upper?vec3(f.x+f.y-1.,1.-f.x,1.-f.y):vec3(1.-f.x-f.y,f);
  weight=weight*weight*(3.-2.*weight);
  weight/=dot(weight,vec3(1.));
- ScanSample result=ScanSample(vec3(0.),vec2(0.),vec2(0.));
+ ScanSample result=ScanSample(vec3(0.),vec3(0.),vec2(0.));
  for(int i=0;i<3;i++){
   if(weight[i]<.00001)continue;
   vec2 vertex=cell+(i==0?(upper?vec2(1.):vec2(0.)):
@@ -226,7 +293,7 @@ ScanSample SampleScan(sampler2D colorMap,sampler2D properties,sampler2D normals,
   vec2 uv=center+rotation*((coordinate-plane*vertex)*extent);
   vec3 scan=textureLod(normals,uv,0.).xyz*2.-1.;
   result.pigment+=weight[i]*textureLod(colorMap,uv,0.).rgb;
-  result.surface+=weight[i]*textureLod(properties,uv,0.).rg;
+  result.surface+=weight[i]*textureLod(properties,uv,0.).rgb;
   result.slope+=weight[i]*transpose(rotation)*scan.xy/max(scan.z,.34);
  }
  return result;
@@ -258,7 +325,7 @@ void main(){
  vec3 p=artSpace(point),normal=normalize(artSpace(faceNormal));
  vec3 tangent=normalize(artSpace(basis.xyz)-normal*dot(normal,artSpace(basis.xyz)));
  vec3 bitangent=-normalize(cross(normal,tangent))*sign(basis.w);
- vec3 color=vec3(0),gradient=vec3(0);vec2 surface=vec2(0);
+ vec3 color=vec3(0),gradient=vec3(0),surface=vec3(0);
  float rough,metal;
  vec3 visible;
  if(wood){
@@ -299,6 +366,7 @@ void main(){
   float grain=softNoise(grainPath);
   float openGrain=smoothstep(.55,.87,.52*(1.-grain)+.36*ring+.12*vessel);
   float pores=smoothstep(.43,.83,.44*(1.-fibre)+.33*ring+.13*vessel+.10*openGrain);
+  float scanPores=smoothstep(.09,.49,surface.z);
   float shade=softNoise(vec2(p.x*20.1+3.*p.y,91.*radial));
   float scanTone=clamp(.43*luma(color)+.57*luma(oldPigment),0.,1.);
   float tone=clamp(.26*shade+.23*figure+.19*fibre+.32*scanTone,0.,1.);
@@ -313,12 +381,14 @@ void main(){
   float polish=smoothstep(.23,.77,.55*contact+.23*shade+.13*oilVariation+.09*woodExposure);
   float scanContrast=clamp(.73*(luma(oldPigment)-.220)+.48*(luma(color)-.454),-.18,.16);
   float fibreContrast=.122*(fibre-.5)+.075*(figure-.5)+.061*(grain-.5);
-  float stain=(1.-(.053+.026*shade)*ring-.106*pores-.067*openGrain-.055*cutEnd+.54*scanContrast+fibreContrast)
+  float stain=(1.025-(.044+.022*shade)*ring-.072*pores-.052*openGrain-.055*cutEnd
+               -.205*scanPores+.59*scanContrast+fibreContrast)
                *(1.-.088*polish+.054*(woodExposure-.5));
   // A shared, deep walnut stain. The lit flanks on the museum example
   // are darker and less orange than the previous coat.
   visible=walnut*stain*vec3(.742,.737,.685);
-  rough=clamp(.584+.13*(surface.x-.57)+.17*(oldRough-.75)+.092*pores+.041*openGrain+.045*cutEnd-.121*polish,.420,.74);
+  rough=clamp(.579+.13*(surface.x-.57)+.17*(oldRough-.75)+.085*pores+.065*scanPores*scanPores
+              +.038*openGrain+.045*cutEnd-.110*polish,.420,.74);
   if(handguard)rough+=.012;
   metal=0.;
   const vec3 stepAcross=vec3(0.,.00026,0.),stepUp=vec3(0.,0.,.00026);
@@ -327,9 +397,9 @@ void main(){
   float fibreSlope=softNoise(fibreCoords+vec2(0.,.13))-softNoise(fibreCoords-vec2(0.,.13));
   float grainSlope=softNoise(grainPath+vec2(0.,.19))-softNoise(grainPath-vec2(0.,.19));
   vec3 radialAxis=vec3(0.,frame.yz/max(radial,.0001));
-  vec3 relief=.88*gradient+1.25*oldSlope+(.117+.047*cutEnd)*ringSlope
-             +radialAxis*(.186*fibreSlope+.195*grainSlope);
-  gradient=(relief-normal*dot(normal,relief))*(1.-.39*polish);
+  vec3 relief=1.85*gradient+1.12*oldSlope+(.064+.040*cutEnd)*ringSlope
+             +radialAxis*(.106*fibreSlope+.100*grainSlope);
+  gradient=(relief-normal*dot(normal,relief))*(1.-.32*polish);
 #ifdef STOCK_CREST_WEAR
   {
    // Keep the handling stain at the stock wrist within the shared walnut tone.
@@ -387,23 +457,32 @@ void main(){
    rough=clamp(rough-.067*rubbed+cuts.x*(.77-rough)*.85+.083*cuts.y,.43,.77);
    gradient+=.64*flank*(slope-normal*dot(slope,normal));
   }
-  float wornZone=clamp(.63*contact+.44*patch(p,vec3(-.142,0.,-.035),vec3(.10,.046,.052))
-                       +.30*patch(p,vec3(.665,0.,.018),vec3(.164,.04,.05)),0.,1.);
-  float flankWear=smoothstep(.25,.82,abs(normal.y))*(1.-.82*cutEnd);
-  vec4 impression=woodImpression(vec2(p.x,p.z+.26*p.y),17.31+17.5*float(p.y<0.)+seed,wornZone)*flankWear;
-  vec3 dentSlope=along*impression.z+(up+.26*across)*impression.w;
-  visible*=1.-.25*impression.x+.11*impression.y;
-  rough=mix(rough,.75,.65*impression.x);
-  rough=mix(rough,.47,.25*impression.y);
+  float wornZone=clamp(.71*contact+.66*patch(p,vec3(-.142,0.,-.046),vec3(.097,.046,.039))
+                       +.59*patch(p,vec3(.665,0.,.026),vec3(.123,.038,.035)),0.,1.);
+  float sidePhase=17.31+17.5*float(p.y<0.)+seed;
+  vec2 side=p.xz+vec2(0.,.18*p.y);
+  vec4 impression=ScatteredWoodDents(side,vec2(.030,.021),sidePhase,wornZone,handguard?.83:1.);
+  impression+=.71*ScatteredWoodDents(side,vec2(.014,.010),sidePhase+31.5,wornZone,.46);
+#ifdef STOCK_CREST_WEAR
+  if(p.x<.120)impression+=StockWitnessDents(side,p.y<0.);
+#endif
+  if(foreEnd||handguard)impression+=ForewoodWitnessDents(side,p.y<0.,handguard);
+  impression*=smoothstep(.26,.81,abs(normal.y))*(1.-.86*cutEnd);
+  float topPhase=36.44+seed;
+  vec4 crown=.71*ScatteredWoodDents(p.xy,vec2(.019,.013),topPhase,wornZone,.58);
+  crown*=smoothstep(.48,.94,abs(normal.z))*(1.-.86*cutEnd);
+  vec3 dentSlope=along*(impression.z+crown.z)+(up+.18*across)*impression.w+across*crown.w;
+  vec2 damage=min(impression.xy+crown.xy,vec2(1.));
+  visible*=1.-.25*damage.x+.175*damage.y;
+  rough=mix(rough,.755,.76*damage.x);
+  rough=mix(rough,.455,.35*damage.y);
   gradient+=dentSlope-normal*dot(dentSlope,normal);
-  finishMask.r*=1.-.43*impression.x;
+  finishMask.r*=1.-.80*damage.x;
  }else{
   vec3 weights=pow(abs(normal),vec3(4.));
   weights/=max(dot(weights,vec3(1.)),.0001);
   vec3 samplePoint=p+vec3(.021,.049,.073)*seed;
-  vec3 agedColor=vec3(0.),agedSlope=vec3(0.),poreSlope=vec3(0.);
-  vec2 agedSurface=vec2(0.);
-  float pores=0.;
+  vec3 agedColor=vec3(0.),agedSlope=vec3(0.),agedSurface=vec3(0.);
   for(int plane=0;plane<3;plane++){
    vec3 axisU=plane==1?along:across;
    vec3 axisV=plane==2?along:up;
@@ -419,19 +498,13 @@ void main(){
    agedColor+=weight*aged.pigment;
    agedSurface+=weight*aged.surface;
    agedSlope+=weight*(axisU*aged.slope.x+axisV*aged.slope.y);
-   vec2 cell=uv*vec2(1550.,1470.)+vec2(2.4,8.1)*float(plane);
-   pores+=weight*flecks(cell);
-   poreSlope+=weight*(axisU*(flecks(cell-vec2(.14,0.))-flecks(cell+vec2(.14,0.)))
-                    +axisV*(flecks(cell-vec2(0.,.14))-flecks(cell+vec2(0.,.14))));
   }
   float cloud=SteelNoise(samplePoint*(steelDetail==4?212.:116.),weights);
   float mottling=SteelNoise(samplePoint*463.,weights);
   float fine=SteelNoise(samplePoint*2170.,weights);
   float film=smoothstep(.21,.84,.36*cloud+.48*mottling+.16*(1.-agedSurface.y));
   if(steelDetail==4)film=mix(.46,film,.68);
-  float cavity=pores*(.34+.66*film);
   float oxidation=smoothstep(.47,.78,.39*mottling+.22*film+.39*fine);
-  float pitting=clamp(.83*cavity+.17*oxidation,0.,1.);
 
   float partLength=max(.001,alongRange.y-alongRange.x);
   float section=clamp((p.x-alongRange.x)/partLength,0.,1.);
@@ -485,6 +558,8 @@ void main(){
   // Break up the wear with the scan and keep the surface normal at its baked scale.
   float rimPolish=fineEdgeFinish?.56*edge*(.93+.07*mottling):.70*edge*(.80+.20*mottling);
   float polish=clamp(rub+rimPolish-.14*film,0.,.93);
+  float cavity=smoothstep(.075,.52,agedSurface.z)*(.38+.62*film)*(1.-.55*polish);
+  float pitting=clamp(.96*cavity+.25*oxidation,0.,1.);
   float mineral=clamp(.39*luma(agedColor)+.61*luma(color),0.,1.);
   float oxideTone=.18*cloud+.47*mineral+.35*mottling;
   vec3 oxide=mix(vec3(.145,.139,.129),vec3(.232,.221,.204),oxideTone);
@@ -495,15 +570,15 @@ void main(){
   float toolMark=softNoise(track);
   float cleaned=worked*polish*(1.-film);
   float scanWeather=clamp(.47*(luma(agedColor)-.33)+.22*(luma(color)-.30),-.14,.14);
-  visible=mix(oxide,bare,polish)*(1.-.30*pitting-.067*oxidation+.125*cleaned*(toolMark-.5))
+  visible=mix(oxide,bare,polish)*(1.-.32*pitting-.067*oxidation+.079*cleaned*(toolMark-.5))
           *(1.+(.42+.49*film)*scanWeather);
-  rough=clamp(.476+.129*film+.117*pitting+.040*(agedSurface.x-.5)
-                 +.049*(surface.x-.5)-.250*polish-.030*edge+.051*cleaned*(toolMark-.5),.295,.73);
+  rough=clamp(.467+.116*film+.174*pitting+.060*(agedSurface.x-.5)
+                 +.049*(surface.x-.5)-.240*polish-.030*edge+.038*cleaned*(toolMark-.5),.295,.73);
   if(steelDetail==5)rough+=.055*(1.-edge);
   metal=clamp(.937+.079*polish-.080*film-.145*pitting,.72,.990);
   float trackSlope=softNoise(track+vec2(0.,.18))-softNoise(track-vec2(0.,.18));
-  vec3 relief=gradient*(.15+.041*film)+agedSlope*(.106+.146*film)
-             +poreSlope*(.104+.149*film)+.118*cleaned*trackSlope*up;
+  float corrosion=(.22+.40*film+.38*cavity)*(1.-.59*polish);
+  vec3 relief=gradient*(.15+.041*film)+agedSlope*corrosion+.085*cleaned*trackSlope*up;
   relief*=1.-.44*edge;
   if(fineEdgeFinish){
    rough=mix(rough,.405+.038*film,.62*edge);

@@ -8,17 +8,22 @@ from pathlib import Path
 import requests
 
 archive = Path(os.environ.get('HANYANG_SOURCE_DIR', 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/HanYang173R'))
-library = archive/'ExteriorFinish_20261122'/'SurfaceScans'
-library.mkdir(exist_ok=True)
-definitions = {'black_walnut_veneer_02':['Diffuse','Rough','nor_gl'], 'metal_plate_02':['Diffuse','Rough','nor_gl','Metal'], 'fine_grained_wood':['Diffuse','Rough','nor_gl']}
-definitions['rusty_metal_04']=['Diffuse','Rough','nor_gl','Metal']
+library = Path(os.environ.get('HANYANG_SCAN_DIR', str(archive/'ExteriorFinish_20261122'/'SurfaceScans')))
+library.mkdir(parents=True, exist_ok=True)
+definitions = {
+    'black_walnut_veneer_02': ['Diffuse', 'Rough', 'nor_gl', 'Displacement'],
+    'metal_plate_02': ['Diffuse', 'Rough', 'nor_gl', 'Metal'],
+    'fine_grained_wood': ['Diffuse', 'Rough', 'nor_gl'],
+    'rusty_metal_04': ['Diffuse', 'Rough', 'nor_gl', 'Metal', 'Displacement'],
+}
 rows = []
 files = []
 for asset, roles in definitions.items():
     response = requests.get('https://api.polyhaven.com/files/'+asset,timeout=30)
     response.raise_for_status()
     for role in roles:
-        source=response.json()[role]['2k']['jpg']
+        extension = 'png' if role == 'Displacement' else 'jpg'
+        source = response.json()[role]['2k'][extension]
         files.append((asset,role,source))
 
 

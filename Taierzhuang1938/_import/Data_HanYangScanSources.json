@@ -24,6 +24,14 @@
     "license": "CC0-1.0"
   },
   {
+    "asset": "black_walnut_veneer_02",
+    "role": "Displacement",
+    "file": "black_walnut_veneer_02_disp_2k.png",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/black_walnut_veneer_02/black_walnut_veneer_02_disp_2k.png",
+    "sha256": "9dd5f6d9da60986264a98590580c0d36eda56f51dc9a1c0da209d5cb32abc28e",
+    "license": "CC0-1.0"
+  },
+  {
     "asset": "metal_plate_02",
     "role": "Diffuse",
     "file": "metal_plate_02_diff_2k.jpg",
@@ -109,6 +117,14 @@
     "file": "rusty_metal_04_metal_2k.jpg",
     "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_metal_2k.jpg",
     "sha256": "9085f395c40ce3860353d77c2a55a4e9b5b370abc5756784330ed3e890654097",
+    "license": "CC0-1.0"
+  },
+  {
+    "asset": "rusty_metal_04",
+    "role": "Displacement",
+    "file": "rusty_metal_04_disp_2k.png",
+    "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/rusty_metal_04/rusty_metal_04_disp_2k.png",
+    "sha256": "2b900ebeb94d8e0debf5bd88c07335311df662312f01aeadb31fb04caea60713",
     "license": "CC0-1.0"
   }
 ]

@@ -5,11 +5,11 @@ The HanYang first-person, carried and dropped world model uses only Dots' 173R d
 ## Asset identity and provenance
 
 - Original delivery: `Hanyang173R_final.glb`, 295,470 triangles. SHA256 `3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c`.
-- Game geometry: **79,909 triangles of an 80,000 triangle cap**, 44 parts and 134 embedded images (132 base PBR images and two linear oil-film masks). In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
+- Game geometry: **79,513 triangles of an 80,000 triangle cap**, 44 named parts, 13 render meshes and 41 embedded maps, including two linear oil-film masks. In `Data_GameGeometry.json`, `gameSha256` identifies the finished GLB and `exteriorFinish.surfaceComparisons` records local-space distances to both Dots and R2. The two exterior ring display poses are recorded separately. Earlier `surfaceRepair` and `mechanismRepair` entries describe their respective revisions.
 - R3 uses a unique atlas for each of the three wood pieces and keeps the grain lengthwise on the sides and samples the caps in the same object-space coordinates. Base colour, roughness/metalness and tangent-space normals are baked from a continuous object-space finish into the final UVs. The steel is darker in protected regions; age and wear vary across its surface rather than following the mesh triangles.
 - The exterior revisions shape the wood shoulder and nose, the two band profiles and the rounded rear outline. The surface-distance record compares digital meshes. The historical photographs supply visual references.
 - A 4.5 mm notch is cut into the previously solid rear sight crosspiece so the front blade is visible. This is a gameplay adaptation. The actual front blade and rear crown define ADS pitch and position.
-- GPU publication uses the existing BC7 path rules. Main-stock images 57–59 are 4096 square; the other two wood sets are 2048 square. Embedded source maps are lossless WebP. All output atlases clamp at their boundaries.
+- GPU publication uses the existing BC7 path rules. Main-stock PBR maps are 4096 square, the other two wood sets are 2048 square, and the two oil-film masks are 1024 square. Embedded source maps are lossless WebP. All output atlases clamp at their boundaries.
 
 Source packages and source Blender projects remain outside Git:
 
@@ -217,6 +217,12 @@ The rear steel uses a single tapered exterior shell. Its visible edge follows th
 The wooden flanks carry compressed dents and short broken edges guided by the stock photographs. Their relief comes from a shallow depression in the normal map. The stain is darker in the bed, with local roughness changes around each rim. [Te Papa DM000453, closed side](https://media.tepapa.govt.nz/collection/131366/full)
 
 The game draws the 44 named pieces in 13 meshes. Pieces with compatible material parameters and animation ownership share lossless Base Color, ORM and Normal atlases. The packing preserves source texel density and leaves a 32-pixel gutter. The GLB retains the named geometry for the Blender archive, and the inspection bench can select its regions inside a merged draw mesh. The tapered rear cover belongs to the fixed body.
+
+### R34 timber impressions and steel surface relief
+
+The stock heel and wrist use clusters of shallow impacts with irregular beds and torn edges. The crest and both pieces of forewood carry smaller impressions. Each impression changes the tangent-space normal, roughness, stain and, where present, the oil film. The band and handle close-ups guide the distribution of pores and the difference between dark cavities and burnished shoulders. [Te Papa DM000453, band](https://media.tepapa.govt.nz/collection/131438/full) · [Te Papa DM000453, handle](https://media.tepapa.govt.nz/collection/131440/full) · [Steven Lu, stock comparison](https://armsofchina.com/wp-content/uploads/2026/04/145.jpg)
+
+The bake uses the walnut and weathered steel scans' 16-bit displacement to isolate recesses and align them with the other PBR channels. It removes the donor steel's broad corrugation from the transferred normals. R34 uses the R33 geometry, with 79,513 triangles, 13 render meshes and 41 embedded maps. The reference crops and matched inspection bench views are in the external archive's `Review` directory.
 
 ### Rebuild and inspect
 

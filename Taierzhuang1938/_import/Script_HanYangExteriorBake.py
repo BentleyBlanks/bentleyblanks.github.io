@@ -25,7 +25,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261127R33'
+version = '173R-20261127R34'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -83,8 +83,29 @@ doc['samplers']=[{'magFilter':9729,'minFilter':9987,'wrapS':33071,'wrapT':33071}
 blocks = [View(doc,binary,index) for index in range(len(doc['bufferViews']))]
 partRecords = {item['part']:item for item in report['parts']}
 imageRecords = {item['name']:item for item in report['texturePayloads']}
-library=revision/'SurfaceScans'
+library=Path(os.environ.get('HANYANG_SCAN_DIR', str(revision/'SurfaceScans')))
 scanSources=json.loads(Path(__file__).with_name('Data_HanYangScanSources.json').read_text())
+
+
+def ScanRecesses(displacement, scale):
+    # Separate the pores and pits from the shape of the scan's original panel.
+    height = np.asarray(displacement, dtype=np.float32) / 65535
+    height = ndimage.gaussian_filter(height, .86, mode='wrap')
+    depth = ndimage.gaussian_filter(height, 12., mode='wrap') - height
+    return Image.fromarray(np.uint8(np.round(255 * np.clip(depth / scale, 0, 1))))
+
+
+def FlattenSteelNormal(image):
+    # The donor scan is corrugated. Its shallow corrosion can be transferred
+    # to a smooth surface once the long-wavelength sheet curvature is removed.
+    normal = np.asarray(image.convert('RGB'), dtype=np.float32) / 127.5 - 1.
+    slope = normal[:, :, :2] / np.maximum(normal[:, :, 2:], .34)
+    slope -= ndimage.gaussian_filter(slope, (13., 13., 0.), mode='wrap')
+    detail = np.dstack((slope, np.ones(slope.shape[:2], dtype=np.float32)))
+    detail /= np.linalg.norm(detail, axis=2, keepdims=True)
+    return Image.fromarray(np.uint8(np.round((detail + 1.) * 127.5)))
+
+
 maps={}
 for kind,asset in [('Wood','black_walnut_veneer_02'),('Steel','metal_plate_02'),('OldWood','fine_grained_wood'),('OldSteel','rusty_metal_04')]:
     channels={}
@@ -95,9 +116,14 @@ for kind,asset in [('Wood','black_walnut_veneer_02'),('Steel','metal_plate_02'),
         channels[source['role']]=img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
     size=channels['Diffuse'].size
     assert all(image.size==size for image in channels.values())
-    surface=Image.merge('RGB',(channels['Rough'].convert('L'),channels.get('Metal',Image.new('L',size)).convert('L'),Image.new('L',size)))
+    recessScale = {'Wood': .0095, 'OldSteel': .034}.get(kind)
+    recesses = ScanRecesses(channels['Displacement'], recessScale) if recessScale else Image.new('L', size)
+    surface = Image.merge('RGB', (channels['Rough'].convert('L'), channels.get('Metal', Image.new('L', size)).convert('L'), recesses))
+    normals = channels['nor_gl'].convert('RGB')
+    if kind == 'OldSteel':
+        normals = FlattenSteelNormal(normals)
     maps[kind]=[]
-    for image in [channels['Diffuse'].convert('RGB'),surface,channels['nor_gl'].convert('RGB')]:
+    for image in [channels['Diffuse'].convert('RGB'),surface,normals]:
         tex=context.texture(size,3,image.tobytes());tex.filter=(moderngl.LINEAR,moderngl.LINEAR)
         maps[kind].append(tex)
 
@@ -312,9 +338,9 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R33: rolled side disks, stock-seated rear cover and compressed timber wear.'
+report['rebake']='R34: compressed timber dents, scan-based wood pores and localized steel pitting.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
-report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
+report['exteriorFinish']['materialSampling']='Blended scan patches in object space with aligned pigment, roughness, normal and band-limited recess depth. The worn-steel normal excludes the source sheet curvature.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)
 report['exteriorFinish']['ringPresentation']=ringPresentation
 report['exteriorFinish']['frontTrimPresentation']='Underside silhouette, rigid display pose estimated from the Lu profile photograph.'

@@ -1,6 +1,6 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "a73893c50c293e2a4f6573c68623249ded937c409255b9bf46d5901ca7667760",
+  "gameSha256": "dd802443254c1414b8e81187cf84d8404754c0c3f51dd2836943197e0f10e713",
   "triangles": 79513,
   "repairedTangents": 45491,
   "parts": [
@@ -668,216 +668,216 @@
   "texturePayloads": [
     {
       "name": "HanYang173R_body_Atlas1_BaseColor",
-      "sha256": "e851bf7586837ecf2018ff0098ee3f9509574db210b297d5dbdb741b43458510",
-      "sourceSha256": "8e59f8104ce841a2b00f83bd79ea0dcd5cbd203c85f3c06ce8619179a8eeedb5",
+      "sha256": "cef4a04ea081ce84e9c2b8b9d573a7cf3b268f954b0dc54c9f69a8d9d1980b6d",
+      "sourceSha256": "d08266933d4317c912ae5a11ea59714f842334fd4f5c5b1afe93e70a735bd39b",
       "mimeType": "image/webp",
       "islandCoverage": 0.407206,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas1_ORM",
-      "sha256": "4ea654eef379d3b037d9af2d2ec422de2237ef46cae061e7e8e5b153249d64a3",
-      "sourceSha256": "65b0ffaf6fd3abbb2123964f28ddb7c216d56fb54ee07e5153e8cda4593b8e5c",
+      "sha256": "18bd6779b52ca6191badd746e240a1cd8e3417c17f22949eb9cd212493917e9a",
+      "sourceSha256": "975501a1c76cc862167bc28d54aa0029eec673a412167ce19334f7e6108e4593",
       "mimeType": "image/webp",
       "islandCoverage": 0.407206,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas1_Normal",
-      "sha256": "8766d04b8acb25a0fe70c6bc7ebf03c958b88057eb9ca753d8ccdd37151c1110",
-      "sourceSha256": "747dbc5bf8c7f2bebad65750eff590a4b176700522e0c7ab8ecb40d5a3e10ee3",
+      "sha256": "0eb2552cc12a4c795990cdff67bdabdc70b6ddb20449c7a087c0e9827ef926ac",
+      "sourceSha256": "80e9cb6cdab44878def2d0028290048e726d504555b081b939dc957a14319669",
       "mimeType": "image/webp",
       "islandCoverage": 0.407206,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas2_BaseColor",
-      "sha256": "7d9a228932b99dfa5de6fcb6d200b66b22391a40c0002a325e88e070d763787b",
-      "sourceSha256": "cf82644287f0d16b5036d7c59ac04aae3adba42b57cb0a7fd776287e1fd5ed8f",
+      "sha256": "1db0061ac413b466283454c6b7bd10d53776c877330395716daea6bf2df471b9",
+      "sourceSha256": "df546c444b3703879a158d2dbd588f9527e98430dfeeb27101549fb44ee5a0ab",
       "mimeType": "image/webp",
       "islandCoverage": 0.275843,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas2_ORM",
-      "sha256": "a345e07340c47f4d7bde188686a94610286de2a1c5da02bc5f964aa3eb812f5a",
-      "sourceSha256": "83ba9f76072411a4f4407e5ccbb443da8044216dc84868981741e9d8f9ad4062",
+      "sha256": "401455a24efe8b0fadd71ccb510480a5f79d0f557d755a53ebf503ecabd58fe5",
+      "sourceSha256": "ccb40d88a8485277112e7af55c74898981db7a25d78a3840f27f911247e37af4",
       "mimeType": "image/webp",
       "islandCoverage": 0.275843,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas2_Normal",
-      "sha256": "90f60d087dc3b2d83f4f1e5d854c73bdc460a6e87ad35a632976d1f30eaa3302",
-      "sourceSha256": "28dd0b626ab904c930d2754206b91465176cc693093e466803323f10da42ab16",
+      "sha256": "c51e3d0eadefeeab247a9920d82e1cf6f96224eb939d8909c2ba22eca107c3a3",
+      "sourceSha256": "c705af9383a7b776589cf1b07e7b395756e63f7acc36e4818321edeed739a98e",
       "mimeType": "image/webp",
       "islandCoverage": 0.275843,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas3_BaseColor",
-      "sha256": "f0d4834b600e7b212a7e912779a1a40b467767c6b367838d6d07dc42408f91aa",
-      "sourceSha256": "3e6c68f3e10acac1f77d61c67cabc28d7935eef33d408c8de281a3aeef90a05e",
+      "sha256": "02ebaebfc6800533cab96b601a64691e6893b07645455559defe394d673a9556",
+      "sourceSha256": "de200e3ed05b7048407bf04ea0a430e1a2ac42be4dd6de3f850ac45e0a210125",
       "mimeType": "image/webp",
       "islandCoverage": 0.688503,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas3_ORM",
-      "sha256": "985a37e4dc2f5673a9aa6edce2020554f0ff7f66b56d0f47fe7fed9114eb2bf1",
-      "sourceSha256": "25724a851cdd285563479a8a6a30dcf7457bbe0db62eb2796ffc24b253963e68",
+      "sha256": "356a7de08469f89359c154945fe35d561da64210cb7698fd45f8e88e5cd18cf4",
+      "sourceSha256": "088dceca851af4c5a00b96e0ada4f82e3d19f35c404851685d65524dd723d06f",
       "mimeType": "image/webp",
       "islandCoverage": 0.688503,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas3_Normal",
-      "sha256": "0ae7923e75d549738e52065eb89272f8be1b9e800dd4473b34ebf2edcdd6aa46",
-      "sourceSha256": "c987faec268b984b2b352bf2585f9397ee69b558e102224937e1e340596f1bd3",
+      "sha256": "f8e0741c0ec7b1a537b0b5bd13ca596c2a1262bce8ce5a7944548c0de0a0a240",
+      "sourceSha256": "748089cfb5c85d59cebd66fa290f61c9edc40dbbae59eed5bc2fe6091f0662db",
       "mimeType": "image/webp",
       "islandCoverage": 0.688503,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas4_BaseColor",
-      "sha256": "c6990f5b3b765029ccc6728559c4228eb038788187a76d2f2009d1643d11299d",
-      "sourceSha256": "e7513e2e905ebfa64ec8239271c7e6a31ab7bee6926d0a8f05145c0ba9789de5",
+      "sha256": "932f333953103cff761756d0a399ef5032d31d3845ebd77ff67f29c6bf5e78df",
+      "sourceSha256": "eb6b4f5d179bd09719ee58c3c503f506e7233f798d2fcde29f8e2689ac37c89d",
       "mimeType": "image/webp",
       "islandCoverage": 0.449166,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas4_ORM",
-      "sha256": "461028d85cd38fee1d3b2db492abe2220dc0700b374d479a023a17a5be1a1781",
-      "sourceSha256": "178156a86abef16d35a3e6e3dce0e6b759f534b0cb96819bf6f31034fea31502",
+      "sha256": "b0a452ce9363ea592d415507a529e98e0807d41f787fb93042073370f28b0113",
+      "sourceSha256": "b886c1d8c93e20ee633b4b569234715b9097948e2d010a454b1439dbd34dd7d2",
       "mimeType": "image/webp",
       "islandCoverage": 0.449166,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas4_Normal",
-      "sha256": "f8895bde196217638dfd56f9547b1c7a73da6124ad415c776db37e3b9bb8f442",
-      "sourceSha256": "4ae41274d9337c157c65174dbb3b2b9d50861a7d6d24a288da0c516238fc364c",
+      "sha256": "f36b0deded0541026420571b25680be03aacab56226b7e2a2b46d1b67dcab7fc",
+      "sourceSha256": "cb3e757373e38ad5863508a9ba2cc8e7092df830a0c863c0561f471c44f0bd78",
       "mimeType": "image/webp",
       "islandCoverage": 0.449166,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas5_BaseColor",
-      "sha256": "4f87e18957def3b5e68a1cf9a4b8e95280ddf67eb8924e02182ba14aa5a15563",
-      "sourceSha256": "de9ff2117f5f12e9baadebf301909f36dfced37f6ff5a8469290a6e494b56ba7",
+      "sha256": "14f6a7f5cf55fcb62695af67f3b9351f0b2d59ac8d00e14a5d6cc992541a2001",
+      "sourceSha256": "90ce6bbcb55c2a936f862fd0291df9d403117c13db2daa85a5fff27581c48a24",
       "mimeType": "image/webp",
       "islandCoverage": 0.294369,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas5_ORM",
-      "sha256": "97fd1be40c9ddaebe497af86bd72690cb793a6f08eb8c8da23b5b9534caba17f",
-      "sourceSha256": "486120ce9198cf70c0c2c99fb3a7fa3f63d70dd9873fcfdc68de944998cc0fd6",
+      "sha256": "b1e3d18f9335481e4e56de6e691376d724523ed2cf6173a1b484cd6b1b180a3b",
+      "sourceSha256": "934e35d438a31dbc33883b9a78d4ee2c07b843faf69349876de0391d57487bcf",
       "mimeType": "image/webp",
       "islandCoverage": 0.294369,
       "rebake": true
     },
     {
       "name": "HanYang173R_body_Atlas5_Normal",
-      "sha256": "bd78321ac512e3d9f34a285d64e22c8f48cb0cb11c979b9c339da3d12d6b5fa6",
-      "sourceSha256": "81b32c36dffecee3715660f603a095159d37cc7cd07454a9ae6319d879bdc516",
+      "sha256": "216374179a42b08b6bed582fdc721f14e2f2eedfb922f89668e7ddc1652fed0c",
+      "sourceSha256": "ab852606adec66a9c7d89b6a9968f044557c5bac413b387c165233190b4b2928",
       "mimeType": "image/webp",
       "islandCoverage": 0.294369,
       "rebake": true
     },
     {
       "name": "HanYang173R_boltBody_Atlas6_BaseColor",
-      "sha256": "f586a2159ea84ab1faf22d6efba4913b196f05d71ad463ade384f4c3c8529beb",
-      "sourceSha256": "328f161d4b23ffc6058cb479714fb2e39e018b4d39cf19292dde4920c4b73912",
+      "sha256": "a19130ad3a329df07025aa276afa22a19ac17c461393d767bbda14e4e099e58e",
+      "sourceSha256": "793ba5dde087fe03d78401afd826b4b795c3809557ec968ea5ea11314a789c5e",
       "mimeType": "image/webp",
       "islandCoverage": 0.634682,
       "rebake": true
     },
     {
       "name": "HanYang173R_boltBody_Atlas6_ORM",
-      "sha256": "f2b6d6825f807794ff64c6524c9fd90fe76646def00cef6a60f6b46da3d4b192",
-      "sourceSha256": "c146013c682ed07bfd9ba97028790e29a73c0a28163caa444605e09ac36ac207",
+      "sha256": "1462d880089a071d9da1f1a8de6c98a2e2f65ff91ef724bdc08e552d993486a4",
+      "sourceSha256": "cb88fbe871b5d0fd5477b439bb9df0b2e6ac4fee4ad2a71ec900dad152e0fbc8",
       "mimeType": "image/webp",
       "islandCoverage": 0.634682,
       "rebake": true
     },
     {
       "name": "HanYang173R_boltBody_Atlas6_Normal",
-      "sha256": "afb7cf5d8eaf466370e9208795f57b4752598f6a1e0a20888b3e9e7f6411da65",
-      "sourceSha256": "94345d5c2f72ffc2600db5674541493200af3609ddbbdc9f22b0de0f298f3405",
+      "sha256": "8de89fb0651af5923fb0f0db3f4cd05f9500af4cf231fefced5e0c7a5410c877",
+      "sourceSha256": "25101f4fd078d52f1d53a17e252a4c15ef3a6ccf052483fdf2e539415e1d9940",
       "mimeType": "image/webp",
       "islandCoverage": 0.634682,
       "rebake": true
     },
     {
       "name": "HanYang173R_frontSight_Atlas7_BaseColor",
-      "sha256": "4b593d35a1359105c107c764ceb1876a02364a2a1d0e32429c3a5c5b3cae301a",
-      "sourceSha256": "b1db3a6cc44cf29194f5afadaf751c3adc358f69b22d381165132d6f86b131f0",
+      "sha256": "ffe9fc776187eb2494a95d0415ee82ecbc51ed733ef895fb563720b79693b589",
+      "sourceSha256": "641cea5838afe17a36921718501d97812326dc5348fef122129f465171144354",
       "mimeType": "image/webp",
       "islandCoverage": 0.422207,
       "rebake": true
     },
     {
       "name": "HanYang173R_frontSight_Atlas7_ORM",
-      "sha256": "3d08e136e80093159f21e3300a11406d5a1e75da081c193622af132d3c12e95a",
-      "sourceSha256": "541f8325a115cd06c9a61c9bacada3c1db34dad7c29bd519ebc64ab1304b07cd",
+      "sha256": "09a437e7f9aebbb9ec8b9b1c55dbb38f55938a2028e93a7dde2d506e79579e20",
+      "sourceSha256": "a44f5d71975ff9b688065d965616c8fc85252286ecfc318d6d0f8f2ee7c6a031",
       "mimeType": "image/webp",
       "islandCoverage": 0.422207,
       "rebake": true
     },
     {
       "name": "HanYang173R_frontSight_Atlas7_Normal",
-      "sha256": "a7da73814b1a08273ef9dbcbab62bf37950ddddfa6e00a4527c3601217b6ef82",
-      "sourceSha256": "65d5497759377c146eccf79b82bcd528e5797ceee4e3ab255d3a90e20e2b4302",
+      "sha256": "871b4e7e6cb06b7abd7c626f0d2c7324c1499c08f601422cb4f20022f22df655",
+      "sourceSha256": "afe01cfe9a72334fea9aa602614c2bb09158b7a1334bce3562bea32f55c2dc4e",
       "mimeType": "image/webp",
       "islandCoverage": 0.422207,
       "rebake": true
     },
     {
       "name": "HanYang173R_cockingPiece_Atlas8_BaseColor",
-      "sha256": "ad9907309df48e9d3b919fc0a42c66910eda7bf23b56d1f04097c120bfa0586f",
-      "sourceSha256": "99155cc6670a05264a1f3e8738c1c7265943d50247f0834b8b18f5528fb872e7",
+      "sha256": "a531a99ca746a58a2c62e2ff2741950b05a2b7ce98b3d3393b07f36da467ff15",
+      "sourceSha256": "4728d65059229d01b736e9c52f8e796f6741b468f726838a7b294f872fdab584",
       "mimeType": "image/webp",
       "islandCoverage": 0.540672,
       "rebake": true
     },
     {
       "name": "HanYang173R_cockingPiece_Atlas8_ORM",
-      "sha256": "382d86ca454f5fc57c5b8485c5f9e15f84a2c72fef096506369583d8817b9acb",
-      "sourceSha256": "18d02ea24973903a204edbd37473204b9b17d2bb33f37e335bb1834004192b06",
+      "sha256": "5436b154752d598a77c9e1f0cd3d134e313706b4b14a950f2d99dfcf00cd5c3f",
+      "sourceSha256": "31b4fdb63339f426c2b0e671e263aad3c649efd3ee13a51c1e3e926faa77d992",
       "mimeType": "image/webp",
       "islandCoverage": 0.540672,
       "rebake": true
     },
     {
       "name": "HanYang173R_cockingPiece_Atlas8_Normal",
-      "sha256": "3ae02339778232cfbd59cd4334224ecac84163208b3cf855dbf7143595ebc6d6",
-      "sourceSha256": "1d3d8afb7863f4ab0277e43a1ae9cda54ff7a445a9516f613becf1d4c832af23",
+      "sha256": "1dc4e71a6c4b5e43eb92a18922006aa75a1c13d573812bac2c27115caec888cc",
+      "sourceSha256": "fd0aeb00965da723ae9825c0fd8e7e85a4766814a0ba2e9c641b3e4a32c83044",
       "mimeType": "image/webp",
       "islandCoverage": 0.540672,
       "rebake": true
     },
     {
       "name": "HanYang173R_rearSight_Atlas9_BaseColor",
-      "sha256": "5633983bf30fb4ca1693a186c1986b11d151143c26fe9704f554a4e1de461851",
-      "sourceSha256": "be62e1e27b5fe5ca89416968a0a582f037ca119ecfbe0696b1d962c4b2364dc4",
+      "sha256": "337a22d5b33b40d5ddcff510c9a4227dcc6c7473c6740e65f7108ac9e910d479",
+      "sourceSha256": "20e79d276f1e734986f4ed4b4a22e2a5c891149d10fb3a49df1f63c68f8d3395",
       "mimeType": "image/webp",
       "islandCoverage": 0.404926,
       "rebake": true
     },
     {
       "name": "HanYang173R_rearSight_Atlas9_ORM",
-      "sha256": "ff16751c5bde0f7ca7c91e2f66234acf21e155674bcfd30a6cd3cf40624b9835",
-      "sourceSha256": "1536c17b39f293480c56c81f3e050120f5d529bad1ec266443ac98553c5ffb38",
+      "sha256": "6d06cd2fdb9631479e64b45a766e47a2a965ff05ef2479c9c4737879e6b7ee2f",
+      "sourceSha256": "f1d37b1c84b78680fcdea82e5f2b746d1d8b563e58374a3f18e166f58a2a0a62",
       "mimeType": "image/webp",
       "islandCoverage": 0.404926,
       "rebake": true
     },
     {
       "name": "HanYang173R_rearSight_Atlas9_Normal",
-      "sha256": "dbdccbf5ffa4b2f306a4d2c89d00389cb4585547160581dea6917c7953c2e25f",
-      "sourceSha256": "be32fc0e7f77e5f5d4e1b76f18f4890c8abaf96344389b9037dfadd24cc84e56",
+      "sha256": "9c7159d89ac1b08351f8d3a9e7dcd138174bf3b2dcb9dd12b7636e4d1df4962d",
+      "sourceSha256": "8b425b96317011e50ac356248eeeaed85732221f46af615a5aa22b9d0e653d11",
       "mimeType": "image/webp",
       "islandCoverage": 0.404926,
       "rebake": true
@@ -885,118 +885,118 @@
     {
       "name": "FrontWood_ContinuousOval_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "ae3ce4a2dbbcdad0801c2476de6775f4845f8d6cb5db60e03db22cb4cc234ef5",
-      "sourceSha256": "e87d8211f8ecc6b7ca7427b74b624424f41f9776b12b5ca1d92c24752a382dfb",
+      "sha256": "cdaf8010aa1247c2a2a3bfacf59eae921f5917aa637bf6aa43cc63843dca1e08",
+      "sourceSha256": "2a2aac85adb9ee1fd155561f6d48cf0ff545ecf0a2d5c7f57be69c805c1a5c3d",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_ORM",
       "mimeType": "image/webp",
-      "sha256": "425921028ed2f201fbf6a202b0d3c8f1734ce473984b54706ca4f10dcd33edaa",
-      "sourceSha256": "c023993f75b5bf4716ad20e7a840d9eeb085c3c8587caa143ec9afb971c3ce84",
+      "sha256": "a1ddb59aae1cb0cdf562cb813d668c10ceaca9fd2ae359edfb3e6bd00e0466d2",
+      "sourceSha256": "43e7d0cdafc960736ad42aa3d750b3b28734ae2b363acc15bc6fbff075905dd8",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_Normal",
       "mimeType": "image/webp",
-      "sha256": "e02295fb336231504e8c2f5860449aa7011c9742bff56646cc62e8a08557f575",
-      "sourceSha256": "a40ceced182ac1dbdfd1d6d73f3504d06f69bfafc12825a122757b6db163561c",
+      "sha256": "d3d71736f1c90c0cfb803efa51a6cd1a817536f1a821e2da93b5cb13adc72a48",
+      "sourceSha256": "103c17ceb052aa8517dfbaf8f6069a44779a43473710e015ff4b0e9892483882",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "73d7624704ae64916ab8edfee8ef117d89b75d92928dd887d2d5777a78d36f18",
-      "sourceSha256": "529f01fcc3157fb73cf9d4c372a03b100494ae5875dfb869387438612b2f9ab0",
+      "sha256": "631dfbd0a414ad8d82432563b0d121cb551d7cfda7294cea070c8316007df07e",
+      "sourceSha256": "8b6b393f02bcdfe15e5a976b6292dd7562e1ef8decd1e97e64b9fbdc4b63842f",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "b10a74d049f986dda7903014bab5c2dc6f9a68aa5da3b4269df488842a2044f9",
-      "sourceSha256": "95527161935bf509c2eb54e702ca96633c0e8a74372f68b0774981258afb8351",
+      "sha256": "82bd0fe8327fc1401a3bdc30d97f9ddad36784714861cc2e94b7e40b89207a38",
+      "sourceSha256": "2dafe3898534988915767077a510b93f0c15bb66490ef7a8f61d28841d746521",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "d50edd550a1c07c3f10ad43db249599b7422aa11e69c46ee88fa3d97fce217dc",
-      "sourceSha256": "82b6f0a2ab01baf6c8eafbb9db803df1210593e9c9738ae05cecb5f8db2467ce",
+      "sha256": "0a8f2f0fb99e977a6e6e02ed121d4be8b26c0d8c062e0aed4b9ed86f812213f2",
+      "sourceSha256": "2a0413c796eb6ce439919c96c7140046c0afa16bf97f578469b425e13f89ac89",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_Normal",
       "mimeType": "image/webp",
-      "sha256": "0048f5273108a787e82083a17c1e95f06bec3ecdf30ebd887b8667753d4b9603",
-      "sourceSha256": "9805454d618f4444c3b6190b544a0745b9f7064cbff292089b2be761b0a7e724",
+      "sha256": "4fdb0e935b757c6b8e39fa0f9a969864cdffc3c94055d180b4a0b08ff2d9325f",
+      "sourceSha256": "fb8555701ad4120ab1680ba35a18f38118e7e2c2e5edf26f9d0feeca08878cfd",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "e371be6a25addbe79cf9ec00c61c88e4764875f8272958d52359393ea53b583c",
-      "sourceSha256": "1cac95412476d5d04f3136ad418261b0232deca9bd0e183fe0f4679f3e3d0ed3",
+      "sha256": "25ca66c2d88f1417aa892d7a29cf0623a2b1d3b010100bef5ac6817da0ff4846",
+      "sourceSha256": "b67caff0d77e9a9926c54b69b90a0c3e066e3c9b67a35852ab8e3550026ff23c",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "69eb8ef578ad078b1fef111b79b0d6878c9b2fcddeb946b9fb12b5e56152ecb7",
-      "sourceSha256": "e454e7b62a55a161c29e80d0a40ee1a101069b362258751a8e0d5bddeea8c01f",
+      "sha256": "d02d2523ef221eabbb08f01f7b95ce478cb9241ecdfccbcbf16e8fdc7d0e22cb",
+      "sourceSha256": "79844b2511e3c3a99d034d6c71eeeceaa80d1f9a90878e6eac6497dfd854d5d3",
       "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_ORM",
       "mimeType": "image/webp",
-      "sha256": "8e01bf8788cb1aafeef5f994b12848a1ea4388ad8fc9dffd5558f32253a7bf9b",
-      "sourceSha256": "c5bba830c6328787221d2d012eb4a031f779ae50cb9ffdce93f496ea7483fc0b",
+      "sha256": "7c71fd0f10550e7599eb47e68586909bb02e40087ab9a0c963864ed9f78e56d4",
+      "sourceSha256": "9b201413cce5642f645adc810fde09db3d43f3276333bce66aa6fe57f7e8fddd",
       "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "Trigger_FlatCurvedExternalStrip_Normal",
       "mimeType": "image/webp",
-      "sha256": "87d39430b6c4b04e939bf50de6e089d23b8e9cbcf2bb643f66a78d6ed75ea3d4",
-      "sourceSha256": "d7be6bdd26adc2da616993b3aafe2040a6d0675bd1516757bc800802c8d909d7",
+      "sha256": "a5f273e97f79500896d31073c148dd27d7a210d4a57034915291a86773242548",
+      "sourceSha256": "f1f9a03cafc15790ab9196c0aaf6b69647552e77ed30e51be2d371d4c8ea179c",
       "islandCoverage": 0.544674,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "db5f62889fe7d0869f6f7f592265e8aaebdeaa49c9573179a23f7c04b5d41eb9",
-      "sourceSha256": "e9da5b417b658d548bad3a9af0dd7aa2c9a337bd9c90b92ed08655d777a9977f",
+      "sha256": "fdb2dc7272eb706a68641b87585956b2778b995f7bc16ab885da45ec6cd431db",
+      "sourceSha256": "246f65e77ccd501e153e1f966ffa3790baeadc23843124096b7521cadd3a62f2",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "a43da6ac700d0f84ca2b06b3946f3952bb64a6a7c90e6c88f0914fb11b091232",
-      "sourceSha256": "d3501cf635ec282d7f9660595294c09c207618736ec34e468605be79fcb56507",
+      "sha256": "673a477733cab9b29eb994789ccfb64cc677af3c5bda8839f80fdda1a87d1194",
+      "sourceSha256": "d5c115bda1b323332578b42ccc3b3a96832740f8f5529d1777843e879b8378bc",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
       "mimeType": "image/webp",
-      "sha256": "32acc11b33ecc7844feab0a7d78855b86b1cafff26718eb82397a15e61ccc6cc",
-      "sourceSha256": "14fa4644f2cd91ff07d1014bf87640f3eca092d31dcd1b023f9cdfb957ca65c5",
+      "sha256": "7d7a7d82a7dd10415de72a2a708a07909c180e25743ddd97b17757085cc7c75d",
+      "sourceSha256": "eab5019296ba86896507621cf04217a454fc05c24745bc0fc35c49a1de2dff45",
       "islandCoverage": 0.32717,
       "rebake": true
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R33: rolled side disks, stock-seated rear cover and compressed timber wear.",
+  "rebake": "R34: compressed timber dents, scan-based wood pores and localized steel pitting.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -1264,7 +1264,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261127R33",
+    "version": "173R-20261127R34",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -1342,6 +1342,14 @@
         "file": "black_walnut_veneer_02_nor_gl_2k.jpg",
         "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/black_walnut_veneer_02/black_walnut_veneer_02_nor_gl_2k.jpg",
         "sha256": "125a46a42525157cb2cf277b712c9933a76518d5a729b43caafce1aebd96bbbb",
+        "license": "CC0-1.0"
+      },
+      {
+        "asset": "black_walnut_veneer_02",
+        "role": "Displacement",
+        "file": "black_walnut_veneer_02_disp_2k.png",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/black_walnut_veneer_02/black_walnut_veneer_02_disp_2k.png",
+        "sha256": "9dd5f6d9da60986264a98590580c0d36eda56f51dc9a1c0da209d5cb32abc28e",
         "license": "CC0-1.0"
       },
       {
@@ -1431,6 +1439,14 @@
         "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/rusty_metal_04/rusty_metal_04_metal_2k.jpg",
         "sha256": "9085f395c40ce3860353d77c2a55a4e9b5b370abc5756784330ed3e890654097",
         "license": "CC0-1.0"
+      },
+      {
+        "asset": "rusty_metal_04",
+        "role": "Displacement",
+        "file": "rusty_metal_04_disp_2k.png",
+        "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/rusty_metal_04/rusty_metal_04_disp_2k.png",
+        "sha256": "2b900ebeb94d8e0debf5bd88c07335311df662312f01aeadb31fb04caea60713",
+        "license": "CC0-1.0"
       }
     ],
     "previousSourceAssets": [
@@ -1455,7 +1471,7 @@
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261127R33",
+    "version": "173R-20261127R34",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -1838,7 +1854,7 @@
         "roundedFaces": 324
       }
     },
-    "materialSampling": "Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.",
+    "materialSampling": "Blended scan patches in object space with aligned pigment, roughness, normal and band-limited recess depth. The worn-steel normal excludes the source sheet curvature.",
     "rearBandRibTriangles": 2688,
     "ringPresentation": {
       "RearBand_ExternalAttachmentLoop": {
@@ -1887,7 +1903,7 @@
   "batching": {
     "originalMeshes": 44,
     "renderMeshes": 13,
-    "authoredSha256": "a5e0bf4d766a8c87f1b032394cdd5d5b8fad0036916d7b484dfa058063982b4c",
+    "authoredSha256": "5dc834c82aa552e3edb404dc9b1e794987b9c6f3e4431237dfce03f1a52bf819",
     "materials": 13,
     "sourceImages": 134,
     "images": 41,

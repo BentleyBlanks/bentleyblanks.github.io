@@ -148,7 +148,12 @@ assert.equal(doc.asset.extras.materialMatch,D.version);
 const scanManifest=JSON.parse(fs.readFileSync(path.resolve(dir,'../../_import/Data_HanYangScanSources.json'),'utf8'));
 assert.deepEqual(report.materialMatch.sourceAssets,scanManifest);
 assert(report.materialMatch.previousSourceAssets.length===2&&report.materialMatch.previousSourceAssets.every(source=>source.tier===1));
-for(const [asset,roles] of Object.entries({black_walnut_veneer_02:['Diffuse','Rough','nor_gl'],fine_grained_wood:['Diffuse','Rough','nor_gl'],metal_plate_02:['Diffuse','Metal','Rough','nor_gl'],rusty_metal_04:['Diffuse','Metal','Rough','nor_gl']})){
+for(const [asset,roles] of Object.entries({
+ black_walnut_veneer_02:['Diffuse','Displacement','Rough','nor_gl'],
+ fine_grained_wood:['Diffuse','Rough','nor_gl'],
+ metal_plate_02:['Diffuse','Metal','Rough','nor_gl'],
+ rusty_metal_04:['Diffuse','Displacement','Metal','Rough','nor_gl'],
+})){
  const sources=scanManifest.filter(item=>item.asset===asset);assert.deepEqual(sources.map(item=>item.role).sort(),roles);
  assert(sources.every(item=>item.license==='CC0-1.0'&&/^[0-9a-f]{64}$/.test(item.sha256)&&new URL(item.url).hostname==='dl.polyhaven.org'));
 }
