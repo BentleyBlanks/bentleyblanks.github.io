@@ -49,19 +49,20 @@
     "The primary 2007 original was recovered during material review (3275x2399). Some other Commons originals remain unavailable and their explicitly labeled standard 1280px thumbnails are retained.",
     "The2007 primary shows an exposed cylindrical perforated bow-MG jacket and an open round cover with an inner five-point badge. The pointed removable cover in2025 photos is a different accessory state and is not substituted into the2007 appearance.",
     "Fine coating grain, shallow cast texture, demonstration speeds and the bow-door gun-stow linkage are explicitly inferred appearance/function choices.",
-    "SurfaceV14 fading, primer, edge chips and cavity dust are art-directed age cues, not measurements of the restored car or documented1938 service wear."
+    "SurfaceV14 fading, primer, edge chips and cavity dust are art-directed age cues, not measurements of the restored car or documented1938 service wear.",
+    "V6 battle wear is authored for gameplay; the right side and rear deposits extend adjacent surfaces where no V6 view is available."
   ],
   "historicalBoundary": "Museum/same-type appearance references do not establish participation in the16-18March Tengxian city assault. This independent asset does not replace the legacy Type89Tank or change mission history.",
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV16",
+  "materialRevision": "SurfaceV17",
   "runtimeTriangleTarget": 80000,
   "runtimeTriangleCeiling": 80000,
-  "runtimeRenderedTriangles": 79821,
-  "sourceTrianglesBeforeExportCleanup": 1465474,
-  "selectedGameSourceTrianglesBeforeCleanup": 79933,
-  "selectedGameVisibleSourceTrianglesBeforeZeroAreaCleanup": 79933,
+  "runtimeRenderedTriangles": 79997,
+  "sourceTrianglesBeforeExportCleanup": 1487422,
+  "selectedGameSourceTrianglesBeforeCleanup": 80109,
+  "selectedGameVisibleSourceTrianglesBeforeZeroAreaCleanup": 80109,
   "exportRemovedZeroAreaTriangles": 54,
   "exportRemovedWhollyEnclosedTriangles": 0,
   "budgetPolicy": "HighDerivedGameHardCeiling",
@@ -70,17 +71,17 @@
   "materialCount": 9,
   "activePackedImages": 9,
   "status": "AuthorReviewedWithDeclaredInferences",
-  "reviewedAt": "2026-11-26",
-  "reviewScope": "Matched 2007 appearance, five closed 2025 views and two auxiliary rear/side views. High-model local geometry and material edits, independent rigid nodes and a new full-vehicle game mesh.",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV16",
+  "reviewedAt": "2026-11-27",
+  "reviewScope": "V6 registered front, left and top finish, neutral inspection, packed GLB and mechanism review",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV17",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
   "geometryRecipeSha256": "9cb5a6862cea20a2365511d3efb020e15010cbf59f6c7752e89f00eede7c8335",
-  "materialReview": "Data_MetalFinishReview.json",
+  "materialReview": "Data_BattleWearReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+  "runtimeSha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -107,9 +108,9 @@
         4096
       ],
       "Track": [
-        1024,
-        1024,
-        1024
+        2048,
+        2048,
+        2048
       ],
       "Guard": [
         1024,
@@ -120,7 +121,9 @@
     "methods": [
       "Local cast finish, film roughness, oxide and directional wear evaluated on the calibrated high source",
       "Selected-to-active reprojection into the released G55 UVs with all rigid geometry and transforms held fixed",
-      "Retain SurfaceV15 AO, guard alpha and protected badge/non-metal footprints"
+      "Retain SurfaceV15 AO, guard alpha and protected badge/non-metal footprints",
+      "V6 anchors are traced in the G55 cameras and projected onto visible rest-pose armour.",
+      "Bake the finish, shallow relief and local dirt occlusion over the V16 photographed-material calibration; four shoe-local texture variants and independent physical mud deposits."
     ],
     "extensions": [
       "KHR_materials_clearcoat",
@@ -136,6 +139,6 @@
   ],
   "exportTriangulationZeroAreaTriangles": 0,
   "exporterOmittedTriangles": 58,
-  "highSourceSha256": "c6135b2779a467cb2a0557286e6c699be3e46be266daa9094841982059f20ea1",
-  "materialHighSourceSha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e"
+  "highSourceSha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
+  "materialHighSourceSha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e"
 }

@@ -288,6 +288,70 @@ if frontFixedSweep:
 if runningGearWheelSweep:
     report['runningGearWheelSweep']=runningGearWheelSweep
     report['pass']=report['pass']and runningGearWheelSweep['pass']
+# Unlike the repeated casting, a specific clay clod must clear an entire
+# lap. Test the actual low-mesh deposits at quarter-pitch spacing.
+mudParts = {i:parent for parent,node in enumerate(g['nodes']) if node['name'].startswith('Mesh_TrackLink')
+            for i in node.get('children',[]) if g['nodes'][i].get('extras',{}).get('battleWearMud')}
+if mudParts:
+    carriers = {link for link in links if any(child in mudParts.values() for child in g['nodes'][link].get('children',[]))}
+    samples = path['linksPerSide']*4
+    targets = {index:(tree,bounds) for index,(_,tree,bounds) in fixedData.items()}
+    closest = 0.0
+    tested = 0
+    deepest = None
+    penetrations = {}
+    for frame in range(samples):
+        distance = path['length']*frame/samples
+        pose = {}
+        for i in carriers:
+            node = g['nodes'][i]
+            signed = -distance if 'Right' in node['name'] else distance
+            y,z,angle = Shoe(node['extras']['phaseM']-signed)
+            pose[i] = Matrix.Translation(Vector((node['translation'][0],z,-y)))@Matrix.Rotation(angle,4,'X')
+        for i in wheels:
+            node = g['nodes'][i]
+            signed = -distance if 'Right' in node['name'] else distance
+            pose[i] = static[i]@Matrix.Rotation(-signed/node['extras']['radiusM'],4,'X')
+        world = World(pose)
+        wheelsNow = {}
+        for mud in mudParts:
+            points,faces = Geometry(mud,world)
+            bounds = Bounds((points,faces))
+            tree = Bvh((points,faces))
+            nearby = dict(targets)
+            for wheel in wheels:
+                centre = world[wheel].translation
+                radius = g['nodes'][wheel]['extras']['radiusM']+.11
+                limit = [(centre.x-.22,centre.x+.22),(centre.y-radius,centre.y+radius),(centre.z-radius,centre.z+radius)]
+                if BoundsOverlap(bounds,limit):
+                    if wheel not in wheelsNow:
+                        geometry = Geometry(wheel,world)
+                        wheelsNow[wheel] = Bvh(geometry),Bounds(geometry)
+                    nearby[wheel] = wheelsNow[wheel]
+            for index,(target,boundsTarget) in nearby.items():
+                if not BoundsOverlap(bounds,boundsTarget):
+                    continue
+                tested += 1
+                pairs = tree.overlap(target)
+                for vertex in {v for face,_ in pairs for v in faces[face]}:
+                    point = points[vertex]
+                    nearest,normal,_,_ = target.find_nearest(point)
+                    intrusion = (nearest-point).dot(normal) if nearest else 0
+                    if intrusion > 0:
+                        name = g['nodes'][mud]['name']
+                        if intrusion > penetrations.get(name,{}).get('depthM',0):
+                            penetrations[name] = {'phase':frame,'depthM':intrusion,
+                                'deposit':name,'target':g['nodes'][index]['name'],
+                                'worldPoint':list(point),'worldNormal':list(normal),
+                                'shoeLocalGltf':list(world[mud].inverted()@point)}
+                        if intrusion > closest:
+                            closest = intrusion
+                            deepest = penetrations[name]
+    report['battleWearBeltSweep'] = {'pass':closest<.001,'samples':samples,'movingDeposits':len(mudParts),
+                                    'testedNearbyPairs':tested,'maximumPenetrationM':closest,'deepest':deepest,
+                                    'penetrations':list(penetrations.values())}
+    report['pass'] = report['pass'] and report['battleWearBeltSweep']['pass']
+
 outputFile.parent.mkdir(parents=True,exist_ok=True)
 outputFile.write_text(json.dumps(report,indent=2),encoding='utf8')
 print(json.dumps(report))

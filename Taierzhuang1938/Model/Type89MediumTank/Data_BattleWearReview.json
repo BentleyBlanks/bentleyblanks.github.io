@@ -1,0 +1,414 @@
+{
+  "schema": "Type89BattleWearReviewV1",
+  "referenceEdition": "Type89BattleWornV6",
+  "revision": "SurfaceV17",
+  "geometryVersion": "20261126GeometryV55",
+  "source": {
+    "editableHighPath": "Scene_Type89MediumTankHighPbr.blend",
+    "highSha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
+    "trackFragments": 227,
+    "hullDeposits": 6,
+    "editableGamePath": "Game/Scene_Type89MediumTankGamePbr.blend",
+    "gameSha256": "859d59201ddbb0a2529ec1c9219cf278c7efbcd4fcfc27ab972ef76947c32fa9"
+  },
+  "runtime": {
+    "nodes": 530,
+    "meshInstances": 269,
+    "renderedTriangles": 79997,
+    "bytes": 37934632,
+    "sha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+    "hardCeiling": 80000,
+    "trackInstances": 162,
+    "wheelGroups": 30,
+    "geometryMudTriangles": 176,
+    "mapSizes": {
+      "Body": 4096,
+      "Guard": 1024,
+      "Track": 2048
+    }
+  },
+  "preservation": {
+    "originalRigidNodes": 518,
+    "verifiedBaseAttributePayloads": 1240,
+    "trackUVQuadsVerified": 162,
+    "guardAlphaExactlyPreserved": true
+  },
+  "views": {
+    "Front": {
+      "matchingCameras": true,
+      "referenceSha256": "9dab8747807e31eca5b2c651925bc80ee292d9ef14a448f72debea3d9f362d5e",
+      "sourceImpactMarks": 19,
+      "rgbWitnesses": [
+        {
+          "landmark": "left turret soot",
+          "calibratedPixel": [
+            732,
+            309
+          ],
+          "referenceRgb": [
+            63,
+            63,
+            62
+          ],
+          "highRgb": [
+            66,
+            62,
+            59
+          ],
+          "runtimeRgb": [
+            70,
+            66,
+            63
+          ]
+        },
+        {
+          "landmark": "driver shoulder rub",
+          "calibratedPixel": [
+            416,
+            605
+          ],
+          "referenceRgb": [
+            73,
+            72,
+            71
+          ],
+          "highRgb": [
+            67,
+            63,
+            59
+          ],
+          "runtimeRgb": [
+            76,
+            72,
+            67
+          ]
+        },
+        {
+          "landmark": "front wrap mud",
+          "calibratedPixel": [
+            306,
+            927
+          ],
+          "referenceRgb": [
+            65,
+            60,
+            54
+          ],
+          "highRgb": [
+            51,
+            47,
+            41
+          ],
+          "runtimeRgb": [
+            49,
+            43,
+            36
+          ]
+        }
+      ]
+    },
+    "Left": {
+      "matchingCameras": true,
+      "referenceSha256": "a8f07fcfa0eed0590405108a225afbffef86d235fec114970a46ea43fb3d6f35",
+      "sourceImpactMarks": 20,
+      "rgbWitnesses": [
+        {
+          "landmark": "turret soot",
+          "calibratedPixel": [
+            786,
+            305
+          ],
+          "referenceRgb": [
+            87,
+            85,
+            82
+          ],
+          "highRgb": [
+            59,
+            56,
+            54
+          ],
+          "runtimeRgb": [
+            61,
+            58,
+            55
+          ]
+        },
+        {
+          "landmark": "forward shoulder",
+          "calibratedPixel": [
+            496,
+            554
+          ],
+          "referenceRgb": [
+            58,
+            57,
+            56
+          ],
+          "highRgb": [
+            75,
+            73,
+            69
+          ],
+          "runtimeRgb": [
+            76,
+            74,
+            70
+          ]
+        },
+        {
+          "landmark": "aft soot",
+          "calibratedPixel": [
+            1399,
+            590
+          ],
+          "referenceRgb": [
+            62,
+            60,
+            58
+          ],
+          "highRgb": [
+            17,
+            16,
+            16
+          ],
+          "runtimeRgb": [
+            20,
+            20,
+            20
+          ]
+        },
+        {
+          "landmark": "front arc",
+          "calibratedPixel": [
+            258,
+            634
+          ],
+          "referenceRgb": [
+            54,
+            44,
+            34
+          ],
+          "highRgb": [
+            83,
+            67,
+            37
+          ],
+          "runtimeRgb": [
+            83,
+            67,
+            37
+          ]
+        }
+      ]
+    },
+    "Top": {
+      "matchingCameras": true,
+      "referenceSha256": "e9e4413361ccc82872b0f16022f72a6f82304c26029b23b1c5c5128e67cb223d",
+      "sourceImpactMarks": 14,
+      "rgbWitnesses": [
+        {
+          "landmark": "forward smoke",
+          "calibratedPixel": [
+            423,
+            540
+          ],
+          "referenceRgb": [
+            42,
+            41,
+            41
+          ],
+          "highRgb": [
+            68,
+            66,
+            65
+          ],
+          "runtimeRgb": [
+            79,
+            77,
+            77
+          ]
+        },
+        {
+          "landmark": "exhaust smoke",
+          "calibratedPixel": [
+            358,
+            1340
+          ],
+          "referenceRgb": [
+            58,
+            56,
+            53
+          ],
+          "highRgb": [
+            53,
+            51,
+            50
+          ],
+          "runtimeRgb": [
+            61,
+            59,
+            58
+          ]
+        },
+        {
+          "landmark": "opposite shoulder",
+          "calibratedPixel": [
+            804,
+            512
+          ],
+          "referenceRgb": [
+            80,
+            75,
+            72
+          ],
+          "highRgb": [
+            84,
+            80,
+            76
+          ],
+          "runtimeRgb": [
+            93,
+            90,
+            86
+          ]
+        },
+        {
+          "landmark": "track mud",
+          "calibratedPixel": [
+            281,
+            195
+          ],
+          "referenceRgb": [
+            54,
+            47,
+            39
+          ],
+          "highRgb": [
+            104,
+            91,
+            82
+          ],
+          "runtimeRgb": [
+            104,
+            95,
+            85
+          ]
+        }
+      ]
+    }
+  },
+  "comparisonDirectory": "Review/Comparisons",
+  "neutralLightDirectory": "Review/High and Review/Runtime",
+  "lighting": "Diffuse guide fixture with low warm ground bounce, plus independent neutral area lights.",
+  "uncertainty": [
+    "The generated V6 images vary slightly in framing and accessories. Each was registered to G55 landmarks.",
+    "Army-use marks and mud are art direction, not biographical evidence. The right side and rear are inferred.",
+    "Small mud fragments and several hull deposits use texture relief in the game model. High source contains their editable shapes."
+  ],
+  "motion": {
+    "reimportedSha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+    "originalHardwareAuditPass": true,
+    "rollingPhaseSamples": 36,
+    "fullBeltAudit": {
+      "pass": true,
+      "samples": 324,
+      "movingDeposits": 10,
+      "testedNearbyPairs": 2967,
+      "maximumPenetrationM": 0.0008002535281395606,
+      "deepest": {
+        "phase": 29,
+        "depthM": 0.0008002535281395606,
+        "deposit": "Mesh_Type89MudClodRight09",
+        "target": "Node_Hull",
+        "worldPoint": [
+          0.9428795576095581,
+          1.2458187341690063,
+          -1.578716516494751
+        ],
+        "worldNormal": [
+          -0.0018358581000939012,
+          -0.9999980330467224,
+          -0.000676709518302232
+        ],
+        "shoeLocalGltf": [
+          0.035879433155059814,
+          0.0419999361038208,
+          -0.003178417682647705
+        ]
+      },
+      "penetrations": [
+        {
+          "phase": 29,
+          "depthM": 0.0008002535281395606,
+          "deposit": "Mesh_Type89MudClodRight09",
+          "target": "Node_Hull",
+          "worldPoint": [
+            0.9428795576095581,
+            1.2458187341690063,
+            -1.578716516494751
+          ],
+          "worldNormal": [
+            -0.0018358581000939012,
+            -0.9999980330467224,
+            -0.000676709518302232
+          ],
+          "shoeLocalGltf": [
+            0.035879433155059814,
+            0.0419999361038208,
+            -0.003178417682647705
+          ]
+        },
+        {
+          "phase": 279,
+          "depthM": 0.0005366924086982472,
+          "deposit": "Mesh_Type89MudClodLeft02",
+          "target": "Node_Hull",
+          "worldPoint": [
+            -0.8834290504455566,
+            1.2468544244766235,
+            -1.5821633338928223
+          ],
+          "worldNormal": [
+            0.0020140777342021465,
+            -0.8365231156349182,
+            -0.5479279160499573
+          ],
+          "shoeLocalGltf": [
+            0.02357107400894165,
+            0.0419999361038208,
+            -0.0067774951457977295
+          ]
+        }
+      ]
+    },
+    "browserChecks": 29,
+    "browserAttachment": {
+      "moving": 10,
+      "fixed": 2,
+      "maximumOffset": 7.108895957933346e-16,
+      "minimumMovement": 0.5927384538031684,
+      "fixedOffset": 0
+    },
+    "consumerEntryPoints": [
+      {
+        "tool": "PropLibrary",
+        "surface": "SurfaceV17",
+        "triangles": 79997,
+        "clods": 12,
+        "webglError": 0,
+        "assetVersion": "20261127GeometryV55SurfaceV17",
+        "pageErrors": []
+      },
+      {
+        "tool": "WeaponInspection",
+        "surface": "SurfaceV17",
+        "triangles": 79997,
+        "clods": 12,
+        "webglError": 0,
+        "assetVersion": "20261127GeometryV55SurfaceV17",
+        "pageErrors": []
+      }
+    ]
+  }
+}

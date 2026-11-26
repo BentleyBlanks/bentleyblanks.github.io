@@ -45,6 +45,32 @@ try{const path=await fetch(${JSON.stringify(trackPathUrl)}).then(r=>r.json());co
     motion.SetTravel(.037,.037);let wheelError=0,wheelCount=0;
     for(const side of ['Left','Right'])for(const wheel of motion.wheels[side]){const rest=new THREE.Quaternion().fromArray(motion.rest.get(wheel.name).quaternion);const angle=2*Math.acos(Math.min(1,Math.abs(rest.dot(wheel.quaternion))));wheelError=Math.max(wheelError,Math.abs(angle*wheel.userData.radiusM-.037));wheelCount++;}
     Check('All wheel surfaces use the same travelled distance',wheelCount===30&&wheelError<2e-7,{wheelCount,wheelError});
+    if(motion.nodes.get('Model_Type89MediumTank')?.userData.surfaceRevision==='SurfaceV17'){
+      motion.Reset();
+      const mud=[...motion.nodes.values()].filter(node=>node.userData.battleWearMud);
+      const moving=mud.filter(node=>node.parent.name.startsWith('Mesh_TrackLink'));
+      const fixed=mud.filter(node=>node.parent.name==='Mesh_Hull');
+      const witness=node=>new THREE.Vector3().fromBufferAttribute(node.geometry.attributes.position,0);
+      const fixedBefore=fixed.map(node=>node.localToWorld(witness(node)));
+      const witnesses=moving.map(node=>{
+        const world=node.localToWorld(witness(node));
+        return {node,world,linkLocal:node.parent.worldToLocal(world.clone())};
+      });
+      let maximumOffset=0,minimumMovement=Infinity,fixedOffset=0;
+      for(const fraction of [.06,.21,.44,.62,.82]){
+        motion.SetTravel(path.length*fraction,-path.length*fraction);
+        for(const {node,world,linkLocal} of witnesses){
+          const current=node.localToWorld(witness(node));
+          maximumOffset=Math.max(maximumOffset,linkLocal.distanceTo(node.parent.worldToLocal(current.clone())));
+          minimumMovement=Math.min(minimumMovement,current.distanceTo(world));
+        }
+        fixed.forEach((node,index)=>{fixedOffset=Math.max(fixedOffset,fixedBefore[index].distanceTo(node.localToWorld(witness(node))));});
+      }
+      Check('Ten mud deposits follow their individual shoes around the belt and two remain on the hull',
+        moving.length===10&&fixed.length===2&&maximumOffset<2e-6&&minimumMovement>.1&&fixedOffset<2e-6,
+        {moving:moving.length,fixed:fixed.length,maximumOffset,minimumMovement,fixedOffset});
+    }
+
     motion.Reset();motion.SetPose({turretYaw:Math.PI/2,mainGunPitch:.18,recoilM:.08,commanderHatchFront:1.1,commanderHatchRear:.8,driverVisionFlap:1.4,leftSideVisionFlap:2.8,bowHatch:.8,engineHatches:.65});
     Check('Turret Y axis and bore recoil work',Math.abs(motion.nodes.get('Node_TurretYaw').quaternion.y-Math.SQRT1_2)<1e-6&&Math.abs(motion.nodes.get('Node_MainGunRecoil').position.z-motion.rest.get('Node_MainGunRecoil').position[2]-.08)<1e-6);
     Check('Fore/aft hatches open independently',motion.nodes.get('Node_CommanderHatchFront').quaternion.x<0&&motion.nodes.get('Node_CommanderHatchRear').quaternion.x>0);

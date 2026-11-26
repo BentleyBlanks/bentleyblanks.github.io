@@ -514,7 +514,7 @@ if(paintFinish){
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
   }
 }
-if (contract.materialRevision === 'SurfaceV16') {
+if (['SurfaceV16', 'SurfaceV17'].includes(contract.materialRevision)) {
   const profileFile = path.join(here,'Model/Type89MediumTank/Data_MetalFinishProfile.json');
   const profileBytes = Buffer.from(fs.readFileSync(profileFile,'utf8').replace(/\r\n/g,'\n'));
   const profile = JSON.parse(profileBytes);
@@ -532,6 +532,8 @@ if (contract.materialRevision === 'SurfaceV16') {
       'The runtime carries the calibrated dielectric finish for '+role);
   }
 
+}
+if (contract.materialRevision === 'SurfaceV16') {
   const shoe=nodesByName.get('Mesh_TrackLinkLeft000');
   const part=g.meshes[shoe.mesh].primitives.find(value=>g.materials[value.material].extras?.Type89Role==='Track');
   const data=await ImageFor(g.materials[part.material].pbrMetallicRoughness.metallicRoughnessTexture);
@@ -555,6 +557,42 @@ if (contract.materialRevision === 'SurfaceV16') {
   const land=[Mid(lands,0),Mid(lands,1)], web=[Mid(webs,0),Mid(webs,1)];
   Check(lands.length>=8&&webs.length>=8&&land[0]+.16<web[0]&&land[1]>web[1]+.21,
     'Baked tread lands are smoother and more conductive than their cast webs',JSON.stringify({land,web}));
+}
+if (contract.materialRevision === 'SurfaceV17') {
+  const recipeFile=path.join(here,'Model/Type89MediumTank/Data_BattleWearProfile.json');
+  const recipeBytes=Buffer.from(fs.readFileSync(recipeFile,'utf8').replace(/\r\n/g,'\n'));
+  const recipe=JSON.parse(recipeBytes);
+  const finish=g.asset.extras?.Type89BattleWear;
+  Check(finish?.revision===recipe.revision && finish?.reference===recipe.referenceEdition
+    && finish?.baselineRuntimeSha256===recipe.baselineRuntimeSha256
+    && finish?.materialRecipeSha256===createHash('sha256').update(recipeBytes).digest('hex'),
+  'V17 is bound to the traced reference controls and the V16 runtime donor');
+  const origins=new Map();
+  for(const node of g.nodes) for(const child of node.children??[]) origins.set(g.nodes[child],node.name);
+  const deposits=g.nodes.filter(node=>node.extras?.battleWearMud===true);
+  const trackDeposits=deposits.filter(node=>/^Mesh_TrackLink(Left|Right)\d{3}$/.test(origins.get(node)));
+  const hullDeposits=deposits.filter(node=>origins.get(node)==='Mesh_Hull');
+  const mudTriangles=deposits.reduce((total,node)=>total+g.meshes[node.mesh].primitives
+    .reduce((sum,part)=>sum+g.accessors[part.indices].count/3,0),0);
+  Check(deposits.length===12 && trackDeposits.length===10 && hullDeposits.length===2
+    && mudTriangles===finish?.addedMudTriangles && triangles-mudTriangles===79821,
+  'Three-dimensional deposits are included in the full-vehicle budget and remain on their carriers',
+  JSON.stringify({track:trackDeposits.length,hull:hullDeposits.length,mudTriangles}));
+  const shoes=g.nodes.filter(node=>/^Mesh_TrackLink(Left|Right)\d{3}$/.test(node.name));
+  const parts=[...new Set(shoes.map(node=>node.mesh))].map(index=>g.meshes[index].primitives[0]);
+  const fingerprint=part=>['POSITION','NORMAL','TANGENT'].map(key=>part.attributes[key]).concat(part.indices).join(':');
+  const ids=new Set(parts.map(part=>part.attributes.TEXCOORD_0));
+  const tiles=new Set(parts.map(part=>{
+    const uv=ReadAccessor(glb,part.attributes.TEXCOORD_0).data;
+    const tile=point=>(point[0]>=.5?1:0)+(point[1]>=.5?2:0);
+    const first=tile(uv);
+    return Array.from({length:uv.length/2},(_,i)=>tile(uv.slice(i*2,i*2+2))).every(value=>value===first)?first:-1;
+  }));
+  const trackImage=await ImageFor(g.materials[parts[0].material].pbrMetallicRoughness.baseColorTexture);
+  Check(shoes.length===162 && parts.length===4 && ids.size===4 && tiles.size===4 && !tiles.has(-1)
+    && parts.every(part=>fingerprint(part)===fingerprint(parts[0]))
+    && trackImage.info.width===2048 && trackImage.info.height===2048,
+  'All articulated shoes share unchanged shape and tangents and use four distinct tread atlas tiles');
 }
 console.log(`Type89MediumTank: ${checks-failures}/${checks} passed`);
 process.exitCode=failures?1:0;

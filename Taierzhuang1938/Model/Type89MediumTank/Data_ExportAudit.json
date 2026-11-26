@@ -1,15 +1,15 @@
 {
   "schema": "Type89RestorationReleaseV55",
-  "reviewedOn": "2026-11-26",
+  "reviewedOn": "2026-11-27",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV16",
+  "materialRevision": "SurfaceV17",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
-    "bytes": 36463272,
-    "renderedTriangles": 79821,
+    "sha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+    "bytes": 37934632,
+    "renderedTriangles": 79997,
     "hardCeiling": 80000,
-    "meshInstances": 257,
+    "meshInstances": 269,
     "trackInstances": 162,
     "trackTriangles": 33696,
     "triangleCountMethod": "Sum triangle-list indices on every mesh node reachable from the default GLB scene",
@@ -22,9 +22,9 @@
         4096
       ],
       "Track": [
-        1024,
-        1024,
-        1024
+        2048,
+        2048,
+        2048
       ],
       "Guard": [
         1024,
@@ -34,12 +34,14 @@
     },
     "up": "+Y",
     "nose": "-Z",
-    "units": "metres"
+    "units": "metres",
+    "trackMudTriangles": 160,
+    "hullMudTriangles": 16
   },
   "highSource": {
     "blend": "Scene_Type89MediumTankHighPbr.blend",
-    "triangles": 1465474,
-    "sha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e",
+    "triangles": 1487422,
+    "sha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
     "referenceSource": "SurfaceV14/Scene_Type89MediumTankHighPbr.blend",
     "referenceSourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
     "changes": {
@@ -103,14 +105,20 @@
         }
       }
     },
-    "packedImages": 25
+    "packedImages": 25,
+    "battleWear": {
+      "trackFragments": 227,
+      "hullDeposits": 6,
+      "largeTrackClods": 10,
+      "projectedControlImages": 11
+    }
   },
   "gameSource": {
     "blend": "Game/Scene_Type89MediumTankGamePbr.blend",
-    "triangles": 79933,
-    "sha256": "42b31ea4ec4ce22aa5ea1de3797072b13e93aae7f44d72aebd33c24b3d1b4241",
-    "bakeSourceSha256": "97ba4b1b640378c1ea7e19e2efa1f4239955e19f7866d38fa30557ded015cd7e",
-    "exportBeforePackingSha256": "6702aa10de84abfdf45ef5e106bbf1c8a9cf6922338730260043af4c8a3030c9",
+    "triangles": 80109,
+    "sha256": "859d59201ddbb0a2529ec1c9219cf278c7efbcd4fcfc27ab972ef76947c32fa9",
+    "bakeSourceSha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
+    "exportBeforePackingSha256": "e22d551568fe9d413cc236772ab5f921041c7bacdcb8aaa6d269a9adfd76751e",
     "removedByZeroAreaCleanup": 54,
     "removedOnExplicitTriangulation": 0,
     "facesOmittedByBlenderExporter": 58,
@@ -149,19 +157,91 @@
     "bowDoorControlInputPoses": 1775,
     "driverShutterSweepPoses": 814,
     "maintenanceSweepPoses": 44,
-    "runtimeBrowserChecks": 28,
+    "runtimeBrowserChecks": 29,
     "entryPoints": [
       {
         "tool": "PropLibrary",
-        "renderedTriangles": 79821,
+        "renderedTriangles": 79997,
         "webglError": 0
       },
       {
         "tool": "WeaponInspection",
-        "renderedTriangles": 79821,
+        "renderedTriangles": 79997,
         "webglError": 0
       }
-    ]
+    ],
+    "battleWearBeltSweep": {
+      "pass": true,
+      "samples": 324,
+      "movingDeposits": 10,
+      "testedNearbyPairs": 2967,
+      "maximumPenetrationM": 0.0008002535281395606,
+      "deepest": {
+        "phase": 29,
+        "depthM": 0.0008002535281395606,
+        "deposit": "Mesh_Type89MudClodRight09",
+        "target": "Node_Hull",
+        "worldPoint": [
+          0.9428795576095581,
+          1.2458187341690063,
+          -1.578716516494751
+        ],
+        "worldNormal": [
+          -0.0018358581000939012,
+          -0.9999980330467224,
+          -0.000676709518302232
+        ],
+        "shoeLocalGltf": [
+          0.035879433155059814,
+          0.0419999361038208,
+          -0.003178417682647705
+        ]
+      },
+      "penetrations": [
+        {
+          "phase": 29,
+          "depthM": 0.0008002535281395606,
+          "deposit": "Mesh_Type89MudClodRight09",
+          "target": "Node_Hull",
+          "worldPoint": [
+            0.9428795576095581,
+            1.2458187341690063,
+            -1.578716516494751
+          ],
+          "worldNormal": [
+            -0.0018358581000939012,
+            -0.9999980330467224,
+            -0.000676709518302232
+          ],
+          "shoeLocalGltf": [
+            0.035879433155059814,
+            0.0419999361038208,
+            -0.003178417682647705
+          ]
+        },
+        {
+          "phase": 279,
+          "depthM": 0.0005366924086982472,
+          "deposit": "Mesh_Type89MudClodLeft02",
+          "target": "Node_Hull",
+          "worldPoint": [
+            -0.8834290504455566,
+            1.2468544244766235,
+            -1.5821633338928223
+          ],
+          "worldNormal": [
+            0.0020140777342021465,
+            -0.8365231156349182,
+            -0.5479279160499573
+          ],
+          "shoeLocalGltf": [
+            0.02357107400894165,
+            0.0419999361038208,
+            -0.0067774951457977295
+          ]
+        }
+      ]
+    }
   },
   "photoEvidence": {
     "matchedOriginals": [
@@ -215,7 +295,7 @@
     "evidenceLocal": "Review/Comparisons, Review/Browser, Review/Data_PhotoAlignment.json, Review/Data_GameMotionReleased.json"
   },
   "referenceArchive": "Data_ReferenceArchive.json",
-  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV16",
+  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV17",
   "photographsAndSourceRemainLocal": true,
   "metalFinish": {
     "pass": true,
@@ -226,5 +306,20 @@
     "actualGameModelSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
     "runtimeShapePreserved": true,
     "motionVerifiedAgainstS16": true
+  },
+  "battleWear": {
+    "pass": true,
+    "baseline": "SurfaceV16",
+    "proof": "Data_BattleWearReview.json",
+    "recipeSha256": "f8528bd9db0ab7c5ea58083d21107ffda9cc8ff1b488b30013fc11dc7f59561a",
+    "baseAssetSha256": "01ca674f8a0866b5fa9bea28b17e6fcb74581339df6a6dce41cf398951b43b51",
+    "battleWearGeometryTriangles": 176,
+    "preservation": {
+      "originalRigidNodes": 518,
+      "verifiedBaseAttributePayloads": 1240,
+      "trackUVQuadsVerified": 162,
+      "guardAlphaExactlyPreserved": true
+    },
+    "localEvidence": "Review/Comparisons, Review/High, Review/Runtime, Review/Browser"
   }
 }
