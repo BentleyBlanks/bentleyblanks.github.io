@@ -953,6 +953,17 @@
             ]
           ]
         ]
+      },
+      "detail": {
+        "file": "Texture_Type89LauncherNeckDetail.png",
+        "sha256": "2dc003c7d1b40209c263cfc70de2ff3b1b4a39325ea2f1c283ba2158f30cc920",
+        "toneScale": 300,
+        "warmthScale": 520,
+        "footprint": {
+          "uCenter": 0.642,
+          "uHalfSpan": 0.132,
+          "vRange": [0.3878991489361702, 0.6829191489361702]
+        }
       }
     },
     "Tab": {

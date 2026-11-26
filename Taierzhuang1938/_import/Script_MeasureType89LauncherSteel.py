@@ -16,6 +16,7 @@ BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
+NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
 
@@ -314,6 +315,30 @@ def ShoeFinish(folder):
     return field
 
 
+def NeckDetail(image, field):
+    footprint = field["footprint"]
+    trace = field["stampTrace"]
+    v0, v1 = footprint["vRange"]
+    y0, y1 = trace["imageYForVRange"]
+    pivot = v0 + (trace["axialCenterImageY"] - y0) * (v1 - v0) / (y1 - y0)
+    # Use the rectified stamp registration for the surrounding metal as well.
+    vRange = [pivot + (v - pivot) * trace["axialScale"] for v in (v0, v1)]
+    u, v = np.meshgrid(np.linspace(-footprint["uHalfSpan"], footprint["uHalfSpan"], 512),
+                       np.linspace(0, 1, 304))
+    xs = trace["imageCenter"] + trace["imageRadius"] * np.sin(2 * np.pi * u)
+    ys = y0 + (y1 - y0) * v
+
+    tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=8.0)
+    valid = Image.new("L", (image.shape[1], image.shape[0]), 255)
+    draw = ImageDraw.Draw(valid)
+    for width, points in trace["strokes"]:
+        draw.line([tuple(point) for point in points], fill=0, width=width + 25, joint="curve")
+    confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(6)), dtype=np.float32) / 255
+    confidence *= np.clip((lightness - 24) / 23, 0, 1) * np.clip((245 - lightness) / 32, 0, 1)
+    detail = SaveDetailPlate(tone, warmth, confidence, xs, ys, NECK_DETAIL)
+    return {**detail, "footprint": {**footprint, "vRange": vRange}}
+
+
 def NeckFinish(folder):
     image, source = Photo(folder, 6)
     angles = np.linspace(-.132, .132, 23)
@@ -351,6 +376,7 @@ def NeckFinish(folder):
                  [687, 393], [672, 392], [658, 386], [652, 377]]],
         ],
     }
+    field["detail"] = NeckDetail(image, field)
     return field
 
 

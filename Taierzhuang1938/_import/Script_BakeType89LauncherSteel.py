@@ -32,7 +32,7 @@ FINISHES = {
     "Tab": (2, (141, 129, 114), (70, 53, 39), .51, (.35, .68), (.95, .41), .73),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
     "Edge": (0, (182, 179, 165), (71, 61, 50), .36, (.255, .59), (.98, .43), .49),
-    "Neck": (2, (142, 138, 125), (60, 51, 43), .55, (.385, .70), (.94, .34), .77),
+    "Neck": (2, (130, 124, 116), (60, 51, 43), .55, (.46, .80), (.91, .28), .77),
     "Recess": (1, (41, 39, 36), (24, 22, 20), .61, (.67, .85), (.32, .16), .28),
     "SaddleRim": (2, (126, 129, 124), (55, 50, 43), .61, (.34, .70), (.89, .38), .49),
     "Channel": (1, (73, 69, 60), (32, 28, 24), .58, (.49, .81), (.77, .22), .60),
@@ -46,7 +46,7 @@ FINISHES = {
 REGISTERED_FINISHES = {
     "Stem": ((177, 162, 144), "rubbedCoverage", .406, .84, .49, .43),
     "Saddle": ((121, 105, 82), "oxideCoverage", .74, .31, .65, .16),
-    "Neck": ((124, 100, 75), "oxideCoverage", .708, .46, .65, .15),
+    "Neck": ((113, 97, 79), "oxideCoverage", .78, .34, .65, .15),
     "Tab": ((163, 149, 134), "rubbedCoverage", .425, .88, .59, .29),
     "TabBack": ((174, 165, 151), "rubbedCoverage", .40, .90, .71, .28),
 }
@@ -99,7 +99,7 @@ def PhotographicGrain(closeup, xx, vv):
         raise ValueError(f"Detail does not match the measured reference: {path}")
     with Image.open(path) as image:
         tone, warmth, confidence = np.asarray(image.convert("RGB"), dtype=np.float32).T
-    plate = {"footprint": closeup["footprint"], "tone": (tone - 128) / detail["toneScale"],
+    plate = {"footprint": detail.get("footprint", closeup["footprint"]), "tone": (tone - 128) / detail["toneScale"],
              "warmth": (warmth - 128) / detail["warmthScale"], "confidence": confidence / 255}
     coverage = ReferenceField(plate, xx, vv, "confidence")
     return ReferenceField(plate, xx, vv, "tone"), ReferenceField(plate, xx, vv, "warmth"), coverage
@@ -277,6 +277,11 @@ def BakeRegion(name, sample, size, index, reference):
         tonalDelta += 119 * stemDetail - (2.5 * detail + 1.25 * medium) * stemCoverage
         warmth += .38 * stemWarmth * stemCoverage
         oxidation += (.024 * medium - .016 * pits) * stemCoverage
+    if name == "Neck":
+        neckTone, neckWarmth, neckCoverage = PhotographicGrain(closeup, xx, vv)
+        neckDetail = neckTone * neckCoverage
+        tonalDelta += 125 * neckDetail - (2.7 * detail + 1.2 * medium) * neckCoverage
+        warmth += .42 * neckWarmth * neckCoverage
     if name in ("Tab", "TabBack"):
         tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, xx, sampledV)
         tabDetail = tabTone * tabCoverage
@@ -332,6 +337,10 @@ def BakeRegion(name, sample, size, index, reference):
         heightField += .33 * stemDetail
         roughnessDelta -= (.016 * medium + .013 * pits) * stemCoverage
         roughnessDelta += .11 * np.maximum(-stemDetail, 0) - .089 * np.maximum(stemDetail, 0)
+    if name == "Neck":
+        heightField *= 1 - .57 * neckCoverage
+        heightField += .32 * neckDetail
+        roughnessDelta += .13 * np.maximum(-neckDetail, 0) - .074 * np.maximum(neckDetail, 0)
     if name in ("Tab", "TabBack"):
         heightField *= 1 - .56 * tabCoverage
         heightField += .27 * tabDetail
@@ -677,6 +686,7 @@ def Bake():
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
+               "neckDetail": reference["closeups"]["Neck"]["detail"],
                "saddleDetail": reference["closeups"]["Saddle"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
                "tabDetail": reference["closeups"]["Tab"]["detail"],
