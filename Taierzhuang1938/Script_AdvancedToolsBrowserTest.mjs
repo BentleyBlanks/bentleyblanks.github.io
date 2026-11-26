@@ -221,6 +221,13 @@ try {
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
       && independent.opener?.endsWith("/ControlCenter.html") && independent.standalone && independent.noWrites
       && independent.models === assetIds.length, JSON.stringify(independent));
+    const desktopWidth = await page.evaluate(() => {
+      const sidebar = document.querySelector(".details").getBoundingClientRect();
+      const stage = document.querySelector(".stage").getBoundingClientRect();
+      return { sidebar: sidebar.width, inset: innerWidth - sidebar.right, gap: sidebar.left - stage.right };
+    });
+    Check("桌面检查栏利用可用宽度，栏间距和外边距紧凑",
+      desktopWidth.sidebar >= 295 && desktopWidth.inset <= 16 && desktopWidth.gap <= 16, JSON.stringify(desktopWidth));
     const vehicleGroup = page.locator(".model-group").filter({ has: page.getByRole("heading", { name: "载具", exact: true }) });
     const listedVehicles = await vehicleGroup.locator("[data-model]").evaluateAll((rows) => rows.map((row) => row.dataset.model));
     Check("载具栏只列九四式和八九式乙型", listedVehicles.join(",") === vehicleIds.join(","), listedVehicles.join(","));

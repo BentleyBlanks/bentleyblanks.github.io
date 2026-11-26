@@ -1,7 +1,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body {
-  --page-gutter: clamp(18px, 3.8vw, 72px);
+  --page-gutter: clamp(10px, 1vw, 16px);
   display: grid;
   grid-template-rows: 54px minmax(440px, 1fr);
   min-width: 280px;
@@ -68,9 +68,9 @@ button { cursor: pointer; }
   isolation: isolate;
   overflow: visible;
   display: grid;
-  grid-template-columns: clamp(155px, 14vw, 225px) minmax(0, 1fr) clamp(222px, 18vw, 285px);
+  grid-template-columns: clamp(155px, 14vw, 225px) minmax(0, 1fr) clamp(230px, 21vw, 420px);
   grid-template-rows: minmax(0, 1fr);
-  gap: clamp(16px, 1.8vw, 32px);
+  gap: clamp(16px, 1.8vw, 32px) var(--page-gutter);
   padding: clamp(14px, 2.3vh, 28px) var(--page-gutter) 16px;
 }
 .workspace.edHome::before { z-index: -1; }
@@ -341,7 +341,6 @@ button { cursor: pointer; }
 
 .details {
   overflow: auto;
-  scrollbar-gutter: stable;
 }
 .model-overview, .inspector-section {
   border: 1px solid var(--ed-rule);
@@ -548,10 +547,7 @@ button { cursor: pointer; }
     grid-template-columns: clamp(155px, 23vw, 230px) minmax(0, 1fr);
     grid-template-rows: max(370px, calc(100dvh - 125px)) auto;
   }
-  .details {
-    grid-column: 2;
-    scrollbar-gutter: auto;
-  }
+  .details { grid-column: 2; }
 }
 
 @media (max-width: 780px) {
@@ -566,8 +562,7 @@ button { cursor: pointer; }
 }
 
 @media (max-width: 620px) {
-  body { --page-gutter: 14px; }
-  .tool-header { gap: 6px; padding-inline: 10px; }
+  .tool-header { gap: 6px; }
   .tool-header h1 { font-size: clamp(14px, 4.2vw, 21px); letter-spacing: .04em; }
   .layout-switch button { padding-inline: 6px; font-size: 11px; }
   #controlCenter { padding-left: 6px; font-size: 11px; }
