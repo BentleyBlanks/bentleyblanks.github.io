@@ -53,9 +53,10 @@
 - 拨片正反面分别按第 5 和第 2 张近照校准局部磨亮钢面、氧化暗部和暖色。中间调对齐的补光下，背面暗部从 79.6 降至 73.1，亮部从 155.5 升至 166.6，近照分别为 73.4 和 168.1。正面归一化红蓝差从 0.356 降至 0.290，近照为 0.290。斜视和默认灯光已复测，正面斜视亮度仍有偏差。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 拨片正反面按实际纹素中心重采样点蚀与擦痕，并按磨亮钢面和氧化层分别校准光泽。固定补光下正视细纹相关系数由 0.65 提至 0.80，背面由 0.80 提至 0.87。固定灯光的斜视正面亮度中值由 85.6 降至 82.4 个灰阶，近照配准区为 80.2。游戏仍使用同一套 2K 底色、2K 法线和 1K ORM。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 在原 2K 图集中重排拨片两面与驻钣背面的 UV。拨片被照片覆盖的窄边由约 30 行纹素增至正面 48 行、背面 40 行。第 4、5 张照片以 94 对可见细节配准，共同可见的磨痕用于校准正面的中尺度纹理。按第 4 张照片的原图像素对比，相关系数由 0.653 提至 0.747。驻钣背面重采样原钢材，两套灯光下亮度中值变化均小于 0.2 个灰阶。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 第 7 张近照的筒身采样由 292×160 增至 584×320。沿冲压字线留出遮罩，保留相邻的真实点蚀，并校正细纹落点、冲压浅凹和侧边褐锈的漫反射。局部对照中，正视字旁点蚀相关系数由 0.25 提至 0.58。斜视褐锈区亮度中值由 99.4 调至 88.9，照片为 89.3。另参照第 1 张照片复测整段筒身。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV36/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV37/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

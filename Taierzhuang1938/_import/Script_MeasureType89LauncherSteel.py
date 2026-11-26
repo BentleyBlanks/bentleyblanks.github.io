@@ -154,16 +154,31 @@ def WriteDetailPlate(image, xs, ys, path, excluded=()):
     return SaveDetailPlate(tone, warmth, confidence, xs, ys, path)
 
 
-def BarrelDetail(image, projection, halfSpan):
-    # Remove the marks from the grain. They have their own relief in the model.
-    marks = [[135, 170, 193, 249], [274, 176, 350, 265], [472, 183, 543, 281],
-             [628, 173, 710, 273], [762, 171, 848, 269], [148, 291, 197, 353],
-             [285, 300, 345, 359], [629, 286, 716, 358], [756, 284, 811, 346]]
+def BarrelDetail(image, projection, halfSpan, stampTrace):
+    # Hold out the punch marks while keeping the steel grain beside the grooves.
+    untracedMarks = [[148, 291, 197, 353], [756, 284, 811, 346]]
+    strokeMargin, feather = 10, 4
+    tone, warmth, lightness = PhotoResiduals(image)
+    valid = Image.new("L", (image.shape[1], image.shape[0]), 255)
+    draw = ImageDraw.Draw(valid)
+    for box in untracedMarks:
+        draw.rectangle(box, fill=0)
+    for width, stroke in stampTrace["strokes"]:
+        points = [tuple(point) for point in stroke]
+        width += 2 * strokeMargin
+        draw.line(points, fill=0, width=width, joint="curve")
+        halfWidth = width / 2
+        for x, y in (points[0], points[-1]):
+            draw.ellipse((x - halfWidth, y - halfWidth, x + halfWidth, y + halfWidth), fill=0)
+    confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(feather)), dtype=np.float32) / 255
+    confidence *= np.clip((245 - lightness) / 30, 0, 1)
     center, radius, first, last = projection
     us, vs = np.meshgrid(np.linspace(0, 1, 584), np.linspace(0, 1, 320))
     xs = center + radius * np.sin(2 * np.pi * halfSpan * (2 * us - 1))
     ys = first + (last - first) * vs
-    return {**WriteDetailPlate(image, xs, ys, BARREL_DETAIL, marks), "excludedMarks": marks}
+    detail = SaveDetailPlate(tone, warmth, confidence, xs, ys, BARREL_DETAIL, halfSize=False)
+    return {**detail, "excludedMarks": untracedMarks, "strokeMarginPixels": strokeMargin,
+            "maskFeatherPixels": feather, "registrationOffsetInFootprint": [.003937, -.005615]}
 
 
 def BarrelFinish(folder):
@@ -179,7 +194,10 @@ def BarrelFinish(folder):
     source["projection"] = projection
     result = FinishMap(samples, source, {"uCenter": .398, "uHalfSpan": halfSpan, "vRange": [.722, .849]})
     result.update(PatinaMap(samples))
-    result["detail"] = BarrelDetail(image, projection, halfSpan)
+    lightness = samples @ LUMA
+    low, transition = np.percentile(lightness, (13, 39))
+    shadow = np.clip((transition - lightness) / max(transition - low, 10), 0, 1)
+    result["shadowCoverage"] = np.rint(100 * shadow).astype(int).tolist()
     result["stampTrace"] = {
         "bounds": [130, 165, 852, 363], "imageCenter": center, "imageRadius": radius,
         "imageYForVRange": [first, last], "axialCenterImageY": 223, "axialScale": 1,
@@ -202,6 +220,7 @@ def BarrelFinish(folder):
             [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
         ],
     }
+    result["detail"] = BarrelDetail(image, projection, halfSpan, result["stampTrace"])
     return result
 
 

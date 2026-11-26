@@ -255,12 +255,22 @@ def BakeRegion(name, sample, size, index, reference):
         # Reuse the API steel at a fine scale around the whole tube. The close
         # photo supplies local variations where its surface can be registered.
         finePits = UnitVariation(luminance, .38, 1.95)
-        photoPits, photoWarmth, photoCoverage = PhotographicGrain(closeup, xx, vv)
+        footprint = closeup["footprint"]
+        start, end = footprint["vRange"]
+        axial = (vv - start) / (end - start)
+        photoArc = (xx - footprint["uCenter"]) / footprint["uHalfSpan"]
+        # Fade the measured phase correction away from the photographed wear.
+        correction = np.clip((.70 - axial) / .27, 0, 1)
+        arcBlend = np.clip((photoArc + .10) / .55, 0, 1)
+        offsetU, offsetV = closeup["detail"]["registrationOffsetInFootprint"]
+        sourceU = xx + offsetU * (2 * footprint["uHalfSpan"]) * correction * arcBlend
+        sourceV = vv + offsetV * (end - start) * correction
+        photoPits, photoWarmth, photoCoverage = PhotographicGrain(closeup, sourceU, sourceV)
         apiPits = finePits * (1 - .78 * photoCoverage)
         photoPits *= photoCoverage
         photoWarmth *= photoCoverage
         oxidation += .061 * medium + .079 * cloud + np.clip(.19 * photoWarmth, -.037, .054)
-        tonalDelta += 8.7 * apiPits + 141 * photoPits - 2.85 * medium
+        tonalDelta += 8.7 * apiPits + 123 * photoPits - 2.85 * medium
         warmth += .41 * photoWarmth
         evidence = ReferenceField(reference, xx, vv, "relativeLuminance")
         heat = ReferenceField(reference, xx, vv, "relativeWarmth")
@@ -415,6 +425,8 @@ def BakeRegion(name, sample, size, index, reference):
         roughnessDelta -= .28 * grain
     if name in ("Barrel", "Collar"):
         brushing = CircumferentialAbrasion(luminance) * np.clip(.92 - oxidation, .08, .9)
+        if name == "Barrel":
+            brushing *= 1 - .68 * photoCoverage
         tonalDelta += (3.6 if name == "Barrel" else 4.8) * brushing
         heightField += (.106 if name == "Barrel" else .23) * brushing
         roughnessDelta -= (.026 if name == "Barrel" else .037) * brushing
@@ -472,8 +484,8 @@ def BakeRegion(name, sample, size, index, reference):
             oxidation += .14 * stamp
             roughnessDelta += .044 * stamp
         else:
-            heightField -= .68 * stamp
-            tonalDelta += 6 * rim - 12.5 * stamp
+            heightField -= .82 * stamp
+            tonalDelta += 6 * rim - 22 * stamp
             oxidation += .11 * stamp
             roughnessDelta += .027 * stamp
 
@@ -526,7 +538,14 @@ def BakeRegion(name, sample, size, index, reference):
         rough += (.725 - rough) * matteOxide + .030 * near * exposedSteel
         metal += (.18 - metal) * matteOxide
         deepCloseOxide = np.clip((oxideCoverage - .28) / .65, 0, 1)
-        linear *= (1 + .09 * matteOxide * deepCloseOxide)[..., None]
+        shadow = ReferenceField(closeup, xx, vv, "shadowCoverage") / 100
+        # The unpolished brown patch in the close-up stays darker across both views.
+        warmOxide = near * np.clip((photoArc - .24) / .54, 0, 1) * np.clip((axial - .27) / .46, 0, 1)
+        warmOxide *= .76 + .24 * oxideCoverage
+        diffuseGain = .09 * matteOxide * deepCloseOxide
+        diffuseGain += .34 * near * shadow * (1 - .60 * exposedSteel) * (1 - .75 * warmOxide)
+        diffuseGain -= .45 * warmOxide
+        linear *= (1 + diffuseGain)[..., None]
     if name == "CollarRing":
         oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
         exposed = .56 * ReferenceField(closeup, xx, vv, "exposedSteelCoverage") / 100
@@ -644,6 +663,7 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Barrel":
         coolPatina = .029 * near * (.40 + .60 * oxideCoverage)
         base -= coolPatina[..., None] * LUMA_NEUTRAL_WARMTH
+        base += .072 * warmOxide[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100

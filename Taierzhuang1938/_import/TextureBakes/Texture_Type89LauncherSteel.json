@@ -19,53 +19,53 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 540194,
-      "sha256": "121ed1b697313a6f12085ccc007d74d7dfc00fc0ddfbe02cdc33d17041f87280"
+      "bytes": 530814,
+      "sha256": "ac9d0d6f3b3cea98018d7bc0dfbac97cd056c785e892398cb73060301a9d7935"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 414688,
-      "sha256": "ca4b4a3611a012212160a48bfe709c6deb44672fb98c0514732032152c02068c"
+      "bytes": 414464,
+      "sha256": "2e7642acba5206ca834b7be4d05f5934ff78dd65cd3d9be957d1ad86b2495d7d"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 53250,
-      "sha256": "d8567eadad1ee44690e6f3388777fb2a3419705eedd99d5a47dcc43c88a9afb9"
+      "bytes": 53220,
+      "sha256": "75ceef7656e8096588289028081376bbd68c1ed0cedb5615eb384149303bb0f8"
     }
   ],
-  "totalBytes": 1008132,
+  "totalBytes": 998498,
   "metrics": {
     "meanSrgb": [
-      0.4338,
+      0.4339,
       0.4237,
       0.3956
     ],
     "luma": 0.4177,
-    "lumaStd": 0.103,
-    "sat": 0.0881,
+    "lumaStd": 0.1031,
+    "sat": 0.0883,
     "clipLow": 0.0001,
     "clipHigh": 0.0,
     "lowFreq": 0.1033,
     "seam": 0.1207,
-    "interior": 0.0251,
-    "seamRatio": 4.804,
-    "border": 0.841,
-    "swing": 0.0766,
+    "interior": 0.0265,
+    "seamRatio": 4.547,
+    "border": 0.836,
+    "swing": 0.0767,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "e76224148ffa2e6d03bb84b2eac2ae50cda8c1d4c702b199cc19f237995c4af4",
+    "sha256": "fd3d92a1be63d759e8252465c33bf5bf557ab76ff629ff21dbc51c50a23a562d",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
-      "sha256": "f659aeceee0a4b1c64b5a9f10ebb2626219a3c9391b5960ce8114da6ffd013fc"
+      "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
     },
     "stemDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherStemDetail.png",
