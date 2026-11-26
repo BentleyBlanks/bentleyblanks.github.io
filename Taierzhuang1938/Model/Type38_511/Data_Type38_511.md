@@ -1,14 +1,26 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v23
+## 当前交付版 v24
 
-游戏使用 `511-rear-rims-23`。近景 79,894 三角，普通 NPC 75,286 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+游戏使用 `511-sight-fit-24`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
-| 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
+| 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 前段钢面、木托使用痕迹和接缝 · 2026-11-27
+
+标记处的前段钢面沿长轴重烘细磨纹。局部磨亮的位置粗糙度更低，暗灰氧化区略散光。底色、金属度、粗糙度和法线分别烘焙，同机位用主灯和斜光检查高光是否连续。 [前段实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+前托、握持区和托尾的旧漆加入零散压痕与脱漆。压痕底部保留暗色压实的木纤维，只有少数边缘露出浅木。凹面和漆边共用遮罩驱动法线、底色、粗糙度和清漆层。 [实物全长侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG)
+
+顺修了照门内框、外沿、滑块肩角和座边的外露转折，并按曲面方向重烘窄磨光。准星顶面的三角折面合为连续的朝向，沿用原最高点。 [照门实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_rear_sight_detail.JPG)
+
+中箍的上弧顺着模型已有的外露木面收紧，侧面渐变接回下沿。实物近照显示箍面与木托贴合，外侧留细接缝。模型的验收按这一可见外观取样。 [中箍实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+运行时将材质设置兼容、跟随同一动画节点的网格合并，按原有纹素比例重排 PBR 图集。资产清单记录实际渲染网格数和每张内嵌图的校验值。Blender 源工程保留逐件编辑。
 
 ## 后部圆角和接缝露木 · 2026-11-26
 
@@ -186,13 +198,16 @@
 
 **网页副本验收：** 不降低两块木料、刻度、暗钢顶面、亮柄和灰钢箍的发布图分辨率；缩小的是小五金、局部底面及部分辅助图。使用实际压缩模型，在检查器同一机位比较高清版与网页副本；7 机位 × 2 灯位中，排除背景后最小亮度 SSIM 为 0.98513，最大平均亮度偏差 0.865 / 255。这是压缩误差，不是美术质量评分。原 `.blend` 和 Git 中的源 GLB 均保留全分辨率。
 
-**当前重建入口**（Python：NumPy、Pillow、SciPy、OpenCV；第一次从 Poly Haven 下载四份带哈希校验的输入，之后离线使用缓存）。
+**当前重建入口**（Python 使用 NumPy、Pillow、SciPy、OpenCV。第一次下载带哈希校验的材质样本，之后复用缓存。）
 
 ```powershell
 python Taierzhuang1938/_blender/Script_Type38Surface.py
+python Taierzhuang1938/_blender/Script_Type38Surface.py --author --output tmp/Type38Author
 node Taierzhuang1938/Script_Type38_511AssetTest.mjs
 node Taierzhuang1938/Script_Type38_511BrowserTest.mjs
 ```
+
+默认入口生成游戏 GLB 并同步该资产的发布贴图规则。带 `--author` 的入口生成可在 Blender 逐件编辑的版本，源工程存于 OneDrive 的 `Blender/Taierzhuang1938/Type38_Exterior_20261122/`。
 
 ## 历史外观版 · 2026-11-22（含字，不是现版）
 

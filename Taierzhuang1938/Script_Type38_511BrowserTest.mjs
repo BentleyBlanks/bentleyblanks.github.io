@@ -25,18 +25,20 @@ try{
   g.player.health=100;g.player.spawnGrace=999;g.player.pitch=0;g.player.aimPitch=0;g.StepFrames(90);
   const meshes=[];g.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part)meshes.push(mesh);});
   const world=g.actorFactory.ModelInstance('Type38_511');
-  const row={version:g.viewmodel.rig.assetVersion,parts:meshes.length,triangles:meshes.reduce((sum,m)=>sum+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),
-   worldTriangles:world.tris,worldParts:world.meshes.length,npcSource:g.actorFactory.WeaponSource('Type38'),
+  const row={version:g.viewmodel.rig.assetVersion,parts:meshes.flatMap(mesh=>mesh.userData.type38Parts).length,renderMeshes:meshes.length,
+   triangles:meshes.reduce((sum,m)=>sum+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),
+   worldTriangles:world.tris,worldParts:world.meshes.flatMap(mesh=>mesh.userData.type38Parts).length,worldMeshes:world.meshes.length,npcSource:g.actorFactory.WeaponSource('Type38'),
    npcTriangles:[...g.actorFactory.WeaponGeometry('Type38').geometries.values()].reduce((s,geo)=>s+(geo.index?.count||geo.attributes.position.count)/3,0),
    nearNpcTriangles:[...g.actorFactory.WeaponGeometry('Type38',0,{detail:true}).geometries.values()].reduce((s,geo)=>s+(geo.index?.count||geo.attributes.position.count)/3,0),
    privateGeometry:world.meshes.every(mesh=>meshes.every(fps=>fps.geometry!==mesh.geometry)),
    compressedTextures:meshes.reduce((sum,mesh)=>sum+Object.values(mesh.material).filter(value=>value?.isCompressedTexture).length,0),
-   materials:meshes.map(mesh=>({part:mesh.userData.type38Part,base:mesh.material.map?.colorSpace,normal:mesh.material.normalMap?.colorSpace,
+   materials:meshes.map(mesh=>({part:mesh.userData.type38Part,sources:mesh.userData.type38Parts.length,base:mesh.material.map?.colorSpace,normal:mesh.material.normalMap?.colorSpace,
     orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
  assert.equal(evidence.identity.version,specification.version);
  assert.equal(evidence.identity.parts,specification.parts);assert.equal(evidence.identity.triangles,specification.triangles);
+ assert.equal(evidence.identity.renderMeshes,specification.renderMeshes);
  evidence.gripDirection=await page.evaluate(()=>{
   let finish;
   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
@@ -49,11 +51,36 @@ try{
  assert(evidence.gripDirection?.physical&&evidence.gripDirection.strength>=.18&&evidence.gripDirection.strength<=.27&&evidence.gripDirection.data==='');
  assert.deepEqual(evidence.gripDirection.scale,[128/1024,24/1024],'directional data must use its own padded atlas tile');
  assert.equal(evidence.identity.npcTriangles,specification.npcTriangles);assert.equal(evidence.identity.nearNpcTriangles,specification.triangles);
- assert.equal(evidence.identity.worldTriangles,specification.triangles);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
- assert(evidence.identity.materials.filter(m=>m.base==='srgb').length>=40);
- assert(evidence.identity.materials.filter(m=>m.normal==='').length>=20);
- assert(evidence.identity.materials.filter(m=>m.clearcoat).length>=2);
+ assert.equal(evidence.identity.worldTriangles,specification.triangles);assert.equal(evidence.identity.worldParts,specification.parts);
+ assert.equal(evidence.identity.worldMeshes,specification.renderMeshes);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
+ const sourceCount=predicate=>evidence.identity.materials.filter(predicate).reduce((sum,m)=>sum+m.sources,0);
+ assert(sourceCount(m=>m.base==='srgb')>=40);
+ assert(sourceCount(m=>m.normal==='')>=20);
+ assert(sourceCount(m=>m.clearcoat)>=4);
  if(!external){
+  await page.evaluate(()=>{
+   // Measure the original UV landmarks inside the actual game's atlas tiles.
+   window.Type38AcceptanceMaterial=part=>{
+    let target;
+    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
+     if(mesh.userData.type38Parts?.includes(part))target=mesh;
+    });
+    const textureTile=target.userData.type38SourceRanges?.find(section=>section.part===part)?.tile;
+    if(!textureTile)return target.material;
+    const view={...target.material};
+    const [left,top,width,height]=textureTile.sourceRect;
+    const [x,y]=textureTile.atlasOrigin;
+    for(const key of ['map','roughnessMap','normalMap']){
+     const texture=target.material[key];
+     if(!texture)continue;
+     const canvas=document.createElement('canvas');
+     [canvas.width,canvas.height]=textureTile.sourceSize;
+     canvas.getContext('2d').drawImage(texture.image,x,y,width,height,left,top,width,height);
+     view[key]={...texture,image:canvas};
+    }
+    return view;
+   };
+  });
   evidence.woodCoat=await page.evaluate(()=>{
    const samples=[];
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
@@ -134,12 +161,8 @@ try{
   assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
    'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{
-   const rig=window.Tengxian.viewmodel.rig.group;
-   let handle,cover;
-   rig.traverse(mesh=>{
-    if(mesh.userData.type38Part==='Exterior_HandleOval08')handle=mesh.material;
-    if(mesh.userData.type38Part==='T38_430B_IndependentLeftCoverSkin')cover=mesh.material;
-   });
+   const handle=window.Type38AcceptanceMaterial('Exterior_HandleOval08');
+   const cover=window.Type38AcceptanceMaterial('T38_430B_IndependentLeftCoverSkin');
    const canvas=document.createElement('canvas');
    const ctx=canvas.getContext('2d',{willReadFrequently:true});
    const Read=image=>{
@@ -188,11 +211,8 @@ try{
   assert(stem[0]<75&&stem[1]>200&&stem[2]>180&&outer[0]>245&&outer[2]>235&&wornFlank[2]<160&&gap[2]<8&&pole[2]<8,
    'the brush direction must fade through the junction and close smoothly at the tip');
   evidence.rearSteel=await page.evaluate(()=>{
-   let collar,face;
-   window.Tengxian.viewmodel.rig.group.traverse(mesh=>{
-    if(mesh.userData.type38Part==='T38_435F2_IndependentTailNeckExterior')collar=mesh.material.roughnessMap.image;
-    if(mesh.userData.type38Part==='T38_440D2_IndependentVisibleRecess')face=mesh.material;
-   });
+   const collar=window.Type38AcceptanceMaterial('T38_435F2_IndependentTailNeckExterior').roughnessMap.image;
+   const face=window.Type38AcceptanceMaterial('T38_440D2_IndependentVisibleRecess');
    const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
    const Read=image=>{
     canvas.width=image.width;
@@ -310,13 +330,15 @@ try{
    if(!HasSurfaceJoin())detachedFrames++;
   }
   const mechanism={frames,maxCover,maxBolt,coverError,detachedFrames,holdOpen:vm.boltOpen,
-   boltParts:children.length,coverParts:vm.rig.parts.dustCover.children.length};
+   boltParts:children.flatMap(mesh=>mesh.userData.type38Parts).length,
+   coverParts:vm.rig.parts.dustCover.children.flatMap(mesh=>mesh.userData.type38Parts).length,
+   coverMeshes:vm.rig.parts.dustCover.children.length};
   window.ProbeType38DisplayJoin=HasSurfaceJoin;
   return mechanism;
  });
  evidence.mechanism=animation;
  assert(evidence.mechanism.frames>20);assert(evidence.mechanism.maxCover>.115&&evidence.mechanism.maxBolt>.115);assert(evidence.mechanism.coverError<1e-8);assert(evidence.mechanism.holdOpen);
- assert.equal(evidence.mechanism.boltParts,4);assert.equal(evidence.mechanism.coverParts,2);
+ assert.equal(evidence.mechanism.boltParts,4);assert.equal(evidence.mechanism.coverParts,2);assert.equal(evidence.mechanism.coverMeshes,1);
  assert.equal(evidence.mechanism.detachedFrames,0,'the visible stem must meet the moving shell during every frame');
  await page.screenshot({path:path.join(out,'Scene_BoltOpen.png')});
  evidence.reload=await page.evaluate(()=>{
@@ -360,7 +382,8 @@ try{
   for(const batch of batches){g.scene.remove(batch);batch.dispose();}for(const mesh of world.meshes)mesh.geometry.dispose();
   return {batches:batches.length,max:gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),rows,toggles,error:gl.getError()};
  });
- assert.equal(evidence.samplers.batches,4);assert(evidence.samplers.rows.every(row=>row.linked&&row.count<=evidence.samplers.max));
+ assert.equal(evidence.samplers.batches,evidence.identity.materials.filter(m=>m.clearcoat).length);
+ assert(evidence.samplers.rows.every(row=>row.linked&&row.count<=evidence.samplers.max));
  assert(evidence.samplers.rows.some(row=>row.shared&&row.batched));assert(evidence.samplers.toggles.every(row=>row.error===0));assert.equal(evidence.samplers.error,0);
  assert(!requests.some(url=>/Model_Type38\.tzm\.json/.test(url)),'retired runtime Type38 is not requested');
  assert(requests.some(url=>/Model_Type38_511[^/]*\.glb/.test(url)));
