@@ -264,10 +264,11 @@ for (const gate of mergedStageGates) {
   assert.ok(gate.hideOn || gate.showOn, `阶段空气墙 ${gate.id} 必须绑定 hideOn 或 showOn 信号`);
 }
 const mergedBlocks = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_Block_"));
-assert.ok(mergedBlocks.length >= 80, `08–13 支路与豁口配置可见白盒路障/倒塌残墙（实测 ${mergedBlocks.length} 块）`);
+assert.ok(mergedBlocks.length >= 200, `08–13 沟口两翼、北田路标与村落外缘配置可见白盒路障/倒塌残墙（实测 ${mergedBlocks.length} 块）`);
 for (const blk of mergedBlocks) {
   assert.equal(blk.noClimb, true, `动线封堵路障 ${blk.id} 必须禁止翻越`);
   assert.notEqual(blk.visual, false, `动线封堵路障 ${blk.id} 为可见实体白盒`);
+  assert.ok(!blk.meta?.planning && blk.material !== "Whitebox/Cover", `动线封堵路障 ${blk.id} 不得混标为战术掩体`);
 }
 // 确保 08a–13e 玩家主线每一步都不撞到任何 KeepIn 或当拍生效中的 StageGate 空气墙
 const keepInCheckGround = () => 0;
@@ -881,6 +882,67 @@ for (const spec of ENCOUNTER_VARIANTS) {
     assert.ok(topY - yUp <= TRAVERSAL.stepMax - 0.1, `${mound.id} 坡顶侧高差 ${(topY - yUp).toFixed(2)}m 须 ≤ stepMax，确保敌军顺畅下沟`);
     assert.ok(topY - yDown >= TRAVERSAL.jumpRiseMax + 0.25, `${mound.id} 沟底侧陡坎 ${(topY - yDown).toFixed(2)}m 须高于玩家跳跃上限`);
   }
+}
+
+// 08–13 沟口两翼/村落外缘围封与 10a 村内多路贯通校验：
+// 1) 沟口东西两翼、北村口东缘、庙西与村西/救护所外缘均配可见白盒封堵；
+// 2) 10a 从老耿家/大槐树 (140, 560) 到救护所 (121, 722) 同时贯通东主街 (x>=155)、村内中街 (x<=142) 与西巷 (x<=102)。
+{
+  for (const prefix of [
+    "Merged_Block_DitchFlankWN", "Merged_Block_DitchFlankWS", "Merged_Block_DitchFlankEN", "Merged_Block_DitchFlankES",
+    "Merged_Block_NorthEntryE", "Merged_Block_TempleWest", "Merged_Block_WestOuter", "Merged_Block_AidEast",
+  ]) {
+    assert.ok(mergedBlocks.some((b) => b.id.startsWith(prefix)), `缺少外缘白盒封堵簇 ${prefix}*`);
+  }
+  const sigs10a = merged.evaluate(merged.BeatById("10a").start + 0.01, merged.defaultDocument).signals || [];
+  const activeBlocks10a = [
+    ...solidObjects.filter((o) => {
+      if (o.hideOn && sigs10a.includes(o.hideOn)) return false;
+      if (o.showOn && !sigs10a.includes(o.showOn)) return false;
+      if (!o.pos || !o.size || o.size[1] < 0.45) return false;
+      const g = groundAt(o.pos[0], o.pos[2]);
+      const baseY = o.pos[1] ?? g;
+      return baseY <= g + 1.5 && baseY + o.size[1] >= g + 0.35;
+    }),
+    ...mergedKeepIn,
+    ...mergedStageGates.filter((g) => stageGateActive(g, sigs10a)),
+  ].filter((o) => o.pos[0] >= 60 && o.pos[0] <= 200 && o.pos[2] >= 540 && o.pos[2] <= 750);
+
+  const cellBlocked = (x, z, r = 0.45) => {
+    for (const o of activeBlocks10a) {
+      const dx = x - o.pos[0], dz = z - o.pos[2];
+      if (Math.abs(dx) > 25 || Math.abs(dz) > 25) continue;
+      const rad = ((o.yawDeg || 0) * Math.PI) / 180;
+      const c = Math.cos(rad), s = Math.sin(rad);
+      const lx = dx * c - dz * s, lz = dx * s + dz * c;
+      if (Math.abs(lx) <= o.size[0] / 2 + r && Math.abs(lz) <= o.size[2] / 2 + r) return true;
+    }
+    return false;
+  };
+  const bfsReach = (allowed) => {
+    const start = [140, 560], goal = [121, 722];
+    const key = (x, z) => `${x},${z}`;
+    const q = [start];
+    const seen = new Set([key(...start)]);
+    let qi = 0;
+    while (qi < q.length) {
+      const [x, z] = q[qi++];
+      if (Math.hypot(x - goal[0], z - goal[1]) <= 2.5) return true;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, nz = z + dz;
+        if (nx < 72 || nx > 182 || nz < 552 || nz > 730) continue;
+        if (!allowed(nx, nz)) continue;
+        const k = key(nx, nz);
+        if (seen.has(k) || cellBlocked(nx, nz)) continue;
+        seen.add(k);
+        q.push([nx, nz]);
+      }
+    }
+    return false;
+  };
+  assert.ok(bfsReach((x, z) => (z < 600 || z > 675) || x >= 155), "10a 老耿家至救护所应保留东主街路线 (x>=155)");
+  assert.ok(bfsReach((x, z) => (z < 610 || z > 685) || x <= 142), "10a 老耿家至救护所应同时贯通村内中街/西巷路线 (x<=142)");
+  assert.ok(bfsReach((x, z) => (z < 610 || z > 685) || x <= 102), "10a 老耿家至救护所应同时贯通西巷外侧路线 (x<=102)");
 }
 
 console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates, enemy occlusion & full zero-clip/zero-LOS/fire-line audit");
