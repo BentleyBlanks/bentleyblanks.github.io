@@ -208,7 +208,7 @@ export const MESHES = {
     span: [0.12804, 0.06149, 0.413], lengthM: 0.413,
     draws: { high: 1, medium: 1, low: 1 },
     pbrSets: [{ name: "Type89LauncherSteel",
-      albedo: "./Texture/Texture_Type89LauncherSteelBase.webp?v=type89-barrel-small-marks-20261127",
+      albedo: "./Texture/Texture_Type89LauncherSteelBase.webp?v=type89-barrel-texel-centers-20261127",
       normal: "./Texture/Texture_Type89LauncherSteelNormal.webp?v=type89-barrel-density-20261126",
       orm: "./Texture/Texture_Type89LauncherSteelOrm.webp?v=type89-barrel-material-20261127" }],
     note: "按馆藏照片重建的八九式重掷弹筒游戏外观。窄长钢制支柱、侧面滚花旋钮与弧形驻钣。保留现有手持和预演挂点。",

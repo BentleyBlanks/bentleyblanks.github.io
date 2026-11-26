@@ -780,7 +780,11 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             base = ApplyBaseLogGain(base, ReferenceField(materialFit, xx, vv, "highlightBase") / 1000)
             metal += ReferenceField(materialFit, xx, vv, "highlightMetal") * (.93 - metal) / 1000
         if barrelSampling is not None:
-            gain = np.zeros_like(xx, dtype=float)
+            # The registered marks follow the texel centers addressed by the renderer.
+            widthAxis = np.clip((np.arange(width) + .5 - padding) / (width - 2 * padding), 0, 1)
+            heightAxis = np.clip((np.arange(height) + .5 - padding) / (height - 2 * padding), 0, 1)
+            markU, markV = np.meshgrid(np.interp(widthAxis, packedU, oldU), top - heightAxis * (top - bottom))
+            gain = np.zeros_like(markU)
             for key in ("markCalibration", "smallMarkCalibration"):
                 marks = closeup.get(key)
                 if marks is None:
@@ -791,7 +795,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
                     raise ValueError(f"Mark correction does not match the measured reference: {path}")
                 with Image.open(path) as image:
                     plate = (np.asarray(image.convert("L"), dtype=float).T - 128) / marks["gainScale"]
-                gain += ReferenceField({"footprint": marks["footprint"], "gain": plate}, xx, vv, "gain")
+                gain += ReferenceField({"footprint": marks["footprint"], "gain": plate}, markU, markV, "gain")
             base = ApplyBaseLogGain(base, gain)
     if name == "Sleeve":
         patina = closeup["endPatina"]

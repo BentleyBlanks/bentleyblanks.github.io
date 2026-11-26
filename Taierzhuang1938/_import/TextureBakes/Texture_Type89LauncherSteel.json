@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 560296,
-      "sha256": "1afa05713ed63a002177c0c50032e0724862345c17c4a41d91e6cd440a7c4b35"
+      "bytes": 560492,
+      "sha256": "baad4d057811295c9f68d57e62e82982dcbae584ced2edb081f07aab0a5306d7"
     },
     {
       "channel": "Normal",
@@ -39,7 +39,7 @@
       "sha256": "d5f07ee3f14c9804f3f9dc714fd8c07b92138aad21e0282d71c4169c66f8c6f2"
     }
   ],
-  "totalBytes": 1011534,
+  "totalBytes": 1011730,
   "metrics": {
     "meanSrgb": [
       0.4344,
@@ -53,9 +53,9 @@
     "clipHigh": 0.0,
     "lowFreq": 0.1053,
     "seam": 0.1244,
-    "interior": 0.0254,
-    "seamRatio": 4.893,
-    "border": 0.744,
+    "interior": 0.0255,
+    "seamRatio": 4.884,
+    "border": 0.743,
     "swing": 0.0835,
     "texelsPerMeter": null
   },
