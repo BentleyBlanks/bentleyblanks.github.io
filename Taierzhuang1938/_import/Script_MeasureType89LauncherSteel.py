@@ -13,6 +13,7 @@ from scipy.ndimage import binary_erosion, gaussian_filter
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
+REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
@@ -193,13 +194,24 @@ def ReadRegisteredFrame(folder):
     return u, v, visible, images["beauty.png"].astype(float), hashes
 
 
-def RegisteredBarrelView(photo, barrel, folder, shape):
+def ReadRegisteredLuma(folder, name, hashes):
+    data = (folder / name).read_bytes()
+    hashes[name] = sha256(data).hexdigest()
+    with Image.open(BytesIO(data)) as frame:
+        return np.asarray(frame.convert("RGB"), dtype=float) @ REGISTERED_LUMA
+
+
+def RegisteredBarrelPhotoFrame(photo, barrel, folder):
     u, v, visible, render, hashes = ReadRegisteredFrame(folder)
     interior = binary_erosion(visible & (u > .08) & (u < .92) & (v > .09) & (v < .91), iterations=3)
     x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
-    weights = np.array([.2126, .7152, .0722])
-    wanted = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
-    observed = render @ weights
+    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
+    return u, v, interior, source, render, hashes
+
+
+def RegisteredBarrelView(photo, barrel, folder, shape):
+    u, v, interior, source, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
+    wanted, observed = source @ REGISTERED_LUMA, render @ REGISTERED_LUMA
     valid = interior & (u > .54) & (v > .33) & (wanted > 25) & (wanted < 242) & (observed > 22)
     if np.count_nonzero(valid) < 1000:
         raise ValueError(f"The registered barrel patch is missing from {folder}")
@@ -249,12 +261,8 @@ def BarrelCalibration(photo, barrel, evidence):
 
 
 def RegisteredBarrelResponse(photo, barrel, folder, shape, sigma, highlightWeight):
-    u, v, visible, render, hashes = ReadRegisteredFrame(folder)
-    interior = binary_erosion(visible & (u > .08) & (u < .92) & (v > .09) & (v < .91), iterations=3)
-    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
-    weights = np.array([.2126, .7152, .0722])
-    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
-    luma = render @ weights
+    u, v, interior, target, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
+    source, luma = target @ REGISTERED_LUMA, render @ REGISTERED_LUMA
     valid = interior & (source > 22) & (source < 240) & (luma > 20)
     if np.count_nonzero(valid) < 1000:
         raise ValueError(f"The registered barrel response is missing from {folder}")
@@ -269,17 +277,11 @@ def RegisteredBarrelResponse(photo, barrel, folder, shape, sigma, highlightWeigh
         accum = np.bincount(cells, weights=values[valid] * reliability, minlength=rows * columns).reshape(shape)
         return gaussian_filter(accum, sigma) / np.maximum(.20, support)
 
-    def MeasuredLuma(name):
-        data = (folder / name).read_bytes()
-        hashes[name] = sha256(data).hexdigest()
-        with Image.open(BytesIO(data)) as frame:
-            return np.asarray(frame.convert("RGB"), dtype=float) @ weights
-
     residual = Sample(np.log((source + 14) / (luma + 14)))
     derivatives = []
     roughnessCurvature = None
     for channel, step in (("base", .28), ("roughness", .28), ("metalness", .25)):
-        plus, minus = (MeasuredLuma(f"{channel}{suffix}.png") for suffix in ("Plus", "Minus"))
+        plus, minus = (ReadRegisteredLuma(folder, f"{channel}{suffix}.png", hashes) for suffix in ("Plus", "Minus"))
         derivatives.append(Sample(np.log((plus + 14) / (minus + 14))) / (2 * step))
         if channel == "roughness":
             roughnessCurvature = Sample(np.log(((plus + 14) * (minus + 14)) / (luma + 14)**2)) / (2 * step**2)
@@ -328,6 +330,101 @@ def BarrelResponseCalibration(photo, barrel, evidence):
     return {**BarrelCalibrationIdentity(barrel), "frameSha256": {name: view[3] for name, view in zip(names, views)}, **maps}
 
 
+def RegisteredBarrelChroma(photo, barrel, folder, shape):
+    u, v, interior, source, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
+    wanted, observed = source @ REGISTERED_LUMA, render @ REGISTERED_LUMA
+    valid = interior & (wanted > 31) & (wanted < 230) & (observed > 31) & (observed < 230)
+    if np.count_nonzero(valid) < 1000:
+        raise ValueError(f"The registered barrel color is missing from {folder}")
+
+    rows, columns = shape
+    cells = np.floor(u[valid]*rows).astype(int)*columns + np.floor(v[valid]*columns).astype(int)
+    offset = source[valid] / wanted[valid, None] - render[valid] / observed[valid, None]
+    counts = np.bincount(cells, minlength=rows * columns).reshape(shape).astype(float)
+    support = gaussian_filter(counts, 1.3)
+    channels = []
+    for signal in offset.T:
+        weighted = np.bincount(cells, weights=signal, minlength=rows * columns).reshape(shape)
+        channels.append(gaussian_filter(weighted, 1.3) / np.maximum(.20, support))
+    return np.stack(channels, axis=-1), support, hashes
+
+
+def BarrelColorAdjustment(photo, barrel, evidence):
+    names = ("V41BarrelFinalDirect", "V41BarrelFinalDefault")
+    direct, default = [RegisteredBarrelChroma(photo, barrel, evidence / name, (93, 59)) for name in names]
+    face, faceSupport, faceHashes = direct
+    normal, normalSupport, normalHashes = default
+    support = np.clip(np.minimum(faceSupport, normalSupport) / .8, 0, 1)
+    agreement = np.exp(-.5 * ((face - normal) / .11)**2)
+    chroma = np.clip((.59*face + .41*normal) * agreement * support[..., None], -.18, .18)
+    # Correct the chroma in display color while preserving its luminance.
+    chroma -= (chroma @ REGISTERED_LUMA)[..., None]
+    maps = {channel: np.rint(chroma[..., index] * 1000).astype(int).tolist()
+            for index, channel in enumerate(("red", "green", "blue"))}
+    return maps, dict(zip(names, (faceHashes, normalHashes)))
+
+
+def BarrelFineAdjustment(photo, barrel, evidence):
+    names = ("V42FineResponseDirect", "V42FineResponseDefault")
+    folders = [evidence / name for name in names]
+    u, v, directInside, source, direct, directHashes = RegisteredBarrelPhotoFrame(photo, barrel, folders[0])
+    otherU, otherV, defaultInside, _, default, defaultHashes = RegisteredBarrelPhotoFrame(photo, barrel, folders[1])
+    if not (np.array_equal(u, otherU) and np.array_equal(v, otherV)):
+        raise ValueError("The fine barrel captures must use the same camera and surface coordinates")
+
+    photoLuma = source @ REGISTERED_LUMA
+    rendered = np.stack((direct @ REGISTERED_LUMA, default @ REGISTERED_LUMA), axis=-1)
+    valid = directInside & defaultInside & (photoLuma > 25) & (photoLuma < 240) & (np.min(rendered, axis=-1) > 23)
+    if np.count_nonzero(valid) < 1000:
+        raise ValueError("The fine barrel captures do not cover the photographed patch")
+    wanted = photoLuma[valid]
+    residual = np.log(wanted[:, None] + 14) - np.log(rendered[valid] + 14)
+
+    def Response(folder, hashes, channel, step):
+        plus, minus = (ReadRegisteredLuma(folder, f"{channel}{side}.png", hashes)[valid] for side in ("Plus", "Minus"))
+        return np.log((plus + 14) / (minus + 14)) / (2 * step)
+
+    frameHashes = (directHashes, defaultHashes)
+    baseSlope = np.stack([Response(folder, hashes, "base", .19) for folder, hashes in zip(folders, frameHashes)], axis=-1)
+    signed = residual / np.clip(baseSlope, .25, .90)
+    agrees = signed[:, 0] * signed[:, 1] > 0
+    shared = np.where(agrees, np.sign(signed[:, 0]) * np.min(np.abs(signed), axis=-1), 0)
+
+    shape = (239, 159)
+    rows, columns = shape
+    # ReferenceField interpolates between sample centers at 0 and 1 on each axis.
+    cells = np.rint(u[valid] * (rows - 1)).astype(int) * columns + np.rint(v[valid] * (columns - 1)).astype(int)
+
+    def Grid(signal):
+        values = np.bincount(cells, weights=signal, minlength=rows * columns).reshape(shape)
+        return gaussian_filter(values, .71)
+
+    peak = np.clip((wanted - 108) / 37, 0, 1)
+    reliability = 1 + .65 * np.clip((wanted - 117) / 36, 0, 1)
+    highlightWeight = (1 + 1.4 * peak) * reliability
+    shadowWeight = (1 - .83 * peak) * reliability
+    highSupport = np.maximum(Grid(highlightWeight), .55)
+    bright = Grid(np.clip(shared, 0, .39) * highlightWeight) / highSupport
+    dark = Grid(np.clip(shared, -.36, 0) * shadowWeight) / np.maximum(Grid(shadowWeight), .55)
+    peakCoverage = Grid(peak * reliability) / np.maximum(Grid(reliability), .55)
+    # Keep the correction for the surrounding oxide from darkening the small reflected flecks.
+    base = bright * (1.08 + 2.30 * peakCoverage) + dark * (1 - .99 * peakCoverage)**2
+    base = np.clip(1.05 * base, -.32, .42)
+
+    metalSlope = Response(folders[1], defaultHashes, "metalness", .22)
+    remaining = baseSlope[:, 1] * base.ravel()[cells] - residual[:, 1] - .020
+    trim = np.clip(remaining / np.maximum(-metalSlope, .09), 0, .26) * peak
+    metal = Grid(trim * highlightWeight) / highSupport
+    maps = {name: np.rint(values * 1000).astype(int).tolist() for name, values in (("base", base), ("metalness", metal))}
+    return maps, dict(zip(names, frameHashes))
+
+
+def BarrelFinishCalibration(photo, barrel, evidence):
+    chroma, colorHashes = BarrelColorAdjustment(photo, barrel, evidence)
+    fine, fineHashes = BarrelFineAdjustment(photo, barrel, evidence)
+    return {**BarrelCalibrationIdentity(barrel), "frameSha256": {**colorHashes, **fineHashes}, **chroma, **fine}
+
+
 def BarrelDetail(image, projection, halfSpan, stampTrace):
     # Hold out the punch marks while keeping the steel grain beside the grooves.
     untracedMarks = [[148, 291, 197, 353], [756, 284, 811, 346]]
@@ -353,7 +450,7 @@ def BarrelDetail(image, projection, halfSpan, stampTrace):
             "maskFeatherPixels": feather, "registrationOffsetInFootprint": [.003937, -.005615]}
 
 
-def BarrelFinish(folder, *, evidence=None, priorCalibration=None, responseEvidence=None, priorResponse=None):
+def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -392,22 +489,17 @@ def BarrelFinish(folder, *, evidence=None, priorCalibration=None, responseEviden
             [2, [[660, 317], [677, 317], [664, 331], [678, 332]]],
         ],
     }
-    calibration = None
-    if evidence is not None:
-        calibration = BarrelCalibration(image, result, evidence)
-    elif priorCalibration is not None:
-        identity = BarrelCalibrationIdentity(result)
-        if all(priorCalibration.get(key) == value for key, value in identity.items()):
-            calibration = priorCalibration
     result["detail"] = BarrelDetail(image, projection, halfSpan, result["stampTrace"])
     result["exposedSteelIslands"] = BarrelSteelIslands(image, projection, halfSpan)
-    if calibration is not None:
-        result["registeredCalibration"] = calibration
-    if responseEvidence is not None:
-        result["surfaceResponseCalibration"] = BarrelResponseCalibration(image, result, responseEvidence)
-    elif priorResponse is not None:
-        if all(priorResponse.get(key) == value for key, value in BarrelCalibrationIdentity(result).items()):
-            result["surfaceResponseCalibration"] = priorResponse
+    identity = BarrelCalibrationIdentity(result)
+    for name, frames, measure in (("registeredCalibration", evidence, BarrelCalibration),
+                                  ("surfaceResponseCalibration", responseEvidence, BarrelResponseCalibration),
+                                  ("finishCalibration", finishEvidence, BarrelFinishCalibration)):
+        prior = previous.get(name)
+        if frames is not None:
+            result[name] = measure(image, result, frames)
+        elif prior is not None and all(prior.get(key) == value for key, value in identity.items()):
+            result[name] = prior
     return result
 
 
@@ -1120,15 +1212,13 @@ def Main():
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
     options.add_argument("--barrel-evidence", type=Path, help="V38 Evidence directory containing fixed-light views and the default-light control")
     options.add_argument("--barrel-response-evidence", type=Path, help="V40 Evidence directory containing the two captures with steel response variants")
+    options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
-    priorBarrel = prior.get("Barrel", {})
-    barrel = BarrelFinish(args.photos, evidence=args.barrel_evidence,
-                          priorCalibration=priorBarrel.get("registeredCalibration"),
-                          responseEvidence=args.barrel_response_evidence,
-                          priorResponse=priorBarrel.get("surfaceResponseCalibration"))
+    barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
+                          responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence)
     sleeve = SleeveFinish(args.photos, evidence=args.sleeve_evidence,
                           priorCalibration=prior.get("Sleeve", {}).get("registeredCalibration"))
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

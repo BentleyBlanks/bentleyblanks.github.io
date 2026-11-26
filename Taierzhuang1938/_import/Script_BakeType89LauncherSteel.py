@@ -94,6 +94,18 @@ def ReferenceField(data, xx, vv, values):
     return (a * (1 - dv) + b * dv) * fade
 
 
+def CheckBarrelRegistration(calibration, closeup):
+    if (calibration["photoSha256"] != closeup["source"]["sha256"]
+            or calibration["projection"] != closeup["source"]["projection"]
+            or calibration["footprint"] != closeup["footprint"]):
+        raise ValueError("The barrel calibration does not match the source photo and projection")
+
+
+def ApplyBaseLogGain(base, logGain):
+    corrected = LinearToSrgb(SrgbToLinear(np.clip(base, 0, 1)) * np.exp(logGain)[..., None])
+    return np.where((logGain != 0)[..., None], corrected, base)
+
+
 def PhotographicGrain(closeup, xx, vv):
     detail = closeup["detail"]
     path = REFERENCE.with_name(detail["file"])
@@ -600,10 +612,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         linear *= (1 + diffuseGain)[..., None]
         calibration = closeup.get("registeredCalibration")
         if barrelSampling is not None and calibration is not None:
-            if (calibration["photoSha256"] != closeup["source"]["sha256"]
-                    or calibration["projection"] != closeup["source"]["projection"]
-                    or calibration["footprint"] != closeup["footprint"]):
-                raise ValueError("The barrel calibration does not match the source photo and projection")
+            CheckBarrelRegistration(calibration, closeup)
             # Apply local contrast and polished-steel response on the registered surface.
             oxideContrast = ReferenceField(calibration, xx, vv, "contrast") / 1000
             steelPeaks = ReferenceField(calibration, xx, vv, "highlights") / 1000
@@ -743,16 +752,19 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             base += .072 * warmOxide[..., None] * LUMA_NEUTRAL_WARMTH
         response = closeup.get("surfaceResponseCalibration")
         if barrelSampling is not None and response is not None:
-            if (response["photoSha256"] != closeup["source"]["sha256"]
-                    or response["projection"] != closeup["source"]["projection"]
-                    or response["footprint"] != closeup["footprint"]):
-                raise ValueError("The barrel response does not match the source photo and projection")
+            CheckBarrelRegistration(response, closeup)
             # The measured response scales the base color seen by the renderer in linear light.
-            baseResponse = ReferenceField(response, xx, vv, "base") / 1000
-            corrected = LinearToSrgb(SrgbToLinear(np.clip(base, 0, 1)) * np.exp(baseResponse)[..., None])
-            base = np.where((baseResponse != 0)[..., None], corrected, base)
+            base = ApplyBaseLogGain(base, ReferenceField(response, xx, vv, "base") / 1000)
             rough *= np.exp(ReferenceField(response, xx, vv, "roughness") / 1000)
             metal *= np.exp(ReferenceField(response, xx, vv, "metalness") / 1000)
+        finish = closeup.get("finishCalibration")
+        if barrelSampling is not None and finish is not None:
+            CheckBarrelRegistration(finish, closeup)
+            base = ApplyBaseLogGain(base, ReferenceField(finish, xx, vv, "base") / 1000)
+            metal *= np.exp(ReferenceField(finish, xx, vv, "metalness") / 1000)
+            chroma = np.stack([ReferenceField(finish, xx, vv, channel) / 1000
+                               for channel in ("red", "green", "blue")], axis=-1)
+            base += .90 * (base @ np.array([.2126, .7152, .0722]))[..., None] * chroma
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
