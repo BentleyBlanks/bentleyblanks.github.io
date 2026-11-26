@@ -27,7 +27,7 @@ FINISHES = {
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
     "Shoulder": (0, (168, 160, 151), (64, 53, 45), .58, (.41, .69), (.89, .43), .60),
     "Knurl": (3, (145, 140, 135), (86, 79, 74), .49, (.392, .622), (.947, .44), .79),
-    "Sleeve": (1, (86, 85, 85), (38, 37, 37), .73, (.37, .68), (.94, .40), .62),
+    "Sleeve": (1, (84, 83, 83), (44, 43, 43), .73, (.64, .80), (.84, .30), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
     "Tab": (2, (141, 129, 114), (70, 53, 39), .51, (.35, .68), (.95, .41), .73),
     "SaddleBack": (2, (115, 119, 114), (62, 53, 44), .66, (.51, .78), (.88, .32), .86),
@@ -323,7 +323,7 @@ def BakeRegion(name, sample, size, index, reference):
         sleeveDetail = sleeveTone * sleeveCoverage
         # The wider arc remains cool. Retain warm oxidation at its worn end.
         shoulder = np.exp(-((vv - .101) / .032) ** 2)
-        tonalDelta += 65 * sleeveDetail - (2.0 * detail + 2.5 * medium) * sleeveCoverage
+        tonalDelta += 82 * sleeveDetail - (2.0 * detail + 2.5 * medium) * sleeveCoverage
         warmth += .28 * sleeveWarmth * sleeveCoverage + .012 * shoulder
         oxidation += .091 * shoulder
 
@@ -346,7 +346,7 @@ def BakeRegion(name, sample, size, index, reference):
         roughnessDelta += .13 * np.maximum(-neckDetail, 0) - .074 * np.maximum(neckDetail, 0)
     if name == "Sleeve":
         heightField *= 1 - .38 * sleeveCoverage
-        heightField += .21 * sleeveDetail
+        heightField += .24 * sleeveDetail
         roughnessDelta += .11 * np.maximum(-sleeveDetail, 0) - .066 * np.maximum(sleeveDetail, 0)
     if name in ("Tab", "TabBack"):
         heightField *= 1 - .56 * tabCoverage

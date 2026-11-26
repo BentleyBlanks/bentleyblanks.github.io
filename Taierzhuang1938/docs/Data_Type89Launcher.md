@@ -42,9 +42,10 @@
 - 拨片正反两面分别从第 5、2 张近照取 480×144 的细节采样。在钢面轮廓内滤去边缘与宽反光，把擦痕、点蚀和氧化烘入基色、法线和粗糙度。固定补光下，正面细纹相关系数由 0.13 提至 0.66，背面由 0.43 提至 0.83。正面亮度中值由 103.1 降至 83.3 个灰阶，近照为 78.5。默认灯和斜视复核均保留可辨的磨痕。 [拨片采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 驻钣接头沿第 6 张照片的号印配准提取 256×152 的周围钢面细纹，遮掉字口后烘焙点蚀、擦痕和氧化。将氧化区调为较哑的粗糙表面，收敛强补光下偏白的反射。近似馆藏布光下，正视配准区细纹相关系数由 0.04 提至 0.64，亮度中值由 81.4 降至 75.2 个灰阶，近照为 72.9。另用默认灯、强补光和斜视复测。 [接头采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 外套筒按第 1 张照片可见的钢面配准 88×352 的细节采样，压低共同反光条纹，将冷灰钢、细纹与端部褐锈分别烘入基色、法线和粗糙度。近似馆藏布光下，中段亮度中值由 56.9 降至 33.4 个灰阶，照片为 35.7。中段归一化红蓝差由 0.247 降至 0.040，照片为 0.051。另用中性灯、默认灯和斜视复测。 [外套筒采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 外套筒提高了冷灰钢面的粗糙度，并分别校准暗部、中间调和已配准的细纹。近似馆藏布光下，正视亮度第 90 百分位从 54.6 降至 50.3，近照为 49.7。斜视同一指标从 61.5 降至 53.4，近照为 50.0，斜视中间调为 35.4，近照为 35.5。用中性灯、默认灯和驻钣接头对照复测。 [外套筒采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV26/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV27/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
