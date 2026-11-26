@@ -363,18 +363,24 @@ def BakeRegion(name, sample, size, index, reference):
         rows = np.rint(padding + (1 - centerV) * (height - 2 * padding)).astype(np.int32)
         cellWear = chip[rows, columns]
         photoTone, photoWarmth, coverage = PhotographicGrain(knurl["wear"], (xx + .5) % 1 - .5, vv)
-        photoTone *= coverage
-        photoWarmth *= coverage
+        flank = knurl["flankWear"]
+        flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
+        photoTone = photoTone * coverage + 1.32 * flankTone * flankCoverage
+        photoWarmth = photoWarmth * coverage + flankWarmth * flankCoverage
+        coverage = np.maximum(coverage, flankCoverage)
         wornHeight = np.clip(.91 + .16 * cellWear, .55, 1.11) * (1 - .10 * coverage)
         exposedArea = np.clip((diamonds - .26) / .56, 0, 1)
         polish = np.clip(.39 + .19 * chip + .29 * cellWear + .75 * photoTone
                          - .95 * np.maximum(photoWarmth, 0), .02, 1)
-        chippedCrests = exposedArea * polish
+        chippedCrests = exposedArea * polish * (1 + .28 * flankCoverage)
+        uKnots, shadowChroma = np.asarray(flank["shadowChroma"], dtype=np.float32).T
+        flankOxide = flankCoverage * np.clip(np.interp(xx, uKnots, shadowChroma) / .24, 0, 1)
         tonalDelta += 6.4 * chip + 15.5 * (shoulders - .45) - 7.6 * grooves + 112 * photoTone
-        heightField += 1.56 * shoulders * wornHeight + .12 * chip * shoulders + .28 * photoTone
+        tonalDelta -= 12.5 * flankOxide * grooves
+        heightField += (1.56 + .40 * flankCoverage) * shoulders * wornHeight + .12 * chip * shoulders + .28 * photoTone
         oxidation += .127 * grooves + .10 * photoWarmth
-        warmth += .32 * photoWarmth
-        roughnessDelta += .071 * grooves + .092 * shoulders - .14 * photoTone
+        warmth += .32 * photoWarmth + .27 * flankOxide * grooves
+        roughnessDelta += .071 * grooves + .092 * shoulders - .14 * photoTone + .067 * flankOxide * grooves
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -581,7 +587,8 @@ def Bake():
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
-               "knurlWear": reference["knurl"]["wear"]["detail"]}
+               "knurlWear": reference["knurl"]["wear"]["detail"],
+               "knurlFlank": reference["knurl"]["flankWear"]["detail"]}
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

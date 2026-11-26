@@ -1249,6 +1249,52 @@
         [0.03555, -0.05571],
         [0.03784, 0.06]
       ]
+    },
+    "flankWear": {
+      "source": {
+        "file": "Mariners4.jpg",
+        "sha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "rotatedCounterclockwise": true,
+        "sampleBounds": [162, 587, 328, 660],
+        "observedGripBounds": [151, 581, 338, 669],
+        "uBySampleRow": [
+          [0.65413, 0.0],
+          [0.66609, 6.0],
+          [0.67802, 12.0],
+          [0.69007, 18.0],
+          [0.70246, 24.0],
+          [0.71485, 30.0],
+          [0.72793, 36.0],
+          [0.74129, 42.0],
+          [0.75531, 48.0],
+          [0.77049, 54.0],
+          [0.7866, 60.0],
+          [0.80496, 66.0],
+          [0.82687, 72.0]
+        ]
+      },
+      "footprint": {
+        "uCenter": 0.7405,
+        "uHalfSpan": 0.08637,
+        "vRange": [0.39821, 0.75679]
+      },
+      "detail": {
+        "file": "Texture_Type89LauncherKnurlFlank.png",
+        "sha256": "c7bef6b1bfd55a299139b83dcc5452403fff7b0bf4ea4cd77a419509cbf997ba",
+        "toneScale": 300,
+        "warmthScale": 520
+      },
+      "shadowChroma": [
+        [0.66808, 0.25406],
+        [0.69833, 0.20995],
+        [0.73016, 0.10829],
+        [0.76416, 0.05921],
+        [0.80343, 0.04261]
+      ],
+      "uvFrequencies": [
+        [0.095, -0.06448],
+        [0.10167, 0.06746]
+      ]
     }
   },
   "ringFinish": {

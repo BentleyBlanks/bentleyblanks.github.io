@@ -15,6 +15,7 @@ RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
+KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
 
 
 def Photo(folder, number):
@@ -516,6 +517,64 @@ def KnurlFrequency(folder):
             "wear": KnurlWear(image, bounds)}
 
 
+def KnurlFlankWear(folder):
+    image, source = Photo(folder, 4)
+    bounds = [162, 587, 328, 660]
+    left, top, right, bottom = bounds
+    region = np.s_[top:bottom, left:right]
+    tone, warmth, lightness = (field[region] for field in PhotoResiduals(image))
+    # Match the straight patterned face to the visible rim and the edge of
+    # the stem. The angular samples follow the foreshortened cylinder.
+    us = np.array([.65413, .66609, .67802, .69007, .70246, .71485, .72793,
+                   .74129, .75531, .77049, .78660, .80496, .82687])
+    projectedY = np.arange(len(us)) * 6
+    sampleU, sampleV = np.meshgrid(np.linspace(us[0], us[-1], 100), np.linspace(0, 1, 168))
+    srcX = (right - left - 1.01) * sampleV
+    srcY = np.clip(np.interp(sampleU, us, projectedY), 0, bottom - top - 1.01)
+    toneUv, warmthUv, shadeUv = (SampleBilinear(field, srcX, srcY) for field in (tone, warmth, lightness))
+    height, width = toneUv.shape
+    window = np.hanning(height)[:, None] * np.hanning(width)[None, :]
+    amplitude = np.abs(np.fft.rfft2(toneUv * window, s=(height * 6, width * 6)))
+    fx = np.fft.rfftfreq(width * 6)[None, :]
+    fy = np.fft.fftfreq(height * 6)[:, None]
+    band = (fx > .074) & (fx < .122) & (np.abs(fy) > .052) & (np.abs(fy) < .081)
+    peaks = [np.unravel_index(np.where(band & (fy * sign > 0), amplitude, 0).argmax(), amplitude.shape)
+             for sign in (-1, 1)]
+    frequencies = [(float(fx[0, j]), float(fy[i, 0])) for i, j in peaks]
+    yy, xx = np.indices(toneUv.shape)
+    a, b = (2 * np.pi * (f * xx + g * yy) for f, g in frequencies)
+    phases = [a, b, 2 * a, 2 * b, a + b, a - b]
+    # The same row of diamonds reflects differently near the rim. Fit that
+    # variation before transferring the non-repeating pits and scratches.
+    angular = (2 * xx / (width - 1) - 1).ravel()
+    basis = np.column_stack([fn(phase).ravel() * scale for phase in phases
+                             for fn in (np.cos, np.sin) for scale in (1, angular, angular ** 2)])
+    weight = np.sqrt(window).ravel()[:, None]
+    observations = np.column_stack((toneUv.ravel(), warmthUv.ravel()))
+    fitted = np.linalg.lstsq(basis * weight, observations * weight, rcond=None)[0]
+    wearTone, wearWarmth = (observations - basis @ fitted).T.reshape(2, height, width)
+    detail = SaveDetailPlate(wearTone, wearWarmth, np.clip((247 - shadeUv) / 25, 0, 1),
+                             np.minimum(xx, width - 1.01), np.minimum(yy, height - 1.01),
+                             KNURL_FLANK, halfSize=False)
+    # The steel is lit unevenly. Measure the excess warmth in grooves
+    # against the exposed edges in the same band of the photograph.
+    sample = image[region]
+    chroma = (sample[..., 0] - sample[..., 2]) / np.maximum(sample @ LUMA, 25)
+    shadowChroma = []
+    for rows in np.array_split(np.arange(tone.shape[0]), 5):
+        bandTone, bandChroma = tone[rows], chroma[rows]
+        dark = np.median(bandChroma[bandTone < -.09])
+        bright = np.median(bandChroma[bandTone > .09])
+        shadowChroma.append([np.interp(rows.mean(), projectedY, us), np.clip(dark - bright, 0, 1)])
+    source["sampleBounds"] = bounds
+    source["observedGripBounds"] = [151, 581, 338, 669]
+    source["uBySampleRow"] = np.stack([us, projectedY], axis=1).tolist()
+    footprint = {"uCenter": round((us[0] + us[-1]) / 2, 6), "uHalfSpan": round((us[-1] - us[0]) / 2, 6),
+                 "vRange": [.39821, .75679]}
+    return {"source": source, "footprint": footprint, "detail": detail,
+            "shadowChroma": np.round(shadowChroma, 5).tolist(), "uvFrequencies": np.round(frequencies, 5).tolist()}
+
+
 def Main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
@@ -529,6 +588,7 @@ def Main():
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)
     record["knurl"] = KnurlFrequency(args.photos)
+    record["knurl"]["flankWear"] = KnurlFlankWear(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
     encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",
                      lambda match: "[" + ", ".join(x.strip() for x in match[1].split(",")) + "]", encoded)
