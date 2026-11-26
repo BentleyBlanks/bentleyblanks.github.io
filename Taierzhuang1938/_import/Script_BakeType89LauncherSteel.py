@@ -122,20 +122,21 @@ def BarrelTexelCenters(width, height, sampling):
     return np.meshgrid(np.interp(column, packed, arc), last - row * (last - first))
 
 
-def ApplyBarrelFacets(tile, closeup, calibration):
+def ApplyBarrelResponse(tile, closeup, calibration, fieldCount):
     CheckBarrelRegistration(calibration, closeup)
     path = REFERENCE.with_name(calibration["file"])
     if Sha256(path) != calibration["sha256"]:
-        raise ValueError(f"Steel facet correction does not match the measured reference: {path}")
+        raise ValueError(f"Barrel response does not match the measured reference: {path}")
     with Image.open(path) as image:
         encoded = (np.asarray(image, dtype=float) - 32768) / calibration["scale"]
-    if encoded.ndim != 2 or encoded.shape[1] % 2:
-        raise ValueError(f"Invalid steel facet fields: {path}")
-    base, normal, _ = tile
+    if encoded.ndim != 2 or encoded.shape[1] % fieldCount:
+        raise ValueError(f"Invalid barrel response fields: {path}")
+    base, normal, orm = tile
     height, width = base.shape[:2]
     uu, vv = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
-    tilt, gain = (ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
-                  for field in np.split(encoded, 2, axis=1))
+    tilt, gain, *roughnessFields = (
+        ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
+        for field in np.split(encoded, fieldCount, axis=1))
     base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
     # Bias the tangent direction of the existing relief before normalizing it.
     active = abs(tilt) > 1e-8
@@ -143,6 +144,11 @@ def ApplyBarrelFacets(tile, closeup, calibration):
     vector[:, 0] += tilt[active] * vector[:, 2]
     unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
     normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
+    if roughnessFields:
+        roughness = roughnessFields[0]
+        active = abs(roughness) > 1e-8
+        channel = orm[..., 1]
+        channel[active] = np.rint(255 * np.clip(channel[active] / 255 + roughness[active], .17, .92)).astype(np.uint8)
 
 
 def PhotographicGrain(closeup, xx, vv):
@@ -1018,9 +1024,10 @@ def BuildAtlas(reference):
                                    barrelSampling=ATLAS["barrelSampling"])
             tile = RepackBarrelTile(denseTile, oldTile, reference)
             closeup = reference["closeups"]["Barrel"]
-            facets = closeup.get("facetCalibration")
-            if facets is not None:
-                ApplyBarrelFacets(tile, closeup, facets)
+            for key, fieldCount in (("facetCalibration", 2), ("bandCalibration", 3)):
+                calibration = closeup.get(key)
+                if calibration is not None:
+                    ApplyBarrelResponse(tile, closeup, calibration, fieldCount)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
@@ -1058,7 +1065,7 @@ def Bake():
                "shoulderDirect": reference["shoulder"]["Direct"]["detail"],
                "shoulderFlank": reference["shoulder"]["Flank"]["detail"]}
     for key, name in (("markCalibration", "barrelMarks"), ("smallMarkCalibration", "smallBarrelMarks"),
-                      ("facetCalibration", "barrelFacets")):
+                      ("facetCalibration", "barrelFacets"), ("bandCalibration", "barrelBand")):
         calibration = reference["closeups"]["Barrel"].get(key)
         if calibration is not None:
             details[name] = calibration

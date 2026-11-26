@@ -19,32 +19,32 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 560190,
-      "sha256": "94cb802b9bb99d13bb4c66f0e0402545f627e6dfc35adc7b8f0642f9f28e611a"
+      "bytes": 560102,
+      "sha256": "eaa1d47b3c97be32ebda4e2a9d9f940d3d594d4ca4ae8ebb251ee62a40d6ef6f"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 399442,
-      "sha256": "41e810accae61aad66450ed8a1a168b9140d4bdc0a40ca2865c09fd3ec6b9c0b"
+      "bytes": 399516,
+      "sha256": "72f2d96c80ab86037821befc97eb6234369ba61587195a427f73e88bbfe26595"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 51844,
-      "sha256": "d5f07ee3f14c9804f3f9dc714fd8c07b92138aad21e0282d71c4169c66f8c6f2"
+      "bytes": 51850,
+      "sha256": "63dffa91a8bec45b625cdb3083f28df5f95d4d6f31c36d123f7682958f7639f1"
     }
   ],
-  "totalBytes": 1011476,
+  "totalBytes": 1011468,
   "metrics": {
     "meanSrgb": [
-      0.4344,
+      0.4343,
       0.4232,
-      0.395
+      0.3949
     ],
     "luma": 0.4175,
     "lumaStd": 0.1079,
@@ -53,16 +53,16 @@
     "clipHigh": 0.0,
     "lowFreq": 0.1053,
     "seam": 0.1245,
-    "interior": 0.0255,
-    "seamRatio": 4.879,
-    "border": 0.743,
-    "swing": 0.0835,
+    "interior": 0.0248,
+    "seamRatio": 5.03,
+    "border": 0.744,
+    "swing": 0.0837,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "e5017e6975b5835d71a51c5d888f28e849090c929692c3859611e18ed088c4dc",
+    "sha256": "5e753f4a7fcfd5bd831c61132a8ea14511bfe7a3e4473419dcdcaa054757ca8f",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -122,6 +122,10 @@
     "barrelFacets": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelFacets.png",
       "sha256": "5439a69e74e34ee6e4684de16143cc41a5e4be1cd3f5222b05b4a0eaced1c3d3"
+    },
+    "barrelBand": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelBand.png",
+      "sha256": "1482ceffc268cb6bc80c66f3184be5bc410c55b5c0b9bfec6fd065d5f7c7aae1"
     }
   }
 }
