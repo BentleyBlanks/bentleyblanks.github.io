@@ -334,6 +334,22 @@ def SleeveFinish(folder):
     oxide *= np.clip((samples[..., 0] - samples[..., 1] - 4) / 21, 0, 1)
     field["oxideCoverage"] = np.rint(100 * oxide ** 1.7).astype(int).tolist()
 
+    # The short contact patch needs denser color samples than the wider arc.
+    endRange = [.043, .174]
+    first, last = footprint["vRange"]
+    endX = photoX[0] + (photoX[-1] - photoX[0]) * (np.linspace(*endRange, 23) - first) / (last - first)
+    endTop, endBottom = (np.interp(endX, photoX, rail) for rail in (top, bottom))
+    endSamples = np.array([[Sample(image, x, y, radius=1) for x, y in zip(endX, endTop + t * (endBottom - endTop))]
+                           for t in np.linspace(0, 1, 25)])
+    endLightness = endSamples @ LUMA
+    endWarmth = (endSamples[..., 0] - endSamples[..., 2]) / np.maximum(endLightness, 25)
+    field["endPatina"] = {
+        "footprint": {**footprint, "vRange": endRange},
+        "darkPatinaCoverage": np.rint(100 * np.clip((59 - endLightness) / 32, 0, 1)).astype(int).tolist(),
+        "oxideChroma": np.rint(100 * np.clip((endWarmth - .32) / .64, 0, 1)).astype(int).tolist(),
+        "exposedSteelCoverage": np.rint(100 * np.clip((.37 - endWarmth) / .34, 0, 1)).astype(int).tolist(),
+    }
+
     tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=5.4)
     columns = np.arange(image.shape[1])
     rows = np.arange(image.shape[0])[:, None]

@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 530176,
-      "sha256": "173c36562310855145a2b8ff053a80f45986ebbbcc986424434e1fab67359218"
+      "bytes": 529756,
+      "sha256": "8d6efc8ec9794d6cb81528f340ae321e9ec81fb9d3fbb4181a9dee3df34ea5c1"
     },
     {
       "channel": "Normal",
@@ -39,30 +39,30 @@
       "sha256": "e0bd13ce22a408b9cd9cdb280e44303b87f19e86db1e7de78eaae54b59759a4b"
     }
   ],
-  "totalBytes": 1004410,
+  "totalBytes": 1003990,
   "metrics": {
     "meanSrgb": [
-      0.4295,
-      0.42,
-      0.3925
+      0.4294,
+      0.4199,
+      0.3924
     ],
-    "luma": 0.414,
-    "lumaStd": 0.1006,
+    "luma": 0.4139,
+    "lumaStd": 0.1009,
     "sat": 0.0862,
     "clipLow": 0.0001,
     "clipHigh": 0.0,
-    "lowFreq": 0.1047,
-    "seam": 0.1134,
-    "interior": 0.0212,
-    "seamRatio": 5.348,
-    "border": 0.809,
-    "swing": 0.0997,
+    "lowFreq": 0.1055,
+    "seam": 0.1137,
+    "interior": 0.022,
+    "seamRatio": 5.158,
+    "border": 0.81,
+    "swing": 0.101,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "1669b4df6f11fe562b10363bc5939a3bdea5e45fa4bfce3e3721b67286e351e3",
+    "sha256": "7493c5e673cfe7de3ff0c63cc8375a2ba111b51e53facde6caa0b23c2d022c59",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "f659aeceee0a4b1c64b5a9f10ebb2626219a3c9391b5960ce8114da6ffd013fc"

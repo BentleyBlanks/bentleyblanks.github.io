@@ -577,6 +577,17 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.82 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
+    if name == "Sleeve":
+        patina = closeup["endPatina"]
+        darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
+        oxideChroma = ReferenceField(patina, xx, vv, "oxideChroma") / 100
+        exposedSteel = ReferenceField(patina, xx, vv, "exposedSteelCoverage") / 100
+        # The contact patch carries deeper oxide than the neighboring steel.
+        contact = np.exp(-((vv - .103) / .023) ** 2)
+        rimFade = np.clip((vv - .056) / .044, 0, 1)
+        base *= 1 - ((.39 + .235 * contact) * darkPatina)[..., None]
+        chroma = (.080 + .090 * contact) * oxideChroma * rimFade - .038 * exposedSteel
+        base += chroma[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Shoulder":
         # Shift hue with near-zero luma change in the photographed flank.
         base += shoulderTint[..., None] * LUMA_NEUTRAL_WARMTH
