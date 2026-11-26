@@ -21,7 +21,7 @@ EDGES = {
     'Exterior_SeatedTang05': (.38, 3, 34, 'all'),
     'Wood_UpperFittedCrown05': (.56, 3, 27, 'ends'),
     'Exterior_Guard02': (.35, 3, 33, 'all'),
-    'T38_407F_VisualSkin_Exterior_FrontBandLowerStep78': (.24, 3, 26, 'all'),
+    'T38_407F_VisualSkin_Exterior_FrontBandLowerStep78': (.38, 3, 26, 'all'),
     'T38_430B_ContinuousLowerFacing_VisualOnly': (.43, 3, 36, 'all'),
     'T38_430B_IndependentLeftCoverSkin': (.30, 3, 33, 'ends'),
     'T38_430B_RetainedRightCoverHalf': (.30, 3, 35, 'ends'),

@@ -64,13 +64,13 @@ try{
     const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;ctx.drawImage(orm,0,0);
     const coverage=ctx.getImageData(0,0,canvas.width,canvas.height).data;
     ctx.drawImage(mat.map.image,0,0);const base=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    let visible=0,varnished=0,redSum=0,greenSum=0;
+    let visible=0,varnished=0,redSum=0,greenSum=0,blueSum=0;
     const steelRoughness=[];
     for(let offset=0;offset<pixels.length;offset+=4*17){
      if(coverage[offset]>=230&&coverage[offset+2]>190)steelRoughness.push(coverage[offset+1]);
      if(coverage[offset]<230||coverage[offset+2]>50)continue;
      visible++;
-     redSum+=base[offset];greenSum+=base[offset+1];
+     redSum+=base[offset];greenSum+=base[offset+1];blueSum+=base[offset+2];
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
     steelRoughness.sort((first,second)=>first-second);
@@ -101,7 +101,7 @@ try{
       filmRoughness.push(rough.sort((one,two)=>one-two)[12]);
      }
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,sideValues,lacquerReflection,filmRoughness,
+    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
@@ -109,8 +109,11 @@ try{
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
-  assert(lower.meanGreen>upper.meanGreen*1.35&&lower.meanRed>upper.meanRed*1.12,'the stained crown and warmer lower wood must not collapse to the same brown');
-  assert(upper.meanRed>108&&upper.meanGreen>39,'the upper handguard must retain warm wood beneath the lacquer');
+  assert(lower.meanRed>upper.meanRed*1.17&&lower.meanGreen>upper.meanGreen*1.09,
+   'the darker upper lacquer must retain contrast with the amber lower wood');
+  assert(upper.meanRed>85&&upper.meanRed<125&&upper.meanGreen>upper.meanRed*.44&&upper.meanGreen<upper.meanRed*.63&&
+   upper.meanBlue>upper.meanRed*.22&&upper.meanBlue<upper.meanRed*.40,
+   'the upper handguard must remain a muted red-brown below the lacquer');
   assert(lower.sideValues.length===3&&lower.sideValues.every(([inside,below])=>below[0]-inside[0]>18&&below[1]-inside[1]>7),
    'recessed flank and adjacent amber wood must remain distinct on the authored map, without relying on a baked highlight');
   assert(lower.lacquerReflection.length===6&&lower.lacquerReflection.slice(0,3).every((value,index)=>value>lower.lacquerReflection[index+3]+75),
@@ -216,12 +219,21 @@ try{
     for(let offset=channel;offset<data.length;offset+=4)values.push(data[offset]);
     return values.sort((first,second)=>first-second)[24];
    };
-   return [[.1914,.15448],[.19243,.51833],[.19271,.83016]].map(([u,v])=>({
-    albedo:Sample(mat.map.image,u,v,0),metal:Sample(mat.roughnessMap.image,u,v,2)}));
+   const patches = [[.1914,.15448],[.19243,.51833],[.19271,.83016]].map(([u,v])=>({
+    albedo:Sample(mat.map.image,u,v,0),
+    roughness:Sample(mat.roughnessMap.image,u,v,1),
+    metal:Sample(mat.roughnessMap.image,u,v,2),
+   }));
+   const map=mat.normalMap;
+   return {patches,normalSpace:map?.colorSpace,normalStrength:mat.normalScale.x};
   });
-  const [bandEnd,midSteel,farSteel]=evidence.foreFinish;
-  assert(bandEnd.albedo>midSteel.albedo+45&&midSteel.albedo>farSteel.albedo+5&&bandEnd.metal>farSteel.metal+30,
-   'polished steel by the band must not whiten the entire outer length');
+  const {patches,normalSpace,normalStrength}=evidence.foreFinish;
+  const albedos=patches.map(patch=>patch.albedo);
+  assert(albedos.every(value=>value>55&&value<115)&&Math.max(...albedos)-Math.min(...albedos)<26,
+   'all three sections of the front steel must share one dark finish through the band junction');
+  assert(patches.every(patch=>patch.roughness>84&&patch.roughness<150&&patch.metal>215),
+   'the front finish must respond as satin steel along the exposed surface');
+  assert(normalSpace===''&&normalStrength>.25&&normalStrength<.65,'the front steel needs its fine non-color normal map');
   evidence.frameFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_FoldedFrame12')mat=mesh.material;});

@@ -78,6 +78,7 @@ def ReadSamples(cache):
                 staging.write(download)
             Path(staging.name).replace(pack)
     layers['steelMicro'] = FineScanBand(layers['Metal009Displacement'],2.0,7.6)
+    layers['tubeMicro'] = FineScanBand(layers['Metal009Displacement'],3.6,7.6)
     layers['steelPits'] = FineScanBand(layers['Metal046BColor'],.88,9.5)
     return layers
 
@@ -791,6 +792,7 @@ def Build(cache, output=None):
         butt = part == 'Exterior_ButtCap04'
         band = part == 'Exterior_MiddleBand57'
         frontBand = part == 'T38_407F_VisualSkin_Exterior_FrontBandBody78'
+        exposedTube = part == 'Exterior_LongRound44'
         trim = part == 'Exterior_FrontWindowBacking49'
         before = doc['accessors'][primitive['indices']]['count']//3
         if part in profiles:
@@ -838,6 +840,15 @@ def Build(cache, output=None):
             separate = part == 'Wood_UpperFittedCrown05'
             across = (.13 if separate else .73) + transverse * 1.10 + side * side * 16 + .0035 * np.sin(8.4 * length)
             down = (.10 if separate else .34) - along * 1.44
+            if separate:
+                # A longitudinal cut of the scan keeps the figure parallel to
+                # the crown. The barrel-shaped section must not bend the grain.
+                across = .21+.94*side+.28*up+4*side**2+.0014*np.sin(7.2*length)
+                down = .24-.91*length+.10*side
+            else:
+                foreGrain = 1-Ramp(-.565,-.476,length)
+                across += foreGrain*(.72+.86*side+.30*up+4*side**2-across)
+                down += foreGrain*(.33-.96*length+.15*side-down)
             # One plank per piece. Grain, pores and lacquer pickup share the
             # same scan offsets so the material channels stay registered.
             across += .024*np.exp(-((length+.045)/.164)**2)*np.clip((up-.002)*19,-.65,.9)
@@ -853,6 +864,8 @@ def Build(cache, output=None):
                 grainSteel = np.clip((glossScan-59)/42,-1,1)
                 edge = np.clip((bend-.11)*1.8,0,1)*np.clip(.46+.27*stain+.18*grainSteel,0,1)
             fibre = np.clip((rgbScan - 15) / 49, 0, 1.3)
+            if not separate:
+                fibre += .24*foreGrain*(.53-fibre)
             pore = np.clip((132 - poreScan) / 51, -.7, 1.15)
             handling = np.exp(-((length-.025) / .115) ** 2) + .65 * np.exp(-((length+.5) / .16) ** 2)
             handling *= np.clip(.56 + .27 * normalSide ** 2 + .23 * stain, 0, 1)
@@ -862,16 +875,16 @@ def Build(cache, output=None):
             vessels = PoreField(length,transverse+side*side*13)
             fleck = np.clip((pore-.12)*.73 + (.37-fibre)*.50 + .76*vessels,0,1)
             honey = Tint([110,50,15],[210,117,37],amber)
-            oldLacquer = Tint([38,12,6],[91,30,12],amber)
+            oldLacquer = Tint([49,23,14],[115,62,36],amber)
             rim = 1-Ramp(-.625,-.606,length)
-            color = Blend(oldLacquer,Tint([68,22,10],[129,49,21],amber),rim) if separate else Blend(
+            color = Blend(oldLacquer,Tint([64,31,18],[133,70,41],amber),rim) if separate else Blend(
                 Tint([62,22,9],[158,66,22],amber),honey,np.clip(.06+.94*sun+.12*warmWrist,0,1))
             if separate:
                 shoulder = Ramp(-.603,-.552,length)*(1-Ramp(-.394,-.352,length))
                 crown = Ramp(.10,.85,normalUp)
-                glaze = np.clip(.28+.65*crown+.12*rgbScan/64+.06*stain,0,1)*shoulder
-                lacquerGrain = np.clip(.33+.64*fibre+.12*stain,0,1.06)
-                color = Blend(color,Tint([108,33,10],[206,86,28],lacquerGrain),glaze)
+                glaze = np.clip(.27+.52*crown+.09*rgbScan/64+.06*stain,0,1)*shoulder
+                lacquerGrain = np.clip(.34+.52*fibre+.10*stain,0,1)
+                color = Blend(color,Tint([83,39,24],[157,78,44],lacquerGrain),glaze)
             else:
                 foreTip = 1-Ramp(-.91,-.69,length)
                 color = Blend(color,Tint([48,17,8],[116,49,19],amber),foreTip*.84)
@@ -944,16 +957,19 @@ def Build(cache, output=None):
                 varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1] + glaze*(8+glossVariation),34,139),0)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.10*glaze*fleck))
                 sheltered = Ramp(-.3775,-.3718,length)*(1-Ramp(-.3642,-.3624,length))*Ramp(.42,.80,normalUp)
-                color = Blend(color,Tint([38,13,7],[91,32,15],amber),sheltered*.71)
+                color = Blend(color,Tint([46,22,14],[93,47,28],amber),sheltered*.71)
                 grainTone = np.clip(.54*(fibre-.55)+.13*stain,-.32,.30)
                 color *= (1+sheltered*grainTone)[:,:,None]
                 warmPocket = sheltered*Ramp(-.3705,-.3655,length)
-                color = Blend(color,Tint([57,20,8],[115,44,17],amber),warmPocket*.36)
+                color = Blend(color,Tint([57,26,15],[111,57,34],amber),warmPocket*.36)
                 innerRim = sheltered*(1-Ramp(-.371,-.367,length))
-                color = Blend(color,Tint([61,26,11],[122,54,23],amber),innerRim*.64)
+                color = Blend(color,Tint([60,27,17],[121,63,36],amber),innerRim*.64)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.48*sheltered))
                 varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1]+28*sheltered,0,150),0)
                 rough += 17*sheltered
+                varnish[:,:,0] = np.rint(varnish[:,:,0]*np.clip(.82+.09*handling-.055*fleck,.74,.93))
+                varnish[:,:,1] = np.where(padded,np.clip(varnish[:,:,1]+12+8*fleck,31,166),0)
+                rough += 8+7*fleck
             if not separate:
                 mellow = rearPanel*np.clip(.72+.22*rearward-.24*warmPath,0,1)
                 varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.47*mellow))
@@ -997,7 +1013,7 @@ def Build(cache, output=None):
             foreWear *= np.clip(.82+.11*stain+.12*fleck,.48,1)
             if not separate:
                 foreWear *= 1-inlay
-            warmWood = Tint([68,36,18],[167,99,48],.42+.47*fibre+.09*stain)
+            warmWood = Tint([67,34,18],[156,87,45],.42+.47*fibre+.09*stain)
             color = Blend(color,warmWood,foreWear*(.29 if separate else .43))
             varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.29*foreWear))
             varnish[:,:,1] = np.rint(np.minimum(165,varnish[:,:,1]+23*foreWear))
@@ -1005,6 +1021,9 @@ def Build(cache, output=None):
             # A pore affects both the lacquer film and the wood directly below
             # it. Keep the pores, ridges and sheen registered in the same scan.
             timber = 1 if separate else 1-inlay
+            if not separate:
+                foreTone = (1-Ramp(-.525,-.464,length))*timber
+                color *= 1-foreTone[:,:,None]*np.array([.116,.145,.035],dtype='f')
             filmWear = np.clip(.43+.27*handling+.45*breach+.18*edge,0,1)
             ridges = fibres*timber
             openPores = Ramp(.20,.93,-fibres)*timber*filmWear
@@ -1018,11 +1037,10 @@ def Build(cache, output=None):
             Store(coat['clearcoatTexture'], varnish)
         else:
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
-            lightTube = part in ('Exterior_LongRound44','Exterior_FrontOuterTube76')
             collar = part == 'T38_435F2_IndependentTailNeckExterior'
             backing = part == 'T38_435F2_VisualBackingRearEnd'
             shoulder = part == 'T38_430L_VisibleUpperShoulderCoordination'
-            if bare or collar or lightTube:
+            if bare or collar:
                 dark, light = ([108,104,97],[163,159,149]) if band else ([148,143,134],[192,189,179])
                 if part.startswith('Exterior_Folded') or part.startswith('SightDetail'):
                     dark, light = [81,80,73],[146,144,131]
@@ -1044,24 +1062,19 @@ def Build(cache, output=None):
             brushScan = ScanStrips(grainU,grainV,axis=1 if band or collar else 0,seed=9083)
             brush = np.clip((brushScan.Read(source['Metal009Roughness'],119)-119)/24,-1.8,1.8)
             rough = (94 if bare or collar else 104) + 16*flow + 13*stain + 4*brush - 20*edge
-            if lightTube:
-                exposed = part == 'Exterior_LongRound44'
-                if exposed:
-                    polished = Ramp(-.900,-.646,length)
-                    color = Tint([46,47,47],[116,114,106],.30+.52*polished+.14*flow+.065*stain)
-                    rough = 79-24*polished+8*flow+5*stain+4*brush
-                    silver = Ramp(-.696,-.653,length)
-                    silver *= np.clip(.96+.12*flow+.035*grainSteel,.72,1)
-                    polishedSteel = Tint([133,132,127],[204,202,192],.48+.18*flow+.095*stain)
-                    color = Blend(color,polishedSteel,silver)
-                    distalOxide = 1-Ramp(-.850,-.780,length)
-                    reflectance = 1.056+.184*Ramp(-.750,-.692,length)+.235*distalOxide
-                    color = (color+14.025)*reflectance[:,:,None]**(1/2.4)-14.025
-                    rough += silver*(91+12*flow+5*stain+5*brush-rough)
-                else:
-                    color = Tint([58,57,54],[99,96,90],.46+.17*flow+.08*stain)
-                    rough = 86+7*flow+5*stain+4*brush
             metal = 251 - oxidation*(22 if bare else 41)
+            if exposedTube:
+                freshWear = Ramp(-.720,-.645,length)
+                rub = np.clip(.30+.24*flow+.17*stain+.16*freshWear,0,1)
+                contact = Ramp(-.677,-.645,length)*np.clip(.20+.26*flow+.27*edge,0,.59)
+                color = Tint([51,50,47],[137,132,122],.32+.47*rub+.083*grainSteel)
+                color = Blend(color,Tint([91,88,81],[135,130,120],.44+.16*brush),contact)
+                rough = 119+10*stain+9*brush-17*rub-19*contact
+                metal = 226+19*rub+9*contact-10*oxidation
+            if part == 'Exterior_FrontOuterTube76':
+                color = Tint([43,42,39],[104,101,94],.45+.17*flow+.08*stain)
+                rough = 102+9*flow+7*stain+5*brush
+                metal -= 15
             if collar or backing or disk:
                 # The adjoining rear steel pieces share the same oxide and wear tones.
                 # Fine directional marks break up the highlight across each surface.
@@ -1092,8 +1105,6 @@ def Build(cache, output=None):
                 color = Blend(color,Tint([74,71,67],[139,133,122],.40+.15*flow),burnish)
                 rough += 6-29*burnish
                 metal -= 12-10*burnish
-            if part == 'Exterior_LongRound44':
-                metal -= (1-silver)*(108+15*oxidation+12*distalOxide)
             if trim:
                 color = Tint([39,37,33],[90,83,73],.42+.26*flow+.09*stain)
                 color = Blend(color,np.array([132,124,109],dtype='f'),.35*edge)
@@ -1126,9 +1137,9 @@ def Build(cache, output=None):
                         metal = 217+29*rub-8*tarnish
                 elif band:
                     rub = np.clip(.60+.22*stain+.14*grainSteel+.16*edge,0,1)
-                    color = Tint([99,95,86],[174,169,156],.32+.51*rub+.073*grain)
-                    rough = 110-30*rub+26*brush+9*tarnish+4*flow
-                    metal = 231+18*rub-5*tarnish
+                    color = Tint([76,73,67],[147,142,131],.30+.48*rub+.068*grain)
+                    rough = 123-29*rub+23*brush+9*tarnish+4*flow
+                    metal = 224+18*rub-5*tarnish
                 else:
                     knob = Ramp(.044,.054,side)
                     chartV = (np.arange(height,dtype='f')+.5)/height
@@ -1145,6 +1156,12 @@ def Build(cache, output=None):
                 relief = .18*scoring+.064*tarnish-.25*pits
                 if handle:
                     relief -= .085*pits*knob
+            if band or frontBand:
+                rimTurn = Ramp(.17,.63,np.abs(normalLength))*(1-Ramp(.84,.99,np.abs(normalLength)))
+                burnish = rimTurn*np.clip(.43+.26*stain+.11*grainSteel,.12,.78)
+                color = Blend(color,Tint([103,99,91],[151,147,136],.33+.22*flow),burnish*.53)
+                rough -= 31*burnish
+                metal += 11*burnish
             if loop:
                 lowerArc = 1-Ramp(.0022,.0062,up)
                 wear = np.clip(lowerArc*(.82+.19*stain+.14*grainSteel)+.19*edge,0,1)
@@ -1206,18 +1223,33 @@ def Build(cache, output=None):
                 rough += 28*groove-8*border
                 relief += -2.8*groove+.64*border
             if not part.startswith('SightDetail') and part != 'Exterior_FoldedFrame12':
-                fine = ScanStrips(grainU*2+.13,grainV*2+.32,axis=1 if band or collar else 0,seed=9191)
-                lines = np.clip((fine.Read(source['steelMicro'],128)-128)/37,-1.25,1.25)
+                fine = ScanStrips(acrossSteel*2+.13,length*5.15+.32,axis=1,seed=9191) if exposedTube else ScanStrips(
+                    grainU*2+.13,grainV*2+.32,axis=1 if band or collar else 0,seed=9191)
+                lines = np.clip((fine.Read(source['tubeMicro' if exposedTube else 'steelMicro'],128)-128)/37,-1.25,1.25)
                 dents = Ramp(.33,1.03,(128-fine.Read(source['steelPits'],128))/34)
                 detail = .42 if handle else .82 if collar or backing else 1
+                if exposedTube:
+                    detail *= .58
                 if disk:
                     detail = .42*(1-face)
                 color *= (1+detail*(.037*lines-.062*dents))[:,:,None]
                 rough += detail*(8*lines+21*dents-6*edge*np.maximum(lines,0))
                 relief += detail*(.17*lines-.24*dents)
+        if exposedTube:
+            name = 'Texture_Type38ForeSteelNormal'
+            normalSlot = dict(index=len(doc['textures']),scale=.43)
+            doc['textures'].append(dict(source=len(doc['images']),sampler=doc['textures'][baseSlot['index']]['sampler']))
+            doc['images'].append(dict(name=name,mimeType='image/png',bufferView=len(views)))
+            doc['bufferViews'].append(dict(buffer=0,byteLength=0))
+            views.append(b'')
+            material['normalTexture'] = normalSlot
         if 'normalTexture' in material:
             normalSlot = material['normalTexture']
-            normals = Load(normalSlot).astype('f') / 127.5 - 1
+            if exposedTube:
+                normals = np.zeros((height,width,3),dtype='f')
+                normals[:,:,2] = 1
+            else:
+                normals = Load(normalSlot).astype('f') / 127.5 - 1
             if not wood and part != 'Exterior_FoldedFrame12':
                 normals[:, :, :2] *= .30 if not disk else .08
             if wood or handle or part == 'T38_430L_VisibleUpperShoulderCoordination':
@@ -1247,7 +1279,7 @@ def Build(cache, output=None):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_SurfaceDetail21'
+    doc['asset']['extras']['version'] = 'Type38_ForeFinish22'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1255,13 +1287,14 @@ def Build(cache, output=None):
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=23, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=24, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
-    for record, image in zip(manifest['imagePayloads'], doc['images'], strict=True):
+    manifest['imagePayloads'] = []
+    for index,image in enumerate(doc['images']):
         chunk = views[image['bufferView']]
-        record.update(bytes=len(chunk), sha256=hashlib.sha256(chunk).hexdigest())
+        manifest['imagePayloads'].append(dict(index=index,name=image['name'],bytes=len(chunk),sha256=hashlib.sha256(chunk).hexdigest()))
     for name, record in [('Data_Type38_511.json', manifest), ('Data_Type38NpcLod.json', {**json.loads(Original('Data_Type38NpcLod.json')), 'sourceSha256':digest, 'fpsTriangles':triangles, 'npcTriangles':triangles-4608})]:
         (folder/name).write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     print('Finished:', digest, flush=True)

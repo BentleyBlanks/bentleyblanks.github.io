@@ -19,7 +19,7 @@ assert.equal(createHash('sha256').update(bytes).digest('hex'),D.sourceSha256);
 assert.equal(contract.runtimeSha256,D.sourceSha256);
 assert.equal(contract.approvedReductionTriangles,69454);assert.equal(contract.triangles,D.triangles);
 assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
-assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,116);
+assert.equal(doc.meshes.length,45);assert.equal(doc.images.length,117);
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part).mesh].primitives[0]);
 const atlasMaterial=doc.materials[insetPrimitives[0].material].pbrMetallicRoughness;
@@ -136,7 +136,7 @@ rimRay.layers.enableAll();
 for(const band of [middleBand,FindPart('T38_407F_VisualSkin_Exterior_FrontBandBody78')]){
   band.geometry.computeBoundingBox();
   const box=band.geometry.boundingBox,mid=box.getCenter(new THREE.Vector3());
-  const normals=[.002,.014,.026,.038,.050,.065].map(phase=>{
+  const normals=[.002,.017,.032,.047,.062,.082].map(phase=>{
     rimRay.ray.origin.set(box.max.x+.03,mid.y,box.min.z+phase*(box.max.z-box.min.z));
     return -rimRay.intersectObject(band)[0]?.normal?.normalize().z;
   });
@@ -239,4 +239,4 @@ for(const part of [...D.wood,'T38_430B_IndependentLeftCoverSkin','Exterior_Middl
 }
 for(const range of Object.values(contract.finishRoughnessP10P50P90))assert(range[2]>range[0] && range.every(Number.isFinite));
 for(const built of [fps,world,npc])for(const mesh of built.meshes)mesh.geometry.dispose();
-console.log(`ok Type38 511: ${D.triangles} triangles, 45 parts, 116 verified PBR images, continuous heel and crown shading`);
+console.log(`ok Type38 511: ${D.triangles} triangles, 45 parts, ${doc.images.length} verified PBR images, continuous heel and crown shading`);
