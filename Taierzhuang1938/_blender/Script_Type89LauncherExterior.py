@@ -230,7 +230,7 @@ def BuildExterior():
                    7: "Barrel", 8: "Barrel", 9: "Edge", 12: "Recess", 13: "CollarRing", 14: "CollarRing",
                    15: "CollarRing", 16: "CollarRing"}, paintBand=7, localChart="CollarRing")
     Revolve(collection, "CollarShoulder", [(.398, .044), (.412, .044), (.425, .0355),
-        (.441, .030), (.451, .0257), (.454, .024)], sides=40, tile="Collar")
+        (.441, .030), (.451, .0257), (.454, .024)], sides=40, tile="Shoulder")
     Stem(collection)
 
     Revolve(collection, "ScallopedThumbWheel", [(.416, .023), (.419, .024), (.429, .024), (.431, .022)],

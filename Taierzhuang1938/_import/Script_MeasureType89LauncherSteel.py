@@ -575,6 +575,74 @@ def KnurlFlankWear(folder):
             "shadowChroma": np.round(shadowChroma, 5).tolist(), "uvFrequencies": np.round(frequencies, 5).tolist()}
 
 
+def ShoulderPhotoGrid(uRange, vRange, viewCenter, rails, width, height):
+    # The two photo rails follow the projected arc. Their horizontal
+    # positions are calibrated at the collar seam and the shoulder edge.
+    u, v = np.meshgrid(np.linspace(*uRange, width), np.linspace(*vRange, height))
+    samples, x, first, last = np.asarray(rails, dtype=float).T
+    low, high = np.sin(2 * np.pi * (np.asarray(uRange) - viewCenter))
+    angle = (np.sin(2 * np.pi * (u - viewCenter)) - low) / (high - low)
+    y = (1 - angle) * np.interp(v, samples, first) + angle * np.interp(v, samples, last)
+    return np.interp(v, samples, x), y
+
+
+def ShoulderFinish(folder):
+    # Each row is a shoulder V coordinate and the photograph's x, upper y
+    # and lower y for the selected angular window.
+    views = {
+        "Direct": (3, (.805, .859), (.48249027237354086, .8664682993820096), .998, 104, [
+            [.48249, 308.06956, 38.40369, 64.61473], [.53109, 322.13987, 49.36836, 74.93868],
+            [.57931, 336.09973, 58.14894, 83.13699], [.62753, 350.0596, 65.88087, 90.28486],
+            [.67576, 364.02388, 70.53136, 94.25883], [.72398, 377.98374, 76.60274, 99.35858],
+            [.77247, 392.02312, 80.4039, 102.34945], [.81669, 404.82555, 82.49834, 103.75066],
+            [.86647, 419.23602, 84.6097, 105.24531],
+        ]),
+        "Flank": (4, (.524, .778), (.3431906614785992, .43404287785152973), .645, 246, [
+            [.34319, 87.96217, 356.49705, 535.42175], [.35531, 88.7496, 356.68103, 535.41247],
+            [.36742, 89.53703, 356.86836, 535.40346], [.37954, 90.32446, 357.17862, 536.22417],
+            [.39165, 91.11188, 356.50108, 536.05457], [.40375, 91.89832, 355.80537, 535.87569],
+            [.40981, 92.29204, 356.45206, 536.37513], [.42193, 93.07946, 355.7389, 536.19099],
+            [.43404, 93.86689, 356.84941, 536.33033],
+        ]),
+    }
+    fields = {}
+    for name, (photo, uRange, vRange, viewCenter, width, rails) in views.items():
+        image, source = Photo(folder, photo)
+        source.update({"photoRails": rails, "viewCenter": viewCenter})
+        u0, u1 = uRange
+        footprint = {"uCenter": round((u0 + u1) / 2, 6), "uHalfSpan": round((u1 - u0) / 2, 6),
+                     "vRange": vRange}
+        x, y = ShoulderPhotoGrid(uRange, vRange, viewCenter, rails, 17, 21)
+        samples = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(image, -1, 0)], axis=-1)
+        samples = samples.transpose(1, 0, 2)
+        field = FinishMap(samples, source, footprint)
+        if name == "Flank":
+            patina = PatinaMap(samples)
+            field["oxideCoverage"] = patina["oxideCoverage"]
+            field["neutralWarmth"] = patina["neutralWarmth"]
+            luma = samples @ LUMA
+            chroma = (samples[..., 0] - samples[..., 2]) / np.maximum(luma, 25)
+            relative = np.asarray(field["relativeLuminance"], dtype=float)
+            clean = np.clip((patina["neutralWarmth"] + .065 - chroma) / .13, 0, 1)
+            # Use scratches and cool local highlights. The broad strip
+            # reflection is removed by FinishMap.
+            wear = np.clip((relative - 2) / 20, 0, 1) * clean
+            field["exposedSteelCoverage"] = np.rint(100 * wear).astype(int).tolist()
+        x, y = ShoulderPhotoGrid(uRange, vRange, viewCenter, rails, width, 108)
+        if name == "Flank":
+            # Keep the blur in PhotoResiduals inside the visible strip so
+            # the adjoining dark stem cannot contribute to the grain.
+            detailBounds = [85, 346, 96, 548]
+            left, top, right, bottom = detailBounds
+            source["detailBounds"] = detailBounds
+            image = image[top:bottom, left:right]
+            x, y = x - left, y - top
+        detailPath = RECORD.with_name(f"Texture_Type89LauncherShoulder{name}.png")
+        field["detail"] = WriteDetailPlate(image, x, y, detailPath)
+        fields[name] = field
+    return fields
+
+
 def Main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("--photos", type=Path, required=True, help="Local ReferencePhotos directory")
@@ -589,6 +657,7 @@ def Main():
     record["wheelFinish"] = WheelFinish(args.photos)
     record["knurl"] = KnurlFrequency(args.photos)
     record["knurl"]["flankWear"] = KnurlFlankWear(args.photos)
+    record["shoulder"] = ShoulderFinish(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
     encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",
                      lambda match: "[" + ", ".join(x.strip() for x in match[1].split(",")) + "]", encoded)

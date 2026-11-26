@@ -24,6 +24,7 @@ FINISHES = {
     "Barrel": (0, (184, 178, 162), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
     "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
+    "Shoulder": (0, (168, 160, 151), (64, 53, 45), .58, (.41, .69), (.89, .43), .60),
     "Knurl": (3, (145, 140, 135), (86, 79, 74), .49, (.392, .622), (.947, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
@@ -277,6 +278,21 @@ def BakeRegion(name, sample, size, index, reference):
         oxidation += .056 * medium + .072 * cloud + np.clip(.16 * photoWarmth, -.034, .044)
         tonalDelta += 7.2 * apiPits + 204 * photoPits - 2.9 * medium
         warmth += .34 * photoWarmth
+    if name == "Shoulder":
+        oxidation += .041 * medium + .068 * cloud
+        tonalDelta -= 2.4 * medium
+        shoulderFields = reference["shoulder"]
+        front = shoulderFields["Direct"]
+        flank = shoulderFields["Flank"]
+        frontTone, frontWarmth, frontCoverage = PhotographicGrain(front, xx, vv)
+        flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
+        shoulderFine = frontTone * frontCoverage + flankTone * flankCoverage
+        shoulderWarmth = frontWarmth * frontCoverage + flankWarmth * flankCoverage
+        tonalDelta += 122 * shoulderFine
+        warmth += .43 * shoulderWarmth
+        for field in shoulderFields.values():
+            tonalDelta += .40 * ReferenceField(field, xx, vv, "relativeLuminance")
+            warmth += ReferenceField(field, xx, vv, "relativeWarmth") / 260
     if name == "Sleeve":
         # The thin brown residue at the stem-side shoulder is visible on the
         # overall and side close-ups of the same object.
@@ -461,6 +477,28 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (crestColor - linear) * exposed[..., None]
         rough += (.322 - rough) * exposed
         metal += (.94 - metal) * exposed
+    if name == "Shoulder":
+        # The front arc retains a dark satin film. Its flank has oxidized
+        # patches and narrow rubbed edges that still reflect like steel.
+        frontZone = {"footprint": front["footprint"], "inside": [[1., 1.], [1., 1.]]}
+        face = .93 * ReferenceField(frontZone, xx, vv, "inside")
+        slate = SrgbToLinear(np.array([81, 74, 67], dtype=np.float32) / 255)
+        linear += (slate - linear) * face[..., None]
+        rough += (.575 - rough) * face
+        metal += (.59 - metal) * face
+        oxide = GaussianPeriodic(.74 * ReferenceField(flank, xx, vv, "oxideCoverage") / 100, 2.5)
+        warmOxide = SrgbToLinear(np.array([75, 57, 44], dtype=np.float32) / 255)
+        linear += (warmOxide - linear) * oxide[..., None]
+        rough += (.695 - rough) * oxide
+        metal += (.43 - metal) * oxide
+        bright = GaussianPeriodic(.66 * ReferenceField(flank, xx, vv, "exposedSteelCoverage") / 100, 2.2) * (1 - oxide)
+        exposed = SrgbToLinear(np.array([170, 157, 143], dtype=np.float32) / 255)
+        linear += (exposed - linear) * bright[..., None]
+        rough += (.36 - rough) * bright
+        metal += (.88 - metal) * bright
+        heightField = strength * (.14 * detail + .06 * medium - .16 * pits) + .40 * shoulderFine
+        flankZone = {"footprint": flank["footprint"], "inside": [[1., 1.], [1., 1.]]}
+        shoulderTint = .123 * GaussianPeriodic(ReferenceField(flankZone, xx, vv, "inside"), 4.5) * (1 - .58 * bright)
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
         weight = ReferenceField(closeup, xx, sampledV, channel) * influence / 100
@@ -489,6 +527,9 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.82 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
+    if name == "Shoulder":
+        # Shift hue with near-zero luma change in the photographed flank.
+        base += shoulderTint[..., None] * np.array([.48, -.101, -.414])
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     if name == "Knurl":
         ao *= 1 - .31 * grooves
@@ -496,7 +537,7 @@ def BakeRegion(name, sample, size, index, reference):
         ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
-    if name in ("Barrel", "Collar", "CollarRing", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
+    if name in ("Barrel", "Collar", "CollarRing", "Shoulder", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
         seamWidth = 6 if name in ("Knurl", "RearEye", "Wheel") else 24
         base = SeamBlend(base, pixels=seamWidth)
         heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
@@ -564,10 +605,12 @@ def BuildAtlas(reference):
         if name == "Stripe":
             continue
         if name == "Collar":
-            # Retain the earlier finish on the small components that share
-            # this chart. The outer ring now has its own measured surface.
-            previous = height + ATLAS["regions"]["CollarRing"][3]
-            tile = ResizeSharedCollar(BakeRegion(name, quadrants, (width, previous), index, reference), width, height)
+            # Resample the legacy finish into the smaller shared chart.
+            legacyHeight = height + ATLAS["regions"]["Shoulder"][3]
+            sourceHeight = legacyHeight + ATLAS["regions"]["CollarRing"][3]
+            legacy = ResizeSharedCollar(BakeRegion(name, quadrants, (width, sourceHeight), index, reference),
+                                        width, legacyHeight)
+            tile = ResizeSharedCollar(legacy, width, height)
         elif name == "Knurl":
             tile = BakeKnurl(quadrants, width, height, index, reference)
         else:
@@ -597,7 +640,9 @@ def Bake():
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "collarDetail": reference["closeups"]["CollarRing"]["detail"],
                "knurlWear": reference["knurl"]["wear"]["detail"],
-               "knurlFlank": reference["knurl"]["flankWear"]["detail"]}
+               "knurlFlank": reference["knurl"]["flankWear"]["detail"],
+               "shoulderDirect": reference["shoulder"]["Direct"]["detail"],
+               "shoulderFlank": reference["shoulder"]["Flank"]["detail"]}
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
