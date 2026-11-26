@@ -260,7 +260,7 @@ def BakeRegion(name, sample, size, index, reference):
         photoPits *= photoCoverage
         photoWarmth *= photoCoverage
         oxidation += .061 * medium + .079 * cloud + np.clip(.19 * photoWarmth, -.037, .054)
-        tonalDelta += 8.7 * apiPits + 174 * photoPits - 2.85 * medium
+        tonalDelta += 8.7 * apiPits + 141 * photoPits - 2.85 * medium
         warmth += .41 * photoWarmth
         evidence = ReferenceField(reference, xx, vv, "relativeLuminance")
         heat = ReferenceField(reference, xx, vv, "relativeWarmth")
@@ -513,6 +513,13 @@ def BakeRegion(name, sample, size, index, reference):
         rough += near * (.115 + .20 * exposedSteel) * (1 - .62 * oxideCoverage)
         metal -= near * (.40 + .54 * oxideCoverage) * np.maximum(metal - (.55 - .19 * oxideCoverage), 0)
         linear *= (1 - .19 * near * exposedSteel)[..., None]
+        # The dark oxidation in the close-up scatters light diffusely. Use its
+        # measured coverage to recover shadow detail around the rubbed steel.
+        matteOxide = .92 * near * oxideCoverage * (1 - .85 * exposedSteel)
+        rough += (.725 - rough) * matteOxide + .030 * near * exposedSteel
+        metal += (.18 - metal) * matteOxide
+        deepCloseOxide = np.clip((oxideCoverage - .28) / .65, 0, 1)
+        linear *= (1 + .09 * matteOxide * deepCloseOxide)[..., None]
     if name == "CollarRing":
         oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
         exposed = .56 * ReferenceField(closeup, xx, vv, "exposedSteelCoverage") / 100
@@ -598,6 +605,9 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.82 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
+    if name == "Barrel":
+        coolPatina = .029 * near * (.40 + .60 * oxideCoverage)
+        base -= coolPatina[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
