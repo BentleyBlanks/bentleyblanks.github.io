@@ -135,8 +135,8 @@ export function BuildEncounterMap(scene, options = {}) {
   for (const place of [front.L0105_PLACES.pit, front.L0105_PLACES.dugout, front.L0105_PLACES.platoonShelter]) {
     floors.push(Rectangle(place.name, { minX: place.x - place.w / 2, maxX: place.x + place.w / 2, minZ: place.z - place.d / 2, maxZ: place.z + place.d / 2 }, true));
   }
-  for (const [id, x, z, w, h, d, material] of scene.surface ? [] : FLOW_GROUND.cover) objects.push({
-    id: `Encounter_${id}`, pos: [x, 0, z], size: [w, h, d], material: `Whitebox/${material}`, group: "遭遇设计/地面工事", planning: true,
+  for (const [id, x, z, w, h, d, material, yawDeg] of scene.surface ? [] : FLOW_GROUND.cover) objects.push({
+    id: `Encounter_${id}`, pos: [x, 0, z], size: [w, h, d], ...(yawDeg ? { yawDeg } : {}), material: `Whitebox/${material}`, group: "遭遇设计/地面工事", planning: true,
   });
   const labels = (scene.markers || []).filter((marker) => marker.z < mapMaxZ)
     .map((marker) => ({ ...marker, p: [marker.x, marker.z] }));

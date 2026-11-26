@@ -780,16 +780,18 @@ export class EncounterPlay {
         ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
         :route[entry.routeIndex];
       const arrived=Math.hypot(soldier.position.x-endTarget[0],soldier.position.z-endTarget[1])<cfg.routeReachM;
+      const holdWaypoint=group?.holdUntil?(group.holdUntil.waypoint??1):null;
+      const held=campHeld&&holdWaypoint!==null&&entry.routeIndex>=holdWaypoint;
       if(arrived&&entry.waitedIndex!==entry.routeIndex){
         entry.waitedIndex=entry.routeIndex;
         const boundWait=group?.behavior==="bounds"&&entry.routeIndex>0&&entry.routeIndex<route.length-1?(group.coverWaitSeconds??6.5):0;
         entry.waitUntil=Math.max(entry.waitUntil,this.plan.elapsed+(entry.routeWaits[entry.routeIndex]||boundWait));
       }
-      if(arrived&&(!campHeld||entry.routeIndex<1)&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm||closeEnemyAlert)&&entry.routeIndex<route.length-1)entry.routeIndex++;
+      if(arrived&&!held&&(this.plan.elapsed>=entry.waitUntil||this.stealth?.state?.alarm||closeEnemyAlert)&&entry.routeIndex<route.length-1)entry.routeIndex++;
       target=entry.routeIndex===route.length-1&&entry.holdOffset
         ?[route[entry.routeIndex][0]+entry.holdOffset[0],route[entry.routeIndex][1]+entry.holdOffset[1]]
         :route[entry.routeIndex];
-      if((campHeld&&entry.routeIndex>=1&&arrived)||(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm&&!closeEnemyAlert))target=[soldier.position.x,soldier.position.z];
+      if((held&&arrived)||(this.plan.elapsed<entry.waitUntil&&!this.stealth?.state?.alarm&&!closeEnemyAlert))target=[soldier.position.x,soldier.position.z];
     }
     if(!escortTethered) moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>reachM;
     if(group?.suppressedBy?.some(id=>[...this.entries.values()].some(e=>e.actor.groupId===id&&e.soldier.alive&&e.soldier.targetVisible))) {

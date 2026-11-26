@@ -714,3 +714,95 @@ export const FLOW_PREVIOUS_INFANTRY_TANK = {
     },
   ],
 };
+
+// Camp flank scattered roadside boxes before the 2026-11-27 concealed-origin
+// tactical revision, used only to upgrade untouched draft fields.
+export const FLOW_PREVIOUS_CAMP_SCATTER = {
+  revision:"2026-11-17-beishahe-story-1",
+  groups:[
+    {
+      id:"GroundWest",
+      area:{"shape":"rect","center":[96,108],"size":[10,22]},
+      route:[[96,108],[95,156],[95,192],[96,218],[95,251]],
+      spawnOffsets:[[-4.5,-0.5],[-3.3,-3.5],[-4.5,-5.5],[-3.3,-10]],
+      holdUntil:{"beat":"05a","fraction":0.8},
+      interval:4,
+      speed:2.8,
+      note:"关卡调度布设",
+      memberPlans:[
+        {"delay":0,"route":[[104.4,116.7],[106.4,117.4],[92.1,154.5],[92.1,190.5],[92.3,216.5],[92.3,231],[92.1,249.5]]},
+        {"delay":0.8,"route":[[92.8,118.6],[95.3,119],[89.6,157.5],[89.6,193.5],[89.8,219.5],[90.6,234],[89.6,252.5]]},
+        {"delay":0,"route":[[100.4,105],[103,105.6],[91.9,150.5],[91.9,186.5],[92.1,212.5],[92.1,226],[97,241]]},
+        {"delay":0.8,"route":[[96.6,111.6],[98.8,112.8],[90.5,146],[90.5,178],[90.5,208],[90.5,227],[90.5,245.5]]},
+      ],
+    },
+    {
+      id:"GroundEast",
+      area:{"shape":"rect","center":[125,109],"size":[10,22]},
+      route:[[125,109],[123,160],[118,189],[118,222],[118,253]],
+      spawnOffsets:[[4.5,-0.5],[3.3,-3.5],[4.5,-7],[3.3,-10]],
+      holdUntil:{"beat":"05a","fraction":0.8},
+      interval:5,
+      speed:2.6,
+      note:"关卡调度布设",
+      memberPlans:[
+        {"delay":0.5,"route":[[131.4,114],[133.6,114.3],[127.7,159.5],[127.7,175.5],[122.7,188.5],[122.7,221.5],[122.7,252.5]]},
+        {"delay":1.3,"route":[[121.4,115.6],[123.8,115.9],[126.1,156.5],[126.1,172.5],[121.3,185.5],[121.3,218.5],[121.3,249.5]]},
+        {"delay":0.5,"route":[[135.2,109.6],[138.6,110],[128.5,153],[128.5,169],[123.4,182],[123.4,215],[123.4,246]]},
+        {"delay":1.3,"route":[[125.4,103],[128,103.6],[126.9,150],[126.9,166],[122,179],[122,212],[122,243]]},
+      ],
+    },
+  ],
+  triggers:[
+    {"id":"Trigger_GroundWest","beat":"03h","mode":"time","delay":0},
+    {"id":"Trigger_GroundEast","beat":"03h","mode":"time","delay":0},
+  ],
+};
+
+// Previous 2026-11-27-infantry-tank-tactics-1 GroundWest/GroundEast defaults before
+// the concealed-origin & natural-cover revision, used to upgrade untouched drafts cleanly.
+export const FLOW_PREVIOUS_CAMP_COMBINED = {
+  revision:"2026-11-27-infantry-tank-tactics-1",
+  groups:[
+    {
+      id:"GroundWest",
+      area:{"shape":"rect","center":[96,108],"size":[10,22]},
+      route:[[96,108],[95,156],[95,192],[96,218],[95,251]],
+      spawnOffsets:[[-4.5,-0.5],[-3.3,-3.5],[-4.5,-5.5],[-3.3,-10]],
+      holdUntil:{"beat":"05a","fraction":0.8},
+      interval:4,
+      speed:2.8,
+      weapon:"machineGun",
+      fireCycle:{"seconds":8,"active":5,"offset":0},
+      note:"西翼先导步兵（含十一年式轻机枪基准火力），05A 后段先于战车沿西侧掩体两两交互跃进，清扫凹路西沿",
+      memberPlans:[
+        {"delay":0,"route":[[104.4,116.7],[106.4,117.4],[92.0,156.4],[92.0,192.0],[92.2,217.6],[92.2,231.0],[92.0,250.8]]},
+        {"delay":0.8,"route":[[92.8,118.6],[95.3,119],[89.6,157.4],[89.6,193.0],[89.8,219.0],[90.6,234.0],[89.8,252.2]]},
+        {"delay":0,"route":[[100.4,105],[103,105.6],[91.8,151.8],[91.8,187.4],[92.1,213.2],[92.0,226.0],[96.8,243.5]]},
+        {"delay":0.8,"route":[[96.6,111.6],[98.8,112.8],[89.8,147.0],[89.8,181.0],[90.0,210.0],[90.5,227.0],[90.5,245.5]]},
+      ],
+    },
+    {
+      id:"GroundEast",
+      area:{"shape":"rect","center":[125,109],"size":[10,22]},
+      route:[[125,109],[123,160],[118,189],[118,222],[118,253]],
+      spawnOffsets:[[4.5,-0.5],[3.3,-3.5],[4.5,-7],[3.3,-10]],
+      holdUntil:{"beat":"05a","fraction":0.8},
+      interval:5,
+      speed:2.6,
+      weapon:"machineGun",
+      fireCycle:{"seconds":8,"active":5,"offset":1.5},
+      note:"东翼先导步兵（含十一年式轻机枪基准火力），05A 后段先于战车沿东侧土埂残墙交互跃进，交叉压制凹路",
+      memberPlans:[
+        {"delay":0.5,"route":[[131.4,114],[133.6,114.3],[119.6,160.0],[119.4,168.0],[114.8,189.6],[114.8,222.6],[116.5,252.6]]},
+        {"delay":1.3,"route":[[121.4,115.6],[123.8,115.9],[126.4,160.0],[126.4,168.0],[121.2,189.6],[121.2,222.6],[119.8,252.6]]},
+        {"delay":0.5,"route":[[135.2,109.6],[138.6,110],[119.6,155.5],[119.4,165.0],[114.8,185.2],[114.8,218.2],[116.2,248.5]]},
+        {"delay":1.3,"route":[[125.4,103],[128,103.6],[126.4,155.5],[126.4,165.0],[121.2,185.2],[121.2,218.2],[119.8,248.5]]},
+      ],
+    },
+  ],
+  triggers:[
+    {"id":"Trigger_GroundWest","beat":"03h","mode":"time","delay":0},
+    {"id":"Trigger_GroundEast","beat":"03h","mode":"time","delay":0},
+  ],
+};

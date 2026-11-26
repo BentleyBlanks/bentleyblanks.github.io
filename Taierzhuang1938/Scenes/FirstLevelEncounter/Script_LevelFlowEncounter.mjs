@@ -1,7 +1,7 @@
 import { FLOW_ZOOM } from "../../Data_Tuning_LevelFlow.mjs";
 import { FLOW_GROUND, FLOW_GROUND_FORMATIONS, FLOW_FRIEND_REINFORCEMENTS, FLOW_PREVIOUS_ENCOUNTER, FLOW_PREVIOUS_DRAG_ENCOUNTER, FLOW_PREVIOUS_BATCH_ENCOUNTER, FLOW_PREVIOUS_FLANK, FLOW_PREVIOUS_CORNER, FLOW_PREVIOUS_PURSUIT } from "./Data_LevelFlow.mjs";
 import { Clamp, Distance, EnterArea, InsideArea, Lerp, SampleRoute, SegmentDistance } from "./Script_LevelFlowGeometry.mjs";
-import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED, FLOW_PREVIOUS_INFANTRY_TANK } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_APPROACH, FLOW_PREVIOUS_CAMP_COVER, FLOW_PREVIOUS_CAMP_ALIGNED, FLOW_PREVIOUS_INFANTRY_TANK, FLOW_PREVIOUS_CAMP_SCATTER, FLOW_PREVIOUS_CAMP_COMBINED } from "./Data_LevelFlowAmbushBaseline.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
@@ -14,7 +14,7 @@ export const ENCOUNTER_CINEMATICS = ["01a","01b","01c","01e","02a","02b","02c","
 const Area = (center, width = 5, depth = width) => ({ shape: "rect", center: [...center], size: [width, depth] });
 
 export function CreateEncounterDocument(timeline, waves, options = {}) {
-  const { id: docId = "FirstLevelEncounter", revision = "2026-11-27-infantry-tank-tactics-1" } = options;
+  const { id: docId = "FirstLevelEncounter", revision = "2026-11-27-camp-tactics-1" } = options;
   const Find = (id) => timeline.find((beat) => beat.id === id);
   const triggers = timeline.filter((beat) => beat.zone).map((beat) => ({
     id: `Arrival_${beat.id}`, label: beat.title, beat: beat.id, endBeat: beat.id,
@@ -102,17 +102,26 @@ export function CreateEncounterDocument(timeline, waves, options = {}) {
   for(const formation of FLOW_GROUND_FORMATIONS) {
     const group=groups.find(item=>item.id===formation.id);
     if(formation.areaCenter) group.area.center=[...formation.areaCenter];
+    if(formation.center) group.area.center=[...formation.center];
     group.area.size=[...formation.areaSize];
-    group.spawnOffsets=structuredClone(formation.offsets);
-    if(formation.holdUntil) group.holdUntil=structuredClone(formation.holdUntil);
+    if(formation.route) group.route=structuredClone(formation.route);
+    if(formation.areaCenter && group.route.length) group.route[0]=[...formation.areaCenter];
     if(formation.behavior) group.behavior=formation.behavior;
+    if(formation.interval!==undefined) group.interval=formation.interval;
+    if(formation.speed!==undefined) group.speed=formation.speed;
+    if(formation.coverWaitSeconds!==undefined) group.coverWaitSeconds=formation.coverWaitSeconds;
     if(formation.weapon) group.weapon=formation.weapon;
     if(formation.engageOn) group.engageOn=formation.engageOn;
     if(formation.fireCycle) group.fireCycle=structuredClone(formation.fireCycle);
-    if(formation.interval!==undefined) group.interval=formation.interval;
-    if(formation.coverWaitSeconds!==undefined) group.coverWaitSeconds=formation.coverWaitSeconds;
-    if(formation.areaCenter && group.route.length) group.route[0]=[...formation.areaCenter];
+    if(formation.firingArea) group.firingArea=structuredClone(formation.firingArea);
     if(formationNotes[formation.id]) group.note=formationNotes[formation.id];
+    if(formation.note) group.note=formation.note;
+    if(formation.triggerDelay!==undefined) {
+      const trigger=triggers.find(item=>item.id===group.triggerId);
+      if(trigger) trigger.delay=formation.triggerDelay;
+    }
+    group.spawnOffsets=structuredClone(formation.offsets);
+    if(formation.holdUntil) group.holdUntil=structuredClone(formation.holdUntil);
     group.memberPlans=formation.offsets.map((offset,index)=>({
       delay:formation.delays[index],
       route:structuredClone(formation.routes?.[index]
@@ -235,7 +244,8 @@ export function ValidateEncounterDocument(input, timeline) {
     }
     Require(group.holdUntil===undefined || group.behavior==="bounds" && group.memberPlans && group.spawnOffsets
       && timeline.some(beat=>beat.id===group.holdUntil?.beat) && Number.isFinite(group.holdUntil.fraction)
-      && group.holdUntil.fraction>=0 && group.holdUntil.fraction<=1, "阻击停留时刻无效");
+      && group.holdUntil.fraction>=0 && group.holdUntil.fraction<=1
+      && (group.holdUntil.waypoint===undefined || Number.isInteger(group.holdUntil.waypoint) && group.holdUntil.waypoint>=1 && group.holdUntil.waypoint<=100), "阻击停留时刻无效");
     Require(group.engageOn===undefined||timeline.some(beat=>beat.id===group.engageOn),"接战拍号无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
@@ -424,7 +434,8 @@ function BuildBoundingPairTracks(group,playerRoute) {
         || time<other.life.born || time>=other.life.fall || arrivals[otherIndex]!==state.next || frontReady[otherIndex]);
       const clear = state.next>=state.path.length || !group.standoffMetres
         || SegmentDistance(player,state.path[state.next-1],state.path[state.next])>=group.standoffMetres;
-      const held=group.holdUntilTime!==null && time<group.holdUntilTime && state.next>1;
+      const holdWaypoint=group.holdUntil?.waypoint??1;
+      const held=group.holdUntilTime!==null && time<group.holdUntilTime && state.next>holdWaypoint;
       if(state.next<state.path.length && time>=state.waitUntil && covering && pairReady && clear && !held) {
         const distance=Math.min(state.distances[state.next],state.distance+group.speed*step);
         const candidate=SampleRoute(state.path,distance/(state.distances.at(-1)||1));
@@ -582,13 +593,21 @@ function UpgradeGroundFormations(value,defaults) {
     const current=value.groups.find(group=>group.id===formation.id);
     const next=defaults.groups.find(group=>group.id===formation.id);
     if(!current || !next || current.memberPlans || current.spawnOffsets) continue;
+    const matchedRoute=JSON.stringify(current.route)===JSON.stringify(next.route)
+      || (formation.previousRoute && JSON.stringify(current.route)===JSON.stringify(formation.previousRoute));
     const previousArea={...next.area,size:formation.previousAreaSize};
-    if(JSON.stringify(current.route)!==JSON.stringify(next.route)
-      || JSON.stringify(current.area)!==JSON.stringify(previousArea)) continue;
+    const legacyArea=formation.previousCenter?{...next.area,center:formation.previousCenter,size:formation.previousAreaSize}:null;
+    const matchedArea=JSON.stringify(current.area)===JSON.stringify(previousArea)
+      || (legacyArea && JSON.stringify(current.area)===JSON.stringify(legacyArea));
+    if(!matchedRoute || !matchedArea) continue;
     current.area=structuredClone(next.area);
+    current.route=structuredClone(next.route);
     current.spawnOffsets=structuredClone(next.spawnOffsets);
     current.memberPlans=structuredClone(next.memberPlans);
     if(next.holdUntil) current.holdUntil=structuredClone(next.holdUntil);
+    for(const key of ["coverWaitSeconds","firingArea","weapon"]) {
+      if(current[key]===undefined && next[key]!==undefined) current[key]=structuredClone(next[key]);
+    }
   }
   return UpgradeDragPursuit(value,defaults);
 }
@@ -849,14 +868,24 @@ export function UpgradeEncounterDocument(input,defaults) {
     if (input.id === "L1_BeishaheMerged" && input.id === defaults.id && input.revision !== defaults.revision) {
       if (eastFlankRevisions.includes(input.revision)) UpgradeMergedEastFlank(cloned, defaults);
       if (boardsLegacyRevisions.includes(input.revision)) UpgradeMergedBoards(cloned, defaults);
-      if (infantryTankLegacyRevisions.includes(input.revision)) UpgradeInfantryTankTactics(cloned, defaults);
+      if (infantryTankLegacyRevisions.includes(input.revision)) {
+        UpgradeCampFromBaseline(cloned, defaults, FLOW_PREVIOUS_CAMP_SCATTER);
+        UpgradeInfantryTankTactics(cloned, defaults);
+      } else if (input.revision === FLOW_PREVIOUS_CAMP_COMBINED.revision) {
+        UpgradeCampFromBaseline(cloned, defaults, FLOW_PREVIOUS_CAMP_COMBINED);
+      }
     }
     cloned.id=defaults.id;
     cloned.revision=defaults.revision;
     return cloned;
   }
   if(input.revision===defaults.revision) return input;
-  if(input.revision==="2026-11-17-beishahe-story-1") return UpgradeInfantryTankTactics(structuredClone(input),defaults);
+  if(input.revision===FLOW_PREVIOUS_CAMP_COMBINED.revision) {
+    return UpgradeCampFromBaseline(structuredClone(input),defaults,FLOW_PREVIOUS_CAMP_COMBINED);
+  }
+  if(input.revision===FLOW_PREVIOUS_CAMP_SCATTER.revision) {
+    return UpgradeInfantryTankTactics(UpgradeCampFromBaseline(structuredClone(input),defaults,FLOW_PREVIOUS_CAMP_SCATTER),defaults);
+  }
   const value=UpgradePriorBeishaheDocument(input,defaults);
   if(value===input) return input;
   const upgraded=structuredClone(value);
@@ -866,40 +895,62 @@ export function UpgradeEncounterDocument(input,defaults) {
   for(const trigger of defaults.triggers.filter(entry=>triggerIds.has(entry.id))) {
     if(!upgraded.triggers.some(entry=>entry.id===trigger.id)) upgraded.triggers.push(structuredClone(trigger));
   }
-  return UpgradeInfantryTankTactics(upgraded,defaults);
+  return UpgradeInfantryTankTactics(UpgradeCampFromBaseline(upgraded,defaults,FLOW_PREVIOUS_CAMP_SCATTER),defaults);
 }
 
 function UpgradePriorBeishaheDocument(input,defaults) {
   if(input.revision===defaults.revision) return input;
-  if(input.revision==="2026-11-17-camp-scatter-1") return structuredClone(input);
-  if(input.revision===FLOW_PREVIOUS_CAMP_ALIGNED.revision) return UpgradeCampScatter(structuredClone(input),defaults);
+  if(input.revision==="2026-11-17-camp-scatter-1") return UpgradeCampFromBaseline(structuredClone(input),defaults,FLOW_PREVIOUS_CAMP_SCATTER);
+  if(input.revision===FLOW_PREVIOUS_CAMP_ALIGNED.revision) return UpgradeCampFromBaseline(structuredClone(input),defaults,FLOW_PREVIOUS_CAMP_ALIGNED);
   const upgraded=input.revision===FLOW_PREVIOUS_CAMP_COVER.revision
     ? structuredClone(input) : UpgradeTempleEncounterDocument(input,defaults);
   if(upgraded===input) return input;
-  for(const previous of FLOW_PREVIOUS_CAMP_COVER.groups) {
-    const current=upgraded.groups.find(group=>group.id===previous.id);
-    const next=defaults.groups.find(group=>group.id===previous.id);
-    if(!current || !next || ["area","route","spawnOffsets"].some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]))) continue;
-    for(const [index,plan] of (current.memberPlans||[]).entries()) {
-      if(JSON.stringify(plan.route)===JSON.stringify(previous.memberPlans[index]?.route)) {
-        plan.route=structuredClone(next.memberPlans[index].route);
-      }
-    }
-  }
-  return UpgradeCampScatter(upgraded,defaults);
+  return UpgradeCampFromBaseline(UpgradeCampFromBaseline(upgraded,defaults,FLOW_PREVIOUS_CAMP_COVER),defaults,FLOW_PREVIOUS_CAMP_ALIGNED);
 }
 
-// Untouched aligned-wall routes move to the scattered roadside cover. Edited
-// routes, delays, counts, switches and deleted groups stay as authored.
-function UpgradeCampScatter(value,defaults) {
-  for(const previous of FLOW_PREVIOUS_CAMP_ALIGNED.groups) {
+// Untouched prior camp flank defaults move to the concealed-origin tactical layout.
+// Edited routes, delays, counts, switches, custom areas and deleted groups stay as authored.
+function UpgradeCampFromBaseline(value,defaults,baseline) {
+  for(const previous of baseline.groups) {
     const current=value.groups.find(group=>group.id===previous.id);
     const next=defaults.groups.find(group=>group.id===previous.id);
     if(!current || !next || ["area","route","spawnOffsets"].some(key=>JSON.stringify(current[key])!==JSON.stringify(previous[key]))) continue;
+    let allRoutesUntouched=(current.memberPlans?.length||0)===previous.memberPlans.length;
     for(const [index,plan] of (current.memberPlans||[]).entries()) {
-      if(JSON.stringify(plan.route)===JSON.stringify(previous.memberPlans[index]?.route)) {
-        plan.route=structuredClone(next.memberPlans[index].route);
+      const prevPlan=previous.memberPlans[index],nextPlan=next.memberPlans[index];
+      if(!prevPlan || !nextPlan) {allRoutesUntouched=false;continue;}
+      if(JSON.stringify(plan.route)===JSON.stringify(prevPlan.route)) {
+        plan.route=structuredClone(nextPlan.route);
+        if(plan.delay===prevPlan.delay) plan.delay=nextPlan.delay;
+      } else {
+        allRoutesUntouched=false;
       }
+    }
+    if(allRoutesUntouched) {
+      current.area=structuredClone(next.area);
+      current.route=structuredClone(next.route);
+      current.spawnOffsets=structuredClone(next.spawnOffsets);
+      for(const key of ["holdUntil","interval","speed","note"]) {
+        if(Object.hasOwn(previous,key)) {
+          if(JSON.stringify(current[key])===JSON.stringify(previous[key])) current[key]=structuredClone(next[key]);
+        } else if(next[key]!==undefined) {
+          current[key]=structuredClone(next[key]);
+        }
+      }
+      for(const key of ["coverWaitSeconds","firingArea","weapon","fireCycle"]) {
+        if(current[key]===undefined && next[key]!==undefined) current[key]=structuredClone(next[key]);
+      }
+    }
+  }
+  for(const previous of baseline.triggers||[]) {
+    const current=value.triggers.find(trigger=>trigger.id===previous.id);
+    const next=defaults.triggers.find(trigger=>trigger.id===previous.id);
+    if(!current || !next) continue;
+    const group=value.groups.find(entry=>entry.triggerId===current.id);
+    const nextGroup=defaults.groups.find(entry=>entry.id===group?.id);
+    if(!group || !nextGroup || JSON.stringify(group.area)!==JSON.stringify(nextGroup.area)) continue;
+    if(current.mode===previous.mode && current.beat===previous.beat && current.delay===previous.delay) {
+      current.delay=next.delay;
     }
   }
   value.revision=defaults.revision;

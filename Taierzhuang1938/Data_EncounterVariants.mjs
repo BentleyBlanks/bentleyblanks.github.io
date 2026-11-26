@@ -77,7 +77,7 @@ export const ENCOUNTER_VARIANTS = Object.freeze([
       Object.freeze({ label: "10–13 救护所突围与炸桥", span: 4, shared: false }),
     ]),
     segments: Object.freeze(["L1_Front0107", "L1_BeishaheMerged0813"]),
-    revision: "2026-11-27-infantry-tank-tactics-1",
+    revision: "2026-11-27-camp-tactics-1",
     storageKey: "tengxian1938_encounter_L1_BeishaheMerged_v1",
     legacyStorageKey: null,
     mapMaxZ: 990,
