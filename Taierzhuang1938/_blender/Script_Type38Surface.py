@@ -15,7 +15,7 @@ from scipy.ndimage import distance_transform_edt, gaussian_filter
 from scipy.interpolate import PchipInterpolator
 
 from Script_Type38ExteriorFinish import FrameEngraving, PaintBandScuff, ReadGlb, WriteGlb
-from Script_Type38EdgeProfiles import BlendCoverCrown, ShapeButtCap, ShapeRolledBand
+from Script_Type38EdgeProfiles import BlendCoverCrown, ShapeButtCap, ShapeRolledBand, WriteAttributes
 
 
 SAMPLES = {
@@ -35,6 +35,12 @@ METAL_SOURCES = {
 COVER_STEEL_TONES = ([59,55,49],[155,149,138])
 
 
+def FineScanBand(sample, along, gain):
+    texture = cv2.GaussianBlur(sample.astype('f'),(0,0),sigmaX=.55,sigmaY=along)
+    carrier = cv2.GaussianBlur(texture,(0,0),sigmaX=4.8,sigmaY=along*2.8)
+    return np.uint8(np.clip(128+(texture-carrier)*gain,0,255))
+
+
 def ReadSamples(cache):
     cache.mkdir(exist_ok=True, parents=True)
     layers = {}
@@ -52,6 +58,7 @@ def ReadSamples(cache):
         bitmap = np.array(Image.open(path).convert('L'))
         layers[key] = bitmap[155:775, 190:690] if key == 'steel' else bitmap
     layers['woodGrowth'] = cv2.GaussianBlur(layers['grain'], (0,0), sigmaX=15, sigmaY=51)
+    layers['woodMicro'] = FineScanBand(layers['pores'],5.1,7.0)
     for asset, channels in METAL_SOURCES.items():
         stem = asset+'_2K-JPG'
         pack = cache/(stem+'.zip')
@@ -70,7 +77,24 @@ def ReadSamples(cache):
             with tempfile.NamedTemporaryFile(dir=cache,delete=False) as staging:
                 staging.write(download)
             Path(staging.name).replace(pack)
+    layers['steelMicro'] = FineScanBand(layers['Metal009Displacement'],2.0,7.6)
+    layers['steelPits'] = FineScanBand(layers['Metal046BColor'],.88,9.5)
     return layers
+
+
+def ReadRoundovers(repo, cache):
+    source = Path(__file__).with_name('Script_Type38Roundovers.py')
+    version = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
+    patch = cache / f'Roundovers_{version}.npz'
+    if not patch.is_file():
+        cache.mkdir(exist_ok=True,parents=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temp:
+            args = Path(temp)/'RoundoverArgs.json'
+            args.write_text(json.dumps([str(patch)]),encoding='utf8')
+            subprocess.run(['node',str(repo/'scripts/Script_BlenderMcp.mjs'),'start',
+                            '--batch',str(source),'--batch-args',str(args),'--task','Type38Roundovers'],cwd=repo,check=True)
+    with np.load(patch) as data:
+        return {key:data[key] for key in data.files}
 
 
 def Attribute(doc, views, index, width):
@@ -714,15 +738,17 @@ def FinishSteelAtlas(doc, views, source, load, store):
     return {name:np.percentile(rough[mask],[10,50,90]).round(1).tolist() for name,mask in coverage.items()}
 
 
-def Build(cache):
+def Build(cache, output=None):
     repo = Path(__file__).resolve().parents[2]
-    folder = repo / 'Taierzhuang1938/Model/Type38_511'
+    folder = output or repo / 'Taierzhuang1938/Model/Type38_511'
+    folder.mkdir(exist_ok=True,parents=True)
     def Original(file):
         return subprocess.check_output(['git', '-C', str(repo), 'show', f'8fd3c955:Taierzhuang1938/Model/Type38_511/{file}'])
     doc, views, baseline = ReadGlb(Original('Model_Type38_511.glb'))
     assert baseline == '285f3258e5bf03d56f1aff6e9390a985e1640a98282e009a6ee30d9a27dda3bb'
     baselineTriangles = sum(doc['accessors'][primitive['indices']]['count']//3
                             for mesh in doc['meshes'] for primitive in mesh['primitives'])
+    roundovers = ReadRoundovers(repo, cache.resolve())
     source = ReadSamples(cache)
     stats = {}
     profileDeltas = {}
@@ -766,12 +792,16 @@ def Build(cache):
         band = part == 'Exterior_MiddleBand57'
         frontBand = part == 'T38_407F_VisualSkin_Exterior_FrontBandBody78'
         trim = part == 'Exterior_FrontWindowBacking49'
+        before = doc['accessors'][primitive['indices']]['count']//3
         if part in profiles:
-            before = doc['accessors'][primitive['indices']]['count']//3
             profiles[part](doc,views,primitive)
-            delta = doc['accessors'][primitive['indices']]['count']//3-before
-            if delta:
-                profileDeltas[part] = delta
+        shape = roundovers.get(part+'_vertices')
+        if shape is not None:
+            WriteAttributes(doc,views,primitive,shape[:,:3],shape[:,3:6],shape[:,6:10],
+                            shape[:,10:12],roundovers[part+'_indices'])
+        delta = doc['accessors'][primitive['indices']]['count']//3-before
+        if delta:
+            profileDeltas[part] = delta
         field, padded, valid = SurfaceAtlas(doc, views, primitive, (width, height))
         if trim:
             orm[:,:,0]=np.where(padded,255,0)
@@ -817,6 +847,7 @@ def Build(cache):
             glossScan = woodScan.Read(source['woodGloss'],60)
             growth = woodScan.Read(source['woodGrowth'],32)
             fibreDetail = np.clip((rgbScan-growth)/25,-1,1)
+            fibres = np.clip((woodScan.Read(source['woodMicro'],128)-128)/36,-1.25,1.25)
             if separate:
                 stain = np.clip((growth-32)/30,-1.05,1.05)
                 grainSteel = np.clip((glossScan-59)/42,-1,1)
@@ -830,7 +861,7 @@ def Build(cache):
             warmWrist = np.exp(-((length+.035)/.17)**2)
             vessels = PoreField(length,transverse+side*side*13)
             fleck = np.clip((pore-.12)*.73 + (.37-fibre)*.50 + .76*vessels,0,1)
-            honey = Tint([112,52,12],[215,123,33],amber)
+            honey = Tint([110,50,15],[210,117,37],amber)
             oldLacquer = Tint([38,12,6],[91,30,12],amber)
             rim = 1-Ramp(-.625,-.606,length)
             color = Blend(oldLacquer,Tint([68,22,10],[129,49,21],amber),rim) if separate else Blend(
@@ -971,6 +1002,19 @@ def Build(cache):
             varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.29*foreWear))
             varnish[:,:,1] = np.rint(np.minimum(165,varnish[:,:,1]+23*foreWear))
             rough += 16*foreWear
+            # A pore affects both the lacquer film and the wood directly below
+            # it. Keep the pores, ridges and sheen registered in the same scan.
+            timber = 1 if separate else 1-inlay
+            filmWear = np.clip(.43+.27*handling+.45*breach+.18*edge,0,1)
+            ridges = fibres*timber
+            openPores = Ramp(.20,.93,-fibres)*timber*filmWear
+            color *= (1+.046*ridges-.086*openPores)[:,:,None]
+            rough += 14*openPores-5*np.maximum(ridges,0)
+            relief += .165*ridges-.16*openPores
+            fineFilm = 1 if separate else 1-Ramp(.08,.44,np.maximum(glazeFill,recess))
+            varnish[:,:,0] = np.rint(varnish[:,:,0]*(1-.18*fineFilm*openPores))
+            filmRoughness = varnish[:,:,1]+fineFilm*(17*openPores-4*np.maximum(ridges,0))
+            varnish[:,:,1] = np.where(padded,np.clip(filmRoughness,31,173),0)
             Store(coat['clearcoatTexture'], varnish)
         else:
             jacket = 'CoverSkin' in part or 'CoverHalf' in part or 'LowerFacing' in part
@@ -1161,6 +1205,16 @@ def Build(cache):
                 color = Blend(color,np.array([55,49,43],dtype='f'),groove*.88)
                 rough += 28*groove-8*border
                 relief += -2.8*groove+.64*border
+            if not part.startswith('SightDetail') and part != 'Exterior_FoldedFrame12':
+                fine = ScanStrips(grainU*2+.13,grainV*2+.32,axis=1 if band or collar else 0,seed=9191)
+                lines = np.clip((fine.Read(source['steelMicro'],128)-128)/37,-1.25,1.25)
+                dents = Ramp(.33,1.03,(128-fine.Read(source['steelPits'],128))/34)
+                detail = .42 if handle else .82 if collar or backing else 1
+                if disk:
+                    detail = .42*(1-face)
+                color *= (1+detail*(.037*lines-.062*dents))[:,:,None]
+                rough += detail*(8*lines+21*dents-6*edge*np.maximum(lines,0))
+                relief += detail*(.17*lines-.24*dents)
         if 'normalTexture' in material:
             normalSlot = material['normalTexture']
             normals = Load(normalSlot).astype('f') / 127.5 - 1
@@ -1193,7 +1247,7 @@ def Build(cache):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_WeatheredSteel20'
+    doc['asset']['extras']['version'] = 'Type38_SurfaceDetail21'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1201,7 +1255,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=22, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=23, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
@@ -1216,4 +1270,6 @@ def Build(cache):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--cache', type=Path, default=Path(__file__).resolve().parents[2]/'tmp/Type38SurfaceSources')
-    Build(parser.parse_args().cache)
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    Build(args.cache,args.output)

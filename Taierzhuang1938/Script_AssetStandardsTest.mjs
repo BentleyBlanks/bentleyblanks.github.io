@@ -8,6 +8,7 @@ import { WEAPONS, LOADOUTS } from "./Data_Weapons.mjs";
 import { WeaponShelved } from "./Script_Weapons.mjs";
 import { MESHES } from "./Data_Meshes.mjs";
 import { FPS_ARM_POSES } from "./Data_FpsArmPoses.mjs";
+import { TYPE38_511 } from "./Data_Type38_511.mjs";
 import {
   ASSET_STANDARD_GROUPS, ComplianceFor, ExternalComplianceFor, EXTERNAL_GLB_STANDARDS, MIN_DECIMATION_REDUCTION,
   SCENE_RENDER_LIMITS, SOURCE_ASSET_STANDARDS, SPECIAL_TRIANGLE_TARGETS, TRIANGLE_RULES,
@@ -132,7 +133,8 @@ Check(["Type95HaGo", "Type97ChiHa"].every((id) => !WEAPONS[id] && !MESHES[id] &&
   && !built.has(id) && !fs.existsSync(path.join(projectDir, "Model", `Model_${id}.tzm.json`))),
   "退役的九五式和九七式无运行时登记或发布模型");
 Check(EXTERNAL_GLB_STANDARDS.length === 64
-  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='Type38_511'&&record.actualTriangles===74412&&record.targetTriangles===80000)
+  && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='Type38_511'&&record.actualTriangles===TYPE38_511.triangles
+    &&record.npcTriangles===TYPE38_511.npcTriangles&&record.targetTriangles===80000)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='RifleSlingFlatV3'&&record.actualTriangles===6584&&record.targetTriangles===6584)
   && EXTERNAL_GLB_STANDARDS.some(record=>record.id==='HanYang173R'&&record.actualTriangles===79584&&record.targetTriangles===80000)
   && EXTERNAL_GLB_STANDARDS.some((record) => record.id === "SingleBlanket" && record.actualTriangles === 12880 && record.targetTriangles === 12880)

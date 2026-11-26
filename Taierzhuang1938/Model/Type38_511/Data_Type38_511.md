@@ -1,14 +1,20 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v20
+## 当前交付版 v21
 
-游戏使用 `511-weathered-steel-20`。近景 74,412 三角，普通 NPC 69,804 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
+游戏使用 `511-surface-detail-21`。近景 78,474 三角，普通 NPC 73,866 三角。枪身仅保留刻度线和刻度数字。下方修订记录按时间倒序排列，各版面数和外观描述对应当时的产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 木孔、钢面细磨纹及接缝圆角 · 2026-11-26
+
+从现有材质扫描分离顺着木纤维的细纹和木孔。木孔同时影响底色、法线和漆面的局部粗糙度，漆层在干磨、凹槽和打磨过的位置形成不同宽度的反光。钢面在原有暗灰色上加入细磨纹和浅蚀点。光扫过前段和覆面时，可以看到分散的细反光。 [木托和钢件全长侧照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle.JPG) · [前箍实物近照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(front_stock_detail).JPG)
+
+在护木端缘、托尾、外壳唇边、下方钢面和前箍等 11 个部件上增加圆角。两道箍口使用与端面、外壁相切的圆弧，使高光沿接缝移动时连续转过边缘。生成脚本通过 BlenderMCP 重建局部边缘网格，再按同一 UV 烘焙运行时贴图。验收使用主灯、反向灯和掠射光，覆盖枪托两侧的木面、护木、前段、后部钢件和底部接缝。 [圆角重建](../../_blender/Script_Type38Roundovers.py)
 
 ## 栓柄与覆面的钢色 · 2026-11-26
 

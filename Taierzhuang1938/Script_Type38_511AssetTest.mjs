@@ -131,6 +131,18 @@ const woodProbe=new THREE.Raycaster(new THREE.Vector3(.06,bandBox.max.y-.38*band
 woodProbe.layers.enableAll();
 assert.equal(woodProbe.intersectObjects(fps.meshes)[0]?.object,woodRim,'wood, not metal, is visible in the lip profile');
 const FindPart=name=>fps.meshes.find(mesh=>mesh.userData.type38Part===name);
+const rimRay=new THREE.Raycaster(new THREE.Vector3(),new THREE.Vector3(-1,0,0));
+rimRay.layers.enableAll();
+for(const band of [middleBand,FindPart('T38_407F_VisualSkin_Exterior_FrontBandBody78')]){
+  band.geometry.computeBoundingBox();
+  const box=band.geometry.boundingBox,mid=box.getCenter(new THREE.Vector3());
+  const normals=[.002,.014,.026,.038,.050,.065].map(phase=>{
+    rimRay.ray.origin.set(box.max.x+.03,mid.y,box.min.z+phase*(box.max.z-box.min.z));
+    return -rimRay.intersectObject(band)[0]?.normal?.normalize().z;
+  });
+  assert(normals[0]>.90&&normals.at(-1)<.105&&normals.every((value,i)=>i===0||value<normals[i-1]-.02),
+    'the band fillet must turn smoothly from the rim onto the outer face');
+}
 const cap=FindPart('Exterior_ButtCap04');
 cap.geometry.computeBoundingBox();
 const capBox=cap.geometry.boundingBox,capCenter=capBox.getCenter(new THREE.Vector3());

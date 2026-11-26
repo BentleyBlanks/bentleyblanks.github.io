@@ -166,15 +166,17 @@ def ShapeRolledBand(doc, views, primitive):
     first,last = original[:,2].min(),original[:,2].max()
     phase = np.linspace(.035,.965,mesh.segments+1)
     width = last-first
-    roll = width*.047
-    # Each perimeter follows the same pair of rolled rims. Read the outside
-    # outline from the existing game shell to retain its fit at the wood seam.
-    bands = [(0,1.65), (0,1.02), (.12,.55), (.40,.18), (1,0), (5,0),
-             (width/roll-5,0), (width/roll-1,0), (width/roll-.40,.18),
-             (width/roll-.12,.55), (width/roll,1.02), (width/roll,1.65)]
+    roll = width*.056
+    # The fillet is tangent to both the ring face and the outer shell. The
+    # several intermediate rings carry the highlight through grazing angles.
+    arc = [(1-np.cos(a),1-np.sin(a)) for a in np.linspace(0,np.pi/2,6)]
+    end = width/roll
+    bands = [(0,1.67), *arc, (4.8,0), (end-4.8,0),
+             *((end-along,inset) for along,inset in reversed(arc)), (end,1.67)]
     points = [np.column_stack((center+outline-radial*(inset*roll),np.full_like(x,first+along*roll)))
               for along,inset in bands]
-    charts = [mesh.Ring(ring,np.column_stack((np.full_like(x,.06+.074*i),phase))) for i,ring in enumerate(points)]
+    charts = [mesh.Ring(ring,np.column_stack((np.full_like(x,u),phase)))
+              for ring,u in zip(points,np.linspace(.06,.874,len(points)),strict=True)]
     for a,b in zip(charts,charts[1:]):
         mesh.Strip(a,b,flip=True)
     inner = [mesh.Ring(ring,np.column_stack((np.full_like(x,u),phase)))
