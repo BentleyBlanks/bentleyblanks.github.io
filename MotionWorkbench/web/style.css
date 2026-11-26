@@ -2128,7 +2128,22 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   pointer-events: none;
 }
 
-/* --- 错峰定时队列抽屉 --- */
+/* --- 错峰定时队列抽屉（暗炭铜金精简风） --- */
+.mwSysBtn.hasQueue {
+  border-color: #edca8388;
+  background: #201c11;
+  color: var(--gold-hi);
+}
+.mwBtn.isQueued {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, #252012 0%, #1a160c 100%);
+  color: var(--gold-hi);
+  font-weight: 600;
+}
+.mwBtn.isQueued:hover {
+  border-color: var(--gold-hi);
+  background: #2d2715;
+}
 .mwSchBadge {
   display: inline-flex;
   align-items: center;
@@ -2141,99 +2156,307 @@ input[type="range"]:hover::-webkit-slider-thumb { background: var(--gold-hi); }
   color: #10120d;
   font: 700 11px var(--ui-mono);
 }
-.mwSchToggle {
+.mwSchDrawerHead {
+  height: auto;
+  min-height: 62px;
+  padding: 12px 18px 12px 22px;
+}
+.mwSchHeadStack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.mwSchHeadSub {
+  font-size: 11.5px;
+  color: #8f8c7e;
+  letter-spacing: 0.04em;
+}
+.mwSchBody {
+  gap: 16px;
+  padding: 16px 20px;
+}
+.mwSchHeroCard {
+  padding: 14px 16px;
+  gap: 12px;
+  background: linear-gradient(180deg, #16150f 0%, #0f110c 100%);
+  border-color: #edca8338;
+}
+.mwSchHeroTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mwSchHeroLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.mwSchHeroTime {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--gold-hi);
+  letter-spacing: 0.03em;
+}
+.mwSchHeroSub {
+  font-size: 12px;
+  color: #a9a596;
+}
+/* 暗铜金自定义拨动开关（替代原生蓝勾） */
+.mwSwitchWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  flex: none;
+}
+.mwSwitchInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.mwSwitchTrack {
+  position: relative;
+  width: 34px;
+  height: 19px;
+  border-radius: 10px;
+  background: #23251e;
+  border: 1px solid #c1bdab33;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.mwSwitchTrack::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #8e8b7d;
+  transition: transform 0.16s ease, background 0.16s ease;
+}
+.mwSwitchInput:checked + .mwSwitchTrack {
+  background: #3a3018;
+  border-color: var(--gold);
+}
+.mwSwitchInput:checked + .mwSwitchTrack::after {
+  transform: translateX(15px);
+  background: var(--gold-hi);
+}
+.mwSwitchLbl {
+  font-size: 12px;
+  color: #c8c4b4;
+}
+
+.mwSchSlotsWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule-2);
+}
+.mwSchSlotGrid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.mwSchSlotBtn {
+  height: 28px;
+  padding: 0;
+  background: #0c0d0a;
+  border: 1px solid #c1bdab28;
+  border-radius: 3px;
+  color: #a5a293;
+  font: 600 11.5px var(--ui-mono);
+  cursor: pointer;
+  transition: border-color 0.12s linear, color 0.12s linear, background 0.12s linear;
+}
+.mwSchSlotBtn:hover {
+  border-color: #ae925699;
+  color: var(--text-hi);
+}
+.mwSchSlotBtn.active {
+  background: var(--gold);
+  border-color: var(--gold-hi);
+  color: #0b0c09;
+  font-weight: 700;
+}
+.mwSchTimeInput {
+  flex: none;
+  width: 82px;
+  height: 28px;
+  padding: 0 6px;
+  background: #0b0c09;
+  border: 1px solid #c1bdab2c;
+  border-radius: 3px;
+  color: var(--gold-text);
+  font: 600 11.5px var(--ui-mono);
+}
+
+.mwSchQueueSec {
+  flex: 1;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mwSchQueueHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mwSchQuickBtns {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--gold-text);
+}
+.mwSchPillBtn {
+  height: 24px;
+  padding: 0 9px;
+  background: #141610;
+  border: 1px solid #c1bdab2e;
+  border-radius: 3px;
+  color: #c5c1b2;
+  font-size: 11.5px;
   cursor: pointer;
 }
-.mwSchTimeRow {
+.mwSchPillBtn:hover {
+  border-color: var(--gold);
+  color: var(--gold-hi);
+  background: #1f1b10;
+}
+.mwSchList {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.mwSchEmpty {
+  padding: 26px 14px;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #848174;
+  border: 1px dashed #c1bdab24;
+  background: #0c0d0a;
+  border-radius: 4px;
+}
+.mwSchItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #11130e;
+  border: 1px solid #c1bdab24;
+  border-left: 3px solid var(--gold);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s linear, border-color 0.12s linear;
+}
+.mwSchItem:hover {
+  background: #181912;
+  border-color: #ae925677;
+}
+.mwSchItem.isCurrent {
+  background: #1d1a10;
+  border-color: var(--gold);
+}
+.mwSchItem.isRun {
+  border-left-color: var(--gold-hi);
+  background: #211c0f;
+}
+.mwSchItem.isDone {
+  border-left-color: #7aa37d;
+  opacity: 0.82;
+}
+.mwSchItem.isErr {
+  border-left-color: #d06b5f;
+  border-color: #c8645a44;
+}
+.mwSchItemMain { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.mwSchItemTop { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-hi); }
+.mwSchItemCode {
+  font: 700 11.5px var(--ui-mono);
+  color: var(--gold-hi);
+  flex: none;
+}
+.mwSchItemTitle {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.mwSchItemBot {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
-.mwSchPreset.active {
-  border-color: var(--gold);
-  background: #241f12;
-  color: var(--gold-hi);
+.mwSchItemKind {
+  font: 600 10.5px var(--ui-mono);
+  padding: 1px 6px;
+  border-radius: 2px;
+  border: 1px solid #edca8348;
+  color: var(--gold-text);
+  background: #1f1b10;
 }
-.mwSchTimeInput {
-  margin-left: auto;
-  height: 28px;
-  padding: 0 8px;
-  background: var(--field);
+.mwSchStateChip {
+  font: 600 10.5px var(--ui-mono);
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: #1a1c15;
+  border: 1px solid #c1bdab28;
+  color: #c2beb0;
+}
+.mwSchItem.isRun .mwSchStateChip { color: var(--gold-hi); border-color: var(--gold); background: #29220f; }
+.mwSchItem.isDone .mwSchStateChip { color: #9fc7a3; border-color: #7aa37d66; background: #142016; }
+.mwSchItem.isErr .mwSchStateChip { color: #f2a99f; border-color: #c8645a66; background: #261412; }
+.mwSchItemMsg { font-size: 11.5px; color: #969284; line-height: 1.4; word-break: break-word; }
+.mwSchItem.isErr .mwSchItemMsg { color: #efa69b; }
+
+.mwSchPolicyList {
+  flex: none;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--edge);
-  color: var(--gold-hi);
-  font: 700 12.5px var(--ui-mono);
+  border-radius: 4px;
+  background: #0e100c;
+  overflow: hidden;
 }
-.mwSchCheck {
+.mwSchPolicyRow {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--muted);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rule-2);
   cursor: pointer;
 }
-.mwSchCheck code {
-  padding: 1px 4px;
-  background: #0b0c09;
-  border: 1px solid var(--rule-2);
-  color: var(--gold-text);
-}
-.mwSchHint {
-  font-size: 12px;
-  color: #b7b3a4;
-  padding: 6px 8px;
-  background: #0c0d0a;
-  border: 1px solid var(--rule-2);
-}
-.mwSchBatchRow {
+.mwSchPolicyRow:last-child { border-bottom: 0; }
+.mwSchPolicyText {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  min-width: 0;
 }
-.mwSchList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 360px;
-  overflow-y: auto;
-}
-.mwSchEmpty {
-  padding: 18px 10px;
-  text-align: center;
-  font-size: 12px;
-  color: #848174;
-}
-.mwSchItem {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
-  background: #10120d;
-  border: 1px solid #c1bdab24;
-  border-radius: 3px;
-}
-.mwSchItem.isRun { border-color: var(--gold); background: #1c180f; }
-.mwSchItem.isErr { border-color: #c8645a66; }
-.mwSchItemMain { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
-.mwSchItemTop { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-hi); }
-.mwSchItemKind {
-  font: 700 10.5px var(--ui-mono);
-  padding: 1px 5px;
-  border: 1px solid #edca8355;
-  color: var(--gold-text);
-  background: #201c11;
-}
-.mwSchItemMsg { font-size: 11.5px; color: #9d998b; line-height: 1.4; word-break: break-word; }
-.mwSchItem.isErr .mwSchItemMsg { color: #efa69b; }
+.mwSchPolicyText strong { font-size: 12.5px; font-weight: 600; color: var(--text-hi); }
+.mwSchPolicyText span { font-size: 11px; color: #8c897c; line-height: 1.35; }
+
 .mwSchFootSticky {
   flex: none;
-  padding: 12px 20px;
+  padding: 12px 20px 14px;
   border-top: 1px solid var(--rule);
   background: #0d0f0b;
 }

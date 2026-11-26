@@ -878,61 +878,84 @@
     </div>
   </aside>
 
-  <!-- 错峰定时队列抽屉（默认北京时间 06:00 美国低峰窗口自动运行） -->
+  <!-- 错峰定时队列抽屉（重设计：倒计时主卡 + 队列列表为主视觉 + 暗铜金自定义开关） -->
   <div id="schScrim" class="mwBackdrop hidden"></div>
   <aside id="schDrawer" class="mwDrawer hidden" aria-label="错峰定时队列">
-    <div class="mwDrawerHead">
-      <div class="mwDrawerTitleWrap">
+    <div class="mwDrawerHead mwSchDrawerHead">
+      <div class="mwSchHeadStack">
         <span class="mwDrawerTitle">错峰定时队列</span>
-        <span class="mwDrawerSub">美国低峰窗口 06:00~11:00 / 14:00~20:00 · 整批复用热机</span>
+        <span class="mwSchHeadSub">美区低峰窗口 · 同批热机复用 · 跑完自动停表</span>
       </div>
       <button id="btnCloseSch" class="mwIconBtn" type="button" title="关闭">✕</button>
     </div>
 
-    <div class="mwDrawerBody">
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead">
-          <span>定时触发策略</span>
-          <label class="mwSchToggle">
-            <input id="schEnabled" type="checkbox" checked>
-            <span>启用自动跑</span>
+    <div class="mwDrawerBody mwSchBody">
+      <!-- ① 倒计时主卡 + 6 档时段条 -->
+      <section class="mwHeroCard mwSchHeroCard">
+        <div class="mwSchHeroTop">
+          <div class="mwSchHeroLeft">
+            <span class="mwEyebrow">下次自动开跑</span>
+            <div id="schHeroTime" class="mwSchHeroTime mwMono">06:00</div>
+            <div id="schNextRunText" class="mwSchHeroSub">—</div>
+          </div>
+          <label class="mwSwitchWrap" title="开启或暂停每日定时自动执行">
+            <input id="schEnabled" class="mwSwitchInput" type="checkbox" checked>
+            <span class="mwSwitchTrack" aria-hidden="true"></span>
+            <span class="mwSwitchLbl">自动运行</span>
           </label>
         </div>
-        <div class="mwSchTimeRow">
-          <button class="mwBtn mwSm mwSchPreset" data-time="04:00" type="button">04:00</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="06:00" type="button">06:00</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="08:00" type="button">08:00</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="12:00" type="button">12:00</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="14:00" type="button">14:00</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="16:00" type="button">16:00</button>
-          <input id="schRunTime" class="mwSchTimeInput" type="time" value="04:00">
-        </div>
-        <label class="mwSchCheck">
-          <input id="schAutoStop" type="checkbox" checked>
-          <span>整批跑完立刻执行 <code>colab stop</code> 停表，绝不空转烧算力</span>
-        </label>
-        <label class="mwSchCheck">
-          <input id="schAutoDefer" type="checkbox" checked>
-          <span>单档重试 3 次仍失败时，沿 <code>04:00→06:00→08:00→12:00→14:00→16:00</code> 自动顺延，直至 16:00 失败 3 次才结束</span>
-        </label>
-        <div id="schNextRunText" class="mwSchHint">—</div>
-      </div>
 
-      <div class="mwDashBox">
-        <div class="mwDashBoxHead"><span>一键批量入队</span></div>
-        <div class="mwSchBatchRow">
-          <button id="btnSchAddAllH3" class="mwBtn mwSm" type="button">+ 全部有分镜待出片 → MiniMax-H3</button>
-          <button id="btnSchAddAllMocap" class="mwBtn mwSm" type="button">+ 全部有视频待提骨 → Colab 提骨</button>
+        <div class="mwSchSlotsWrap">
+          <div class="mwSchSlotGrid">
+            <button class="mwSchSlotBtn mwSchPreset" data-time="04:00" type="button">04:00</button>
+            <button class="mwSchSlotBtn mwSchPreset" data-time="06:00" type="button">06:00</button>
+            <button class="mwSchSlotBtn mwSchPreset" data-time="08:00" type="button">08:00</button>
+            <button class="mwSchSlotBtn mwSchPreset" data-time="12:00" type="button">12:00</button>
+            <button class="mwSchSlotBtn mwSchPreset" data-time="14:00" type="button">14:00</button>
+            <button class="mwSchSlotBtn mwSchPreset" data-time="16:00" type="button">16:00</button>
+          </div>
+          <input id="schRunTime" class="mwSchTimeInput" type="time" value="06:00" title="自定义起跑时间">
         </div>
-      </div>
+      </section>
 
-      <div class="mwDashBox mwSchListBox">
-        <div class="mwDashBoxHead">
-          <span id="schQueueTitle">队列任务 (0)</span>
-          <button id="btnSchClearDone" class="mwLinkBtn" type="button">清理已完成</button>
+      <!-- ② 排队任务主区（视觉焦点） -->
+      <section class="mwSchQueueSec">
+        <div class="mwSchQueueHead">
+          <div class="mwSchQueueTitleRow">
+            <span id="schQueueTitle" class="mwSecTitle">排队任务 (0)</span>
+          </div>
+          <div class="mwSchQuickBtns">
+            <button id="btnSchAddAllH3" class="mwSchPillBtn" type="button">+ 全部待出片</button>
+            <button id="btnSchAddAllMocap" class="mwSchPillBtn" type="button">+ 全部待提骨</button>
+            <button id="btnSchClearDone" class="mwLinkBtn" type="button">清已完成</button>
+          </div>
         </div>
         <div id="schItemsList" class="mwSchList"></div>
-      </div>
+      </section>
+
+      <!-- ③ 简洁双开关策略行（无丑陋系统蓝勾） -->
+      <section class="mwSchPolicyList">
+        <label class="mwSchPolicyRow">
+          <div class="mwSchPolicyText">
+            <strong>整批跑完立刻停表</strong>
+            <span>结束后自动执行 colab stop 释放 GPU，避免空转扣算力点</span>
+          </div>
+          <span class="mwSwitchWrap">
+            <input id="schAutoStop" class="mwSwitchInput" type="checkbox" checked>
+            <span class="mwSwitchTrack" aria-hidden="true"></span>
+          </span>
+        </label>
+        <label class="mwSchPolicyRow">
+          <div class="mwSchPolicyText">
+            <strong>失败自动顺延至 16:00</strong>
+            <span>每档 503 重试 3 次仍失败时，沿 04→06→08→12→14→16 依次顺延</span>
+          </div>
+          <span class="mwSwitchWrap">
+            <input id="schAutoDefer" class="mwSwitchInput" type="checkbox" checked>
+            <span class="mwSwitchTrack" aria-hidden="true"></span>
+          </span>
+        </label>
+      </section>
     </div>
 
     <div class="mwSchFootSticky">

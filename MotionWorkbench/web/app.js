@@ -1677,27 +1677,51 @@ function renderScheduleUI() {
   if (!sch) return;
   const runTime = sch.runTime || "06:00";
   const items = sch.items || [];
-  const pendingCount = items.filter((x) => x.status === "pending" || x.status === "running").length;
+  const pendingItems = items.filter((x) => x.status === "pending" || x.status === "running");
+  const pendingCount = pendingItems.length;
+  const cur = currentTask();
 
+  const btnSch = $("#btnSchedule");
+  if (btnSch) btnSch.classList.toggle("hasQueue", pendingCount > 0 || Boolean(sch.runningBatch));
   const btnLbl = $("#schBtnLabel");
-  if (btnLbl) btnLbl.textContent = sch.runningBatch ? "定时运行中" : `定时 ${runTime}`;
+  if (btnLbl) btnLbl.textContent = sch.runningBatch ? "定时运行中" : pendingCount > 0 ? `已排 ${runTime}` : `定时 ${runTime}`;
   const badge = $("#schCountBadge");
   if (badge) {
     badge.textContent = String(pendingCount);
     badge.classList.toggle("hidden", pendingCount === 0);
   }
+
+  // Stage 03 / Stage 04 inspector buttons: clearly show whether the current task is ALREADY in the queue!
+  const curH3Item = cur ? pendingItems.find((x) => x.taskId === cur.id && x.kind === "stage3_h3") : null;
+  const curMocapItem = cur ? pendingItems.find((x) => x.taskId === cur.id && x.kind === "stage4_mocap") : null;
   const s3q = $("#btnStage3QueueSch");
-  if (s3q) s3q.textContent = `加入 ${runTime} 错峰队列（MiniMax-H3）`;
+  if (s3q) {
+    s3q.classList.toggle("isQueued", Boolean(curH3Item));
+    s3q.textContent = curH3Item
+      ? `✓ 已排入 ${curH3Item.scheduledTime || runTime} 错峰队列（点此查看）`
+      : `加入 ${runTime} 错峰队列（MiniMax-H3）`;
+  }
   const s4q = $("#btnStage4QueueSch");
-  if (s4q) s4q.textContent = `加入 ${runTime} 错峰队列（Colab 提骨）`;
+  if (s4q) {
+    s4q.classList.toggle("isQueued", Boolean(curMocapItem));
+    s4q.textContent = curMocapItem
+      ? `✓ 已排入 ${curMocapItem.scheduledTime || runTime} 错峰队列（点此查看）`
+      : `加入 ${runTime} 错峰队列（Colab 提骨）`;
+  }
 
   if ($("#schEnabled")) $("#schEnabled").checked = Boolean(sch.enabled);
   if ($("#schAutoStop")) $("#schAutoStop").checked = sch.autoStopAfterBatch !== false;
   if ($("#schAutoDefer")) $("#schAutoDefer").checked = sch.autoDeferToAfternoon !== false;
   if ($("#schRunTime") && document.activeElement !== $("#schRunTime")) $("#schRunTime").value = runTime;
   $$(".mwSchPreset").forEach((b) => b.classList.toggle("active", b.dataset.time === runTime));
+
+  const heroTime = $("#schHeroTime");
+  if (heroTime) {
+    const nextSlot = pendingItems[0]?.scheduledTime || runTime;
+    heroTime.textContent = sch.runningBatch ? "执行中" : sch.enabled ? nextSlot : "已暂停";
+  }
   if ($("#schNextRunText")) $("#schNextRunText").textContent = sch.nextRunText || "—";
-  if ($("#schQueueTitle")) $("#schQueueTitle").textContent = `队列任务 (${items.length}，待执行 ${pendingCount})`;
+  if ($("#schQueueTitle")) $("#schQueueTitle").textContent = `排队任务 (${pendingCount} 待执行 / 共 ${items.length})`;
 
   const runBtn = $("#btnSchRunNow");
   if (runBtn) {
@@ -1709,19 +1733,21 @@ function renderScheduleUI() {
   if (!listEl) return;
   listEl.innerHTML = "";
   if (!items.length) {
-    listEl.innerHTML = `<div class="mwSchEmpty">暂无排队任务。可在 03/04 阶段点「加入 ${escapeHtml(runTime)} 错峰队列」，或点上方一键批量入队</div>`;
+    listEl.innerHTML = `<div class="mwSchEmpty">暂无排队任务<br>可在 03/04 阶段点「加入 ${escapeHtml(runTime)} 错峰队列」，或点上方快捷批量入队</div>`;
     return;
   }
   for (const it of items) {
     const isRun = it.status === "running";
     const isErr = it.status === "failed";
     const isDone = it.status === "succeeded";
+    const isCur = cur && it.taskId === cur.id;
     const row = document.createElement("div");
-    row.className = `mwSchItem ${isRun ? "isRun" : ""} ${isErr ? "isErr" : ""}`;
+    row.className = `mwSchItem ${isCur ? "isCurrent" : ""} ${isRun ? "isRun" : ""} ${isDone ? "isDone" : ""} ${isErr ? "isErr" : ""}`;
+    row.title = "点击跳转到该动作对应阶段";
     const kindLabel =
       it.kind === "stage4_mocap"
-        ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}${it.fallbackToModal ? " → Modal兜底" : ""}`
-        : `H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
+        ? `Colab 提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}${it.fallbackToModal ? " → Modal" : ""}`
+        : `MiniMax-H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
     const itemSlot = it.scheduledTime || runTime;
     const deferCnt = Array.isArray(it.deferHistory) ? it.deferHistory.length : it.deferredFrom ? 1 : 0;
     const stText = isRun
@@ -1731,22 +1757,33 @@ function renderScheduleUI() {
       : isErr
       ? "失败"
       : deferCnt > 0
-      ? `待 ${itemSlot} · 已顺延 ${deferCnt} 次`
+      ? `待 ${itemSlot} · 顺延 ${deferCnt} 次`
       : `待 ${itemSlot}`;
+    const showDetailMsg = isErr || isRun || deferCnt > 0 || isDone;
     row.innerHTML = `
       <div class="mwSchItemMain">
         <div class="mwSchItemTop">
-          <span class="mwMono">${escapeHtml(it.beatCode)}</span>
-          <span class="mwSchItemKind">${escapeHtml(kindLabel)}</span>
-          <span>${escapeHtml(it.taskTitle)}</span>
+          <span class="mwSchItemCode">${escapeHtml(it.beatCode)}</span>
+          <span class="mwSchItemTitle">${escapeHtml(it.taskTitle)}</span>
         </div>
-        <div class="mwSchItemMsg">[${stText}] ${escapeHtml(it.message || "")}</div>
+        <div class="mwSchItemBot">
+          <span class="mwSchItemKind">${escapeHtml(kindLabel)}</span>
+          <span class="mwSchStateChip">${escapeHtml(stText)}</span>
+        </div>
+        ${showDetailMsg && it.message ? `<div class="mwSchItemMsg">${escapeHtml(it.message)}</div>` : ""}
       </div>
       ${isRun ? "" : `<button class="mwIconBtn" type="button" data-del-sch="${escapeHtml(it.id)}" title="移出队列">✕</button>`}
     `;
+    row.onclick = () => {
+      appState.selectedTaskId = it.taskId;
+      appState.activeStage = it.kind === "stage4_mocap" ? 4 : 3;
+      setScheduleDrawer(false);
+      renderAll();
+    };
     const delBtn = row.querySelector("[data-del-sch]");
     if (delBtn) {
-      delBtn.onclick = async () => {
+      delBtn.onclick = async (ev) => {
+        ev.stopPropagation();
         try {
           const res = await api(`/api/schedule/items/${encodeURIComponent(it.id)}`, { method: "DELETE" });
           appState.schedule = res.schedule;
