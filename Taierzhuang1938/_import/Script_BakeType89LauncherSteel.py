@@ -24,7 +24,7 @@ FINISHES = {
     "Barrel": (0, (184, 178, 162), (74, 69, 61), .63, (.244, .56), (.96, .61), .64),
     "Stem": (1, (155, 151, 141), (77, 69, 61), .51, (.29, .60), (.96, .53), .71),
     "Collar": (0, (180, 177, 164), (82, 72, 62), .50, (.215, .54), (.98, .53), .43),
-    "Knurl": (3, (155, 154, 148), (63, 57, 49), .49, (.34, .64), (.95, .44), .79),
+    "Knurl": (3, (150, 148, 140), (61, 55, 47), .49, (.36, .64), (.95, .44), .79),
     "Sleeve": (1, (129, 125, 114), (48, 42, 37), .63, (.36, .65), (.94, .42), .62),
     "Saddle": (2, (119, 128, 129), (70, 74, 73), .59, (.48, .76), (.88, .34), .92),
     "Tab": (2, (158, 149, 136), (86, 73, 60), .51, (.35, .68), (.95, .41), .73),
@@ -347,18 +347,32 @@ def BakeRegion(name, sample, size, index, reference):
         heightField += (.106 if name == "Barrel" else .23) * brushing
         roughnessDelta -= (.026 if name == "Barrel" else .037) * brushing
     if name == "Knurl":
-        angular = reference["knurl"]["angularCycles"] * xx
-        axial = reference["knurl"]["axialCycles"] * vv
-        left, right = np.mod(angular + axial, 1), np.mod(angular - axial, 1)
+        knurl = reference["knurl"]
+        angular = knurl["angularCycles"] * xx
+        axial = knurl["axialCycles"] * vv
+        phaseA, phaseB = angular + axial, angular - axial
+        left, right = np.mod(phaseA, 1), np.mod(phaseB, 1)
         diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
-        shoulders = np.clip((diamonds - .04) / .63, 0, 1)
-        grooves = np.clip(1 - diamonds / .37, 0, 1) ** .83
+        shoulders = np.clip((diamonds - .05) / .55, 0, 1)
+        grooves = np.clip(1 - diamonds / .34, 0, 1) ** .83
         chip = UnitVariation(luminance, .42, 2.15)
-        chippedCrests = shoulders * np.clip(.60 + .21 * chip - .13 * medium, .12, 1)
-        tonalDelta += 6.8 * chip + 3.3 * (shoulders - .45) - 5.5 * grooves
-        heightField += 1.54 * shoulders + .12 * chip * shoulders
-        oxidation += .127 * grooves
-        roughnessDelta += .075 * grooves - .047 * shoulders
+        centerA, centerB = np.floor(phaseA) + .5, np.floor(phaseB) + .5
+        centerU = np.mod((centerA + centerB) / (2 * knurl["angularCycles"]), 1)
+        centerV = np.clip((centerA - centerB) / (2 * knurl["axialCycles"]), 0, 1)
+        columns = np.rint(padding + centerU * (width - 2 * padding)).astype(np.int32)
+        rows = np.rint(padding + (1 - centerV) * (height - 2 * padding)).astype(np.int32)
+        cellWear = chip[rows, columns]
+        photoTone, photoWarmth, coverage = PhotographicGrain(knurl["wear"], (xx + .5) % 1 - .5, vv)
+        photoTone *= coverage
+        photoWarmth *= coverage
+        wornHeight = np.clip(.91 + .16 * cellWear, .55, 1.11) * (1 - .10 * coverage)
+        exposedArea = np.clip((diamonds - .26) / .56, 0, 1)
+        chippedCrests = exposedArea * np.clip(.60 + .16 * chip + .22 * cellWear - .13 * medium, .09, 1)
+        tonalDelta += 6.8 * chip + 3.3 * (shoulders - .45) - 5.5 * grooves + 101 * photoTone
+        heightField += 1.43 * shoulders * wornHeight + .12 * chip * shoulders + .21 * photoTone
+        oxidation += .127 * grooves + .10 * photoWarmth
+        warmth += .32 * photoWarmth
+        roughnessDelta += .075 * grooves - .047 * shoulders - .11 * photoTone
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -420,15 +434,15 @@ def BakeRegion(name, sample, size, index, reference):
     if name == "Knurl":
         # The dark bottoms retain oxide while worn metal catches light on
         # the irregular diamond shoulders.
-        dark = .83 * grooves
-        recessColor = SrgbToLinear(np.array([35, 32, 27], dtype=np.float32) / 255)
+        dark = .83 * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
+        recessColor = SrgbToLinear(np.array([40, 36, 30], dtype=np.float32) / 255)
         linear += (recessColor - linear) * dark[..., None]
         rough += (.73 - rough) * dark
         metal += (.30 - metal) * dark
         exposed = .65 * chippedCrests
-        crestColor = SrgbToLinear(np.array([171, 164, 150], dtype=np.float32) / 255)
+        crestColor = SrgbToLinear(np.array([159, 152, 140], dtype=np.float32) / 255)
         linear += (crestColor - linear) * exposed[..., None]
-        rough += (.34 - rough) * exposed
+        rough += (.378 - rough) * exposed
         metal += (.94 - metal) * exposed
     if name in REGISTERED_FINISHES:
         tint, channel, finishRoughness, finishMetal, influence, smoothing = REGISTERED_FINISHES[name]
@@ -466,7 +480,7 @@ def BakeRegion(name, sample, size, index, reference):
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
     if name in ("Barrel", "Collar", "CollarRing", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
-        seamWidth = 6 if name in ("RearEye", "Wheel") else 24
+        seamWidth = 6 if name in ("Knurl", "RearEye", "Wheel") else 24
         base = SeamBlend(base, pixels=seamWidth)
         heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
         surface = SeamBlend(surface, pixels=seamWidth)
@@ -538,8 +552,10 @@ def Bake():
     record = json.loads(recordPath.read_text(encoding="utf-8"))
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
-    for region, key in (("Barrel", "barrelDetail"), ("CollarRing", "collarDetail")):
-        detail = reference["closeups"][region]["detail"]
+    details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
+               "collarDetail": reference["closeups"]["CollarRing"]["detail"],
+               "knurlWear": reference["knurl"]["wear"]["detail"]}
+    for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
     recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

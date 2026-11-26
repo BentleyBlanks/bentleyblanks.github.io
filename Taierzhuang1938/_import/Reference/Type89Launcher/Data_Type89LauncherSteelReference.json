@@ -1232,7 +1232,24 @@
     "axialCyclesPerPixel": 0.0367,
     "angularCyclesPerPixel": 0.05714,
     "axialCycles": 31,
-    "angularCycles": 57
+    "angularCycles": 57,
+    "wear": {
+      "footprint": {
+        "uCenter": 0.02227,
+        "uHalfSpan": 0.09188,
+        "vRange": [0.44433, 0.69863]
+      },
+      "detail": {
+        "file": "Texture_Type89LauncherKnurlDetail.png",
+        "sha256": "e3f53dc1bf40e6ab93d50f3fd54f8b96f903caa0545d90551f963536e6b8514a",
+        "toneScale": 300,
+        "warmthScale": 520
+      },
+      "removedFrequencies": [
+        [0.03555, -0.05571],
+        [0.03784, 0.06]
+      ]
+    }
   },
   "ringFinish": {
     "front": {

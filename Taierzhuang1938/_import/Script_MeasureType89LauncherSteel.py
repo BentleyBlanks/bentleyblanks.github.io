@@ -14,6 +14,7 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
+KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 
 
 def Photo(folder, number):
@@ -99,7 +100,7 @@ def OverallBarrelPatina(folder, footprint):
     return {"source": source, "footprint": footprint, **PatinaMap(samples)}
 
 
-def WriteDetailPlate(image, xs, ys, path, excluded=()):
+def PhotoResiduals(image):
     photo = Image.fromarray(image.astype(np.uint8))
     fine = np.asarray(photo.filter(ImageFilter.GaussianBlur(.58)), dtype=np.float32)
     surround = np.asarray(photo.filter(ImageFilter.GaussianBlur(8.0)), dtype=np.float32)
@@ -109,13 +110,10 @@ def WriteDetailPlate(image, xs, ys, path, excluded=()):
     warmth = ((fine[..., 0] - fine[..., 2]) / np.maximum(lightness, 30)
               - (surround[..., 0] - surround[..., 2]) / np.maximum(envelope, 30))
 
-    valid = Image.new("L", photo.size, 255)
-    draw = ImageDraw.Draw(valid)
-    for box in excluded:
-        draw.rectangle(box, fill=0)
-    confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(8)), dtype=np.float32) / 255
-    confidence *= np.clip((245 - lightness) / 30, 0, 1)
+    return tone, warmth, lightness
 
+
+def SaveDetailPlate(tone, warmth, confidence, xs, ys, path):
     height, width = xs.shape
     us, vs = np.meshgrid(np.linspace(0, 1, width), np.linspace(0, 1, height))
     edge = np.clip(14 * np.minimum(np.minimum(us, 1 - us), np.minimum(vs, 1 - vs)), 0, 1)
@@ -128,6 +126,17 @@ def WriteDetailPlate(image, xs, ys, path, excluded=()):
     detail.save(path, optimize=True)
     return {"file": path.name, "sha256": sha256(path.read_bytes()).hexdigest(),
             "toneScale": toneScale, "warmthScale": warmthScale}
+
+
+def WriteDetailPlate(image, xs, ys, path, excluded=()):
+    tone, warmth, lightness = PhotoResiduals(image)
+    valid = Image.new("L", (image.shape[1], image.shape[0]), 255)
+    draw = ImageDraw.Draw(valid)
+    for box in excluded:
+        draw.rectangle(box, fill=0)
+    confidence = np.asarray(valid.filter(ImageFilter.GaussianBlur(8)), dtype=np.float32) / 255
+    confidence *= np.clip((245 - lightness) / 30, 0, 1)
+    return SaveDetailPlate(tone, warmth, confidence, xs, ys, path)
 
 
 def BarrelDetail(image, projection, halfSpan):
@@ -446,6 +455,44 @@ def WheelFinish(folder):
                     "oxide": np.rint(100 * rust).astype(int).tolist(), "toothDetail": fine}}
 
 
+def KnurlWear(image, bounds):
+    left, top, right, bottom = bounds
+    selection = np.s_[top:bottom, left:right]
+    tone, warmth, lightness = (field[selection] for field in PhotoResiduals(image))
+    h, w = tone.shape
+    window = np.hanning(h)[:, None] * np.hanning(w)[None, :]
+    amplitude = np.abs(np.fft.rfft2(tone * window, s=(h * 4, w * 4)))
+    fx = np.fft.rfftfreq(w * 4)[None, :]
+    fy = np.fft.fftfreq(h * 4)[:, None]
+    band = (fx > .025) & (fx < .052) & (abs(fy) > .041) & (abs(fy) < .077)
+    peaks = [np.unravel_index(np.where(band & (sign * fy > 0), amplitude, 0).argmax(), amplitude.shape)
+             for sign in (-1, 1)]
+    frequencies = [(float(fx[0, j]), float(fy[i, 0])) for i, j in peaks]
+    yy, xx = np.indices((h, w))
+    phaseA, phaseB = (2 * np.pi * (px * xx + py * yy) for px, py in frequencies)
+    # Keep the measured variations between crests. The regular diamond
+    # response and its first harmonics are built separately during baking.
+    modes = [phaseA, phaseB, 2 * phaseA, 2 * phaseB, phaseA + phaseB, phaseA - phaseB]
+    basis = np.column_stack([fn(phase.ravel()) for phase in modes for fn in (np.cos, np.sin)])
+    signals = np.column_stack((tone.ravel(), warmth.ravel()))
+    weights = np.sqrt(window.ravel())[:, None]
+    fitted = np.linalg.lstsq(basis * weights, signals * weights, rcond=None)[0]
+    irregularTone, irregularWarmth = (signals - basis @ fitted).T.reshape(2, h, w)
+
+    # This photo crop matches the visible UV window in the side inspection.
+    # U crosses the UV seam, while V follows the horizontal axis in the photo.
+    center, halfSpan = .02227, .09188
+    footprint = {"uCenter": center, "uHalfSpan": halfSpan, "vRange": [.44433, .69863]}
+    us, vs = np.meshgrid(np.linspace(0, 1, 200), np.linspace(0, 1, 216))
+    srcX = (w - 1.01) * vs
+    arc = np.sin(2 * np.pi * halfSpan * (2 * us - 1)) / np.sin(2 * np.pi * halfSpan)
+    srcY = (h - 1.01) * (.5 - .5 * arc)
+    confidence = np.clip((247 - lightness) / 25, 0, 1)
+    detail = SaveDetailPlate(irregularTone, irregularWarmth, confidence, srcX, srcY, KNURL_DETAIL)
+    return {"footprint": footprint, "detail": detail,
+            "removedFrequencies": [[round(x, 5), round(y, 5)] for x, y in frequencies]}
+
+
 def KnurlFrequency(folder):
     image, source = Photo(folder, 3)
     x0, y0, x1, y1 = bounds = [665, 338, 883, 513]
@@ -462,7 +509,8 @@ def KnurlFrequency(folder):
     source["sampleBounds"] = bounds
     return {"source": source, "axialCyclesPerPixel": round(axial, 5),
             "angularCyclesPerPixel": round(angular, 5),
-            "axialCycles": round(axial * 345 / .406), "angularCycles": round(angular * np.pi * 316)}
+            "axialCycles": round(axial * 345 / .406), "angularCycles": round(angular * np.pi * 316),
+            "wear": KnurlWear(image, bounds)}
 
 
 def Main():
