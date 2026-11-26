@@ -1,6 +1,6 @@
 {
   "generator": "audit",
-  "date": "2026-11-26",
+  "date": "2026-11-27",
   "name": "Dadao",
   "preset": null,
   "source": null,
@@ -16,44 +16,44 @@
       "file": "Texture_DadaoBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 577842,
-      "sha256": "d2931de9af35deac2e464fc5867e6ed79ff3737cd12d111058da09dc9bf7530c"
+      "bytes": 573698,
+      "sha256": "0505630f86ae630c619e177053c579db3feb492b1227bd0f43449fe5e97b38b0"
     },
     {
       "channel": "Normal",
       "file": "Texture_DadaoNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 11174,
-      "sha256": "2ee99e3bf904957d5d25ba0abb05b3bfa4fad788ae0adf90982ca579f4d62b81"
+      "bytes": 9004,
+      "sha256": "27f02dc6df678ec5efd40b24b1f9e0fb604f9457bea8eb7ebeba30a874a4412a"
     },
     {
       "channel": "Orm",
       "file": "Texture_DadaoOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 39122,
-      "sha256": "f0e1385bd45479d1fab417b646d86ec98b392128a85c6d3ff1cc21554d116017"
+      "bytes": 42984,
+      "sha256": "65aac8794f6be65f80979ad95a8c394e7ed59f0fcdd190ca97e73a599867ee61"
     }
   ],
-  "totalBytes": 628138,
+  "totalBytes": 625686,
   "metrics": {
     "meanSrgb": [
-      0.5981,
-      0.6022,
-      0.604
+      0.6508,
+      0.5931,
+      0.5497
     ],
-    "luma": 0.6014,
-    "lumaStd": 0.1313,
-    "sat": 0.0098,
-    "clipLow": 0.0022,
-    "clipHigh": 0.0,
-    "lowFreq": 0.1104,
-    "seam": 0.1207,
-    "interior": 0.0886,
-    "seamRatio": 1.362,
-    "border": 0.18,
-    "swing": 0.129,
+    "luma": 0.5979,
+    "lumaStd": 0.1326,
+    "sat": 0.1554,
+    "clipLow": 0.0,
+    "clipHigh": 0.0001,
+    "lowFreq": 0.1475,
+    "seam": 0.1665,
+    "interior": 0.0841,
+    "seamRatio": 1.979,
+    "border": 0.731,
+    "swing": 0.1267,
     "texelsPerMeter": null
   },
   "gateProblems": []

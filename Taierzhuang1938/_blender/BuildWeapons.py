@@ -35,7 +35,7 @@
 import math
 
 from TzmCore import Box, Join, Lathe, Loft, Node, RibbonYz, Ring, Transform, TubeY
-from Script_BuildSichuanDadao import BuildDadao
+from Script_BuildYangYunfengDadao import BuildDadao
 
 PI = math.pi
 BORE = 0.035          # 膛线轴高

@@ -6,18 +6,18 @@
   "assetReviews": [
     {
       "asset": "Dadao",
-      "date": "2026-11-26",
+      "date": "2026-11-27",
       "runtimeAsset": "Model/Model_Dadao.tzm.json",
       "assetContract": "_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md",
-      "decision": "The upper object in the Jianchuan group photograph supplies the visible profile. The 1938 Taierzhuang museum object corroborates the presence of a broad head and pommel ring on contemporary military dadao. The 122nd Division specimen and its unseen surfaces remain unverified.",
+      "decision": "The photograph of a dadao donated by 29th Army veteran Yang Yunfeng supplies the visible profile. The widening and unseen surfaces are art direction for the game. The shape of the 122nd Division specimen remains unverified.",
       "notionSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-11-25T16:54:57.940Z"
+          "lastEdited": "2026-11-26T20:38:05.097Z"
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-11-25T16:54:59.416Z"
+          "lastEdited": "2026-11-26T20:38:02.889Z"
         }
       ]
     },
