@@ -305,6 +305,8 @@ void main(){
   gradient=(relief-normal*dot(normal,relief))*(1.-.39*polish);
 #ifdef STOCK_CREST_WEAR
   {
+   // Keep the handling stain at the stock wrist within the shared walnut tone.
+   visible*=1.+.033*patch(p,vec3(.053,0.,-.006),vec3(.061,.068,.036));
    float face=smoothstep(.25,.77,abs(normal.y));
    float crest=(1.-smoothstep(-.055,.090,p.x))*smoothstep(.31,.90,normal.z);
    finishMask.r=crest*(.60+.30*polish)*(1.-.44*pores);
@@ -394,10 +396,10 @@ void main(){
   float oxidation=smoothstep(.47,.78,.39*mottling+.22*film+.39*fine);
   float pitting=clamp(.83*cavity+.17*oxidation,0.,1.);
 
-  float length=max(.001,alongRange.y-alongRange.x);
-  float section=clamp((p.x-alongRange.x)/length,0.,1.);
+  float partLength=max(.001,alongRange.y-alongRange.x);
+  float section=clamp((p.x-alongRange.x)/partLength,0.,1.);
   float height=clamp((p.z-heightRange.x)/max(.002,heightRange.y-heightRange.x),0.,1.);
-  float tip=min(section,1.-section)*length;
+  float tip=min(section,1.-section)*partLength;
   float rim=band?(1.-smoothstep(.00009,.00140,tip))*(.62+.38*fine):0.;
   float shoulder=abs(normal.z);
   float rub=.18+.09*worn+.09*cloud;
@@ -423,6 +425,8 @@ void main(){
    rub=.15+.14*smoothstep(.30,.84,normal.z);
   }else if(steelDetail==5){
    rub=.25+.11*mottling;
+  }else if(steelDetail==6){
+   rub=.17+.11*mottling+.08*shoulder;
   }else if(steelDetail==4){
    rub=.14+.08*shoulder+.07*cloud;
   }
@@ -460,6 +464,22 @@ void main(){
   vec3 relief=gradient*(.15+.041*film)+agedSlope*(.106+.146*film)
              +poreSlope*(.104+.149*film)+.118*cleaned*trackSlope*up;
   relief*=1.-.44*edge;
+  if(steelDetail==6){
+   // Satin on the rear cheeks and cap, with the bright cast limited to their lips.
+   rough=mix(rough,.510+.049*mottling,.62*(1.-edge));
+   visible*=mix(vec3(.91,.93,.95),vec3(1.),edge);
+   relief*=.69+.31*edge;
+  }
+  if(guard){
+   vec2 toOpening=vec2(.104-p.x,-.012-p.z);
+   float reach=smoothstep(.063,.076,p.x)*(1.-smoothstep(.134,.144,p.x));
+   float inward=dot(normal.xz,toOpening/max(length(toOpening),.0001));
+   float wall=reach*smoothstep(.32,.84,inward)*(1.-.85*edge);
+   // The continuous inner wall has a coherent satin response under raking light.
+   rough=mix(rough,.567+.048*mottling+.025*pitting,.91*wall);
+   visible*=1.-wall*(.12+.05*film);
+   relief*=1.-.64*wall;
+  }
   gradient=relief-normal*dot(normal,relief);
  }
  base=vec4(visible,1.);

@@ -198,6 +198,12 @@ The front band uses a closed oval loft with rounded outer lips and eased inner r
 
 The walnut bake adds fine grain along the carved volume and varies the worn oil across all three pieces. The steel bake separates neutral oxide, localized pits and satin machining marks from polished edges. The stock flanks are clear of lettering. The runtime retains 44 meshes at 79,584 triangles. The archive contains matched R29 and R30 views from the weapon inspection bench and captures of Albedo, Roughness, Reflection and Normal. [Te Papa DM000453](https://collections.tepapa.govt.nz/object/58119) · [Steven Lu, upper surfaces](https://armsofchina.com/wp-content/uploads/2026/04/142.jpg)
 
+### R31 receiver joint, rear cheeks and guard lighting
+
+The handguard heel sits beneath the stock flank on both sides. A local taper carries the upper end underneath the collar. The stock and handguard mounts share the same walnut stain. The asset test sweeps the two stock flanks at their joint.
+
+The rear cheeks use closed profiles with rounded returns. The satin finish carries across the cheeks and cap, with brighter wear on their lips. The guard opening has a rounded inner lip and a continuous satin wall. Short rays into the opening add the visibility of the opposite wall to the AO bake. The R31 inspection archive captures the three areas from the feedback view in the actual game inspection bench. [Te Papa DM000453, side detail](https://media.tepapa.govt.nz/collection/131366/preview) · [Te Papa DM000453, alternate view](https://media.tepapa.govt.nz/collection/131367/preview)
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.

@@ -55,6 +55,8 @@ def MeasureContact(name, parts, radius, directions):
         cornerPositions.extend(positions.tolist())
         cornerFaces.extend((faces+np.int32(offset)).tolist())
     tree = BVHTree.FromPolygons(cornerPositions, cornerFaces, all_triangles=True)
+    guard = name.startswith('LowerPlateGuard_')
+    lining = BVHTree.FromPolygons(vertices.tolist(), parts[name][2].tolist(), all_triangles=True) if guard else None
     samples, inverse = np.unique(np.round(np.column_stack((vertices, normals)), 6), axis=0, return_inverse=True)
     values = []
     for row in samples:
@@ -63,12 +65,22 @@ def MeasureContact(name, parts, radius, directions):
         axis = Vector((0, 1, 0)) if abs(normal.y)<.9 else Vector((0, 0, 1))
         tangent = normal.cross(axis).normalized()
         bitangent = normal.cross(tangent)
+        # The walls around the guard opening obscure the opposite return.
+        # Keep that shallow cavity shadow local to its inward-facing surface.
+        inside = lining is not None and -.142 < row[2] < -.063 and -.029 < row[1] < .001
+        if inside:
+            centre = Vector((0., -.012-row[1], -.104-row[2]))
+            inside = centre.length > 1e-6 and normal.dot(centre.normalized()) > .42
         obscured = 0.
         for first, second, third in directions:
             ray = tangent*first+bitangent*second+normal*third
             distance = tree.ray_cast(origin, ray, radius)[3]
-            if distance is not None:
-                obscured += (1.-distance/radius)**1.5
+            blockage = (1.-distance/radius)**1.5 if distance is not None else 0.
+            if inside:
+                innerDepth = lining.ray_cast(origin, ray, .028)[3]
+                if innerDepth is not None:
+                    blockage = max(blockage, .85*(1.-innerDepth/.028)**1.3)
+            obscured += blockage
         values.append(1.-obscured/len(directions))
     return np.asarray(values, dtype='<f4')[inverse].reshape(-1)
 
@@ -80,6 +92,7 @@ assert not bpy.data.filepath or Path(bpy.data.filepath).resolve().parent == revi
 importDirectory=Path.cwd()/'Taierzhuang1938/_import'
 assert (importDirectory/'Script_HanYangTimberFrames.py').is_file(),'Start the owned Blender session from the worktree root'
 sys.path.insert(0,str(importDirectory))
+from Script_HanYangReceiverFinish import ShapeReceiverWood
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
 from Script_HanYangBandProfiles import FormInspectionBand, SeatFrontBandTimber, SeatRearBandTimber, ShapeStockEnd
 incoming = ReadMesh(revision/'Input_R2.glb', '6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d')
@@ -118,7 +131,7 @@ for name in timber:
         streams['handling'] = timber[name]
         streams, faces = SeatFrontBandTimber(streams, faces, bandBounds)
         timber[name] = streams.pop('handling')
-    streams = SeatRearBandTimber(name, streams)
+    streams = ShapeReceiverWood(name, SeatRearBandTimber(name, streams))
     parts[name] = streams['POSITION'], streams['NORMAL'], faces.reshape(-1, 3)
 np.savez_compressed(geometryDirectory/'Data_TimberHandling.npz', **timber)
 with np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=False) as bevels:
@@ -131,4 +144,4 @@ for name in ('FrontBand_ContinuousEnvelopeContact', 'RearBand_ControlledCrown'):
     parts[name] = shaped['POSITION'], shaped['NORMAL'], faces.reshape(-1, 3)
 result = {name: MeasureContact(name, parts, .004, directions) for name in parts}
 np.savez_compressed(geometryDirectory/'Data_ContactVisibility.npz', **result)
-print('Fixed exterior contact fields:', {name: (len(value), int(np.sum(value<.90))) for name, value in result.items()})
+print('Exterior contact fields and guard cavity:', {name: (len(value), int(np.sum(value<.90))) for name, value in result.items()})

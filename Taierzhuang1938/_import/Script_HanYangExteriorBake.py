@@ -6,6 +6,7 @@ import os
 import struct
 from pathlib import Path
 import moderngl
+from Script_HanYangReceiverFinish import ShapeReceiverWood
 from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
 from Script_HanYangBandProfiles import FormInspectionBand, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
@@ -23,7 +24,7 @@ bevels = np.load(geometryDirectory/'Data_InspectionBevels.npz', allow_pickle=Fal
 contactFields = np.load(geometryDirectory/'Data_ContactVisibility.npz', allow_pickle=False)
 timberHandling = np.load(geometryDirectory/'Data_TimberHandling.npz', allow_pickle=False)
 report = json.loads((revision/'Input_R2.json').read_text())
-version = '173R-20261126R30'
+version = '173R-20261126R31'
 context = moderngl.create_standalone_context()
 vertexShader = '''#version 330
 in vec2 uv; in vec3 pos; in vec3 normal; in vec4 tangent; in float access,handling,rounded;
@@ -39,10 +40,11 @@ steelDetails = {
     'HandledCylinder': 1,
     'HandleNeck': 2,
     'HandleRoot': 5,
-    'RearSmallCover': 2,
+    'RearSmallCover': 6,
     'RearSmallPin': 2,
     'RearCockingExterior': 3,
-    'RearOuterCover_RoundedSideReturn': 3,
+    'RearOuterCover_RoundedSideReturn': 6,
+    'RearTab': 6,
     'RearTopExternalLever': 3,
     'Sight_LowContinuousLeaf_NoUnknownNumbers': 4,
     'Sight_LowCrossPiece': 4,
@@ -141,6 +143,9 @@ for node in doc['nodes']:
             modifiedSurfaces[name]=(streams['POSITION'],faceIndices)
         if name in report['materialMatch']['woodParts']:
             streams=SeatRearBandTimber(name,streams)
+        if name.startswith(('MainWood_', 'UpperWood_')):
+            streams=ShapeReceiverWood(name,streams)
+            modifiedSurfaces[name]=(streams['POSITION'],faceIndices)
         if bevelChart:
             before=faceIndices.size//3
             streams={key:bevels[name+'_'+key] for key in streams}
@@ -297,7 +302,7 @@ for name,distances in audit.items():
     partRecords[name].update(gameToSourceMaxM=distances['toDotsM'],sourceToGameMaxM=distances['fromDotsM'])
 report['exteriorFinish'].update(surfaceComparisons=audit,deviationScope='Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.')
 report['textureFill']='Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.'
-report['rebake']='R30: rolled band edges, rounded exposed steel, aged walnut fibres and localized satin steel wear.'
+report['rebake']='R31: seated receiver joint, rounded rear steel and a shaded guard return.'
 report['exteriorFinish']['inspectionBevels']=beveledParts
 report['exteriorFinish']['materialSampling']='Blended scan patches in object space with per-cell offsets and orientation. Steel plate joints are outside the sampled swatches.'
 report['exteriorFinish']['rearBandRibTriangles']=int(bandProfiles['RearBand_ControlledCrown'][1].size//3)
@@ -309,7 +314,7 @@ report['exteriorFinish']['smoothedCrestNormals']=crestNormalCount
 report['exteriorFinish']['endFrameRepairs']=endFrameRepairs
 report['runtimeNormalPacking']={'runtimeBits':8,'images':44,'source':'OpenGL material normals reoriented into the exported tangent frame, independent of pigment.'}
 report['runtimeLosslessPacking']='Per-image WebP lossless; round-trip RGB equality checked.'
-report['exteriorFinish']['contactVisibility']={'parts':sorted(contactFields.files),'channel':'linear ORM red','strength':.85,'sampling':'32 cosine-weighted directions per fixed exterior vertex; inter-part only, short range with distance falloff.'}
+report['exteriorFinish']['contactVisibility']={'parts':sorted(contactFields.files),'channel':'linear ORM red','strength':.85,'sampling':'32 cosine-weighted directions per fixed exterior vertex. The guard return also samples the opposite inner wall.'}
 doc['asset']['extras'].update(gameTriangles=report['triangles'],materialMatch=version,rebake=report['rebake'],calibratedBaseColor=True);doc['extensionsRequired']=['EXT_texture_webp']
 header=json.dumps(doc,separators=(',',':')).encode();header+=b' '*((-len(header))%4);out=struct.pack('<4sII',b'glTF',2,28+len(header)+len(payload))+struct.pack('<I4s',len(header),b'JSON')+header+struct.pack('<I4s',len(payload),b'BIN\0')+payload
 report['gameSha256']=hashlib.sha256(out).hexdigest()

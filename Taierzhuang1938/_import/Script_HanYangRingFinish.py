@@ -1,7 +1,7 @@
 """Static display pose and continuous shading of the two exterior strap rings."""
 import numpy as np
 from scipy.spatial.transform import Rotation
-from scipy.spatial import ConvexHull
+from scipy.spatial import ConvexHull, cKDTree
 
 
 DisplayPoses = {
@@ -126,20 +126,37 @@ def CloseFittingShell(name, streams, triangles, rearBandBounds=None):
 
 
 def VertexDistance(points, targetPositions, targetIndices):
-    faces=targetPositions[targetIndices.reshape(-1,3)].astype(np.float64)
-    first,second,third=faces[:,0],faces[:,1],faces[:,2]
-    planes=np.cross(second-first,third-first)
-    planes/=np.maximum(np.linalg.norm(planes,axis=1)[:,None],1e-20)
-    worst=0.
-    for point in np.unique(points,axis=0):
-        height=((point-first)*planes).sum(axis=1)
-        projected=point-height[:,None]*planes
-        inside=np.linalg.norm(planes,axis=1)>.5
-        nearest=np.full(len(faces),np.inf)
-        for start,end in ((first,second),(second,third),(third,first)):
-            edge=end-start
-            inside&=(np.cross(edge,projected-start)*planes).sum(axis=1)>=-1e-15
-            fraction=np.clip(((point-start)*edge).sum(axis=1)/np.maximum((edge*edge).sum(axis=1),1e-25),0.,1.)
-            nearest=np.minimum(nearest,np.linalg.norm(point-start-fraction[:,None]*edge,axis=1))
-        worst=max(worst,float(np.where(inside,abs(height),nearest).min()))
+    faces = targetPositions[targetIndices.reshape(-1,3)].astype(np.float64)
+    centres = faces.mean(axis=1)
+    radii = np.linalg.norm(faces-centres[:, None],axis=2).max(axis=1)
+    planes = np.cross(faces[:,1]-faces[:,0],faces[:,2]-faces[:,0])
+    planes /= np.maximum(np.linalg.norm(planes,axis=1)[:,None],1e-20)
+    size = np.floor(np.log2(np.maximum(radii,1e-12))).astype(int)
+    groups = []
+    for value in np.unique(size):
+        members = np.flatnonzero(size == value)
+        groups.append((cKDTree(centres[members]), members, radii[members].max()))
+    points = np.unique(points,axis=0)
+    upperBounds = cKDTree(faces.reshape(-1,3)).query(points)[0]
+
+    worst = 0.
+    for point, upper in zip(points, upperBounds):
+        # A face outside its group's search radius cannot be closer than the
+        # nearest actual mesh vertex. Measure the remaining faces exactly.
+        neighbours = np.concatenate([
+            members[tree.query_ball_point(point,upper+radius+1e-10)]
+            for tree, members, radius in groups
+        ])
+        first, second, third = faces[neighbours].transpose(1,0,2)
+        normals = planes[neighbours]
+        height = ((point-first)*normals).sum(axis=1)
+        projected = point-height[:,None]*normals
+        inside = np.linalg.norm(normals,axis=1)>.5
+        nearest = np.full(len(neighbours),np.inf)
+        for start, end in ((first,second),(second,third),(third,first)):
+            edge = end-start
+            inside &= (np.cross(edge,projected-start)*normals).sum(axis=1)>=-1e-15
+            fraction = np.clip(((point-start)*edge).sum(axis=1)/np.maximum((edge*edge).sum(axis=1),1e-25),0.,1.)
+            nearest = np.minimum(nearest,np.linalg.norm(point-start-fraction[:,None]*edge,axis=1))
+        worst = max(worst,float(np.where(inside,abs(height),nearest).min()))
     return worst

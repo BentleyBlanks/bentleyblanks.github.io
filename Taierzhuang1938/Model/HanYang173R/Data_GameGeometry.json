@@ -1,7 +1,7 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "70fd507dcb8176dfc9e79c25ff860122ec31c94dc3c3796359e99e210d7292ac",
-  "triangles": 79584,
+  "gameSha256": "c9dd37351bb68744558c8cf99a0f8550a75907c837190d42978bc5c130b0747e",
+  "triangles": 79479,
   "repairedTangents": 45491,
   "parts": [
     {
@@ -277,14 +277,14 @@
     {
       "part": "LowerPlateGuard_FlatSideNarrowReturn",
       "sourceTriangles": 4648,
-      "gameTriangles": 3361,
-      "gameToSourceMaxM": 0.00018719816815006618,
-      "sourceToGameMaxM": 9.825297897815034e-05,
+      "gameTriangles": 3448,
+      "gameToSourceMaxM": 0.00016211975717023443,
+      "sourceToGameMaxM": 9.261664582032816e-05,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 7.61,
-        "uvCoverage": 0.23184,
+        "pxPerMm": 7.52,
+        "uvCoverage": 0.226986,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -293,12 +293,12 @@
       "part": "MainWood_ContinuousLowerShoulder",
       "sourceTriangles": 183704,
       "gameTriangles": 32211,
-      "gameToSourceMaxM": 0.004423075821250677,
-      "sourceToGameMaxM": 0.004410122521221638,
+      "gameToSourceMaxM": 0.00442307221625145,
+      "sourceToGameMaxM": 0.00441012807032521,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 4096,
-        "pxPerMm": 4.81,
+        "pxPerMm": 4.79,
         "uvCoverage": 0.175897,
         "tiledUv": false,
         "tileMeters": null
@@ -427,14 +427,14 @@
     {
       "part": "RearOuterCover_RoundedSideReturn",
       "sourceTriangles": 2936,
-      "gameTriangles": 1144,
-      "gameToSourceMaxM": 0.007182146888226271,
-      "sourceToGameMaxM": 0.008958852849900723,
+      "gameTriangles": 952,
+      "gameToSourceMaxM": 0.006529168822219472,
+      "sourceToGameMaxM": 0.010142046546120324,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 23.76,
-        "uvCoverage": 0.723268,
+        "pxPerMm": 23.41,
+        "uvCoverage": 0.691457,
         "tiledUv": false,
         "tileMeters": null
       }
@@ -653,12 +653,12 @@
       "part": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront",
       "sourceTriangles": 41590,
       "gameTriangles": 12107,
-      "gameToSourceMaxM": 0.004702415317296982,
-      "sourceToGameMaxM": 0.005104949697852135,
+      "gameToSourceMaxM": 0.00470241279827285,
+      "sourceToGameMaxM": 0.005104948007110724,
       "gameplayAdaptation": null,
       "rebake": {
         "textureSize": 2048,
-        "pxPerMm": 6.42,
+        "pxPerMm": 6.44,
         "uvCoverage": 0.32717,
         "tiledUv": false,
         "tileMeters": null
@@ -1093,56 +1093,56 @@
     {
       "name": "LongOuterSteel_TrueRound_ORM",
       "mimeType": "image/webp",
-      "sha256": "d484d07435380d39c53c4b01050e933667fc6692b5475468d8413ea8b5d16d0d",
-      "sourceSha256": "4589dec8e5043ab69ea7093cb7da49d03bfce63c71dd3ee1affb4223dfb5543f",
+      "sha256": "b6f403db4096ab5f018bb9b8e9f9869560a33a4957330018aebf6a68d767e2d0",
+      "sourceSha256": "47a563d3bf01327cf928017dfae40e40019c0f2aeadfbf5c19625a85a2285cec",
       "islandCoverage": 0.558266,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_Normal",
       "mimeType": "image/webp",
-      "sha256": "b7ac19be73b2fcf51508fc7786737d8542699653feb4845507913e0832d10e61",
-      "sourceSha256": "08350b52928ab4f81e03cc86fc76070c1bfb31e9983c62182b97930e2a0e684a",
-      "islandCoverage": 0.23184,
+      "sha256": "158a5e1b2eba1bd7fba1b3f27c3cee72314bf4062eac52e70dfad0098432d0a1",
+      "sourceSha256": "27b26825d8bf1a442e18ca2cf6435527c1d107efa73d1e7a78d2be1018721e40",
+      "islandCoverage": 0.226986,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "89bf3b484883b298d12c229d9e40c79cd79e7ff91ad7f537277b50f469a993c4",
-      "sourceSha256": "12f7a1de85dc8e131f952c803cebfc465b94342c5c66afad4a6ee758cd27b57d",
-      "islandCoverage": 0.23184,
+      "sha256": "17b729c234b3961c4abdd2ec0220daa42fd379dd0c86dfe4c4b5731999d62c81",
+      "sourceSha256": "0ed9daf1d81e327b7969b34f4322a20f494f51c22b486581a21bc1d2746491b8",
+      "islandCoverage": 0.226986,
       "rebake": true
     },
     {
       "name": "LowerPlateGuard_FlatSideNarrowReturn_ORM",
       "mimeType": "image/webp",
-      "sha256": "c5d956ab02c85a68b8647d8c0396d9bc13eb53a842869f810ea3c1d8b1baf368",
-      "sourceSha256": "6d1827e625b08a61aae4f7ce1d92b9b2b9a5ea53dbf395871ea8b7ca5a8a786c",
-      "islandCoverage": 0.23184,
+      "sha256": "55a022367dbaccb71895a4eed02e41eff5d979cb6f3ab6a9dc131b7f18db5c54",
+      "sourceSha256": "dfd393316bdca8966f9d6be66631d560f4d9fb77765b6e1920d359170965b7f8",
+      "islandCoverage": 0.226986,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_Normal",
       "mimeType": "image/webp",
-      "sha256": "9859b345ab1e184e9f0af5057fab6658e775a804b50f99054ed0165da1329e7a",
-      "sourceSha256": "8a4e52cfae99a47b54b85b56128521d2f966c104bee74e61622e6277da88e1e6",
+      "sha256": "18b8daf99291c94593ed7f064d06ceb241b93862dcd7a6950a07be407dc744f4",
+      "sourceSha256": "24126d0bf5911090cfc904ae31f24cf23307c7a33ffc4c9a342494b52c17b70c",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "22dad61ed6476b903daf33dc46d3cef5c640fb02002c6bdbdd0188682d4523c5",
-      "sourceSha256": "d214d435df41829b7207367704c9b98daad6b431094ff0ac1f5b4fec56f501cc",
+      "sha256": "681ff6d0ee00afae52ee2fafb3a0ad64d4e2b022500e9c9c9400e41320831847",
+      "sourceSha256": "49fd3d27d508ee633e9c59910a3792a18427a27cd46664914e71b21b1c593127",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "72f0360bcd1e69ec952038c0500be07a70d13bee4746233f782631dc2f9509a0",
-      "sourceSha256": "9b051848c85c6d24e77263ffc44dadb900bc2b48b65bcfbeddefeb3fc254e750",
+      "sha256": "9d7c0f2ec0d2e72596d62cf2700a0bc2be32775796997d00e49d0ca18c43a182",
+      "sourceSha256": "c5b067ce56990d4f47602e5c8279f02f7242252b1d84b2e722a27d7876bb4e94",
       "islandCoverage": 0.175897,
       "rebake": true
     },
@@ -1341,48 +1341,48 @@
     {
       "name": "RearOuterCover_RoundedSideReturn_Normal",
       "mimeType": "image/webp",
-      "sha256": "633700037e191ff6dc44288e4600c79adc0acdd49e826dea828c1cc1ce2c778b",
-      "sourceSha256": "08faa173c45f7f252121729ad6e1b2496ec1e5b107f51fbcae319f33c6fe5987",
-      "islandCoverage": 0.723268,
+      "sha256": "f2eb6526991dd03714ccbe223f5e9fd854c12cb39da33560328265f8a2b73938",
+      "sourceSha256": "92008dd1197638b6e5002a22d3ef5df3bcd6ab84eb432282736f93b2208fa8fd",
+      "islandCoverage": 0.691457,
       "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "ff1ee22ff0aeeccbf7766573c28351c134f67f93c80771e54cc3463faa977c65",
-      "sourceSha256": "66450dffac97beefb8800a09308c07fbc7ebe00ec58ad53f0d8d6689c6fdfe44",
-      "islandCoverage": 0.723268,
+      "sha256": "9759ec0e9fcae838835acaa04b8acddc1724b7e9e038143ed1c0c05b88811aa3",
+      "sourceSha256": "c6a4d96a7992c54d521fc848c45fa9f454aa4dc8b4eba1c43b3e75b5e94b0d94",
+      "islandCoverage": 0.691457,
       "rebake": true
     },
     {
       "name": "RearOuterCover_RoundedSideReturn_ORM",
       "mimeType": "image/webp",
-      "sha256": "f46ded5ee46e170fb266108e6a83e082bf35b260ab734d97e82974e9007525aa",
-      "sourceSha256": "b3e7ea02a2ec3562dc457d76959284bff339d690bf96ce3c2e1277fa622c3235",
-      "islandCoverage": 0.723268,
+      "sha256": "dbe1285e685ffa7739df48a772b190911cdd239dfb55b08dfb6531a025f1e796",
+      "sourceSha256": "e78921543755b4d6ccf78c426cdb8f63a0d04dba44a272712fd7282c6fea4b36",
+      "islandCoverage": 0.691457,
       "rebake": true
     },
     {
       "name": "RearSmallCover_Normal",
       "mimeType": "image/webp",
-      "sha256": "fea10883b6e17f21bedfc97754a5d5f8edf76a1112e331b5cabc419b08f768dd",
-      "sourceSha256": "4f18d3d4112e593079b1053c268abcbd8c18dee39e84752d931d7ec2346c28f6",
+      "sha256": "90322f02d71cf96a8f59b41d0f3a4ffecf927681e50ec46e9abc34ca2c1c78f2",
+      "sourceSha256": "bbd04b2c02e22184aaa68d5006d9e659b09d735fbdee406a8349f55d887430a2",
       "islandCoverage": 0.639923,
       "rebake": true
     },
     {
       "name": "RearSmallCover_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "3f3f797b77ef6081e24910db96c7401e2f04234c7144f1208d3adf90c408025a",
-      "sourceSha256": "ac28777eff22f47793fb99505e622df9017a35913ce1a954d44150188944aa5e",
+      "sha256": "09f62997ec97708a79fc9b9acdb5358a07250c9e08347b04a350bc65337674c2",
+      "sourceSha256": "1c5fcc379e66ace6d27e799dcad95cf181f0cf7a7cd879a1b0044c694e9bd9e2",
       "islandCoverage": 0.639923,
       "rebake": true
     },
     {
       "name": "RearSmallCover_ORM",
       "mimeType": "image/webp",
-      "sha256": "8bee1777d46f17343e46914d183ebcce519adedf2bc8f0204a3758c484686162",
-      "sourceSha256": "2c9943421f25a5ba4a1bf91f77dd051e59544f45ebda6c08c39dd78579a24762",
+      "sha256": "d6cb97592337cd67a5284c54a533a8340ffa7cab63afc5d137f5c0275d29618c",
+      "sourceSha256": "4b75d99a78dd45947dbc9f825a4425d1a5bfc76fd26d5e11fb328c2f783e6f3f",
       "islandCoverage": 0.639923,
       "rebake": true
     },
@@ -1461,24 +1461,24 @@
     {
       "name": "RearTab_Normal",
       "mimeType": "image/webp",
-      "sha256": "e0722c752cf4107afa7a7b1a2165133ab1a1bc180898039a1486be93efd9cbde",
-      "sourceSha256": "c012c21cc717783fb3b10b15c1a882bf6b58a63b420833491a71b98c9c3d9f70",
+      "sha256": "76aab661be8d5436177d3f982de436fa808c290e3b8f1cd58ea72ae0f587abe9",
+      "sourceSha256": "0899fe0449e4715160cc4afc6eb0f9e14ac3b88305bc6687ed20deedb707619f",
       "islandCoverage": 0.403962,
       "rebake": true
     },
     {
       "name": "RearTab_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "a422c9b806ec7c7b16ee726b28ddee12d9b1b3881a38f5c28e3a004056297249",
-      "sourceSha256": "a49949c9a233328fba3ae4e7d66767de6bb465ba59eea7943fbcd2a5b09e7b0c",
+      "sha256": "4665b8f213037c464a0e3f8937e1e8642df91b5dccc4dbba113973a22244825b",
+      "sourceSha256": "bd335cd4618082bbda3a283a0759165c3fd70d105429d03c8660b099e00059cb",
       "islandCoverage": 0.403962,
       "rebake": true
     },
     {
       "name": "RearTab_ORM",
       "mimeType": "image/webp",
-      "sha256": "96052d485e6c55cd7828612e01db4ee45d29204888ae2ba3b6317bf79f09b706",
-      "sourceSha256": "483c6ab0a8265ce3613764e9c8b068c3bdf2015591e100220661de0bc8cec6af",
+      "sha256": "78bee1338a443c0c510b04a78713d840835a4e74e1d493e031ce99a96ce35367",
+      "sourceSha256": "a334d08005a12ce162c1c9748112b0be6bb145a1c37a38d785a1b7e44972cc43",
       "islandCoverage": 0.403962,
       "rebake": true
     },
@@ -1525,8 +1525,8 @@
     {
       "name": "ReceiverOuterCollar_ORM",
       "mimeType": "image/webp",
-      "sha256": "1a6311e08c3358c157e6ecb45dcf92166bdc5d0962e37e996630d70d912eec33",
-      "sourceSha256": "d9c03d32bbc7698736b5adf354b8a769fec995e61f75f53660b8f3d864e47550",
+      "sha256": "d8b221712aa09192352f0c6e5d13325a4a9b38c537756d62576f75718d396754",
+      "sourceSha256": "07a4d9c33cebc453f145f4d528aaa9652fbf1a5d4efa33a9b5bce9f810426853",
       "islandCoverage": 0.295713,
       "rebake": true
     },
@@ -1701,24 +1701,24 @@
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
       "mimeType": "image/webp",
-      "sha256": "9211afc250079cbe54ca45e6c69e23a37419e1dc621c53ba8ee309899616aaf4",
-      "sourceSha256": "cb78692905a4629fc7eb49060f06bdd12ffc9188de0045583d575b678084f848",
+      "sha256": "8dd46db28da9595e666743b63f333fcbcb8df78be9248e3ce213ceb6665e0aea",
+      "sourceSha256": "f2beca5d14161a43a2cfcba330f2d63a64f5a355f2d0146ba809ed6e7a741806",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "ae2d845ebcd8a7548cee25ef31b3f0dd90eef7981454797c1fcfcf332005780d",
-      "sourceSha256": "498be09803db0050ab510d7d7e9d3e851211337b9953e7cfaf259086ec75ef3d",
+      "sha256": "d9c88426cb18e57af7cb56424bce50cb26b9376bc5b053cafb075294ecf9791c",
+      "sourceSha256": "623f973a59042357dbe9956f993f310253b41ed8433bc7a2cd15e50c973d1935",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "499b07922647b6978decff50dd1cb0ce19d54ad140b872dc4d8313570602e724",
-      "sourceSha256": "88823d8cb1119553bc12d90991650a5f754d226936758dbe9628c1c37ba0ddca",
+      "sha256": "6f621a99c46c890a6dedae73f481714a38b9779a8e2800ab05c19271ed488bdb",
+      "sourceSha256": "46e9a6e3efb37e28257a1d6984183358b7f1e3d53bd936c9664701b12a3f3fe2",
       "islandCoverage": 0.32717,
       "rebake": true
     },
@@ -1740,7 +1740,7 @@
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R30: rolled band edges, rounded exposed steel, aged walnut fibres and localized satin steel wear.",
+  "rebake": "R31: seated receiver joint, rounded rear steel and a shaded guard return.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -2008,7 +2008,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261126R30",
+    "version": "173R-20261126R31",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -2199,7 +2199,7 @@
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261126R30",
+    "version": "173R-20261126R31",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -2219,6 +2219,7 @@
       "RearBand_ControlledCrown",
       "RearBand_ExternalAttachmentBridge",
       "RearBand_ExternalAttachmentLoop",
+      "RearOuterCover_RoundedSideReturn",
       "RearStock_ExternalAttachmentBridge",
       "RearStock_ExternalAttachmentLoop",
       "RearTab",
@@ -2350,16 +2351,16 @@
         "fromR2M": 0
       },
       "LowerPlateGuard_FlatSideNarrowReturn": {
-        "toDotsM": 0.00018719816815006618,
-        "fromDotsM": 9.825297897815034e-05,
-        "toR2M": 0.00018175366840283397,
+        "toDotsM": 0.00016211975717023443,
+        "fromDotsM": 9.261664582032816e-05,
+        "toR2M": 0.00015995548677146418,
         "fromR2M": 2.9178463359839922e-05
       },
       "MainWood_ContinuousLowerShoulder": {
-        "toDotsM": 0.004423075821250677,
-        "fromDotsM": 0.004410122521221638,
-        "toR2M": 0.004423297941684723,
-        "fromR2M": 0.004408448003232479
+        "toDotsM": 0.00442307221625145,
+        "fromDotsM": 0.00441012807032521,
+        "toR2M": 0.00442329826175035,
+        "fromR2M": 0.004408444660497924
       },
       "MiddleSideDisk": {
         "toDotsM": 6.067890353733674e-05,
@@ -2410,10 +2411,10 @@
         "fromR2M": 0
       },
       "RearOuterCover_RoundedSideReturn": {
-        "toDotsM": 0.007182146888226271,
-        "fromDotsM": 0.008958852849900723,
-        "toR2M": 0,
-        "fromR2M": 0
+        "toDotsM": 0.006529168822219472,
+        "fromDotsM": 0.010142046546120324,
+        "toR2M": 0.0002899998798966408,
+        "fromR2M": 0.0023233905039522044
       },
       "RearSmallCover": {
         "toDotsM": 0.014020368456840515,
@@ -2500,10 +2501,10 @@
         "fromR2M": 0
       },
       "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
-        "toDotsM": 0.004702415317296982,
-        "fromDotsM": 0.005104949697852135,
-        "toR2M": 0.004702415317296982,
-        "fromR2M": 0.005104949697852135
+        "toDotsM": 0.00470241279827285,
+        "fromDotsM": 0.005104948007110724,
+        "toR2M": 0.00470241279827285,
+        "fromR2M": 0.005104948007110724
       }
     },
     "deviationScope": "Bidirectional maximum vertex-to-mesh distances against Dots and R2 in part-local metres. No museum geometry measurement is implied. surfaceRepair and mechanismRepair are historical baselines.",
@@ -2520,8 +2521,13 @@
       },
       "LowerPlateGuard_FlatSideNarrowReturn": {
         "before": 3330,
-        "after": 3361,
-        "roundedFaces": 112
+        "after": 3448,
+        "roundedFaces": 192
+      },
+      "RearOuterCover_RoundedSideReturn": {
+        "before": 1144,
+        "after": 952,
+        "roundedFaces": 640
       },
       "ReceiverOuterCollar": {
         "before": 2058,
@@ -2587,7 +2593,7 @@
       ],
       "channel": "linear ORM red",
       "strength": 0.85,
-      "sampling": "32 cosine-weighted directions per fixed exterior vertex; inter-part only, short range with distance falloff."
+      "sampling": "32 cosine-weighted directions per fixed exterior vertex. The guard return also samples the opposite inner wall."
     }
   }
 }
