@@ -17,7 +17,7 @@
 ## 金属表面修订
 
 - 美国水手博物馆馆藏的第 3、4、6、7 张近照提供滚花、支柱擦痕、驻钣铸造纹和筒身点蚀依据。以整体照采样筒身相对亮度和冷暖变化，滤去圆柱反光的宽亮带后保留局部氧化位置。冲压号 `44023` 参考第 6、7 张照片。 [馆藏](https://catalogs.marinersmuseum.org/object/CL2830) [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
-- BlenderMCP 重排 18 个 UV 区域。筒身、箍圈、旋钮、窄槽、尾套和驻钣分别控制露钢、残留发蓝层、腐蚀与抛光。驻钣边缘有独立区域，保留暗色铸造面和局部露钢。以粗糙度和金属度区分镜面反射和哑光氧化，浅点蚀和字戳使用切线法线，沿用一套材质。
+- BlenderMCP 重排 19 个 UV 区域。筒身、箍圈、旋钮、窄槽、尾套和驻钣分别控制露钢、残留发蓝层、腐蚀与抛光。驻钣边缘有独立区域，保留暗色铸造面和局部露钢。以粗糙度和金属度区分镜面反射和哑光氧化，浅点蚀和字戳使用切线法线，沿用一套材质。
 - 第 7 张筒身近照、第 4 张支柱近照和整体照的驻钣正面用于校准局部擦亮、氧化和冷暖分布。第 3 张近照的频谱给出旋钮双向菱纹密度。筒身在磨亮钢与深锈之间增加受擦发蓝层，恢复中间调和细小周向擦痕。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json) [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 支柱擦亮区和驻钣正面通过检查台的表面交点校准 UV 方向，再按近照转移亮度关系和氧化色分布。第 6 张接头近照补充氧化层的暖色、光泽和冲压号位置。检查覆盖两套照明下同部位的新旧对照。
 - 接头在共用 2K 图集中分到 512×384。按第 6 张近照逐字描摹冲压号，沿弧面配准并按检查台的实际投影校正字形比例。凹印用切线法线表现，凹处保留轻微积色，接头两侧按近照收敛亮边。 [号印描摹与采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
@@ -36,9 +36,10 @@
 - 第 4 张照片露出支柱遮挡侧的滚花。用直段两端和遮挡边缘配准单独的磨损采样，将照片展平到 UV 后滤去反复出现的菱纹反光。在同一窄带对照暗槽与露钢，分配槽内褐色氧化、粗糙度和棱面反光。固定侧光下，暗槽归一化红蓝差由 0.143 调到 0.274，近照为 0.281。另用检查台默认灯、双条灯和邻近机位复核。 [侧面采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 第 4 张近照的一组斜向沟槽有更明显的褐色积层，按该方向分别烘焙槽底和磨亮窄边。相机和固定侧光一致时，这组斜纹占两组对比能量的比例由 43.5% 提至 65.3%，近照为 64.8%。同步复核了柔和补光、两个邻近机位和正面控制视图。
 - 筒尾肩部在原共用区域内划出 544×112 的独立 UV 区。参照第 3、4 张照片的肩部边缘配准两段可见弧面，分别烘焙正面的暗灰积层、侧面的褐色氧化和露钢擦痕。侧面细节仅采自避开邻接件遮挡的钢面。固定对照灯光下，正面中值由 102.5 调到 69.9 个灰阶，近照为 69.5。侧面细节对比度由 0.029 提至 0.063，近照为 0.086。 [肩部采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 用第 7 张近照的露钢和氧化区分别调节号印附近的反光。中性灯下近景的第 90 百分位亮度由 198.9 调到 170.2 个灰阶，近照为 164.3，亮度中值为 100.5，近照为 100.9。复核了柔和补光、斜视和第 1 张对应的整段筒身。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV20/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV21/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

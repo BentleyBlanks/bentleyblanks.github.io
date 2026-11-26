@@ -447,10 +447,11 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (steelColor - linear) * exposed[..., None]
         rough += (.348 - rough) * exposed
         metal += (.918 - metal) * exposed
-        # The close-up shows more diffuse wear beside the stamp. Ease the
-        # polished response there while keeping the photographed color field.
-        rough += .11 * near * (1 - .64 * oxideCoverage)
-        metal -= .48 * near * np.maximum(metal - .55, 0)
+        # The worn steel and the oxide beside the stamp scatter light differently.
+        # Soften the hot steel glints and keep the oxide's diffuse response.
+        rough += near * (.115 + .20 * exposedSteel) * (1 - .62 * oxideCoverage)
+        metal -= near * (.40 + .54 * oxideCoverage) * np.maximum(metal - (.55 - .19 * oxideCoverage), 0)
+        linear *= (1 - .19 * near * exposedSteel)[..., None]
     if name == "CollarRing":
         oxidized = .58 * ReferenceField(closeup, xx, vv, "oxideCoverage") / 100
         exposed = .56 * ReferenceField(closeup, xx, vv, "exposedSteelCoverage") / 100
