@@ -627,7 +627,7 @@ def SleeveCalibrationIdentity(sleeve):
             "sampleRails": sleeve["source"]["sampleRails"], "footprint": sleeve["footprint"]}
 
 
-def RegisteredSleeveView(photo, sleeve, folder, shape):
+def RegisteredSleevePhotoFrame(photo, sleeve, folder):
     u, v, visible, render, hashes = ReadRegisteredFrame(folder)
     footprint = sleeve["footprint"]
     center, half = footprint["uCenter"], footprint["uHalfSpan"]
@@ -637,13 +637,17 @@ def RegisteredSleeveView(photo, sleeve, folder, shape):
     x = stations[0] + (stations[-1] - stations[0]) * np.clip((v - first) / (last - first), 0, 1)
     lo, hi = (np.interp(x, stations, rail) for rail in (top, bottom))
     y = lo + (hi - lo) * np.clip((u - u0) / (u1 - u0), 0, 1)
-    weights = np.array([.2126, .7152, .0722])
-    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ weights
-    observed = render @ weights
+    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
     inside = visible & (u > u0) & (u < u1) & (v > first) & (v < last)
     s, t = (u - center + half) / (2 * half), (v - first) / (last - first)
-    valid = binary_erosion(inside, iterations=3) & (source >= 13) & (source <= 120) & (observed >= 10)
-    valid &= (s > 0) & (s < 1) & (t > 0) & (t < 1)
+    interior = binary_erosion(inside, iterations=3) & (s > 0) & (s < 1) & (t > 0) & (t < 1)
+    return s, t, interior, source, render, hashes
+
+
+def RegisteredSleeveView(photo, sleeve, folder, shape):
+    s, t, interior, colors, render, hashes = RegisteredSleevePhotoFrame(photo, sleeve, folder)
+    source, observed = colors @ REGISTERED_LUMA, render @ REGISTERED_LUMA
+    valid = interior & (source >= 13) & (source <= 120) & (observed >= 10)
     if np.count_nonzero(valid) < 1200:
         raise ValueError(f"The registered sleeve patch is missing from {folder}")
 
@@ -676,7 +680,109 @@ def SleeveCalibration(photo, sleeve, evidence):
             "contrast": np.rint(contrast * 1000).astype(int).tolist()}
 
 
-def SleeveFinish(folder, *, evidence=None, priorCalibration=None):
+def FitSleeveResponse(photo, sleeve, evidence, shape):
+    names = ("V43SleeveStudyneutral", "V43SleeveStudydefault")
+    folders = tuple(evidence / name for name in names)
+    s, t, inside, colors, direct, directHashes = RegisteredSleevePhotoFrame(photo, sleeve, folders[0])
+    otherS, otherT, defaultInside, _, default, defaultHashes = RegisteredSleevePhotoFrame(photo, sleeve, folders[1])
+    if not (np.array_equal(s, otherS) and np.array_equal(t, otherT)):
+        raise ValueError("The sleeve response captures must use the same camera and surface coordinates")
+    frameHashes = (directHashes, defaultHashes)
+    target = colors @ REGISTERED_LUMA
+    original = np.minimum(direct @ REGISTERED_LUMA, default @ REGISTERED_LUMA)
+    valid = inside & defaultInside & (target > 13) & (target < 120) & (original > 7)
+    if np.count_nonzero(valid) < 1200:
+        raise ValueError("The sleeve response captures do not cover the photographed steel")
+
+    rows, columns = shape
+    cells = np.rint(s[valid] * (rows - 1)).astype(int) * columns + np.rint(t[valid] * (columns - 1)).astype(int)
+    counts = np.bincount(cells, minlength=rows * columns).reshape(shape).astype(float)
+    sigma = (1.55, 2.7)
+    support = gaussian_filter(counts, sigma)
+    wanted = np.log(target[valid] + 9)
+    neutralWeight = .85
+    weights = np.array([neutralWeight, 1 - neutralWeight])
+    chosen = np.zeros((*shape, 4))
+    lowest = np.full(shape, np.inf)
+
+    def Smooth(samples):
+        field = np.bincount(cells, weights=samples, minlength=rows * columns).reshape(shape)
+        return gaussian_filter(field, sigma) / np.maximum(support, .30)
+
+    def Sample(name):
+        return np.stack([ReadRegisteredLuma(folder, name, hashes)[valid]
+                         for folder, hashes in zip(folders, frameHashes)], axis=-1)
+
+    # Search the measured finishes and compensate their base color in both lights.
+    # The penalty limits changes where several finishes reproduce the photo equally well.
+    for i, metal in enumerate((0, .34, .70)):
+        for j, (roughTarget, rough) in enumerate(((.40, 0), (.40, .35), (.40, .62), (.92, .49))):
+            observed = np.log(Sample(f"Sweep_{i}_{j}.png") + 9)
+            gradient = np.clip((np.log(Sample(f"Base_{i}_{j}.png") + 9) - observed) / .36, .14, .95)
+            error = wanted[:, None] - observed
+            residual = np.stack([Smooth(error[:, slot]) for slot in range(2)], axis=-1)
+            sensors = np.stack([Smooth(gradient[:, slot]) for slot in range(2)], axis=-1)
+            gain = (residual * sensors * weights).sum(axis=-1) / np.maximum((sensors**2 * weights).sum(axis=-1), .03)
+            gain = np.clip(gain, -.40, .52)
+            prediction = residual - sensors * gain[..., None]
+            loss = (prediction**2 * weights).sum(axis=-1) + .0012 * (metal**2 + rough**2)
+            improved = loss < lowest
+            lowest[improved] = loss[improved]
+            chosen[..., 0][improved] = gain[improved]
+            chosen[..., 1][improved] = metal
+            chosen[..., 2][improved] = rough if roughTarget == .40 else 0
+            chosen[..., 3][improved] = rough if roughTarget == .92 else 0
+
+    coverage = np.clip(support / .95, 0, 1)
+    fields = gaussian_filter(chosen * coverage[..., None], (.73, 1.24, 0))
+    maps = {name: np.rint(fields[..., index] * 1000).astype(int).tolist()
+            for index, name in enumerate(("base", "metal", "polish", "matte"))}
+    return maps, dict(zip(names, frameHashes))
+
+
+def RegisteredSleeveRefinement(photo, sleeve, folder, shape):
+    s, t, inside, colors, render, hashes = RegisteredSleevePhotoFrame(photo, sleeve, folder)
+    wanted, observed = colors @ REGISTERED_LUMA, render @ REGISTERED_LUMA
+    valid = inside & (wanted > 13) & (wanted < 120) & (observed > 9)
+    if np.count_nonzero(valid) < 1200:
+        raise ValueError(f"The sleeve refinement capture is missing from {folder}")
+    rows, columns = shape
+    cells = np.rint(s[valid] * (rows - 1)).astype(int) * columns + np.rint(t[valid] * (columns - 1)).astype(int)
+    counts = np.bincount(cells, minlength=rows * columns).reshape(shape).astype(float)
+
+    def Sample(values, sigma):
+        support = gaussian_filter(counts, sigma)
+        total = np.bincount(cells, weights=values, minlength=rows * columns).reshape(shape)
+        return gaussian_filter(total, sigma) / np.maximum(support, .22), support
+
+    residual = np.log((wanted[valid] + 9) / (observed[valid] + 9))
+    local, support = Sample(residual, (.65, .77))
+    broad, _ = Sample(residual, (3.85, 7.1))
+    color = colors[valid] / wanted[valid, None] - render[valid] / observed[valid, None]
+    chroma = np.stack([Sample(signal, (1.08, 1.55))[0] for signal in color.T], axis=-1)
+    return local - broad, chroma, support, hashes
+
+
+def SleeveResponseCalibration(photo, sleeve, evidence):
+    shape = (49, 185)
+    response, responseHashes = FitSleeveResponse(photo, sleeve, evidence, shape)
+    names = ("V43RegionalNeutral", "V43RegionalDefault", "V43RegionalRake")
+    direct, default, oblique = [RegisteredSleeveRefinement(photo, sleeve, evidence / name, shape) for name in names]
+    coverage = np.clip(np.minimum.reduce((direct[2], default[2], oblique[2])) / .90, 0, 1)
+    # Restore the fine contrast after the roughness and metalness adjustments.
+    agreement = np.exp(-.5 * ((direct[0] - oblique[0]) / .15)**2)
+    contrast = np.clip(.55 * direct[0] + .18 * default[0] + .27 * oblique[0], -.21, .21) * coverage * agreement
+    chroma = np.clip(.55 * direct[1] + .20 * default[1] + .25 * oblique[1], -.18, .18)
+    chroma *= coverage[..., None] * np.exp(-.5 * ((direct[1] - oblique[1]) / .125)**2)
+    chroma -= (chroma @ REGISTERED_LUMA)[..., None]
+    color = {name: np.rint(chroma[..., index] * 1000).astype(int).tolist()
+             for index, name in enumerate(("red", "green", "blue"))}
+    hashes = dict(zip(names, (direct[3], default[3], oblique[3])))
+    return {**SleeveCalibrationIdentity(sleeve), "frameSha256": {**responseHashes, **hashes}, **response,
+            "contrast": np.rint(contrast * 1000).astype(int).tolist(), **color}
+
+
+def SleeveFinish(folder, previous, *, evidence=None, responseEvidence=None):
     image, source = Photo(folder, 1)
     rails = [[1149, 593, 642], [1164, 593, 648], [1183, 593, 640],
              [1260, 594, 639], [1334, 594, 639], [1354, 595, 641]]
@@ -710,13 +816,6 @@ def SleeveFinish(folder, *, evidence=None, priorCalibration=None):
         "exposedSteelCoverage": np.rint(100 * np.clip((.37 - endWarmth) / .34, 0, 1)).astype(int).tolist(),
     }
 
-    calibration = None
-    if evidence is not None:
-        calibration = SleeveCalibration(image, field, evidence)
-    elif priorCalibration is not None:
-        if all(priorCalibration.get(key) == value for key, value in SleeveCalibrationIdentity(field).items()):
-            calibration = priorCalibration
-
     tone, warmth, lightness = PhotoResiduals(image, envelopeRadius=5.4)
     columns = np.arange(image.shape[1])
     rows = np.arange(image.shape[0])[:, None]
@@ -732,8 +831,14 @@ def SleeveFinish(folder, *, evidence=None, priorCalibration=None):
     upper, lower = (np.interp(x, photoX, rail) for rail in (top, bottom))
     field["detail"] = SaveDetailPlate(tone, warmth, confidence, x, upper + us * (lower - upper),
                                      SLEEVE_DETAIL, halfSize=False)
-    if calibration is not None:
-        field["registeredCalibration"] = calibration
+    identity = SleeveCalibrationIdentity(field)
+    for name, frames, measure in (("registeredCalibration", evidence, SleeveCalibration),
+                                  ("responseCalibration", responseEvidence, SleeveResponseCalibration)):
+        prior = previous.get(name)
+        if frames is not None:
+            field[name] = measure(image, field, frames)
+        elif prior is not None and all(prior.get(key) == value for key, value in identity.items()):
+            field[name] = prior
     return field
 
 
@@ -1214,13 +1319,14 @@ def Main():
     options.add_argument("--barrel-response-evidence", type=Path, help="V40 Evidence directory containing the two captures with steel response variants")
     options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
+    options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence)
-    sleeve = SleeveFinish(args.photos, evidence=args.sleeve_evidence,
-                          priorCalibration=prior.get("Sleeve", {}).get("registeredCalibration"))
+    sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
+                          responseEvidence=args.sleeve_response_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": sleeve,

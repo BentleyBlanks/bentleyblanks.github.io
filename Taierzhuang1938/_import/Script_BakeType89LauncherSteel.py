@@ -101,6 +101,13 @@ def CheckBarrelRegistration(calibration, closeup):
         raise ValueError("The barrel calibration does not match the source photo and projection")
 
 
+def CheckSleeveRegistration(calibration, closeup):
+    if (calibration["photoSha256"] != closeup["source"]["sha256"]
+            or calibration["sampleRails"] != closeup["source"]["sampleRails"]
+            or calibration["footprint"] != closeup["footprint"]):
+        raise ValueError("The sleeve calibration does not match the source photo and projection")
+
+
 def ApplyBaseLogGain(base, logGain):
     corrected = LinearToSrgb(SrgbToLinear(np.clip(base, 0, 1)) * np.exp(logGain)[..., None])
     return np.where((logGain != 0)[..., None], corrected, base)
@@ -728,10 +735,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
     if name == "Sleeve":
         calibration = closeup.get("registeredCalibration")
         if calibration is not None:
-            if (calibration["photoSha256"] != closeup["source"]["sha256"]
-                    or calibration["sampleRails"] != closeup["source"]["sampleRails"]
-                    or calibration["footprint"] != closeup["footprint"]):
-                raise ValueError("The sleeve calibration does not match the source photo and projection")
+            CheckSleeveRegistration(calibration, closeup)
             # Restore photographed local contrast shared by both lighting conditions.
             contrast = ReferenceField(calibration, xx, vv, "contrast") / 1000
             linear *= np.exp(1.65 * contrast)[..., None]
@@ -776,6 +780,20 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         base *= 1 - ((.39 + .235 * contact) * darkPatina)[..., None]
         chroma = (.080 + .090 * contact) * oxideChroma * rimFade - .038 * exposedSteel
         base += chroma[..., None] * LUMA_NEUTRAL_WARMTH
+        response = closeup.get("responseCalibration")
+        if response is not None:
+            CheckSleeveRegistration(response, closeup)
+            zone = {"footprint": response["footprint"], "coverage": [[1, 1], [1, 1]]}
+            gain = ReferenceField(response, xx, vv, "base") / 1000
+            gain += 2.05 * ReferenceField(response, xx, vv, "contrast") / 1000
+            gain += .038 * ReferenceField(zone, xx, vv, "coverage")
+            base = ApplyBaseLogGain(base, gain)
+            metal += ReferenceField(response, xx, vv, "metal") * (.94 - metal) / 1000
+            rough += (ReferenceField(response, xx, vv, "polish") * (.40 - rough)
+                      + ReferenceField(response, xx, vv, "matte") * (.92 - rough)) / 1000
+            color = np.stack([ReferenceField(response, xx, vv, channel) / 1000
+                              for channel in ("red", "green", "blue")], axis=-1)
+            base += .74 * (base @ np.array([.2126, .7152, .0722]))[..., None] * color
     if name == "Shoulder":
         # Shift hue with near-zero luma change in the photographed flank.
         base += shoulderTint[..., None] * LUMA_NEUTRAL_WARMTH
