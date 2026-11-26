@@ -135,8 +135,12 @@ export function InstallDebugApi(ctx) {
       preset: ctx.post.preset?.terrainTrails ?? null }),
     Stamp: (o) => TerrainTrailSystem.Stamp(o),
     Read: (x, z) => ctx.post.terrainTrailsPass?.ReadTexel(ctx.renderer, x, z) ?? null,
+    ReadRgba: (x, z) => ctx.post.terrainTrailsPass?.ReadTexelRgba(ctx.renderer, x, z) ?? null,
     SetEnabled: (value) => TerrainTrailSystem.SetEnabled(value !== false),
-    Reset: () => TerrainTrailSystem.Reset(),
+    SetDisplacement: (value) => TerrainTrailSystem.SetDisplacementEnabled(value !== false),
+    AddStaticTrack: (spec) => TerrainTrailSystem.AddStaticTrack(spec),
+    OffsetAt: (x, z) => TerrainTrailSystem.displacementField?.OffsetAt(x, z) ?? 0,
+    Reset: (options) => TerrainTrailSystem.Reset(options),
   };
   // 受击物理反应取证口（docs/Data_HitReaction.md §2.4）。**所有关卡都挂**；?hitreact=0 关整层。
   // Hit 走正片 TakeHit 链（扣血、可致死、方向死亡）；Impulse 只打冲量不扣血（调参、拍对照图用）。

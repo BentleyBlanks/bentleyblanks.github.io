@@ -779,6 +779,7 @@ export function CreateTerrainMaterial(library, pack, { quality = "high", name = 
   material.userData.terrainTrails = !!patch.terrainTrails;
   material.userData.terrainCraterSlice = Number.isInteger(patch.terrainCraterSlice) ? patch.terrainCraterSlice : (Number.isInteger(pack.craterSlice) ? pack.craterSlice : -1);
   material.userData.staticCraters = !!patch.staticCraters;
+  material.userData.terrainUniforms = patch.terrainUniforms || null;
   library.InjectSurface(material, patch, { reflections });
   return material;
 }

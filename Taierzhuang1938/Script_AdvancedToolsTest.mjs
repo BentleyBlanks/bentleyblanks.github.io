@@ -203,14 +203,14 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   const tsCards = TestSceneCards(tsPage);
   const functional = tsCards.filter((card) => card.group === "functional");
   Check("测试场景页标题正确", TEST_SCENES_TITLE === "测试场景");
-  Check("测试场景页只保留 10 个独立功能测试场且均有进入、场景编辑器链接与实机封面", tsCards.length === 10 && functional.length === 10
+  Check("测试场景页只保留 11 个独立功能测试场且均有进入、场景编辑器链接与实机封面", tsCards.length === 11 && functional.length === 11
     && functional.every((card) => card.sceneId && card.runHref.includes(`?${card.id}=1`)
       && card.editHref.includes(`/AdvancedTools/SceneEditor.html?scene=${card.sceneId}`)
       && card.cover === CoverUrlFor(card.id)),
     functional.map((c) => `${c.id}->${c.sceneId}`).join(","));
   const coversCheck = CheckTestSceneCovers();
-  Check("10 个功能测试场实机 WebP 封面均齐备且合法（Script_CaptureTestSceneCovers --check）",
-    coversCheck.ok && coversCheck.items.length === 10,
+  Check("11 个功能测试场实机 WebP 封面均齐备且合法（Script_CaptureTestSceneCovers --check）",
+    coversCheck.ok && coversCheck.items.length === 11,
     coversCheck.ok ? `${coversCheck.items.length} 张` : JSON.stringify(coversCheck));
   const tsLauncher = path.join(toolsDir, "Script_TestScenesLaunch.mjs");
   const tsPlan = execFileSync(process.execPath, [tsLauncher, "--dry-run", "8193"], { encoding: "utf8", cwd: os.tmpdir() });

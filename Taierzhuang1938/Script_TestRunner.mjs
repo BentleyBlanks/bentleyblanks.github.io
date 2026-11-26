@@ -323,6 +323,8 @@ export const testDefs = {
   TerrainTrailRulesTest: { file: "Script_TerrainTrailRulesTest.mjs", desc: "地面脚印与痕迹规则层：印章图集（鞋纹/履带）、环形窗口露出条带暴力核对、历史回填与减淡、落脚判定（纯 Node）" },
   TerrainTrailsTest: { file: "Script_TerrainTrailsTest.mjs", timeoutMs: 240000, desc: "脚印痕迹靶 GPU 夹具：写靶/左右镜像/减淡/滑窗回填/跨靶边/地形与壕沟着色/石材不编/履带车辆/采样器" },
   TerrainTrailsBrowserTest: { file: "Script_TerrainTrailsBrowserTest.mjs", timeoutMs: 900000, desc: "第一关实机：真按 W 落印、班组真实脚骨落脚、开关痕迹 pass 印子处像素变化、程序链接与采样器" },
+  VehicleTracksTest: { file: "Script_VehicleTracksTest.mjs", desc: "通用车辆车辙规则与真几何高度场：车型表/五类截面/稀疏 3 m 瓦片/交叉泥棱不填槽/边界锁零/静态样条校验（纯 Node）" },
+  VehicleTracksBrowserTest: { file: "Script_VehicleTracksBrowserTest.mjs", timeoutMs: 360000, desc: "车辆车辙测试场实机 GPU：八九式/九四式/驴车真 3D 凹陷与泥棱、擦地 A/B 像素差、静态交叉、A 通道与采样器 ≤16" },
   TrenchSurfaceTest: { file: "Script_TrenchSurfaceTest.mjs", desc: "Wet trench assets and shared terrain contact update/reset" },
   SandbagStandardTest: { file: "Script_SandbagStandardTest.mjs", desc: "唯一沙袋模型：GLB 袋底实测、贴地数学、禁用旧沙袋画法（纯 Node）" },
   TrenchPlanTest: { file: "Script_TrenchPlanTest.mjs", desc: "壕沟样条规划契约：legacy 逐点等价/热路径/三岔口/并集抛土/宽深有界/布设/圆角（纯 Node，秒级）" },
@@ -790,7 +792,7 @@ export const browserTests = new Set([
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "MeleeLabVariantsBrowserTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "AboutBrowserTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "FilmGrainTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "FilmGrainTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "VehicleTracksBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "TrenchEditorTest", "VisibilityTest", "VoiceTest",
@@ -872,6 +874,7 @@ export const tier0Fast = [
   "BootPayloadTest",
   "TerrainLayersTest",
   "TerrainTrailRulesTest",
+  "VehicleTracksTest",
   "TextureStandardsTest",
   "AssetStandardsTest",
   "AssetStandardsSaveTest",
@@ -1012,7 +1015,7 @@ export const domains = {
   repoSize: { label: "仓库体积闸门（GitHub 单文件上限）", tests: ["RepoSizeGateTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "TrenchSurfaceTest", "PhysicsTest", "JumpTest", "TerrainTrailRulesTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "VehicleTracksTest", "VehicleTracksBrowserTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -1225,10 +1228,10 @@ const changedDomainRules = [
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow|GrenadeBundleThrow/},
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'render',pattern:/TerrainBlend|TrenchSurfaceMaterial/},
-  // 地面脚印与痕迹（docs/Data_TerrainTrails.md）：痕迹靶 pass、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
-  {domain:'terrain',pattern:/TerrainTrail|Script_TerrainMaterial|Script_TerrainDeformationView|Script_SceneCraters/},
+  // 地面脚印与痕迹（docs/Data_TerrainTrails.md / docs/Data_VehicleTracks.md）：痕迹靶 pass、车辙真几何瓦片、地形 / 壕沟 / 砸坑着色接入、人物骨架与战车登记。
+  {domain:'terrain',pattern:/TerrainTrail|VehicleTrack|TestVehicleTracks|SandboxPlugin_Tracks|Script_TerrainMaterial|Script_TerrainDeformationView|Script_SceneCraters/},
   {domain:'explosives',pattern:/Script_SceneCraters/},
-  {domain:'render',pattern:/TerrainTrail/},
+  {domain:'render',pattern:/TerrainTrail|VehicleTrack/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
   // 人物表面层（2026-09-28 B3）：补丁读蒙皮前的 position（运动矢量）、改人物材质（采样器 / 预热 / 远景合批）。
@@ -1371,8 +1374,8 @@ const changedDomainRules = [
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
-  // HairRange 是毛发测试场；其中的 Range 不代表武器测试场。
-  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirearmEffects|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|(?<!Hair)Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
+  // HairRange / VehicleTrackRange 是毛发与车辙测试场；其中的 Range 不代表武器测试场。
+  { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FpsReload|FirearmEffects|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|(?<!Hair|Track)Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
   { domain: "interact", pattern: /(Carry|Interact|Emplacement|MountedGrip|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|LitterBlock|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },

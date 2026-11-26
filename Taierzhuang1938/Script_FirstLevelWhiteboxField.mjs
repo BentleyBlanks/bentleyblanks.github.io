@@ -26,8 +26,12 @@ import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BuildTrenchEarth } from "./Script_TrenchEarth.mjs";
 import { TRENCH_APPEARANCE } from "./Data_TrenchAppearance.mjs";
 import { TRENCH_SURFACE } from "./Data_TrenchSurface.mjs";
-import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
+import { TERRAIN_SETS, TERRAIN_MUD_ZONE } from "./Data_Tuning_Terrain.mjs";
 import { TerrainLayerUrls } from "./Script_Tuning_Terrain.mjs";
+import { VEHICLE_TRACK_GEOMETRY } from "./Data_VehicleTracks.mjs";
+import { VehicleTrackField } from "./Script_VehicleTrackField.mjs";
+import { VehicleTrackView } from "./Script_VehicleTrackView.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Script_TrenchSurface.mjs";
 import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
@@ -135,6 +139,9 @@ export class FirstLevelWhiteboxField {
     this.SampleGroundSurface = null;
     this.SampleCraterSurface = null;
     this.staticCraterDebris = null;
+    this.vehicleTrackField = null;
+    this.vehicleTrackView = null;
+    this.groundMeshes = [];
     this.fortificationModels = null;
     this.fortificationPlacements = [];
     this.sharedFortificationMaterials = new Set();
@@ -369,9 +376,11 @@ export class FirstLevelWhiteboxField {
         mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
       }
       this.meshes.push(mesh);
+      this.groundMeshes.push(mesh);
       this.stats.groundChunks++;
     }
     sink.SetSector("FirstLevelWhitebox");
+    this._InitVehicleTracks(ground);
 
     let trenchCrownHeightAt = null;
     if (this.TrenchPlan() && this.terrainLayers) {
@@ -1158,8 +1167,81 @@ export class FirstLevelWhiteboxField {
     }
   }
 
+  _InitVehicleTracks(ground) {
+    if (!this.terrain || !this.groundMeshes.length) return;
+    const hasStatic = Array.isArray(this.layout.vehicleTracks) && this.layout.vehicleTracks.length > 0;
+    if (!this.terrainLayers && !hasStatic && !this.layout.vehicleTracksEnabled) return;
+    const baseHeight = (x, z) => this.TerrainHeight(x, z);
+    const mudBox = TERRAIN_MUD_ZONE.box;
+    const soilSoft = VEHICLE_TRACK_GEOMETRY.soilSoftness;
+    const scratchRgb = [0, 0, 0], scratchWeights = [0, 0, 0, 1];
+    const SoftnessAt = this.layout.SampleTrackSoftness
+      ? (x, z) => this.layout.SampleTrackSoftness(x, z)
+      : this.SampleGroundSurface
+        ? (x, z) => {
+            scratchWeights[0] = 0; scratchWeights[1] = 0; scratchWeights[2] = 0; scratchWeights[3] = 1;
+            this.SampleGroundSurface(x, z, scratchRgb, scratchWeights);
+            const wTrack = scratchWeights[0];
+            const wSpoil = scratchWeights[1] * (1 - wTrack);
+            const wRest = Math.max(0, 1 - wTrack - wSpoil);
+            const wStubble = scratchWeights[2] * wRest * 0.5;
+            const wSoil = Math.max(0, wRest - wStubble);
+            let soft = wSoil * soilSoft[0] + wTrack * soilSoft[1] + wStubble * soilSoft[2] + wSpoil * soilSoft[3];
+            if (x >= mudBox[0] && x <= mudBox[2] && z >= mudBox[1] && z <= mudBox[3]) {
+              soft *= VEHICLE_TRACK_GEOMETRY.mudZoneMultiplier;
+            }
+            return soft;
+          }
+        : () => 1;
+    const CanDeform = (x, z) => {
+      const gx = (baseHeight(x + 0.5, z) - baseHeight(x - 0.5, z));
+      const gz = (baseHeight(x, z + 0.5) - baseHeight(x, z - 0.5));
+      return (1 / Math.hypot(gx, 1, gz)) >= VEHICLE_TRACK_GEOMETRY.slopeRange[0];
+    };
+    this.vehicleTrackField = new VehicleTrackField({
+      BaseHeight: baseHeight,
+      SoftnessAt,
+      CanDeform,
+      bounds: this.bounds,
+      quality: this.quality,
+    });
+    const groundMaterial = this.materials.get(ground.semantic || "Whitebox") || this.whiteMaterial;
+    this.vehicleTrackView = new VehicleTrackView({
+      scene: this.scene,
+      field: this.vehicleTrackField,
+      groundMeshes: this.groundMeshes,
+      groundMaterial,
+      sampleGroundSurface: this.SampleGroundSurface,
+      sampleGroundColor: this.SampleGroundColor,
+      sampleCraterSurface: this.SampleCraterSurface,
+    });
+    if (!this.trailSystem) {
+      this.trailSystem = TerrainTrailSystem;
+      TerrainTrailSystem.AttachGround(this, baseHeight);
+    }
+    TerrainTrailSystem.AttachDisplacement(this, this.vehicleTrackField, this.vehicleTrackView);
+    if (hasStatic) {
+      this.stats.staticVehicleTracks = TerrainTrailSystem.AddStaticTracks(this.layout.vehicleTracks);
+      this.vehicleTrackView.Sync();
+    }
+  }
+
+  /** 每帧由帧循环在 TerrainTrailSystem.Update 之后调用，把本帧新压出的车辙脏瓦片同步到 GPU。 */
+  UpdateVehicleTracks() {
+    return this.vehicleTrackView ? this.vehicleTrackView.Sync() : 0;
+  }
+
+  /** 采样某处因车辙产生的真几何高度偏移（负值下凹、正值泥棱）。 */
+  VehicleTrackOffsetAt(x, z) {
+    return this.vehicleTrackField ? this.vehicleTrackField.OffsetAt(x, z) : 0;
+  }
+
   Dispose() {
     SetInteriorVolumes(null);
+    this.vehicleTrackView?.Dispose(); this.vehicleTrackView = null;
+    this.vehicleTrackField = null;
+    this.groundMeshes.length = 0;
+    this.trailSystem?.DetachDisplacement(this);
     this.trailSystem?.DetachGround(this); this.trailSystem = null;
     this.breakableTrees?.Dispose(); this.breakableTrees=null;
     this.staticCraterDebris?.Dispose(); this.staticCraterDebris = null;

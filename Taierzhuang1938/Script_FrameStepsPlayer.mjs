@@ -164,6 +164,7 @@ export function PlayStepFoley(ctx, f) {
   // 画进痕迹靶是帧图 terrainTrails 那一趟的事。过场里玩家不留印（机位在演，身子不在那）。
   TerrainTrailSystem.Update(dt, { focus: ctx.camera.getWorldPosition(ctx.trailFocus),
     player: ctx.state.cutscene || ctx.state.menu ? null : ctx.player, scene: ctx.scene });
+  ctx.battlefield?.UpdateVehicleTracks?.();
 }
 
 export function PlayStepPrompts(ctx, f) {

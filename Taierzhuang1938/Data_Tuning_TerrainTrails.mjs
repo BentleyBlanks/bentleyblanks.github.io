@@ -82,10 +82,14 @@ export const TERRAIN_TRAIL_STAMPS = Object.freeze({
   drag: Object.freeze({ cell: 5, lengthM: 0.62, widthM: 0.4 }),
   scuff: Object.freeze({ cell: 6, lengthM: 0.3, widthM: 0.24 }),
   tread: Object.freeze({ cell: 7, lengthM: 0.56, widthM: 0.32, pitchM: 0.14 }),
+  tanketteTread: Object.freeze({ cell: 8, lengthM: 0.38, widthM: 0.21, pitchM: 0.095 }),
+  ironWheel: Object.freeze({ cell: 9, lengthM: 0.32, widthM: 0.07 }),
+  hoof: Object.freeze({ cell: 10, lengthM: 0.10, widthM: 0.085 }),
+  tire: Object.freeze({ cell: 11, lengthM: 0.42, widthM: 0.22, pitchM: 0.105 }),
 });
 
-/** 印章图集的格子（像素）。一行 8 格。 */
-export const TERRAIN_TRAIL_ATLAS = Object.freeze({ cellW: 64, cellH: 128, cells: 8 });
+/** 印章图集的格子（像素）。一行 12 格（0–7 原有人物/八九式，8–11 扩展载具与蹄印）。 */
+export const TERRAIN_TRAIL_ATLAS = Object.freeze({ cellW: 64, cellH: 128, cells: 12 });
 
 /**
  * 地面怎么「吃」印子。
@@ -142,8 +146,12 @@ export const TERRAIN_TRAIL_STRENGTH = Object.freeze({
   hand: Object.freeze([0.45, 0.35, 0.5]),
   drag: Object.freeze([0.3, 0.45, 0.85]),
   scuff: Object.freeze([0.25, 0.2, 0.8]),
-  // 战车十几吨压在两条履带上：坑深、泥边都顶满
-  tread: Object.freeze([1.0, 1.0, 1.0]),
+  // 战车十几吨压在两条履带上：坑深、泥边都顶满；第 4 位 A 通道为宏观深车辙强度
+  tread: Object.freeze([1.0, 1.0, 1.0, 0.74]),
+  tanketteTread: Object.freeze([0.96, 0.92, 0.95, 0.54]),
+  ironWheel: Object.freeze([0.98, 0.95, 0.9, 0.62]),
+  hoof: Object.freeze([0.9, 0.78, 0.85, 0.28]),
+  tire: Object.freeze([0.92, 0.85, 0.92, 0.45]),
   // 跑起来脚跟蹬出去，印子往后拖长一点
   runLengthScale: 1.08,
 });

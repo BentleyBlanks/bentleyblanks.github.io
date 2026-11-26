@@ -25,6 +25,8 @@ import {
   TERRAIN_TRAIL_STAMPS, TERRAIN_TRAIL_STRENGTH as STR, TERRAIN_TRAIL_CONTACT as CONTACT,
   TERRAIN_TRAIL_PLAYER as PLAYER, TERRAIN_TRAIL_ATLAS,
 } from "./Data_Tuning_TerrainTrails.mjs";
+import { VEHICLE_TRACK_SURFACE } from "./Data_VehicleTracks.mjs";
+import { ResolveVehicleTrackProfile, CompileStaticVehicleTrack } from "./Script_VehicleTrackField.mjs";
 
 // ===========================================================================
 // 一、材质那一侧：共享 uniform + GLSL
@@ -86,8 +88,8 @@ uniform vec4 uTrailShapeC;
 uniform vec4 uTrailFade;
 uniform vec4 uTrailHard;
 vec3 gTerrainTrailDebug = vec3(0.0);
-vec3 TrailTap(vec2 xz) { return textureLod(uTrailMap, xz * uTrailWindow.z, 0.0).rgb; }
-float TrailHeight(vec3 s, float depthM, float rimM) { return s.g * rimM - s.r * depthM; }
+vec4 TrailTap(vec2 xz) { return textureLod(uTrailMap, xz * uTrailWindow.z, 0.0); }
+float TrailHeight(vec4 s, float depthM, float rimM) { return s.g * rimM - max(s.r, s.a * 0.35) * depthM; }
 // albedo：线性反照率（积水之前）；weights：地形四层混合权重；mud：前沿湿泥区权重；
 // pixelM：一个像素在地面上多少米（差分步长不小于它，远处不闪）；dist：到相机的距离。
 void TerrainTrailApply(inout vec3 albedo, vec3 world, vec3 geomN, vec4 weights, float mud, float pixelM, float dist) {
@@ -103,9 +105,9 @@ void TerrainTrailApply(inout vec3 albedo, vec3 world, vec3 geomN, vec4 weights, 
   vec3 toEye = normalize(cameraPosition - world);
   vec2 shift = toEye.xz / max(toEye.y, 0.22);
   vec2 p = world.xz;
-  vec3 s0 = TrailTap(p);
-  vec3 s1 = TrailTap(p - shift * depthM);
-  if (max(max(s0.r, s0.g), s0.b) + max(max(s1.r, s1.g), s1.b) < 0.004) return;
+  vec4 s0 = TrailTap(p);
+  vec4 s1 = TrailTap(p - shift * depthM);
+  if (max(max(s0.r, s0.g), max(s0.b, s0.a)) + max(max(s1.r, s1.g), max(s1.b, s1.a)) < 0.004) return;
   // 视差（POM）：从泥边顶往坑底走，找视线第一次落到高度场下面的地方，两步之间线性插值。
   float par = 1.0 - smoothstep(uTrailFade.z, uTrailFade.w, dist);
   if (par > 0.01 && depthM > 1e-4) {
@@ -120,7 +122,7 @@ void TerrainTrailApply(inout vec3 albedo, vec3 world, vec3 geomN, vec4 weights, 
     }
     p += shift * h * par;
   }
-  vec3 s = TrailTap(p);
+  vec4 s = TrailTap(p);
   // 高度场的梯度 → 法线（y = H(x, z) 的法线 ∝ (−∂H/∂x, 1, −∂H/∂z)）。
   // 硬地上坑浅，按真实深度算出来的坡几乎是平的：坡度按 wallLight 放大一点（只影响光，不影响视差与积水）。
   float e = max(uTrailInfo.x, pixelM * 0.7);
@@ -130,23 +132,26 @@ void TerrainTrailApply(inout vec3 albedo, vec3 world, vec3 geomN, vec4 weights, 
   grad *= 1.0 + uTrailHard.y * (1.0 - min(soft, 1.0));
   float gl = length(grad);
   if (gl > uTrailShapeA.w) grad *= uTrailShapeA.w / gl;
-  // 颜色：硬地上坑浅，但鞋底把土压实、压出鞋纹，颜色照样读得出 —— 保底 hardFloor
+  // 颜色：硬地上坑浅，但鞋底与履带把土压实、压出纹路，颜色照样读得出 —— 保底 hardFloor
   float tone = max(min(soft, 1.0), uTrailHard.x);
-  // 坑里：鞋底把土粒压平（贴图细节法线往几何法线收），再叠坑的法线
-  vec3 n = normalize(mix(gTerrainNormalW, geomN, uTrailShapeC.x * s.r * fade));
+  float macroRut = s.a * fade * tone;
+  // 坑里：鞋底/车轮把土粒压平（贴图细节法线往几何法线收），再叠坑的微观法线
+  vec3 n = normalize(mix(gTerrainNormalW, geomN, uTrailShapeC.x * max(s.r, s.a * 0.85) * fade));
   vec3 perturb = vec3(-grad.x, 0.0, -grad.y) * fade;
   perturb -= geomN * dot(geomN, perturb);
   gTerrainNormalW = normalize(n + perturb);
-  // 鞋底把碎石土粒压平：坑里的反照率往这一处地层的均值收（gTerrainMeanOut，由调用方的地形那一路写好）。
-  // 这是脚印在碎石土路上最读得出来的一条：一块形状清楚的、没有颗粒的压实面。
-  float press = clamp(s.r * 1.6, 0.0, 1.0);
+  // 鞋底/车轮把碎石土粒压平：坑里的反照率往这一处地层的均值收（gTerrainMeanOut）。
+  float press = clamp(max(s.r * 1.6, s.a * 0.95), 0.0, 1.0);
   albedo = mix(albedo, gTerrainMeanOut, uTrailHard.z * press * fade * tone);
   albedo *= (1.0 - uTrailShapeB.x * s.r * fade * tone) * (1.0 - uTrailShapeB.y * s.b * fade)
-    * (1.0 + uTrailShapeB.z * s.g * fade * tone);
-  gTerrainRough *= 1.0 - uTrailShapeB.w * clamp(s.r * 0.7 + s.b * 0.3, 0.0, 1.0) * fade;
-  gMaterialAo *= 1.0 - uTrailShapeC.y * s.r * fade * tone;
-  gTerrainPrint = s.r * depthM * fade;
-  gTerrainTrailDebug = s * fade;
+    * (1.0 + uTrailShapeB.z * s.g * fade * tone) * (1.0 - 0.14 * macroRut);
+  gTerrainRough *= (1.0 - uTrailShapeB.w * clamp(s.r * 0.7 + s.b * 0.3, 0.0, 1.0) * fade)
+    * (1.0 - 0.18 * macroRut);
+  gMaterialAo *= (1.0 - uTrailShapeC.y * s.r * fade * tone)
+    * (1.0 - ${(VEHICLE_TRACK_SURFACE.cavityAo * 0.65).toFixed(3)} * macroRut);
+  // 宏观深车辙（A 通道）同样灌进积水判据，泥地里战车/驴车深辙最先汪水
+  gTerrainPrint = (s.r * depthM + s.a * ${(VEHICLE_TRACK_SURFACE.rutDepthM * 0.55).toFixed(4)} * min(soft, 1.35)) * fade;
+  gTerrainTrailDebug = vec3(max(s.r, s.a * 0.85), s.g, s.b) * fade;
 }`;
 }
 
@@ -181,10 +186,13 @@ export class TerrainTrails {
     this.rigs = new Map();
     this.vehicles = new Map();
     this.ground = null;          // { heightAt(x, z), owner }
+    this.displacementField = null;
+    this.displacementView = null;
+    this.displacementOwner = null;
     this.focus = new THREE.Vector3();
     this.hasFocus = false;
     this.generation = 0;         // 历史被整个清掉时 +1：pass 看到就整张重建
-    this.stats = { stamps: 0, player: 0, rigs: 0, knees: 0, drags: 0, treads: 0, dropped: 0 };
+    this.stats = { stamps: 0, player: 0, rigs: 0, knees: 0, drags: 0, treads: 0, wheels: 0, hooves: 0, staticTracks: 0, dropped: 0 };
     this.recent = [];            // 最近几个印（取证用：落在哪、什么鞋、谁踩的）；玩家的单独一份
     this.recentPlayer = [];
     this.recentVehicle = [];
@@ -203,16 +211,92 @@ export class TerrainTrails {
   /** 关卡把「地形高度」挂上来（脚离地多高按它算；楼板、踏板不算地形 → 踩上去不出印）。 */
   AttachGround(owner, heightAt) { this.ground = { owner, heightAt }; this.Reset(); }
   DetachGround(owner) { if (this.ground?.owner === owner) { this.ground = null; this.Reset(); } }
+  /** 关卡挂上真 3D 几何车辙高度场与稀疏瓦片视图（VehicleTrackField / VehicleTrackView）。 */
+  AttachDisplacement(owner, field, view = null) {
+    this.displacementOwner = owner;
+    this.displacementField = field || null;
+    this.displacementView = view || null;
+  }
+  DetachDisplacement(owner) {
+    if (this.displacementOwner === owner) {
+      this.displacementOwner = null;
+      this.displacementField = null;
+      this.displacementView = null;
+    }
+  }
+  SetDisplacementEnabled(on) {
+    this.displacementView?.SetEnabled(on !== false);
+    return this.displacementView?.enabled ?? false;
+  }
   get active() { return this.enabled && !!this.ground; }
 
+  /**
+   * 烘焙一条静态预置车辙样条（来自场景 JSON `vehicleTracks` 或测试场预设）：
+   * 同时写入 CPU 真 3D 高度场与 GPU 持久微观印章历史（不随时间衰减、不被动态脚印挤掉）。
+   */
+  AddStaticTrack(trackSpec) {
+    const compiled = CompileStaticVehicleTrack(trackSpec);
+    if (!compiled.segments.length && !compiled.hooves.length && !compiled.stamps.length) {
+      return { segments: 0, hooves: 0, stamps: 0 };
+    }
+    if (this.displacementField) {
+      for (const seg of compiled.segments) {
+        this.displacementField.ImprintSegment(seg.p0, seg.p1, seg.contactor, {
+          softness: seg.softness,
+          depthScale: seg.depthScale,
+          passes: seg.passes,
+          phaseStartM: seg.phaseStartM,
+        });
+      }
+      for (const h of compiled.hooves) {
+        this.displacementField.ImprintHoof(h.x, h.z, h.contactor, {
+          softness: h.softness,
+          depthScale: h.depthScale,
+        });
+      }
+    }
+    for (const s of compiled.stamps) {
+      const stamp = MakeStamp(s);
+      this.history.AddStatic(stamp);
+    }
+    this.stats.staticTracks++;
+    this.generation++;
+    return { segments: compiled.segments.length, hooves: compiled.hooves.length, stamps: compiled.stamps.length };
+  }
+
+  AddStaticTracks(list) {
+    let totalSegments = 0, totalHooves = 0, totalStamps = 0;
+    for (const spec of list || []) {
+      const r = this.AddStaticTrack(spec);
+      totalSegments += r.segments; totalHooves += r.hooves; totalStamps += r.stamps;
+    }
+    return { tracks: (list || []).length, segments: totalSegments, hooves: totalHooves, stamps: totalStamps };
+  }
+
+  ClearStaticTracks() {
+    this.history.ClearPersistent();
+    this.stats.staticTracks = 0;
+    this.generation++;
+  }
+
   /** 换关 / 读档：历史与待画全清，下一帧整张重建。 */
-  Reset() {
-    this.history.Clear(); this.pending.length = 0; this.decay.Reset();
+  Reset({ keepStatic = false } = {}) {
+    this.history.Clear({ keepPersistent: keepStatic });
+    this.pending.length = 0; this.decay.Reset();
     this.decaySteps[0] = this.decaySteps[1] = this.decaySteps[2] = 0;
     this.stride.Reset(); this.lastLandSerial = null;
     this.recent.length = 0; this.recentPlayer.length = 0; this.recentVehicle.length = 0;
     for (const entry of this.rigs.values()) this._ResetRig(entry);
-    for (const entry of this.vehicles.values()) entry.seeded = false;
+    for (const entry of this.vehicles.values()) {
+      entry.seeded = false;
+      entry.tracks = null;
+      entry.contactors = null;
+    }
+    if (!keepStatic) {
+      this.displacementField?.Clear();
+      this.displacementView?.ResetVisuals();
+      this.stats.staticTracks = 0;
+    }
     this.generation++;
   }
 
@@ -239,19 +323,34 @@ export class TerrainTrails {
   Unregister(rig) { this.rigs.delete(rig); }
 
   /**
-   * 登记一辆履带车（车体局部 −Z 车头、+X 右）。spec 见 Data_Tuning_TerrainTrails.TERRAIN_TRAIL_VEHICLES。
-   * 每条履带两个游标：车往前开时在着地段最前面盖新的一段，倒车时在最后面盖；每段长 = 履带图样周期，
-   * 所以相邻两段的履齿落在同一套格子上。原地转向两条履带各走各的。第一次压到地形上时整段着地长盖一遍。
+   * 登记一辆车（坦克 / 轻战车 / 驴车 / 牛马车 / 卡车；车体局部 −Z 车头、+X 右）。
+   * 既支持新版 Data_VehicleTracks 车型 ID/配置对象，也 100% 兼容旧版 TERRAIN_TRAIL_VEHICLES.type89。
+   * 行驶时同步写入 CPU 稀疏高密真 3D 凹陷高度场与 GPU 2 cm/纹素微观细节靶。
    */
-  TrackVehicle(object, spec) {
+  TrackVehicle(object, profileOrSpec, options = {}) {
     if (!object || this.vehicles.has(object)) return;
-    this.vehicles.set(object, { object, spec, half: spec.halfGaugeM || null, seeded: false, tracks: null,
-      inScene: false, sceneCheckAt: -1 });
+    const isLegacy = !!(profileOrSpec && typeof profileOrSpec === "object"
+      && !Array.isArray(profileOrSpec.contactors) && Number.isFinite(profileOrSpec.trackWidthM));
+    const profile = ResolveVehicleTrackProfile(profileOrSpec);
+    if (!profile && !isLegacy) return;
+    this.vehicles.set(object, {
+      object,
+      spec: isLegacy ? profileOrSpec : null,
+      profile,
+      legacyTracked: isLegacy,
+      options: options || {},
+      half: isLegacy ? (profileOrSpec.halfGaugeM || null) : null,
+      seeded: false,
+      tracks: null,
+      contactors: null,
+      inScene: false,
+      sceneCheckAt: -1,
+    });
   }
   UntrackVehicle(object) { this.vehicles.delete(object); }
 
   /** 半轨距：车体局部包围盒半宽 − 半履带宽（按模型量，不写死）。 */
-  _MeasureGauge(entry) {
+  _MeasureGauge(entry, trackWidthM = null) {
     const object = entry.object, inverse = new THREE.Matrix4().copy(object.matrixWorld).invert();
     const box = new THREE.Box3(), local = new THREE.Box3(), m = new THREE.Matrix4();
     object.traverse((node) => {
@@ -261,11 +360,13 @@ export class TerrainTrails {
       box.union(local);
     });
     const halfWidth = box.isEmpty() ? 1.09 : (box.max.x - box.min.x) / 2;
-    return Math.min(1.5, Math.max(0.5, halfWidth - entry.spec.trackWidthM / 2));
+    const widthM = trackWidthM ?? entry.spec?.trackWidthM ?? 0.32;
+    return Math.min(1.5, Math.max(0.35, halfWidth - widthM / 2));
   }
 
-  _Vehicles() {
+  _Vehicles(gpuActive = true) {
     const heightAt = this.ground.heightAt;
+    const field = this.displacementField;
     for (const [object, entry] of this.vehicles) {
       if (this.scene && (entry.sceneCheckAt < 0 || this.frame - entry.sceneCheckAt > 30)) {
         let top = object;
@@ -275,49 +376,317 @@ export class TerrainTrails {
       }
       if (!object.visible || (this.scene && !entry.inScene)) continue;
       const e = object.matrixWorld.elements;
-      const px = e[12], py = e[13], pz = e[14];
-      if (Math.abs(py - heightAt(px, pz)) > entry.spec.onGroundM) { entry.seeded = false; continue; }
-      if (Math.hypot(px - this.focus.x, pz - this.focus.z) > (entry.spec.recordWithinM ?? WIN.history.recordWithinM)) continue;
+      const originYOffset = entry.options.originHeightM || 0;
+      const px = e[12], py = e[13] - originYOffset, pz = e[14];
+      const onGroundM = entry.spec?.onGroundM ?? entry.profile?.onGroundM ?? 0.7;
+      if (Math.abs(py - heightAt(px, pz)) > onGroundM) { entry.seeded = false; continue; }
+      const recordWithinM = entry.spec?.recordWithinM ?? entry.profile?.recordWithinM ?? WIN.history.recordWithinM;
+      if (this.hasFocus && Math.hypot(px - this.focus.x, pz - this.focus.z) > recordWithinM) continue;
       let fx = -e[8], fz = -e[10], rx = e[0], rz = e[2];
       const fl = Math.hypot(fx, fz) || 1, rl = Math.hypot(rx, rz) || 1;
       fx /= fl; fz /= fl; rx /= rl; rz /= rl;
-      entry.half ||= this._MeasureGauge(entry);
-      const spec = entry.spec, seg = TERRAIN_TRAIL_STAMPS.tread.lengthM;
-      const reach = Math.max(0, spec.contactLengthM / 2 - seg / 2);
-      const widthScale = spec.trackWidthM / TERRAIN_TRAIL_STAMPS.tread.widthM;
-      const Put = (x, z) => {
+
+      const softness = entry.options.softness ?? 1;
+      const depthScale = entry.options.depthScale ?? 1;
+      const rimScale = entry.options.rimScale ?? 1;
+
+      if (entry.legacyTracked) {
+        this._UpdateLegacyTrackedVehicle(entry, px, pz, fx, fz, rx, rz, { softness, depthScale, rimScale, field, gpuActive });
+      } else {
+        this._UpdateGenericVehicle(entry, px, pz, fx, fz, rx, rz, { softness, depthScale, rimScale, field, gpuActive });
+      }
+    }
+  }
+
+  _UpdateLegacyTrackedVehicle(entry, px, pz, fx, fz, rx, rz, { softness, depthScale, rimScale, field, gpuActive }) {
+    entry.half ||= this._MeasureGauge(entry, entry.spec.trackWidthM);
+    const spec = entry.spec, seg = TERRAIN_TRAIL_STAMPS.tread.lengthM;
+    const reach = Math.max(0, spec.contactLengthM / 2 - seg / 2);
+    const widthScale = spec.trackWidthM / TERRAIN_TRAIL_STAMPS.tread.widthM;
+    const Put = (x, z) => {
+      if (gpuActive) {
         this.Stamp({ x, z, dirX: fx, dirZ: fz, kind: "tread", strength: STR.tread, widthScale, recordWithinM: spec.recordWithinM });
-        this.stats.treads++;
-      };
-      if (!entry.tracks) entry.tracks = [-1, 1].map((side) => ({ side, front: { x: 0, z: 0 }, rear: { x: 0, z: 0 } }));
-      for (const track of entry.tracks) {
-        const cx = px + rx * track.side * entry.half, cz = pz + rz * track.side * entry.half;
-        const front = { x: cx + fx * reach, z: cz + fz * reach }, rear = { x: cx - fx * reach, z: cz - fz * reach };
-        const jumped = entry.seeded && Math.hypot(front.x - track.front.x, front.z - track.front.z) > 12;
-        if (!entry.seeded || jumped) {
-          // 整段着地长盖一遍（停着的车也压着地）
-          const n = Math.max(1, Math.round(spec.contactLengthM / seg));
+      }
+      this.stats.treads++;
+    };
+    if (!entry.tracks) {
+      entry.tracks = [-1, 1].map((side, idx) => ({
+        side,
+        contactor: entry.profile?.contactors?.[idx] || null,
+        front: { x: 0, z: 0 },
+        rear: { x: 0, z: 0 },
+        prevFront: { x: 0, z: 0 },
+        prevRear: { x: 0, z: 0 },
+        phaseM: 0,
+      }));
+    }
+    for (const track of entry.tracks) {
+      const cx = px + rx * track.side * entry.half, cz = pz + rz * track.side * entry.half;
+      const front = { x: cx + fx * reach, z: cz + fz * reach }, rear = { x: cx - fx * reach, z: cz - fz * reach };
+      const jumped = entry.seeded && Math.hypot(front.x - track.front.x, front.z - track.front.z) > 12;
+      if (!entry.seeded || jumped) {
+        if (field && track.contactor) {
+          field.ImprintSegment(rear, front, track.contactor, { softness, depthScale, rimScale, phaseStartM: 0 });
+        }
+        const n = Math.max(1, Math.round(spec.contactLengthM / seg));
+        for (let k = 0; k < n; k++) {
+          const a = n === 1 ? 0.5 : k / (n - 1);
+          Put(rear.x + (front.x - rear.x) * a, rear.z + (front.z - rear.z) * a);
+        }
+        track.front = front; track.rear = rear;
+        track.prevFront = { ...front }; track.prevRear = { ...rear };
+        track.phaseM = 0;
+        continue;
+      }
+      if (field && track.contactor) {
+        const dfx = front.x - track.prevFront.x, dfz = front.z - track.prevFront.z;
+        const df = Math.hypot(dfx, dfz);
+        if (df >= 0.03) {
+          const lat = Math.abs(dfx * rx + dfz * rz);
+          const churn = lat > 0.015 ? 1 + 0.45 * Math.min(1, lat / df) : 1;
+          field.ImprintSegment(track.prevFront, front, track.contactor, {
+            softness, depthScale: depthScale * churn, rimScale: rimScale * churn, phaseStartM: track.phaseM,
+          });
+          if (lat > 0.04) {
+            field.ImprintSegment(rear, front, track.contactor, {
+              softness, depthScale: depthScale * churn * 0.9, rimScale: rimScale * churn, phaseStartM: track.phaseM,
+            });
+          }
+          track.phaseM += df;
+          track.prevFront = { ...front };
+          track.prevRear = { ...rear };
+        }
+      }
+      for (const [key, point, sign] of [["front", front, 1], ["rear", rear, -1]]) {
+        const cursor = track[key];
+        for (let guard = 0; guard < 16; guard++) {
+          const dx = point.x - cursor.x, dz = point.z - cursor.z, d = Math.hypot(dx, dz);
+          if (d < seg) break;
+          if ((dx * fx + dz * fz) * sign <= 0) { cursor.x = point.x; cursor.z = point.z; break; }
+          cursor.x += dx / d * seg; cursor.z += dz / d * seg;
+          Put(cursor.x, cursor.z);
+        }
+      }
+    }
+    entry.seeded = true;
+  }
+
+  _UpdateGenericVehicle(entry, px, pz, fx, fz, rx, rz, { softness, depthScale, rimScale, field, gpuActive }) {
+    const profile = entry.profile;
+    const object = entry.object;
+    const recordWithinM = profile.recordWithinM ?? WIN.history.recordWithinM;
+    if (!entry.contactors) {
+      entry.contactors = profile.contactors.map((c) => ({
+        spec: c,
+        node: c.nodeName && entry.options.useNodes !== false ? object.getObjectByName(c.nodeName) || null : null,
+        half: null,
+        front: { x: 0, z: 0 },
+        rear: { x: 0, z: 0 },
+        prev: { x: 0, z: 0 },
+        prevRear: { x: 0, z: 0 },
+        cursor: { x: 0, z: 0 },
+        phaseM: 0,
+        travelM: 0,
+        nextStepM: (c.strideM || 0.72) * (c.phase || 0),
+        seeded: false,
+      }));
+    }
+
+    for (const st of entry.contactors) {
+      const c = st.spec;
+      const stampSpec = TERRAIN_TRAIL_STAMPS[c.stampKind] || TERRAIN_TRAIL_STAMPS.tread;
+      const widthScale = c.widthM / stampSpec.widthM;
+
+      if (c.type === "track") {
+        if (!st.half) {
+          st.half = c.measureGauge && !entry.options.fixedGauge
+            ? this._MeasureGauge(entry, c.widthM)
+            : Math.abs(c.offsetX);
+          if (entry.half === null) entry.half = st.half;
+        }
+        const cx = px + rx * c.side * st.half - fx * (c.offsetZ || 0);
+        const cz = pz + rz * c.side * st.half - fz * (c.offsetZ || 0);
+        const seg = Math.max(0.12, c.segmentStepM || stampSpec.lengthM);
+        const reach = Math.max(0, c.contactLengthM * 0.5 - seg * 0.5);
+        const front = { x: cx + fx * reach, z: cz + fz * reach };
+        const rear = { x: cx - fx * reach, z: cz - fz * reach };
+        const jumped = st.seeded && Math.hypot(front.x - st.prev.x, front.z - st.prev.z) > 12;
+        const lengthScale = Math.min(1.25, Math.max(0.7, (seg * 1.18) / stampSpec.lengthM));
+
+        const PutTread = (x, z, dx, dz, boost = 1) => {
+          if (gpuActive) {
+            const strength = boost === 1 ? c.strength : c.strength.map((v) => Math.min(1, v * boost));
+            this.Stamp({ x, z, dirX: dx, dirZ: dz, kind: c.stampKind, side: c.side, strength, widthScale, lengthScale, recordWithinM });
+          }
+          this.stats.treads++;
+        };
+
+        if (!st.seeded || jumped) {
+          if (field) {
+            field.ImprintSegment(rear, front, c, { softness, depthScale, rimScale, phaseStartM: 0 });
+          }
+          const n = Math.max(1, Math.round(c.contactLengthM / seg));
           for (let k = 0; k < n; k++) {
             const a = n === 1 ? 0.5 : k / (n - 1);
-            Put(rear.x + (front.x - rear.x) * a, rear.z + (front.z - rear.z) * a);
+            PutTread(rear.x + (front.x - rear.x) * a, rear.z + (front.z - rear.z) * a, fx, fz, 1);
           }
-          track.front = front; track.rear = rear;
+          st.front = { ...front }; st.rear = { ...rear };
+          st.prev = { ...front }; st.prevRear = { ...rear };
+          st.phaseM = 0;
+          st.seeded = true;
           continue;
         }
-        // 往前：着地段最前面每走一段盖一段；倒车：最后面。另一头的游标只跟着走、不盖（那片地已经压过了）。
+
+        const dfx = front.x - st.prev.x, dfz = front.z - st.prev.z;
+        const df = Math.hypot(dfx, dfz);
+        const drx = rear.x - st.prevRear.x, drz = rear.z - st.prevRear.z;
+        const dr = Math.hypot(drx, drz);
+        if (df >= 0.03 || dr >= 0.03) {
+          const lat = Math.abs(dfx * rx + dfz * rz);
+          const churn = lat > 0.015 ? 1 + ((profile.skidChurnBoost || 1.3) - 1) * Math.min(1, lat / Math.max(df, 0.02)) : 1;
+          if (field) {
+            if (df >= 0.03) {
+              field.ImprintSegment(st.prev, front, c, {
+                softness, depthScale: depthScale * churn, rimScale: rimScale * churn, phaseStartM: st.phaseM,
+              });
+            }
+            if (dr >= 0.03) {
+              field.ImprintSegment(st.prevRear, rear, c, {
+                softness, depthScale: depthScale * churn, rimScale: rimScale * churn, phaseStartM: st.phaseM,
+              });
+            }
+            if (lat > 0.035) {
+              field.ImprintSegment(rear, front, c, {
+                softness, depthScale: depthScale * churn * 0.92, rimScale: rimScale * churn, phaseStartM: st.phaseM,
+              });
+            }
+          }
+          st.phaseM += Math.max(df, dr);
+          st.prev = { ...front };
+          st.prevRear = { ...rear };
+        }
+
         for (const [key, point, sign] of [["front", front, 1], ["rear", rear, -1]]) {
-          const cursor = track[key];
-          for (let guard = 0; guard < 16; guard++) {
+          const cursor = st[key];
+          for (let guard = 0; guard < 24; guard++) {
             const dx = point.x - cursor.x, dz = point.z - cursor.z, d = Math.hypot(dx, dz);
             if (d < seg) break;
             if ((dx * fx + dz * fz) * sign <= 0) { cursor.x = point.x; cursor.z = point.z; break; }
-            cursor.x += dx / d * seg; cursor.z += dz / d * seg;
-            Put(cursor.x, cursor.z);
+            const nx = dx / d, nz = dz / d;
+            cursor.x += nx * seg; cursor.z += nz * seg;
+            PutTread(cursor.x, cursor.z, nx, nz, 1);
           }
         }
+        continue;
       }
-      entry.seeded = true;
+
+      if (c.type === "wheel") {
+        let wx, wz;
+        if (st.node) {
+          const wp = WorldPos(st.node, Scratch.a);
+          wx = wp.x; wz = wp.z;
+        } else {
+          wx = px + rx * c.offsetX - fx * (c.offsetZ || 0);
+          wz = pz + rz * c.offsetX - fz * (c.offsetZ || 0);
+        }
+        const seg = Math.max(0.1, c.segmentStepM || 0.16);
+        const lengthScale = Math.max(0.75, (seg * 1.4) / stampSpec.lengthM);
+        const jumped = st.seeded && Math.hypot(wx - st.prev.x, wz - st.prev.z) > 10;
+
+        const PutWheel = (x, z, dx, dz) => {
+          if (gpuActive) {
+            this.Stamp({ x, z, dirX: dx, dirZ: dz, kind: c.stampKind, side: c.side, strength: c.strength, widthScale, lengthScale, recordWithinM });
+          }
+          this.stats.wheels++;
+        };
+
+        if (!st.seeded || jumped) {
+          const halfC = (c.contactLengthM || 0.2) * 0.5;
+          if (field) {
+            field.ImprintSegment(
+              { x: wx - fx * halfC, z: wz - fz * halfC },
+              { x: wx + fx * halfC, z: wz + fz * halfC },
+              c,
+              { softness, depthScale, rimScale, phaseStartM: 0 },
+            );
+          }
+          PutWheel(wx, wz, fx, fz);
+          st.prev = { x: wx, z: wz };
+          st.cursor = { x: wx, z: wz };
+          st.phaseM = 0;
+          st.seeded = true;
+          continue;
+        }
+
+        const dx = wx - st.prev.x, dz = wz - st.prev.z, d = Math.hypot(dx, dz);
+        if (d >= 0.025) {
+          if (field) {
+            field.ImprintSegment(st.prev, { x: wx, z: wz }, c, {
+              softness, depthScale, rimScale, phaseStartM: st.phaseM,
+            });
+          }
+          st.phaseM += d;
+          st.prev = { x: wx, z: wz };
+        }
+        for (let guard = 0; guard < 32; guard++) {
+          const sx = wx - st.cursor.x, sz = wz - st.cursor.z, sd = Math.hypot(sx, sz);
+          if (sd < seg) break;
+          const nx = sx / sd, nz = sz / sd;
+          st.cursor.x += nx * seg; st.cursor.z += nz * seg;
+          PutWheel(st.cursor.x, st.cursor.z, nx, nz);
+        }
+        continue;
+      }
+
+      if (c.type === "hoof") {
+        const animalRoot = c.animalSpace ? entry.options.animalRoot : null;
+        if (c.animalSpace && entry.options.animalRoot && !animalRoot.visible) { st.seeded = false; continue; }
+        let hx, hz, hfx = fx, hfz = fz;
+        if (animalRoot) {
+          const ae = animalRoot.matrixWorld.elements;
+          let afx = -ae[8], afz = -ae[10], arx = ae[0], arz = ae[2];
+          const afl = Math.hypot(afx, afz) || 1, arl = Math.hypot(arx, arz) || 1;
+          afx /= afl; afz /= afl; arx /= arl; arz /= arl;
+          const localZ = c.animalOffsetZ ?? (c.offsetZ + 2.05);
+          hx = ae[12] + arx * c.offsetX - afx * localZ;
+          hz = ae[14] + arz * c.offsetX - afz * localZ;
+          hfx = afx; hfz = afz;
+        } else {
+          hx = px + rx * c.offsetX - fx * (c.offsetZ || 0);
+          hz = pz + rz * c.offsetX - fz * (c.offsetZ || 0);
+        }
+        const stride = Math.max(0.3, c.strideM || 0.72);
+        const jumped = st.seeded && Math.hypot(hx - st.prev.x, hz - st.prev.z) > 10;
+        if (!st.seeded || jumped) {
+          st.prev = { x: hx, z: hz };
+          st.travelM = 0;
+          st.nextStepM = stride * (c.phase || 0);
+          st.seeded = true;
+          continue;
+        }
+        const dx = hx - st.prev.x, dz = hz - st.prev.z, d = Math.hypot(dx, dz);
+        if (d < 0.01) continue;
+        const nx = dx / d, nz = dz / d;
+        st.travelM += d;
+        while (st.travelM >= st.nextStepM) {
+          const back = st.travelM - st.nextStepM;
+          const sx = hx - nx * back, sz = hz - nz * back;
+          if (field) {
+            field.ImprintHoof(sx, sz, c, { softness, depthScale, rimScale });
+          }
+          if (gpuActive) {
+            this.Stamp({
+              x: sx, z: sz, dirX: nx || hfx, dirZ: nz || hfz, kind: c.stampKind || "hoof",
+              side: c.side || 1, strength: c.strength, widthScale, recordWithinM,
+            });
+          }
+          this.stats.hooves++;
+          st.nextStepM += stride;
+        }
+        st.prev = { x: hx, z: hz };
+      }
     }
+    entry.seeded = true;
   }
   _ResetRig(entry) {
     for (const f of entry.feet) { f.contact = new FootContact(); f.knee = new FootContact({ absolute: true }); f.px = f.pz = f.kx = f.kz = NaN; }
@@ -371,13 +740,19 @@ export class TerrainTrails {
     if (scene !== this.scene) { this.scene = scene; for (const entry of this.rigs.values()) entry.sceneCheckAt = -1; }
     this.updates++;
     if (!this.active || step <= 0) return;
-    if (this.idleSkip && this.updates - this.consumedAt > 60) return;
-    this.source = "player";
-    if (player) this._Player(player);
-    this.source = "rig";
-    this._Rigs(step);
+    // 首帧渲染前（consumedAt === -Infinity）放行前 160 次更新，确保测试场预推或开场车辆不会漏写 GPU 细部历史
+    const gpuActive = !this.idleSkip
+      || (this.consumedAt === -Infinity && this.updates <= 160)
+      || (this.updates - this.consumedAt <= 60);
+    if (!gpuActive && !this.displacementField) return;
+    if (gpuActive) {
+      this.source = "player";
+      if (player) this._Player(player);
+      this.source = "rig";
+      this._Rigs(step);
+    }
     this.source = "vehicle";
-    if (this.vehicles.size) this._Vehicles();
+    if (this.vehicles.size) this._Vehicles(gpuActive);
     this.source = "api";
   }
 
@@ -528,7 +903,10 @@ export class TerrainTrails {
   Describe() {
     return {
       enabled: this.enabled, active: this.active, time: +this.time.toFixed(3),
-      history: this.history.count, pending: this.pending.length, rigs: this.rigs.size, vehicles: this.vehicles.size,
+      history: this.history.count, staticStamps: this.history.persistent.length,
+      pending: this.pending.length, rigs: this.rigs.size, vehicles: this.vehicles.size,
+      displacement: this.displacementView ? this.displacementView.Describe()
+        : this.displacementField ? { enabled: true, field: this.displacementField.State() } : null,
       stats: { ...this.stats }, generation: this.generation, recent: this.recent.slice(-12), recentPlayer: this.recentPlayer.slice(-12),
       recentVehicle: this.recentVehicle.slice(-12),
     };
@@ -546,13 +924,13 @@ attribute vec2 iCenter;   // 靶像素坐标
 attribute vec2 iAxis;     // 脚跟 → 脚尖（单位向量，世界 xz = 靶 xy）
 attribute vec2 iSize;     // 四边形 宽（带符号：负 = 左脚镜像）、长（像素）
 attribute float iCell;
-attribute vec3 iStrength;
-attribute vec3 iFade;     // 从历史回填时已经退掉的量（新印为 0）；靶上的减淡是逐纹素减色阶，这里同口径
+attribute vec4 iStrength;
+attribute vec4 iFade;     // 从历史回填时已经退掉的量（新印为 0）；靶上的减淡是逐纹素减色阶，这里同口径
 uniform vec2 uTarget;
 varying vec2 vLocal;
 varying float vCell;
-varying vec3 vStrength;
-varying vec3 vFade;
+varying vec4 vStrength;
+varying vec4 vFade;
 void main() {
   vec2 right = vec2(-iAxis.y, iAxis.x);
   vec2 p = iCenter + right * position.x * iSize.x + iAxis * position.y * iSize.y;
@@ -568,12 +946,12 @@ uniform sampler2D uAtlas;
 uniform vec3 uAtlasInfo;  // x 格数 y 半纹素（格内 u）z 半纹素（v）
 varying vec2 vLocal;
 varying float vCell;
-varying vec3 vStrength;
-varying vec3 vFade;
+varying vec4 vStrength;
+varying vec4 vFade;
 void main() {
   vec2 local = clamp(vLocal, uAtlasInfo.yz, 1.0 - uAtlasInfo.yz);
-  vec3 s = texture2D(uAtlas, vec2((vCell + local.x) / uAtlasInfo.x, local.y)).rgb;
-  gl_FragColor = vec4(max(s * vStrength - vFade, 0.0), 0.0);
+  vec4 s = texture2D(uAtlas, vec2((vCell + local.x) / uAtlasInfo.x, local.y));
+  gl_FragColor = max(s * vStrength - vFade, vec4(0.0));
 }`;
 
 const FULL_VERT = /* glsl */`void main() { gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -614,8 +992,8 @@ export class TerrainTrailsPass {
       axis: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 2), 2),
       size: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 2), 2),
       cell: new THREE.InstancedBufferAttribute(new Float32Array(BATCH), 1),
-      strength: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 3), 3),
-      fade: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 3), 3),
+      strength: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 4), 4),
+      fade: new THREE.InstancedBufferAttribute(new Float32Array(BATCH * 4), 4),
     };
     for (const attr of Object.values(this.inst)) attr.setUsage(THREE.DynamicDrawUsage);
     quad.setAttribute("iCenter", this.inst.center);
@@ -732,6 +1110,10 @@ export class TerrainTrailsPass {
           this.decayMaterial.uniforms.uDecay.value.set(decay[0] / 255, decay[1] / 255, decay[2] / 255);
           renderer.render(this.decayScene, this.camera);
           this.stats.decays++;
+          // 静态场景预置车辙永不衰减：衰减步（每 ~1.5 s 一次）后用 MAX 混合补刷一次当前窗内静态印章
+          if (system.history.persistent.length) {
+            this._DrawPersistent(renderer, WorldRectOf(WindowRange(this.index, size), texelM), size, texelM);
+          }
         }
         if (next !== this.index) {
           for (const range of ExposedRanges(this.index, next, size)) {
@@ -796,7 +1178,7 @@ export class TerrainTrailsPass {
       this._Scissor(renderer, null);
       this.stampMaterial.uniforms.uTarget.value.set(tier.size, tier.size);
       I.center.array.fill(0, 0, 2); I.axis.array[0] = 1; I.axis.array[1] = 0; I.size.array.fill(0, 0, 2);
-      I.cell.array[0] = 0; I.strength.array.fill(0, 0, 3); I.fade.array.fill(0, 0, 3);
+      I.cell.array[0] = 0; I.strength.array.fill(0, 0, 4); I.fade.array.fill(0, 0, 4);
       for (const attr of Object.values(I)) {
         attr.clearUpdateRanges?.();
         attr.addUpdateRange?.(0, attr.itemSize);
@@ -832,6 +1214,19 @@ export class TerrainTrailsPass {
     this.stats.restamped += n;
   }
 
+  _DrawPersistent(renderer, rect, size, texelM) {
+    const list = this.system.history.persistent;
+    if (!list.length) return;
+    this._Begin();
+    for (let k = 0; k < list.length; k++) {
+      const p = list[k];
+      const rad = StampRadius(p);
+      if (rect && (p.x + rad < rect.minX || p.x - rad > rect.maxX || p.z + rad < rect.minZ || p.z - rad > rect.maxZ)) continue;
+      this._Push(renderer, p, size, texelM);
+    }
+    this._Flush(renderer);
+  }
+
   _Begin() { this.count = 0; }
 
   _Push(renderer, stamp, size, texelM) {
@@ -843,8 +1238,10 @@ export class TerrainTrailsPass {
       I.axis.array[i * 2] = stamp.dirX; I.axis.array[i * 2 + 1] = stamp.dirZ;
       I.size.array[i * 2] = stamp.quadW / texelM; I.size.array[i * 2 + 1] = stamp.quadL / texelM;
       I.cell.array[i] = stamp.cell;
-      I.strength.array[i * 3] = stamp.r; I.strength.array[i * 3 + 1] = stamp.g; I.strength.array[i * 3 + 2] = stamp.b;
-      I.fade.array[i * 3] = stamp.fr || 0; I.fade.array[i * 3 + 1] = stamp.fg || 0; I.fade.array[i * 3 + 2] = stamp.fb || 0;
+      I.strength.array[i * 4] = stamp.r; I.strength.array[i * 4 + 1] = stamp.g;
+      I.strength.array[i * 4 + 2] = stamp.b; I.strength.array[i * 4 + 3] = stamp.a || 0;
+      I.fade.array[i * 4] = stamp.fr || 0; I.fade.array[i * 4 + 1] = stamp.fg || 0;
+      I.fade.array[i * 4 + 2] = stamp.fb || 0; I.fade.array[i * 4 + 3] = stamp.fa || 0;
     }
   }
 
@@ -863,12 +1260,18 @@ export class TerrainTrailsPass {
 
   /** 调试 / 测试：读靶上一个世界点的 [R, G, B]（0..255）。同步读回，别在帧循环里用。 */
   ReadTexel(renderer, x, z) {
+    const rgba = this.ReadTexelRgba(renderer, x, z);
+    return rgba ? [rgba[0], rgba[1], rgba[2]] : null;
+  }
+
+  /** 调试 / 测试：读靶上一个世界点的 [R, G, B, A]（0..255，A = 宏观深车辙）。 */
+  ReadTexelRgba(renderer, x, z) {
     if (!this.target || !this.tier) return null;
     const { size, texelM } = this.tier;
     const px = ((Math.floor(x / texelM) % size) + size) % size, pz = ((Math.floor(z / texelM) % size) + size) % size;
     const out = new Uint8Array(4);
     renderer.readRenderTargetPixels(this.target, px, pz, 1, 1, out);
-    return [out[0], out[1], out[2]];
+    return [out[0], out[1], out[2], out[3]];
   }
 
   /** 调试视图：把靶送屏（RGB = 坑深 / 泥边 / 踩乱）。 */

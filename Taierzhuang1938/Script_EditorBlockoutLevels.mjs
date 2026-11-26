@@ -693,6 +693,7 @@ export function LayoutFromSceneDoc(doc) {
     ...(doc.camera ? { camera: doc.camera } : {}),
     ...(doc.smokeColumns ? { smokeColumns: doc.smokeColumns } : {}),
     ...(doc.fogVolumes ? { fogVolumes: doc.fogVolumes } : {}),
+    ...(doc.vehicleTracks?.length ? { vehicleTracks: doc.vehicleTracks.map((track) => structuredClone(track)) } : {}),
     ...(doc.landmarks ? { landmarks: doc.landmarks.map((marker) => ({ ...marker })) } : {}),
     ways: {
       roads: (doc.ways?.roads || []).map(line => line.map(p => ({ x: p.x, z: p.z }))),

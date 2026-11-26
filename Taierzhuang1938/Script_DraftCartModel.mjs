@@ -7,6 +7,7 @@ import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 
 const VERSION = "2026101401";
 const KIND_NAME = Object.freeze({ ox: "Ox", horse: "Horse" });
@@ -156,6 +157,10 @@ export class DraftCartModels {
       instance = CreateDraftCartInstance(this.assets, cart.draft === "ox" ? "ox" : "horse");
       this.instances.set(cart.id, instance);
       this.root.add(instance.root);
+      TerrainTrailSystem.TrackVehicle(instance.cartRoot, "oxCart", {
+        animalRoot: instance.animalRoot,
+        originHeightM: 1,
+      });
     }
     // 一只合并网格承载好几个身份时，userData 记它承载的第一个；身份全集看 stableParts 的键。
     if (stableParts) for (const [identity, mesh] of Object.entries(instance.parts)) {
@@ -175,7 +180,10 @@ export class DraftCartModels {
   }
   Dispose() {
     this.disposed = true;
-    for (const instance of this.instances.values()) instance.Dispose();
+    for (const instance of this.instances.values()) {
+      TerrainTrailSystem.UntrackVehicle(instance.cartRoot);
+      instance.Dispose();
+    }
     this.instances.clear();
   }
 }

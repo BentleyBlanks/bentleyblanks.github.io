@@ -53,6 +53,7 @@ const WATCH_PATTERNS = Object.freeze({
   reactions: [/Scenes\/TestShellImpact\//i, /BattleReactionRange/i, /ShellImpactRange/i, /Script_SandboxPlugin_Reactions/i],
   cloth: [/Scenes\/TestCloth\//i, /ClothRange/i, /Script_SandboxPlugin_Cloth/i],
   hair: [/Scenes\/TestHair\//i, /HairRange/i, /Script_SandboxPlugin_Hair/i],
+  tracks: [/Scenes\/TestVehicleTracks\//i, /VehicleTrack/i, /TerrainTrail/i, /Script_SandboxPlugin_Tracks/i],
 });
 
 // 各测试场的实机干净取景配置（全分辨率 quality=high，不带 scale=small，推帧让模型/阴影/风场/烟尘稳定后截取）
@@ -176,6 +177,24 @@ const SHOT_PRESETS = Object.freeze({
       const T = window.Taierzhuang;
       T.Debug.HairRange.ShowPanel(false);
       T.StepFrames(30, 1 / 60, true);
+    },
+  },
+  tracks: {
+    query: "tracks=1&shot=1&manual=1&quality=high&audio=0",
+    frames: 30,
+    Ready: () => {
+      const state = window.Taierzhuang?.Debug.VehicleTracks?.State();
+      if (state?.error) throw new Error(state.error);
+      return state?.ready;
+    },
+    Stage: () => {
+      const T = window.Taierzhuang;
+      const api = T.Debug.VehicleTracks;
+      api.ShowPanel(false);
+      api.Pause(true);
+      api.SetWetness(1.3);
+      api.Camera("overview");
+      T.StepFrames(8, 1 / 60, true);
     },
   },
 });

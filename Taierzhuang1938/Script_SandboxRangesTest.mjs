@@ -137,7 +137,8 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
     gengjiazhuangFieldApproach: ["UpdateCamera"], gengjiazhuangEastSmoke: ["UpdateCamera"],
     tanketteAdvanceEastTrack: ["UpdateCamera"], aircraftEvacuationDitch: ["UpdateCamera"],
     encounterPlay: ["ScaleDt", "CapturesInput", "ApplyCamera"],
-    cloth: ["UpdateCamera"], hair: ["UpdateCamera"], impacts: ["ScaleDt", "CapturesInput", "ApplyCamera"],
+    cloth: ["UpdateCamera"], hair: ["UpdateCamera"], tracks: ["UpdateCamera"],
+    impacts: ["ScaleDt", "CapturesInput", "ApplyCamera"],
     reactions: ["ScaleDt"], gore: ["ScaleDt", "CapturesInput", "ApplyCamera"],
   };
   const pluginSourceFile = {
@@ -158,6 +159,7 @@ Check(IsMenuStartup(new URLSearchParams("")), "什么都不带进正式菜单");
     reactions: "Script_SandboxPlugin_Reactions.mjs",
     cloth: "Script_SandboxPlugin_Cloth.mjs",
     hair: "Script_SandboxPlugin_Hair.mjs",
+    tracks: "Script_SandboxPlugin_Tracks.mjs",
   };
   for (const plugin of SANDBOX_PLUGINS) {
     const body = fs.readFileSync(path.join(dirHere, pluginSourceFile[plugin.id]), "utf8");

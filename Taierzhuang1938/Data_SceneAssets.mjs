@@ -60,6 +60,8 @@ export const SCENE_LIST = Object.freeze([
     note: "九件布料材质与吸血对比实验室（?cloth=1）" }),
   Object.freeze({ id: "TestHair", title: "测试场景 · 头发胡子测试场", style: "whitebox", category: "test", runParam: "hair",
     note: "五排胸像台座与三档发丝/发片/头发壳对比（?hair=1）" }),
+  Object.freeze({ id: "TestVehicleTracks", title: "测试场景 · 车辆车辙印测试场", style: "formal", category: "test", runParam: "tracks",
+    note: "八九式、九四式、驴车并排实时压痕 + 静态交叉车辙与真 3D 凹陷对比（?tracks=1）" }),
 ]);
 
 /** 场景 id → 清单里那一项（没有返回 null）。 */

@@ -101,7 +101,11 @@ const CELL_SHAPES = {
   hand: (x, t, L, W, seed) => Hand(x, t, L, W, seed),
   drag: (x, t, L, W, seed) => Drag(x, t, L, W, seed),
   scuff: (x, t, L, W, seed) => Scuff(x, t, L, W, seed),
-  tread: (x, t, L, W, seed) => Tread(x, t, L, W, seed),
+  tread: (x, t, L, W, seed) => Tread(x, t, L, W, seed, TERRAIN_TRAIL_STAMPS.tread.pitchM),
+  tanketteTread: (x, t, L, W, seed) => Tread(x, t, L, W, seed, TERRAIN_TRAIL_STAMPS.tanketteTread.pitchM, 0.016),
+  ironWheel: (x, t, L, W, seed) => IronWheel(x, t, L, W, seed),
+  hoof: (x, t, L, W, seed) => Hoof(x, t, L, W, seed),
+  tire: (x, t, L, W, seed) => Tire(x, t, L, W, seed),
 };
 
 function Sole(kind, xn, t, L, W, seed) {
@@ -198,19 +202,71 @@ function Scuff(xn, t, L, W, seed) {
 
 // 履带一段：横向履齿按节距排（以印章中心为相位原点 —— 每走一个 lengthM 盖一段时履齿落在同一套世界格子上），
 // 中间导齿那一道浅一些，两侧被挤出的泥。两端各留 6% 的淡出（相邻两段重叠在那里）。
-function Tread(xn, t, L, W, seed) {
-  const pitch = TERRAIN_TRAIL_STAMPS.tread.pitchM;
+// A 通道存平滑宏观凹槽轮廓（不含高频履齿噪声），供深车辙积水、腔体遮蔽与自阴影使用。
+function Tread(xn, t, L, W, seed, pitch = TERRAIN_TRAIL_STAMPS.tread.pitchM, guideWidth = 0.022) {
   const x = xn * W, y = (t - 0.5) * L;
   const ends = Smooth(-0.06, 0.02, t) * Smooth(1.06, 0.98, t);
   const edge = Math.abs(x) - 0.5 * W;
   const band = Smooth(0.004, -0.01, edge);
   const phase = y / pitch - Math.round(y / pitch);
   const grouser = Gauss(phase, 0, 0.13);
-  const guide = Gauss(x, 0, 0.022);
+  const guide = Gauss(x, 0, guideWidth);
   const dep = band * (0.62 + 0.33 * grouser) * (1 - 0.35 * guide) * (0.94 + 0.06 * ValueNoise(x * 80, y * 30, seed)) * ends;
   const rim = Gauss(edge, 0.016, 0.014) * ends * (0.65 + 0.35 * ValueNoise(x * 60, y * 25, seed + 3));
   const dist = Math.max(band, 0.8 * Math.exp(-((Math.max(edge, 0) / 0.05) ** 2))) * ends;
-  return [Clamp01(dep), Clamp01(rim), Clamp01(dist)];
+  const macro = band * (1 - 0.15 * guide) * ends;
+  return [Clamp01(dep), Clamp01(rim), Clamp01(dist), Clamp01(macro)];
+}
+
+// 铁箍木轮一段（驴车 / 牛马车）：窄而深、侧壁陡峭，槽内带铁箍纵向磨擦细纹，两侧紧贴锐利挤泥脊。
+function IronWheel(xn, t, L, W, seed) {
+  const x = xn * W, y = (t - 0.5) * L;
+  const ends = Smooth(-0.08, 0.06, t) * Smooth(1.08, 0.94, t);
+  const edge = Math.abs(x) - 0.5 * W;
+  const u = Math.abs(x) / Math.max(1e-4, 0.5 * W);
+  const groove = u < 1 ? Math.pow(1 - u * u, 0.55) : 0;
+  const striation = 0.86 + 0.14 * ValueNoise(x * 160, y * 14, seed + 11);
+  const dep = groove * striation * ends;
+  const rim = Gauss(edge, 0.012, 0.012) * Smooth(-0.004, 0.004, edge) * ends
+    * (0.68 + 0.32 * ValueNoise(x * 95, y * 32, seed + 5));
+  const dist = Math.max(Smooth(0.006, -0.004, edge), 0.78 * Math.exp(-((Math.max(edge, 0) / 0.036) ** 2))) * ends;
+  const macro = groove * ends;
+  return [Clamp01(dep), Clamp01(rim), Clamp01(dist), Clamp01(macro)];
+}
+
+// 驴 / 马 / 牛蹄印：U 形角质蹄壁（前缘与两侧最深）、中央微隆蹄叉、后缘蹬起小泥埂。
+function Hoof(xn, t, L, W, seed) {
+  const x = xn * W, y = (t - 0.5) * L;
+  const rx = x / (0.5 * W), ry = y / (0.5 * L);
+  // 蹄形：前端圆弧，后端微收并向内凹出一道蹄踵缺口
+  const r = Math.hypot(rx * (1 + 0.08 * (0.5 - t)), ry);
+  const d = (r - 1) * 0.5 * Math.min(W, L);
+  const notch = Smooth(0.25, 0.02, t) * Gauss(rx, 0, 0.28);
+  const inside = Smooth(0.003, -0.006, d) * (1 - 0.75 * notch);
+  // 外圈蹄壁最深，中间蹄底略浅
+  const wall = Smooth(0.38, 0.78, r) * inside;
+  const dep = inside * (0.52 + 0.48 * wall) * (0.9 + 0.1 * ValueNoise(x * 130, y * 130, seed));
+  const rim = Gauss(d, 0.006, 0.006) * Smooth(-0.002, 0.003, d) * (0.65 + 0.45 * Smooth(0.6, 0.1, t))
+    * (0.7 + 0.3 * ValueNoise(x * 110, y * 110, seed + 9));
+  const dist = Math.max(inside, 0.8 * Math.exp(-((Math.max(d, 0) / 0.018) ** 2)));
+  return [Clamp01(dep), Clamp01(rim), Clamp01(dist), Clamp01(inside * 0.85)];
+}
+
+// 充气橡胶胎（1930 年代卡车人字/斜块胎纹）：左右错开斜纹 + 胎肩挤泥。
+function Tire(xn, t, L, W, seed) {
+  const pitch = TERRAIN_TRAIL_STAMPS.tire.pitchM;
+  const x = xn * W, y = (t - 0.5) * L;
+  const ends = Smooth(-0.06, 0.04, t) * Smooth(1.06, 0.96, t);
+  const edge = Math.abs(x) - 0.5 * W;
+  const band = Smooth(0.006, -0.012, edge);
+  const chevronY = y + Math.abs(x) * 0.55 + (x < 0 ? pitch * 0.35 : 0);
+  const phase = chevronY / pitch - Math.round(chevronY / pitch);
+  const lug = Gauss(phase, 0, 0.2);
+  const centerGroove = Gauss(x, 0, 0.016);
+  const dep = band * (0.58 + 0.36 * lug) * (1 - 0.22 * centerGroove) * (0.94 + 0.06 * ValueNoise(x * 80, y * 30, seed)) * ends;
+  const rim = Gauss(edge, 0.015, 0.014) * ends * (0.68 + 0.32 * ValueNoise(x * 65, y * 28, seed + 7));
+  const dist = Math.max(band, 0.78 * Math.exp(-((Math.max(edge, 0) / 0.045) ** 2))) * ends;
+  return [Clamp01(dep), Clamp01(rim), Clamp01(dist), Clamp01(band * ends)];
 }
 
 /** 每种印章在格子里的留白：印章四边形 = 鞋底尺寸 × pad（泥边、踩乱、趾头都在四边形里）。 */
@@ -219,10 +275,14 @@ export const STAMP_PADS = Object.freeze({
   knee: Object.freeze([1.7, 1.7]), hand: Object.freeze([1.7, 1.5]), drag: Object.freeze([1.3, 1.12]),
   scuff: Object.freeze([1.35, 1.35]),
   tread: Object.freeze([1.6, 1.12]),
+  tanketteTread: Object.freeze([1.65, 1.14]),
+  ironWheel: Object.freeze([2.8, 1.18]),
+  hoof: Object.freeze([1.85, 1.7]),
+  tire: Object.freeze([1.6, 1.14]),
 });
 
 /**
- * 生成印章图集。RGBA8，一行 cells 格，每格 cellW × cellH；R 坑深 G 泥边 B 踩乱 A 0。
+ * 生成印章图集。RGBA8，一行 cells 格，每格 cellW × cellH；R 坑深 G 泥边 B 踩乱 A 宏观车辙深度。
  * 每格外圈留 2 px 空白（mip 往下几级时不串格）。数据行 0 = 纹理 v = 0 = 脚跟。
  */
 export function BuildStampAtlas({ cellW = TERRAIN_TRAIL_ATLAS.cellW, cellH = TERRAIN_TRAIL_ATLAS.cellH,
@@ -240,13 +300,14 @@ export function BuildStampAtlas({ cellW = TERRAIN_TRAIL_ATLAS.cellW, cellH = TER
       for (let px = border; px < cellW - border; px++) {
         const u = (px + 0.5) / cellW;
         const xn = (u - 0.5) * padW;
-        const [r, g, b] = shape(xn, t, L, W, spec.cell * 101 + 17);
+        const [r, g, b, a = 0] = shape(xn, t, L, W, spec.cell * 101 + 17);
         // 格子边上再淡一下：任何形状都不许顶到留白（顶到了就是四边形裁出来的直线）
         const fade = Smooth(border, border + 3, Math.min(px, cellW - 1 - px, py, cellH - 1 - py));
         const i = (py * width + spec.cell * cellW + px) * 4;
         data[i] = Math.round(255 * r * fade);
         data[i + 1] = Math.round(255 * g * fade);
         data[i + 2] = Math.round(255 * b * fade);
+        data[i + 3] = Math.round(255 * a * fade);
       }
     }
   }
@@ -282,13 +343,14 @@ export function MakeStamp(p) {
   let dx = p.dirX, dz = p.dirZ;
   const n = Math.hypot(dx, dz);
   if (n > 1e-6) { dx /= n; dz /= n; } else { dx = 0; dz = -1; }
-  const s = p.strength || [1, 1, 1];
+  const s = p.strength || [1, 1, 1, 0];
   return {
     x: p.x, z: p.z, dirX: dx, dirZ: dz,
     quadW: spec.widthM * padW * (p.widthScale || 1) * (p.side === -1 ? -1 : 1),
     quadL: spec.lengthM * padL * (p.lengthScale || 1),
     cell: spec.cell,
-    r: Clamp01(s[0]), g: Clamp01(s[1]), b: Clamp01(s[2]),
+    r: Clamp01(s[0]), g: Clamp01(s[1]), b: Clamp01(s[2]), a: Clamp01(s[3] ?? 0),
+    persistent: !!p.persistent,
   };
 }
 
@@ -392,45 +454,65 @@ export function StampCopies(stamp, texelM, size) {
 export class TrailHistory {
   constructor(capacity = 8192) {
     this.capacity = capacity;
-    this.f = new Float32Array(capacity * 10);   // x z dirX dirZ quadW quadL cell r g b
+    this.stride = 11;
+    this.f = new Float32Array(capacity * 11);   // x z dirX dirZ quadW quadL cell r g b a
     this.t = new Float64Array(capacity);
     this.head = 0;
     this.count = 0;
+    this.persistent = [];                       // 静态预置车辙：不随时间减淡、不被动态脚印挤掉
   }
-  Clear() { this.head = 0; this.count = 0; }
+  Clear({ keepPersistent = false } = {}) {
+    this.head = 0; this.count = 0;
+    if (!keepPersistent) this.persistent.length = 0;
+  }
+  ClearPersistent() { this.persistent.length = 0; }
+  AddStatic(stamp) { this.persistent.push(stamp); }
   Add(stamp, time) {
-    const i = this.head, o = i * 10, f = this.f;
+    if (stamp.persistent) { this.persistent.push(stamp); return; }
+    const i = this.head, o = i * 11, f = this.f;
     f[o] = stamp.x; f[o + 1] = stamp.z; f[o + 2] = stamp.dirX; f[o + 3] = stamp.dirZ;
     f[o + 4] = stamp.quadW; f[o + 5] = stamp.quadL; f[o + 6] = stamp.cell;
-    f[o + 7] = stamp.r; f[o + 8] = stamp.g; f[o + 9] = stamp.b;
+    f[o + 7] = stamp.r; f[o + 8] = stamp.g; f[o + 9] = stamp.b; f[o + 10] = stamp.a || 0;
     this.t[i] = time;
     this.head = (i + 1) % this.capacity;
     this.count = Math.min(this.count + 1, this.capacity);
   }
   /**
    * 与世界矩形相交、且还没退干净的印章，按落下的先后顺序回调。
-   * stamp.r/g/b 是原强度，stamp.fr/fg/fb 是到现在已经退掉的量（0..1，按 lifeS 线性）。
+   * 静态持久车辙先回填（无衰减），再回填动态环形历史。
    * @param {{minX,maxX,minZ,maxZ}|null} rect null = 全部
    * @param {(stamp:object) => void} visit
    * @returns {number} 回调次数
    */
   Query(rect, now, lifeS, visit) {
     let n = 0;
+    const stamp = { x: 0, z: 0, dirX: 0, dirZ: 0, quadW: 0, quadL: 0, cell: 0, r: 0, g: 0, b: 0, a: 0, fr: 0, fg: 0, fb: 0, fa: 0 };
+    for (let k = 0; k < this.persistent.length; k++) {
+      const p = this.persistent[k];
+      const rad = 0.5 * Math.hypot(p.quadW, p.quadL);
+      if (rect && (p.x + rad < rect.minX || p.x - rad > rect.maxX || p.z + rad < rect.minZ || p.z - rad > rect.maxZ)) continue;
+      stamp.x = p.x; stamp.z = p.z; stamp.dirX = p.dirX; stamp.dirZ = p.dirZ;
+      stamp.quadW = p.quadW; stamp.quadL = p.quadL; stamp.cell = p.cell;
+      stamp.r = p.r; stamp.g = p.g; stamp.b = p.b; stamp.a = p.a || 0;
+      stamp.fr = 0; stamp.fg = 0; stamp.fb = 0; stamp.fa = 0;
+      visit(stamp);
+      n++;
+    }
     const f = this.f, cap = this.capacity;
     const first = (this.head - this.count + cap) % cap;
-    const stamp = { x: 0, z: 0, dirX: 0, dirZ: 0, quadW: 0, quadL: 0, cell: 0, r: 0, g: 0, b: 0, fr: 0, fg: 0, fb: 0 };
     for (let k = 0; k < this.count; k++) {
-      const i = (first + k) % cap, o = i * 10;
+      const i = (first + k) % cap, o = i * 11;
       const age = Math.max(0, now - this.t[i]);
       const fr = age / lifeS[0], fg = age / lifeS[1], fb = age / lifeS[2];
-      if (f[o + 7] - fr <= 0.002 && f[o + 8] - fg <= 0.002 && f[o + 9] - fb <= 0.002) continue;
+      const fa = lifeS[3] > 0 ? age / lifeS[3] : 0;
+      if (f[o + 7] - fr <= 0.002 && f[o + 8] - fg <= 0.002 && f[o + 9] - fb <= 0.002 && f[o + 10] - fa <= 0.002) continue;
       const x = f[o], z = f[o + 1];
       const rad = 0.5 * Math.hypot(f[o + 4], f[o + 5]);
       if (rect && (x + rad < rect.minX || x - rad > rect.maxX || z + rad < rect.minZ || z - rad > rect.maxZ)) continue;
       stamp.x = x; stamp.z = z; stamp.dirX = f[o + 2]; stamp.dirZ = f[o + 3];
       stamp.quadW = f[o + 4]; stamp.quadL = f[o + 5]; stamp.cell = f[o + 6];
-      stamp.r = f[o + 7]; stamp.g = f[o + 8]; stamp.b = f[o + 9];
-      stamp.fr = fr; stamp.fg = fg; stamp.fb = fb;
+      stamp.r = f[o + 7]; stamp.g = f[o + 8]; stamp.b = f[o + 9]; stamp.a = f[o + 10];
+      stamp.fr = fr; stamp.fg = fg; stamp.fb = fb; stamp.fa = fa;
       visit(stamp);
       n++;
     }

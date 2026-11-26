@@ -69,6 +69,9 @@ export const SANDBOX_RANGES = Object.freeze([
   RANGE({ id: "hair", phaseId: "HairRange", sceneId: "TestHair",
     bootLabel: "boot.start.hairRange", invincible: true, externalProps: false, trimProps: false,
     tightBounds: true, muteAudio: true, ownsFrame: true }),
+  RANGE({ id: "tracks", phaseId: "VehicleTrackRange", sceneId: "TestVehicleTracks",
+    bootLabel: "boot.start.trackRange", invincible: true, externalProps: false, trimProps: false,
+    tightBounds: true, muteAudio: true, ownsFrame: true }),
 ]);
 
 /** 测试场的网址开关名（开机路由用）。 */

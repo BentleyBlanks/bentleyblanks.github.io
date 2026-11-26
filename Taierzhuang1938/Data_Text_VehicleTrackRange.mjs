@@ -1,0 +1,50 @@
+// Data_Text_VehicleTrackRange.mjs — 车辆轮痕测试场文案（键前缀 `tracks.`）。
+export const TEXT = Object.freeze({
+  "tracks.title": "车辆轮痕测试场",
+  "tracks.subtitle": "八九式 · 九四式 · 驴车 真 3D 凹陷 + 2 cm 微观纹素",
+  "tracks.loading": "正在载入三辆实车模型与测试场…（{done}/{total}）",
+  "tracks.error": "测试场加载失败：{error}",
+  "tracks.hint": "左键拖拽环绕 · 右键拖拽平移 · 滚轮缩放 · WASD 飞行",
+  "tracks.show": "显示面板",
+  "tracks.hide": "隐藏面板",
+  "tracks.section.playback": "行驶控制",
+  "tracks.section.cameras": "观察机位",
+  "tracks.section.compare": "A/B 与地表对比",
+  "tracks.section.stats": "实时几何与纹素统计",
+  "tracks.play": "继续行驶",
+  "tracks.pause": "暂停行驶",
+  "tracks.step": "单步 +0.5 s",
+  "tracks.reset": "重置压痕",
+  "tracks.dispOn": "真 3D 凹陷：开",
+  "tracks.dispOff": "真 3D 凹陷：关（平地对照）",
+  "tracks.vehiclesOn": "隐藏车辆（看车底压痕）",
+  "tracks.vehiclesOff": "显示车辆",
+  "tracks.wetness": "地表湿度 / 积水",
+  "tracks.wet.dry": "干土",
+  "tracks.wet.damp": "湿土",
+  "tracks.wet.rain": "雨后积水",
+  "tracks.debugView": "渲染视图",
+  "tracks.view.lit": "正式着色",
+  "tracks.view.normal": "法线视图",
+  "tracks.view.trail": "痕迹靶视图",
+  "tracks.cam.overview": "全景总览",
+  "tracks.cam.grazing": "低角侧光特写",
+  "tracks.cam.tank89": "八九式宽履带",
+  "tracks.cam.tankette94": "九四式窄履带",
+  "tracks.cam.donkeyCart": "驴车铁轮与脚印",
+  "tracks.cam.crossing": "交叉碾压细节",
+  "tracks.vehicle.type89": "八九式中战车（34 cm 宽履带）",
+  "tracks.vehicle.type94": "九四式轻装甲车（21 cm 窄履带）",
+  "tracks.vehicle.donkeyCart": "灰驴两轮木车（6.8 cm 铁轮 + 四脚）",
+  "tracks.stats": "活跃高密瓦片 {tiles} 块（{cellCm} cm 格距 / {tris} 三角）\n动态印章 {stamps} · 静态持久印章 {staticStamps}\n槽深探测：八九式 {d89} cm · 九四式 {d94} cm · 驴车 {ddc} cm",
+  "tracks.build.ready": "车辆轮痕测试场就绪",
+});
+
+export const GATED_MODULES = Object.freeze([
+  "Script_VehicleTrackRange.mjs",
+  "Script_VehicleTrackRangeField.mjs",
+]);
+
+export const DYNAMIC_PREFIXES = Object.freeze([
+  "tracks.",
+]);

@@ -25,6 +25,7 @@ const CARD_META = Object.freeze({
   reactions: { glyph: "震", cover: "./Covers/Texture_TestSceneCover_Reactions.webp" },
   cloth: { glyph: "布", cover: "./Covers/Texture_TestSceneCover_Cloth.webp" },
   hair: { glyph: "发", cover: "./Covers/Texture_TestSceneCover_Hair.webp" },
+  tracks: { glyph: "痕", cover: "./Covers/Texture_TestSceneCover_Tracks.webp" },
 });
 
 function MenuMetaFor(sandboxId) {

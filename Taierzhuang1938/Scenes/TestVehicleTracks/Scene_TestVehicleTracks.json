@@ -1,0 +1,33 @@
+{
+  "schema": "tengxian-scene/1",
+  "id": "TestVehicleTracks",
+  "title": "测试场景 · 车辆车辙印测试场",
+  "source": {"notes":"通用战车、坦克、驴车真 3D 凹陷与 2 cm GPU 细部车辙测试场（?tracks=1）"},
+  "bounds": {"minX":-36,"maxX":36,"minZ":-36,"maxZ":36},
+  "spawn": {"x":0,"z":24,"yawDeg":0},
+  "terrain": {"file":"Scene_TestVehicleTracks.height.bin","encoding":"int16-cm-le","minX":-36,"minZ":-36,"cellM":0.5,"cols":144,"rows":144},
+  "look": {"terrainLayers":"MissionPlain","proceduralDressing":false,"groundTint":[1.02,0.98,0.9]},
+  "paint": [
+    {"id":"WetMudTestStrip","color":"#4c4237","tint":[0.82,0.78,0.73],"feather":2.2,"strength":0.9,"poly":[{"x":-24,"z":-2},{"x":12,"z":-2},{"x":12,"z":12},{"x":-24,"z":12}]},
+    {"id":"CompactedRoadStrip","color":"#786e60","tint":[1.12,1.06,0.98],"feather":1.8,"strength":0.85,"poly":[{"x":10,"z":-26},{"x":26,"z":-26},{"x":26,"z":26},{"x":10,"z":26}]}
+  ],
+  "vehicleTracks": [
+    {"id":"Static_Type89Cross","profile":"type89Tank","passes":2,"depthScale":1.15,"points":[[-19,14],[-10,9],[-1,5],[9,1],[18,-5]]},
+    {"id":"Static_Type94Cross","profile":"type94Tankette","passes":1.6,"depthScale":1.1,"points":[[-16,-4],[-7,0],[2,4],[11,8],[19,12]]},
+    {"id":"Static_DonkeyCross","profile":"donkeyCart","passes":2,"depthScale":1.15,"hooves":true,"points":[[-14,10],[-5,7],[4,4],[13,2],[21,1]]}
+  ],
+  "markers": [
+    {"id":"Lane_Type89","name":"八九式中战车车道","kind":"area","x":-8.5,"z":6,"radiusM":3},
+    {"id":"Lane_Type94","name":"九四式轻装甲车车道","kind":"area","x":0,"z":6,"radiusM":3},
+    {"id":"Lane_DonkeyCart","name":"灰驴木车车道","kind":"area","x":9.2,"z":6,"radiusM":3},
+    {"id":"Pad_Crossing","name":"静态交叉车辙区","kind":"area","x":-0.5,"z":5.4,"radiusM":4}
+  ],
+  "objects": [
+    {"id":"YardCrate_W1","asset":"Prop/militaryCrateClosed","pos":[-15.5,null,12.5],"size":[0.55,0.32,0.38],"yawDeg":18,"group":"场边标物"},
+    {"id":"YardCrate_W2","asset":"Prop/battlefieldSupplyBox","pos":[-16.4,null,11.6],"size":[0.85,0.48,0.52],"yawDeg":-12,"group":"场边标物"},
+    {"id":"YardSandbag_N1","asset":"Prop/battlefieldSandbag01","pos":[-14.5,null,-6.5],"size":[1.8,0.9,0.9],"yawDeg":15,"group":"场边标物"},
+    {"id":"YardSandbag_E1","asset":"Prop/battlefieldSandbag03","pos":[17.5,null,14.5],"size":[1.6,0.85,0.8],"yawDeg":-24,"group":"场边标物"},
+    {"id":"YardTree_NW","asset":"Tree/Dead","pos":[-26,null,-22],"size":[0.6,10,0.6],"yawDeg":30,"group":"场边远景"},
+    {"id":"YardTree_NE","asset":"Tree/Dead","pos":[27,null,-20],"size":[0.6,11,0.6],"yawDeg":140,"group":"场边远景"}
+  ]
+}

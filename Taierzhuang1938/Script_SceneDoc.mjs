@@ -15,6 +15,7 @@ import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutCo
 import { GridSampler, SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
 import { CompileSceneAirWalls, SceneAirWallIssues } from "./Script_SceneAirWalls.mjs";
 import { SceneCraterIssues, SliceSceneCraters } from "./Script_SceneCraters.mjs";
+import { SceneVehicleTrackIssues, NormalizeTrackPoints } from "./Script_VehicleTrackField.mjs";
 import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
 import { MAX_FOG_VOLUMES } from "./Data_Tuning_Volumetrics.mjs";
 import { PARTICLE_VOLUME_ASSETS } from "./Data_ParticleVolumeAssets.mjs";
@@ -180,6 +181,7 @@ export function ValidateScene(doc) {
   }
   if (doc.trenches !== undefined) SceneTrenchIssues(doc.trenches, errors);
   if (doc.craters !== undefined) SceneCraterIssues(doc.craters, errors, "craters", ids);
+  if (doc.vehicleTracks !== undefined) SceneVehicleTrackIssues(doc.vehicleTracks, errors);
   return { ok: errors.length === 0, errors, warnings };
 }
 
@@ -189,7 +191,7 @@ export function FormatSceneJson(scene) {
   const entries = Object.entries(scene);
   entries.forEach(([key, value], i) => {
     const comma = i < entries.length - 1 ? "," : "";
-    if (["objects", "airWalls", "markers", "paint", "craters"].includes(key) && Array.isArray(value)) {
+    if (["objects", "airWalls", "markers", "paint", "craters", "vehicleTracks"].includes(key) && Array.isArray(value)) {
       lines.push(`  ${JSON.stringify(key)}: [`);
       value.forEach((item, j) => lines.push(`    ${JSON.stringify(item)}${j < value.length - 1 ? "," : ""}`));
       lines.push(`  ]${comma}`);
@@ -373,6 +375,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const site = bd?.siteBounds;
   const withBackdrop = bd && (!site || Inside(area, (site.minX + site.maxX) / 2, (site.minZ + site.maxZ) / 2));
   const paint = (scene.paint || []).filter(item => LineTouches(area, item.poly || item.line, (item.halfW || 0) + (item.feather || 1)));
+  const vehicleTracks = (scene.vehicleTracks || []).filter(track => LineTouches(area, NormalizeTrackPoints(track.points), 3));
   const markers = (scene.markers || []).filter(m => Inside(area, m.x, m.z));
   const Lines = (lines) => (lines || []).filter(line => LineTouches(area, line));
   const look = { ...(scene.look || {}) };
@@ -407,6 +410,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     blocks,
     ...(gates.length ? { gates } : {}),
     ...(paint.length ? { paint: paint.map(p => ({ ...p })) } : {}),
+    ...(vehicleTracks.length ? { vehicleTracks: vehicleTracks.map(t => structuredClone(t)) } : {}),
     ...(withBackdrop ? { backdrop: { far: bd.far, ground: { ...bd.ground }, ...(bd.haze ? { haze: { ...bd.haze } } : {}),
       paint: (bd.paint || []).map(p => ({ ...p })), shapes } } : {}),
     ...(markers.length ? { landmarks: markers.map(m => ({ ...m })) } : {}),

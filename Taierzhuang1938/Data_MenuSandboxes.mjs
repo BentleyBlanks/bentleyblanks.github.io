@@ -196,4 +196,26 @@ export const MENU_SANDBOX_ENTRIES = Object.freeze([
     minutes: 600,
     zones: [{ id: "Pedestals", name: "台座" }],
   },
+  {
+    id: "VehicleTrackRange",
+    sandbox: true,
+    sandboxKey: "tracks",
+    sandboxGlyph: "痕",
+    date: "轮痕实验",
+    label: "车辆轮痕测试场",
+    place: "八九式 · 九四式 · 驴车 真 3D 凹陷与交叉碾压",
+    brief: [
+      "八九式中战车、九四式轻装甲车与灰驴两轮木车并排驶过松软田土、湿泥带与压实车道，实时压出真 3D 凹陷、挤泥边与 2 cm 微观履齿/脚印。",
+      "中段预置对角静态交叉压痕；左侧面板可切换低角特写、实时开关 3D 几何凹陷 A/B 对照、调节积水湿度或暂停单步。",
+    ],
+    objectives: ["对比战车、坦克、驴车的真 3D 凹陷轮痕与交叉碾压"],
+    mechanic: "测试场：独立观察相机，玩家无敌，无敌军与武器。",
+    minutes: 600,
+    zones: [
+      { id: "Type89Lane", name: "八九式中战车车道" },
+      { id: "Type94Lane", name: "九四式轻装甲车车道" },
+      { id: "DonkeyCartLane", name: "灰驴木车车道" },
+      { id: "CrossingPad", name: "静态交叉压痕区" },
+    ],
+  },
 ]);

@@ -32,6 +32,7 @@ const PLUGIN_LOADERS = Object.freeze({
   reactions: () => import("./Script_SandboxPlugin_Reactions.mjs").then((m) => m.CreatePlugin()),
   cloth: () => import("./Script_SandboxPlugin_Cloth.mjs").then((m) => m.CreatePlugin()),
   hair: () => import("./Script_SandboxPlugin_Hair.mjs").then((m) => m.CreatePlugin()),
+  tracks: () => import("./Script_SandboxPlugin_Tracks.mjs").then((m) => m.CreatePlugin()),
 });
 
 /** 已按需加载好的插件实例缓存（id → plugin）。 */

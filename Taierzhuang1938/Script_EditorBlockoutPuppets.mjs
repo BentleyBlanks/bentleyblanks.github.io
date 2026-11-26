@@ -101,6 +101,7 @@ import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCart
 import { LoadStretcherAsset, StretcherAssetGeometry, CreateStretcherMaterial } from "./Script_StretcherAsset.mjs";
 import { LoadBlockoutBlanket, CreateBlockoutBlanket } from "./Script_EditorBlockoutBlanket.mjs";
 import { InstantiateExternalProp } from "./Script_ExternalProps.mjs";
+import { TerrainTrailSystem } from "./Script_TerrainTrails.mjs";
 import { WantsWoundTowel, CreateWoundTowel } from "./Script_EditorBlockoutWoundTowel.mjs";
 import { XBotSkins, XBotLook } from "./Script_EditorBlockoutXBot.mjs";
 import { XBOT_CHARACTERS, XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -523,6 +524,7 @@ export class BlockoutPuppets {
   _Destroy(puppet) {
     this._DisposeHumans(puppet);
     if (puppet.body) {
+      TerrainTrailSystem.UntrackVehicle(puppet.body);
       // 正式模型：车 / 牲口的几何与骨架是共用的（CloneSkinnedRig），只停动画摘下来；战车是每辆现造的几何，照拆。材质都是共用的，不拆。
       const model = puppet.body.userData.model;
       if (model?.draft) model.draft.Dispose();
@@ -879,6 +881,7 @@ export class BlockoutPuppets {
         const root = this.tanketteAsset.clone(true);
         body.add(root);
         model = { tankette: root, turret: root.getObjectByName("TurretYaw") || null };
+        TerrainTrailSystem.TrackVehicle(body, "type94Tankette");
       }
       body.userData.model = model;
       return;
@@ -893,6 +896,7 @@ export class BlockoutPuppets {
         tank.root.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         body.add(tank.root);
         model = { tank, turret: tank.nodes?.get?.("turret") || null };
+        TerrainTrailSystem.TrackVehicle(body, "type89Tank");
       }
     } else if (unit.kind === "litter" && IsBlanketLitter(unit)) {
       // 01–05 的「单被」（拖着走的被子）：上传的五补丁单被，头端朝前（资产头端 +Z，这里前方是 −Z，转 180°）
@@ -934,6 +938,7 @@ export class BlockoutPuppets {
         else draft.animalRoot.position.set(0, 0, -draft.teamOffsetM);
         body.add(draft.root);
         model = { draft, kind, travelM: 0, last: null };
+        if (unit.kind === "cart") TerrainTrailSystem.TrackVehicle(body, "oxCart", { animalRoot: draft.animalRoot });
       }
     }
     body.userData.model = model;

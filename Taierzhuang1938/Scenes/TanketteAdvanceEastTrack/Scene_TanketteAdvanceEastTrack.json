@@ -1276,6 +1276,9 @@
     ]
   },
   "ways": {"roads":[],"trenches":[]},
+  "vehicleTracks": [
+    {"id":"EastTrack_Type94Advance","profile":"type94Tankette","passes":2,"depthScale":1.05,"points":[[2.4,-28],[2.48,-22],[2.56,-16],[2.59,-11.4],[2.54,-7],[2.38,-2],[2.05,2]]}
+  ],
   "markers": [
     {"id":"WoundedPosition","name":"沟底伤员位","kind":"place","x":-1.1,"z":-3.7,"note":"伤员躺在担架上，头侧靠近树根。","y":-0.23,"ry":-2.374},
     {"id":"AidPosition","name":"沟底照护位","kind":"place","x":-0.51,"z":-4.01,"note":"取现有照护动作的一帧，静态贴近担架侧。","y":-0.36,"ry":1.658},

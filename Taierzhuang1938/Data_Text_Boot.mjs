@@ -40,6 +40,7 @@ export const TEXT = Object.freeze({
   "boot.start.impactRange": "进入炮击扬尘测试场",
   "boot.start.reactionRange": "进入人物战场反应测试场",
   "boot.start.goreRange": "进入断肢测试场",
+  "boot.start.trackRange": "进入轮痕测试场",
 
   "boot.error.startFailed": "启动失败：{message}",
 
