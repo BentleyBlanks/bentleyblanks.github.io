@@ -56,6 +56,12 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
     !ownObjectIds.has(obj.id) && !excludeIds.has(obj.id) && (!obj.pos || obj.pos[2] < maxZ));
   const objects = [...northObjects, ...(doc.objects || [])];
 
+  const ownAirWallIds = new Set((doc.airWalls || []).map((wall) => wall.id));
+  const northAirWalls = (base.doc.airWalls || []).filter((wall) =>
+    !ownAirWallIds.has(wall.id) && !excludeIds.has(wall.id)
+    && Array.isArray(wall.points) && wall.points.every((point) => PointZ(point) < maxZ));
+  const mergedAirWalls = [...northAirWalls, ...(doc.airWalls || [])];
+
   const ownSegIds = new Set((doc.trenches?.segments || []).map((seg) => seg.id));
   const northSegments = (base.doc.trenches?.segments || []).filter((seg) =>
     !ownSegIds.has(seg.id) && seg.points.every((point) => point[1] < maxZ));
@@ -125,6 +131,7 @@ export function ResolveInheritedScene(doc, ownHeights, ownDatum, base) {
       segments: mergedSegments,
     },
     markers: [...northMarkers, ...(doc.markers || [])],
+    ...(mergedAirWalls.length ? { airWalls: mergedAirWalls } : {}),
     objects,
     ...(surface ? { surface } : {}),
   };

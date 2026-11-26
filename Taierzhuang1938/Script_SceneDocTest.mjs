@@ -10,8 +10,9 @@ import path from "node:path";
 import { SCENE_ASSETS, SCENE_MATERIALS, WhiteboxMaterialFor } from "./Data_SceneAssets.mjs";
 import { SCENE_EVENTS } from "./Data_SceneEvents.mjs";
 import {
-  ValidateScene, DecodeSceneHeights, EncodeSceneHeights, CropSceneHeights, SceneObjectToBlock, BlockoutDocFromScene,
+  ValidateScene, FormatSceneJson, DecodeSceneHeights, EncodeSceneHeights, CropSceneHeights, SceneObjectToBlock, BlockoutDocFromScene,
 } from "./Script_SceneDoc.mjs";
+import { CompileAirWallSpline, CompileSceneAirWalls } from "./Script_SceneAirWalls.mjs";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { BLOCKOUT_LEVELS, HeightGridSampler, LayoutFromSceneDoc } from "./Script_EditorBlockoutLevels.mjs";
 import { PROJECT_DIR, ReadSceneSync, ReadBlockoutSceneDocSync, SceneFilePath } from "./Script_SceneNode.mjs";
@@ -288,6 +289,93 @@ Check(spec("FirstLevel0105").priorSignals.length === 0, "01–05 没有 priorSig
   Check(doc.terrain.cellM === .2 && roots && layout.blocks.some(block => block.id === roots.id && block.propConformGround)
     && !ValidateScene({ ...doc, objects: [{ ...roots, solid: true }] }).ok,
     "沟沿根须沿厘米制高程贴坡，无碰撞");
+}
+
+// --- 6. 样条空气墙（docs/Data_Scene.md §10）---
+{
+  const openSpline = {
+    id: "TestCorridor",
+    group: "01–05/空气墙",
+    points: [[0, 120], [10, 120], [10, 140]],
+    height: 6,
+    thickness: 0.4,
+    overlap: 0.4,
+    noClimb: true,
+  };
+  const segs = CompileAirWallSpline(openSpline);
+  Check(segs.length === 2 && segs[0].id === "TestCorridor_01" && segs[1].id === "TestCorridor_02",
+    "开放折线样条按段编号编译为标准空气墙物件");
+  Check(segs[0].size[0] === 10.4 && segs[1].size[0] === 20.4 && segs[0].tag === "airWall" && segs[0].visual === false && segs[0].noClimb === true,
+    "每段延长 overlap 保证拐角无缝咬合且保留 tag/visual/noClimb");
+  const singleGate = CompileAirWallSpline({
+    id: "TestGate",
+    points: [[2, 130], [8, 130]],
+    hideOn: "A",
+  });
+  Check(singleGate.length === 1 && singleGate[0].id === "TestGate" && singleGate[0].hideOn === "A",
+    "单段门禁样条保留原始 id 与信号");
+  const closedLoop = CompileAirWallSpline({
+    id: "TestLoop",
+    points: [[0, 120], [10, 120], [10, 130], [0, 130]],
+    closed: true,
+  });
+  Check(closedLoop.length === 4, "closed=true 自动首尾闭合");
+  const filleted = CompileAirWallSpline({
+    id: "TestFillet",
+    points: [[0, 120], [10, 120], [10, 130]],
+    cornerRadiusM: 3,
+  });
+  Check(filleted.length > 3, `cornerRadiusM>0 在拐角插入圆弧段（实测 ${filleted.length} 段）`);
+  const slopeGround = (x) => (x < 5 ? -1 : x > 15 ? 2 : 0.5);
+  const grounded = CompileAirWallSpline({
+    id: "TestSlope",
+    points: [[0, 120], [20, 120]],
+    height: 5,
+    embedM: 1,
+  }, { groundAt: slopeGround });
+  Check(grounded.length === 1 && grounded[0].pos[1] === -2 && grounded[0].pos[1] + grounded[0].size[1] >= 7,
+    "带地形采样时底面下埋 minGround-embedM 且顶高覆盖 maxGround+height");
+  const subdivided = CompileAirWallSpline({
+    id: "TestSub",
+    points: [[0, 120], [30, 120]],
+    maxSegmentM: 10,
+  }, { groundAt: slopeGround });
+  Check(subdivided.length === 3, "maxSegmentM 按上限自动切分长段");
+
+  const airDoc = {
+    ...scene,
+    objects: [],
+    airWalls: [
+      openSpline,
+      { id: "TestGateHide", points: [[2, 130], [8, 130]], hideOn: "A", group: "01–05/空气墙" },
+      { id: "TestGateShow", points: [[2, 135], [8, 135]], showOn: "B", group: "01–05/空气墙" },
+    ],
+  };
+  const validAir = ValidateScene(airDoc);
+  Check(validAir.ok, `带 airWalls 的场景通过校验：${validAir.errors.join("；")}`);
+  Check(FormatSceneJson(airDoc).includes('  "airWalls": [\n    {"id":"TestCorridor"'), "FormatSceneJson 将 airWalls 按一条一行输出");
+  const bo1 = BlockoutDocFromScene(airDoc, heights, { level: "AirTest", region, priorSignals: ["A"] });
+  Check(bo1.blocks.filter(b => b.id.startsWith("TestCorridor_")).length === 2
+    && !(bo1.gates || []).some(g => g.id === "TestGateHide")
+    && (bo1.gates || []).some(g => g.id === "TestGateShow" && g.appearSignal === "B" && g.tag === "airWall" && g.visual === false),
+    "BlockoutDocFromScene 展开 airWalls 并遵守 priorSignals / hideOn / showOn");
+  const bo2 = BlockoutDocFromScene(airDoc, heights, { level: "AirTest2", region, futureSignals: ["A", "B"] });
+  Check(bo2.blocks.some(b => b.id === "TestGateHide") && !(bo2.gates || []).length,
+    "BlockoutDocFromScene 对 futureSignals 将 hideOn 样条编为常驻块、过滤 showOn 样条");
+  const badAir = ValidateScene({
+    ...scene,
+    objects: [{ id: "DupId", asset: "Whitebox/Box", material: "Whitebox/EarthDark", pos: [0, 0, 0], size: [1, 1, 1] }],
+    airWalls: [
+      { id: "DupId", points: [[0, 0], [5, 0]] },
+      { id: "TooShortClosed", closed: true, points: [[0, 0], [5, 0]] },
+      { id: "BadField", points: [[0, 0], [5, 0]], unknownProp: 1 },
+    ],
+  });
+  Check(!badAir.ok && badAir.errors.some(e => /与 objects 重名/.test(e))
+    && badAir.errors.some(e => /至少 3 个/.test(e))
+    && badAir.errors.some(e => /不认识的字段 unknownProp/.test(e)),
+    `ValidateScene 拦截无效 airWalls：${badAir.errors.join("；")}`);
+  Check(CompileSceneAirWalls(undefined).length === 0, "未写 airWalls 时编译返回空数组");
 }
 
 console.log(`场景文件测试全过（${checks} 项）`);

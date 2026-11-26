@@ -12,7 +12,8 @@
 
 import { SCENE_ASSETS, SCENE_MATERIALS, SCENE_LIST, SceneInfo, SceneObjectSemantic } from "./Data_SceneAssets.mjs";
 import { BLOCKOUT_SCENE_SCHEMA, LandmarkIssues } from "./Script_EditorBlockoutConfig.mjs";
-import { SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
+import { GridSampler, SceneTrenchIssues, SceneTrenchLines, SliceTrenchPlan } from "./Script_SceneTrenches.mjs";
+import { CompileSceneAirWalls, SceneAirWallIssues } from "./Script_SceneAirWalls.mjs";
 import { TERRAIN_SETS } from "./Data_Tuning_Terrain.mjs";
 import { MAX_FOG_VOLUMES } from "./Data_Tuning_Volumetrics.mjs";
 import { PARTICLE_VOLUME_ASSETS } from "./Data_ParticleVolumeAssets.mjs";
@@ -145,12 +146,13 @@ export function ValidateScene(doc) {
     if (!Finite(t.minX) || !Finite(t.minZ) || !(Finite(t.cellM) && t.cellM > 0)) errors.push("terrain 要带有限的 minX / minZ 与正的 cellM");
     if (!Number.isInteger(t.cols) || !Number.isInteger(t.rows) || t.cols < 1 || t.rows < 1) errors.push("terrain.cols / rows 要是正整数");
   }
+  const ids = new Set();
   if (!Array.isArray(doc.objects)) errors.push("objects 要是数组");
   else {
     if (doc.objects.length > SCENE_LIMITS.maxObjects) errors.push(`objects 最多 ${SCENE_LIMITS.maxObjects} 个`);
-    const ids = new Set();
     doc.objects.forEach((obj, i) => ObjectIssues(obj, `objects[${i}]`, errors, ids));
   }
+  if (doc.airWalls !== undefined) SceneAirWallIssues(doc.airWalls, errors, ids);
   if (doc.markers !== undefined) LandmarkIssues(doc.markers, errors, "markers");
   if (doc.paint !== undefined && !Array.isArray(doc.paint)) errors.push("paint 要是数组");
   if (doc.backdrop !== undefined) {
@@ -185,7 +187,7 @@ export function FormatSceneJson(scene) {
   const entries = Object.entries(scene);
   entries.forEach(([key, value], i) => {
     const comma = i < entries.length - 1 ? "," : "";
-    if (["objects", "markers", "paint"].includes(key) && Array.isArray(value)) {
+    if (["objects", "airWalls", "markers", "paint"].includes(key) && Array.isArray(value)) {
       lines.push(`  ${JSON.stringify(key)}: [`);
       value.forEach((item, j) => lines.push(`    ${JSON.stringify(item)}${j < value.length - 1 ? "," : ""}`));
       lines.push(`  ]${comma}`);
@@ -344,9 +346,19 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const blocks = [];
   const gates = [];
   const shapes = [];
-  for (const obj of scene.objects) {
+  const groundAt = heights ? GridSampler(scene.terrain, heights) : null;
+  const compiledAirWalls = CompileSceneAirWalls(scene.airWalls, { groundAt });
+  const TouchesObjectArea = (obj) => {
+    if (Inside(objectArea, obj.pos[0], obj.pos[2])) return true;
+    if (!obj.size) return false;
+    const r = Math.hypot(obj.size[0], obj.size[2]) * 0.5;
+    return obj.pos[0] + r >= objectArea.minX && obj.pos[0] - r <= objectArea.maxX
+      && obj.pos[2] + r >= objectArea.minZ && obj.pos[2] - r <= objectArea.maxZ;
+  };
+  for (const obj of [...scene.objects, ...compiledAirWalls]) {
     if (obj.layer === "backdrop") { shapes.push(BackdropShape(obj)); continue; }
-    if (!["box", "prop", "tree"].includes(SCENE_ASSETS[obj.asset]?.kind) || !Inside(objectArea, obj.pos[0], obj.pos[2])) continue;
+    const inArea = obj.meta?.airWallSpline ? TouchesObjectArea(obj) : Inside(objectArea, obj.pos[0], obj.pos[2]);
+    if (!["box", "prop", "tree"].includes(SCENE_ASSETS[obj.asset]?.kind) || !inArea) continue;
     if ((obj.hideOn && prior.has(obj.hideOn)) || (obj.showOn && future.has(obj.showOn))) continue;
     // 两个都写 = 先出现、后消失（如 0610 塌墙的土堆被清走）
     const block = SceneObjectToBlock(obj);

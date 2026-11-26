@@ -1323,7 +1323,8 @@ const changedDomainRules = [
   // 配置里没有游戏数据（改它不影响正式关卡），但编辑器与生成器读它，改了跑 editor 域。
   { domain: "editor", pattern: /Blockout\/|Script_EditorBlockout|Data_EditorBlockout/i },
   // 场景文件与场景编辑器（docs/Data_Scene.md）：白盒编辑器第一关新剧本三段从 Scenes/FirstLevelWhitebox 取一块建场，改了跑 editor 域。
-  { domain: "editor", pattern: /Scenes\/|Script_Scene(Doc|Node|ImportBlockout|Edit)|Data_SceneAssets|SceneEditor|WhiteboxGrid|WhiteboxMaterial/i },
+  { domain: "editor", pattern: /Scenes\/|Script_Scene(Doc|AirWalls|Inherit|Trenches|Node|ImportBlockout|Edit)|Data_SceneAssets|SceneEditor|WhiteboxGrid|WhiteboxMaterial/i },
+  { domain: "levelFlow", pattern: /Script_SceneAirWalls|Script_SceneInherit/i },
   // 组件式环境系统与环境编辑器（docs/Data_Environment.md）：预设、区域文件、组件、框架、编辑器面板。接在白盒编辑器的场景上，改了跑 editor 域；
   // 它同时改天穹 / 灯 / 后期的输入，render 域另由下面那条按文件名（Sky / Light / Post）命中。
   { domain: "editor", pattern: /Environment\/|Script_EnvironmentWindow|EnvironmentEditor\.html|Script_Env(System|Track|Components|Preset|Apply|Loader|VolumeGizmo|PresetSeed)|Data_Env(Components|Levels)|Data_Tuning_Environment|EditorEnvironment|Style_EditorEnvironment|Script_CharacterLight/i },

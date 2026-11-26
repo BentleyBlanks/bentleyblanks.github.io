@@ -17,6 +17,7 @@ import {
 import {
   DecodeTrenchDatum, CompileSceneTrenches, CarveSceneHeights, GridSampler, TrenchGroup, SegmentReachBounds, UnionBounds,
 } from "../Script_SceneTrenches.mjs";
+import { CompileSceneAirWalls } from "../Script_SceneAirWalls.mjs";
 import { TRENCH_PRESETS } from "../Script_TrenchPlan.mjs";
 import { TRENCH_DETAILS, TRENCH_LOOKS, EffectiveTrenchDetail } from "../Data_TrenchDetails.mjs";
 import { MISSION_LAYOUT } from "../Data_FirstLevelMissionLayout.mjs";
@@ -336,16 +337,22 @@ class SceneEditorApp {
       this.DisposeGroup(this.inherited.objectGroup);
       this.inherited.objectGroup = null;
     }
-    const { baseDoc, objects } = this.inherited;
+    const { baseDoc, objects, sampler, info } = this.inherited;
     const visible = [];
     const groups = new Map();
-    for (const obj of objects) {
-      if (obj.layer === "backdrop" && !this.show.backdrop) continue;
-      if (obj.visual === false && !this.show.hidden) continue;
+    const Push = (obj) => {
+      if (obj.layer === "backdrop" && !this.show.backdrop) return;
+      if (obj.visual === false && !this.show.hidden) return;
       visible.push(obj);
       const key = this.LayerKey(obj);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(obj);
+    };
+    for (const obj of objects) Push(obj);
+    if (this.show.hidden && baseDoc?.airWalls?.length) {
+      const ownAirIds = new Set((this.model.doc.airWalls || []).map((w) => w.id));
+      const northSplines = baseDoc.airWalls.filter((w) => !ownAirIds.has(w.id) && w.points?.every((p) => p[1] < info.maxZ));
+      for (const obj of CompileSceneAirWalls(northSplines, { groundAt: sampler })) Push(obj);
     }
     this.inherited.visibleObjects = visible;
     const objGroup = new THREE.Group();
@@ -1011,6 +1018,15 @@ class SceneEditorApp {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(obj);
     }
+    if (this.show.hidden && this.model.doc.airWalls?.length) {
+      const compiled = CompileSceneAirWalls(this.model.doc.airWalls, { groundAt: this.sampler || null });
+      for (const obj of compiled) {
+        if (!this.StageVisible(obj.group)) continue;
+        const key = this.LayerKey(obj);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(obj);
+      }
+    }
     const matrix = new THREE.Matrix4(), color = new THREE.Color();
     for (const [key, list] of groups) {
       const kind = key.startsWith("bd:") ? key.slice(3) : "box";
@@ -1027,8 +1043,12 @@ class SceneEditorApp {
           color.setHex(HexInt(kind === "backdropTree" ? "#5a5446" : p.color, 0x8a8370), THREE.SRGBColorSpace);
           mesh.setColorAt(i, color);
         }
-        layer.ids.push(obj.id);
-        this.where.set(obj.id, { layer, index: i });
+        if (!obj.meta?.airWallSpline) {
+          layer.ids.push(obj.id);
+          this.where.set(obj.id, { layer, index: i });
+        } else {
+          layer.ids.push(null);
+        }
       });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;

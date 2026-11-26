@@ -7,6 +7,7 @@ import path from "node:path";
 import { registerHooks } from "node:module";
 import { fileURLToPath } from "node:url";
 import { SCENE_IDS, ValidateScene, DecodeSceneHeights, BlockoutDocFromScene } from "./Script_SceneDoc.mjs";
+import { CompileSceneAirWalls, SceneAirWallObjects } from "./Script_SceneAirWalls.mjs";
 import { ValidateBlockoutScene } from "./Script_EditorBlockoutConfig.mjs";
 import { DecodeTrenchDatum, PrepareSceneTerrain, GridSampler } from "./Script_SceneTrenches.mjs";
 import { ResolveInheritedScene, FetchResolvedScene } from "./Script_SceneInherit.mjs";
@@ -232,14 +233,26 @@ for (const defId of ["bn2_mgWest", "bn2_mgEast", "bn2_westFlank", "bn2_eastFlank
 }
 const f13cDef = merged.evaluate(merged.BeatById("13c").start + 10);
 assert.ok(f13cDef.actors.some((a) => a.id === "bn3_mgEast" && a.side === "friend"), "13c 桥南阵地部署三营东翼掩护机枪组");
-const mergedKeepIn = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_KeepIn_"));
+assert.ok(Array.isArray(baseDisk.doc.airWalls) && baseDisk.doc.airWalls.length >= 17,
+  `FirstLevelEncounter 的 01–05 沟沿空气墙已迁移为样条 airWalls（实测 ${baseDisk.doc.airWalls?.length || 0} 条）`);
+assert.ok(!baseDisk.doc.objects.some((o) => o.tag === "airWall"), "FirstLevelEncounter.objects 不再保留手摆碎块空气墙");
+assert.ok(Array.isArray(mergedDisk.doc.airWalls) && mergedDisk.doc.airWalls.length >= 10,
+  `FirstLevelMerged 的 08–13 空气墙与门禁已迁移为样条 airWalls（实测 ${mergedDisk.doc.airWalls?.length || 0} 条）`);
+assert.ok(!mergedDisk.doc.objects.some((o) => o.tag === "airWall"), "FirstLevelMerged.objects 不再保留手摆碎块空气墙");
+assert.equal(
+  resolved.doc.airWalls?.length,
+  baseDisk.doc.airWalls.filter((w) => w.points.every((p) => p[1] < 355)).length + mergedDisk.doc.airWalls.length,
+  "北段继承正确合并基线 z<355 与合并版南段的 airWalls 样条",
+);
+const resolvedAirWalls = SceneAirWallObjects(resolved.doc);
+const mergedKeepIn = resolvedAirWalls.filter((o) => o.id.startsWith("Merged_KeepIn_"));
 assert.ok(mergedKeepIn.length >= 25, `08–13 可玩走廊配置完整玩家专用空气墙收束（实测 ${mergedKeepIn.length} 段）`);
 for (const aw of mergedKeepIn) {
   assert.equal(aw.tag, "airWall");
   assert.equal(aw.material, "Whitebox/AirWall");
   assert.equal(aw.visual, false);
 }
-const mergedStageGates = resolved.doc.objects.filter((o) => o.id.startsWith("Merged_StageGate_"));
+const mergedStageGates = resolvedAirWalls.filter((o) => o.id.startsWith("Merged_StageGate_"));
 assert.ok(mergedStageGates.length >= 7, `08–13 配置阶段动态空气墙门禁以防止跨阶段自由乱逛（实测 ${mergedStageGates.length} 段）`);
 for (const gate of mergedStageGates) {
   assert.equal(gate.tag, "airWall", `阶段空气墙 ${gate.id} 必须使用 tag="airWall"`);

@@ -4,6 +4,7 @@ import * as village from "../Data_EditorBlockoutFirstLevel0610Space.mjs";
 import { SegmentDistance, InsidePolygon } from "./Script_LevelFlowGeometry.mjs";
 import { LoadEncounterTerrain } from "./Script_LevelFlowTerrain.mjs";
 import { FetchResolvedScene } from "../Script_SceneInherit.mjs";
+import { CompileSceneAirWalls, IsAirWallObject } from "../Script_SceneAirWalls.mjs";
 import { FrontPaperFields, MergedFieldZones, MergedPaperFields } from "../Script_EncounterFarmland.mjs";
 
 const Point = (point) => (Array.isArray(point) ? point.slice(0, 2) : [point.x, point.z]);
@@ -60,13 +61,16 @@ export function BuildEncounterMap(scene, options = {}) {
   const mapMaxZ = options.mapMaxZ ?? options.variantSpec?.mapMaxZ ?? (hasGengjiazhuang ? ENCOUNTER_MAP_MAX_Z : (scene.bounds?.maxZ ?? ENCOUNTER_MAP_MAX_Z));
   const southWaysZ = hasGengjiazhuang ? GENGJIAZHUANG_SOUTH_Z : FRONT_SHARED_SPLIT_Z - 5;
 
-  const IsAirWall = (object) => object.tag === "airWall" || object.material === "Whitebox/AirWall" || /空气墙/.test(object.group || "");
   const objects = scene.objects.filter((object) => object.pos && object.pos[2] < mapMaxZ
-    && object.layer !== "backdrop" && !IsAirWall(object) && !/^远景/.test(object.group || ""));
-  const airWalls = scene.objects.filter((object) => object.pos && object.pos[2] < mapMaxZ
-    && object.layer !== "backdrop" && IsAirWall(object));
+    && object.layer !== "backdrop" && !IsAirWallObject(object) && !/^远景/.test(object.group || ""));
+  const legacyAirWalls = scene.objects.filter((object) => object.pos && object.pos[2] < mapMaxZ
+    && object.layer !== "backdrop" && IsAirWallObject(object));
+  const airWallSplines = (scene.airWalls || []).filter((wall) =>
+    Array.isArray(wall.points) && wall.points.some((pt) => Point(pt)[1] < mapMaxZ));
+  const compiledAirWalls = CompileSceneAirWalls(airWallSplines).filter((object) => object.pos && object.pos[2] < mapMaxZ);
+  const airWalls = [...legacyAirWalls, ...compiledAirWalls];
   const farObjects = scene.objects.filter((object) => object.pos && !objects.includes(object)
-    && !IsAirWall(object)).map((object) => {
+    && !IsAirWallObject(object)).map((object) => {
     if (object.size) return object;
     const params = object.params || {}, height = params.h || 1;
     const tree = object.asset === "Backdrop/Tree";
@@ -158,7 +162,7 @@ export function BuildEncounterMap(scene, options = {}) {
     .filter((r) => Array.isArray(r.points) && r.points.length >= 2)
     .map((r) => structuredClone(r));
   return {
-    bounds: [-160, 320, -480, mapMaxZ], objects, airWalls, farObjects, roads, railways, trenches, labels, floors, ramps,
+    bounds: [-160, 320, -480, mapMaxZ], objects, airWalls, airWallSplines, farObjects, roads, railways, trenches, labels, floors, ramps,
     planningPockets: scene.surface?.pockets || FLOW_GROUND.pockets,
     paint: scene.paint.filter((paint) => (paint.poly || paint.line)?.some((point) => (point.z ?? point[1]) < mapMaxZ)),
     fields: hasGengjiazhuang ? [...FrontPaperFields(), ...village.L0610_FIELDS] : [...FrontPaperFields(), ...MergedPaperFields(mapMaxZ)],

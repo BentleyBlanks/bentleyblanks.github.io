@@ -264,3 +264,28 @@ Taierzhuang1938/Scenes/<Id>/Environment_<Id>.json   场景的环境：昼夜时�
 - **磁盘只存分叉南段**：例如 `Scenes/FirstLevelMerged/Scene_FirstLevelMerged.json` 写 `inherit: { scene: "FirstLevelEncounter", maxZ: 355 }`，自身只存 `z >= 355` 的高度图、壕沟、物件、涂色与地标，不复制 `01–07` 北段数据。
 - **运行时毫秒级无缝拼接**：`Script_SceneInherit.mjs`（`ResolveInheritedScene` / `FetchResolvedScene`）在浏览器与 Node 侧自动裁取基线场景 `z < maxZ` 的高度行、壕沟基准面、物件、样条与地表，与变体南段拼成标准内存场景，供 `Script_EditorBlockoutLevels`、`EncounterPlay` 与 `Tool_LevelFlow` 统一消费。
 - **场景编辑器只读北段预览与原生存盘**：`SceneEditor.html` 打开带 `inherit` 的场景时，在顶栏提示继承来源、提供「编辑基线 ↗」与「遭遇设计 ↗」直跳，并在视图中以冷灰半透明只读组渲染基线北段（`z < maxZ`）及切口虚线；`Ctrl+S`（`/__scene/save`）仍只写回变体自身的 `z >= maxZ` 南段。门禁见 `Script_SceneDocTest.mjs` 与 `Script_EncounterVariantsTest.mjs`。
+
+## 10. 样条空气墙（`doc.airWalls`，2026-11-27）
+
+场景文件顶层可选 `airWalls` 数组，用折线 / 可选圆角样条声明玩家阻挡边界与阶段门禁，替代大批量手算位置和偏航角的 `Whitebox/AirWall` 碎块。纯编译与校验逻辑在 `Script_SceneAirWalls.mjs`（零 three、零 DOM，Node 与浏览器共用）。
+
+```json
+"airWalls": [
+  { "id": "Merged_KeepIn_W", "group": "08–13合并/空气墙", "points": [[82, 355], [82, 466], [80, 488]], "height": 6, "thickness": 0.4, "overlap": 0.35, "noClimb": true },
+  { "id": "Merged_StageGate_NorthVillageEntry", "group": "08–13合并/空气墙/阶段门禁", "points": [[100, 496], [113.5, 496]], "height": 6, "thickness": 0.4, "overlap": 0.35, "noClimb": true, "hideOn": "PlankBridgeRemoved" }
+]
+```
+
+| 字段 | 写什么 |
+| --- | --- |
+| `id` | 场景内唯一（`/^[A-Za-z0-9_]+$/`，不能与 `objects[].id` 重名）；单段样条编译后保留原 `id`，多段自动编号 `<id>_01`… |
+| `points` | 控制点 `[[x, z], …]`，开放样条至少 2 点，`closed: true` 至少 3 点 |
+| `closed` | 可选，默认 `false`；`true` 首尾闭合 |
+| `height` / `thickness` / `overlap` | 墙高（缺省 `6` m）、墙厚（缺省 `0.4` m）、段端延长咬合（缺省 = `thickness`，保证拐角零缝隙） |
+| `cornerRadiusM` | 可选拐角倒圆半径（缺省 `0` = 折线直连，避免贴院墙时过冲） |
+| `maxSegmentM` / `maxReliefM` | 可选按长度或地形高差自动切分（缺省 `0` 不强切）；提供高度图时每段自动按 ≤ 4 m 步长探地，使底面低至 `minGround - embedM`、顶面不低于 `maxGround + height` |
+| `y` / `embedM` | `y` 为 `null`/省略时贴地并向下埋入 `embedM`（缺省 `0.5` m）；写有限数字时使用固定底高 |
+| `noClimb` / `group` / `hideOn` / `showOn` / `note` | 语义同 `objects`（`noClimb` 缺省 `true`，`group` 缺省 `"空气墙"`） |
+
+- **管线消费**：`Script_SceneDoc.BlockoutDocFromScene` 编译为标准 `tag: "airWall", visual: false` 的常驻块或动态门禁（继续走 Rapier `IG_AIR_WALL`，只挡角色不挡弹道与视线）；`Script_SceneInherit` 自动按 `points` 落在 `z < maxZ` 继承北段样条；`Script_LevelFlowMap.BuildEncounterMap` 与 `SceneEditor`（勾「编辑视口显示空气墙」）直接消费编译结果；同时保持对遗留手摆 `objects` 空气墙的完全兼容。
+- **已迁移场景**：Encounter Designer 使用的第一关两份场景 `FirstLevelEncounter`（1,124 块 `KeepIn_*` → 17 条样条）与 `FirstLevelMerged`（73 块 `Merged_KeepIn_*` / `Merged_StageGate_*` → 10 条样条）均已切为 `doc.airWalls`。
