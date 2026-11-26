@@ -368,6 +368,11 @@ def BakeRegion(name, sample, size, index, reference):
         photoTone = photoTone * coverage + 1.32 * flankTone * flankCoverage
         photoWarmth = photoWarmth * coverage + flankWarmth * flankCoverage
         coverage = np.maximum(coverage, flankCoverage)
+        # In the flank photo the darker, warmer grooves run along phase B.
+        # Broaden that groove profile within the registered area.
+        cutDistance = 2 * np.minimum(right, 1 - right)
+        flankGroove = np.clip(1 - cutDistance / .44, 0, 1) ** .79
+        grooves += flankCoverage * np.maximum(flankGroove - grooves, 0)
         wornHeight = np.clip(.91 + .16 * cellWear, .55, 1.11) * (1 - .10 * coverage)
         exposedArea = np.clip((diamonds - .26) / .56, 0, 1)
         polish = np.clip(.39 + .19 * chip + .29 * cellWear + .75 * photoTone
@@ -376,8 +381,9 @@ def BakeRegion(name, sample, size, index, reference):
         uKnots, shadowChroma = np.asarray(flank["shadowChroma"], dtype=np.float32).T
         flankOxide = flankCoverage * np.clip(np.interp(xx, uKnots, shadowChroma) / .24, 0, 1)
         tonalDelta += 6.4 * chip + 15.5 * (shoulders - .45) - 7.6 * grooves + 112 * photoTone
-        tonalDelta -= 12.5 * flankOxide * grooves
+        tonalDelta -= 12.5 * flankOxide * grooves + 22 * flankCoverage * flankGroove
         heightField += (1.56 + .40 * flankCoverage) * shoulders * wornHeight + .12 * chip * shoulders + .28 * photoTone
+        heightField -= .49 * flankCoverage * flankGroove
         oxidation += .127 * grooves + .10 * photoWarmth
         warmth += .32 * photoWarmth + .27 * flankOxide * grooves
         roughnessDelta += .071 * grooves + .092 * shoulders - .14 * photoTone + .067 * flankOxide * grooves
@@ -443,11 +449,14 @@ def BakeRegion(name, sample, size, index, reference):
         # The groove bottoms retain oxide. Small worn patches catch sharper
         # reflections within the satin finish on the diamond shoulders.
         dark = .83 * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
+        dark = np.minimum(.96, dark + .21 * flankCoverage * flankGroove)
         recessColor = SrgbToLinear(np.array([40, 36, 30], dtype=np.float32) / 255)
         linear += (recessColor - linear) * dark[..., None]
         rough += (.73 - rough) * dark
         metal += (.30 - metal) * dark
-        exposed = .77 * chippedCrests
+        lip = np.clip(1 - np.abs(cutDistance - .47) / .22, 0, 1)
+        wornLip = flankCoverage * lip * (1 - grooves) * np.clip(.65 + .32 * cellWear, .25, 1)
+        exposed = np.clip(.77 * chippedCrests + .26 * wornLip, 0, 1)
         crestColor = SrgbToLinear(np.array([159, 152, 140], dtype=np.float32) / 255)
         linear += (crestColor - linear) * exposed[..., None]
         rough += (.322 - rough) * exposed
