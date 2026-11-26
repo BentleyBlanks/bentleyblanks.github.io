@@ -314,7 +314,7 @@ function scheduleIdleStop(exe, sessionName, autoStopSec, onLog) {
       .catch(() => {});
     return;
   }
-  onLog?.(`[Colab CLI] 任务完成，会话 ${sessionName} 将热保留 ${sec} 秒以加速下一条视频，超时自动停机释放算力`);
+  onLog?.(`[Colab CLI] 本轮执行结束，会话 ${sessionName} 将热保留 ${sec} 秒以供复用，超时自动停机释放算力`);
   const timer = setTimeout(() => {
     idleStopTimers.delete(sessionName);
     runColabCmd(exe, ["stop", "-s", sessionName], { timeoutMs: 20000 })

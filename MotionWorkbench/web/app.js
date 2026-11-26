@@ -973,6 +973,13 @@ function renderTaskDetail() {
         hint: "Google Colab 的 /tun/m/assign 接口拒绝了 GPU 分配（机房满载或当前代理节点受限，你的算力点数未消耗）。建议切换代理节点（如美/日/新）后重试，或改用右侧 Seedance 引擎生成视频。",
       };
     }
+    if (/Connection was lost/i.test(combined)) {
+      return {
+        isColabAuth: false,
+        title: "Colab 云端会话中途断连（Connection was lost）",
+        hint: "Colab GPU 运行时在执行中途与本机断开连接（常见于代理抖动或 Colab 回收实例），请重新抽卡或交由错峰队列自动顺延重试。",
+      };
+    }
     if (/ProxyError|SSLEOFError|SSLError|RemoteDisconnected|UNEXPECTED_EOF/i.test(combined)) {
       return {
         isColabAuth: false,
@@ -1716,14 +1723,15 @@ function renderScheduleUI() {
         ? `提骨 · ${it.precisionPreset === "high_a100" ? "A100" : "L4"}${it.fallbackToModal ? " → Modal兜底" : ""}`
         : `H3 · ${it.resolution || "720p"} ${it.duration || 6}s`;
     const itemSlot = it.scheduledTime || runTime;
+    const deferCnt = Array.isArray(it.deferHistory) ? it.deferHistory.length : it.deferredFrom ? 1 : 0;
     const stText = isRun
       ? "运行中"
       : isDone
       ? "已完成"
       : isErr
       ? "失败"
-      : it.deferredFrom
-      ? `待 ${itemSlot} · 早间延后`
+      : deferCnt > 0
+      ? `待 ${itemSlot} · 已顺延 ${deferCnt} 次`
       : `待 ${itemSlot}`;
     row.innerHTML = `
       <div class="mwSchItemMain">

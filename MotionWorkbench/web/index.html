@@ -899,9 +899,13 @@
           </label>
         </div>
         <div class="mwSchTimeRow">
-          <button class="mwBtn mwSm mwSchPreset" data-time="06:00" type="button">06:00 早高峰前</button>
-          <button class="mwBtn mwSm mwSchPreset" data-time="14:00" type="button">14:00 午后窗口</button>
-          <input id="schRunTime" class="mwSchTimeInput" type="time" value="06:00">
+          <button class="mwBtn mwSm mwSchPreset" data-time="04:00" type="button">04:00</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="06:00" type="button">06:00</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="08:00" type="button">08:00</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="12:00" type="button">12:00</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="14:00" type="button">14:00</button>
+          <button class="mwBtn mwSm mwSchPreset" data-time="16:00" type="button">16:00</button>
+          <input id="schRunTime" class="mwSchTimeInput" type="time" value="04:00">
         </div>
         <label class="mwSchCheck">
           <input id="schAutoStop" type="checkbox" checked>
@@ -909,7 +913,7 @@
         </label>
         <label class="mwSchCheck">
           <input id="schAutoDefer" type="checkbox" checked>
-          <span>06:00 重试 3 次仍失败时，自动延后至当日 <code>14:00</code> 午后窗口再跑</span>
+          <span>单档重试 3 次仍失败时，沿 <code>04:00→06:00→08:00→12:00→14:00→16:00</code> 自动顺延，直至 16:00 失败 3 次才结束</span>
         </label>
         <div id="schNextRunText" class="mwSchHint">—</div>
       </div>

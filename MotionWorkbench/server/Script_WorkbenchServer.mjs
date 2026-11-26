@@ -55,10 +55,13 @@ const CONFIG_PATH = path.join(WORKSPACE_DIR, "config.json");
 const TASKS_PATH = path.join(WORKSPACE_DIR, "tasks.json");
 const SCHEDULE_PATH = path.join(WORKSPACE_DIR, "schedule.json");
 
+const CASCADE_SCHEDULE_SLOTS = ["04:00", "06:00", "08:00", "12:00", "14:00", "16:00"];
+
 const DEFAULT_SCHEDULE = {
   enabled: true,
-  runTime: "06:00", // 北京时间 06:00（美国低峰窗口 06:00~11:00）
-  fallbackRunTime: "14:00", // 06:00 重试 3 次仍失败时自动延后至当日 14:00 午后窗口
+  runTime: "04:00", // 默认从凌晨 04:00 起跑，失败沿 04:00→06:00→08:00→12:00→14:00→16:00 一路顺延
+  cascadeSlots: [...CASCADE_SCHEDULE_SLOTS],
+  fallbackRunTime: "16:00",
   autoDeferToAfternoon: true,
   autoStopAfterBatch: true,
   lastTriggeredDate: null,
@@ -457,26 +460,28 @@ async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = 
   });
   if (!pendingAll.length) return { started: false, reason: "队列中没有等待执行的任务" };
 
-  const fallbackSlot = state.schedule.fallbackRunTime || "14:00";
-  const fallbackMin = parseHHMMToMinutes(fallbackSlot, 14 * 60);
-  const canDeferItem = (item) => {
-    if (state.schedule.autoDeferToAfternoon === false) return false;
-    if (item.deferredFrom) return false;
+  const slotsOrder = Array.isArray(state.schedule.cascadeSlots) && state.schedule.cascadeSlots.length
+    ? state.schedule.cascadeSlots
+    : CASCADE_SCHEDULE_SLOTS;
+  const findNextCascadeSlot = (item) => {
+    if (state.schedule.autoDeferToAfternoon === false) return null;
     const itemSlot = targetSlot || item.scheduledTime || defaultSlot;
-    const itemMin = parseHHMMToMinutes(itemSlot, 6 * 60);
+    const itemMin = parseHHMMToMinutes(itemSlot, 4 * 60);
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-    // Only auto-defer morning/pre-14:00 runs when today's 14:00 window is still ahead
-    return itemMin < fallbackMin && nowMin < fallbackMin;
+    const minCutoff = Math.max(itemMin, nowMin);
+    const next = slotsOrder.find((s) => parseHHMMToMinutes(s, -1) > minCutoff);
+    return next || null;
   };
-  const deferItemToAfternoon = (item, reasonText) => {
+  const deferItemToNextSlot = (item, nextSlot, reasonText) => {
     const prevSlot = targetSlot || item.scheduledTime || defaultSlot;
     item.status = "pending";
     item.deferredFrom = prevSlot;
-    item.scheduledTime = fallbackSlot;
+    item.deferHistory = [...(item.deferHistory || []), prevSlot];
+    item.scheduledTime = nextSlot;
     item.deferredAt = Date.now();
     item.finishedAt = null;
-    item.message = `${prevSlot} 重试 3 次仍失败，已自动延后至今日 ${fallbackSlot} 队列（${String(reasonText || "").slice(0, 120)}）`;
-    pushSystemLog(`[错峰定时队列] ${item.beatCode} (${item.kind}) 在 ${prevSlot} 批次失败，已自动延后至今日 ${fallbackSlot} 队列`);
+    item.message = `${prevSlot} 重试 3 次仍失败，已自动顺延至今日 ${nextSlot} 队列（已顺延 ${item.deferHistory.length} 次 · ${String(reasonText || "").slice(0, 110)}）`;
+    pushSystemLog(`[错峰定时队列] ${item.beatCode} (${item.kind}) 在 ${prevSlot} 批次失败，已自动顺延至今日 ${nextSlot} 队列`);
   };
 
   state.schedule.runningBatch = true;
@@ -484,7 +489,7 @@ async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = 
   pushSystemLog(`[错峰定时队列] ${triggerReason}：开始执行 ${pendingAll.length} 项任务（按 MiniMax-H3 → Colab 提骨分组复用热机）`);
 
   (async () => {
-    const deferredH3TaskIds = new Set();
+    const deferredH3SlotByTask = new Map();
     try {
       // Phase 1: All MiniMax-H3 video tasks together (reuse warm G4 96G weights across the entire batch)
       const h3Items = pendingAll.filter((x) => x.kind === "stage3_h3");
@@ -514,12 +519,13 @@ async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = 
           item.finishedAt = Date.now();
         } catch (err) {
           const errMsg = String(err?.message || err);
-          if (canDeferItem(item)) {
-            deferItemToAfternoon(item, errMsg);
-            deferredH3TaskIds.add(item.taskId);
+          const nextSlot = findNextCascadeSlot(item);
+          if (nextSlot) {
+            deferItemToNextSlot(item, nextSlot, errMsg);
+            deferredH3SlotByTask.set(item.taskId, nextSlot);
           } else {
             item.status = "failed";
-            item.message = errMsg.slice(0, 220);
+            item.message = `已顺延至末班 ${slotsOrder[slotsOrder.length - 1]} 且重试 3 次仍失败：${errMsg.slice(0, 180)}`;
             item.finishedAt = Date.now();
           }
         }
@@ -548,8 +554,9 @@ async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = 
           task.stage3?.takes?.find((t) => t.id === task.stage3.selectedTakeId && t.status === "succeeded") ||
           task.stage3?.takes?.find((t) => t.status === "succeeded");
         if (!take?.localPath) {
-          if (deferredH3TaskIds.has(item.taskId) && canDeferItem(item)) {
-            deferItemToAfternoon(item, "依赖的 MiniMax-H3 视频已延后至今日 14:00，提骨同步顺延");
+          const depNext = deferredH3SlotByTask.get(item.taskId) || findNextCascadeSlot(item);
+          if (deferredH3SlotByTask.has(item.taskId) && depNext) {
+            deferItemToNextSlot(item, depNext, `依赖的 MiniMax-H3 视频已顺延至今日 ${depNext}，提骨同步顺延`);
           } else {
             item.status = "failed";
             item.message = "该任务尚无可用成片视频，跳过提骨";
@@ -616,11 +623,12 @@ async function runScheduledBatch(triggerReason = "定时触发", { targetSlot = 
             }
           }
           if (!handledByModal) {
-            if (canDeferItem(item)) {
-              deferItemToAfternoon(item, errMsg);
+            const nextSlot = findNextCascadeSlot(item);
+            if (nextSlot) {
+              deferItemToNextSlot(item, nextSlot, errMsg);
             } else {
               item.status = "failed";
-              item.message = errMsg.slice(0, 220);
+              item.message = `已顺延至末班 ${slotsOrder[slotsOrder.length - 1]} 且重试 3 次仍失败：${errMsg.slice(0, 180)}`;
               item.finishedAt = Date.now();
             }
           }
