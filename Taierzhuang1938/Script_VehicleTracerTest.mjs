@@ -1,9 +1,11 @@
-// 战车机枪的弹道光束与硬面火星（Data_Tuning_BulletVisual）：真 GPU 上数像素。
+// 战车机枪的真实曳光弹道（白热梭形弹头 + 冷却余烬火星 + 受光细烟丝）与硬面火星（Data_Tuning_BulletVisual）：真 GPU 上数像素。
 //
-// 2026-09-22 用户要「看到清晰的一条子弹的光束」与「子弹在墙上飞溅的火花」。
-// 「visible 不等于看得见」：这里不看粒子池有没有写进去，只看画面上多了几个像素 ——
-//   · 同一条 30 m 弹道，光束点亮的像素要远多于旧的 Tracer 短曳光；
-//   · 远端一列至少两像素宽（像素保底），贴着脸飞过去不超过像素上限；
+// 2026-09-22 用户要「看到清晰的一条子弹的光束」与「子弹在墙上飞溅的火花」；
+// 2026-11-27 用户指出旧版横贯全场的橙色实心光束「有点丑有点 low 不是很真实」：
+//   · 升级为双层真实曳光：beam（针尖白热弹芯 + 炽橙彗尾 + 紧贴弹尾快速冷却的余烬火星）
+//     + beamSmoke（NormalBlending 受日光/天光照明的淡灰白细烟丝，舒展卷曲后自然消散）；
+//   · 飞行中段弹头与余烬清晰可读、远高于旧短曳光，保持远处像素保底与贴脸像素上限；
+//   · 命中后灼热弹头迅速熄灭（不再留下横贯全场的激光管），由受光细烟丝自然交代来向并彻底消散；
 //   · 砖墙溅火星、沙袋/土不溅、步枪不传 hardSparks 也不溅；
 //   · 第一关白盒按体块分弹着表面：墙体按 tag 落砖、沙袋墙 sandbag、木料 wood。
 import assert from "node:assert/strict";
@@ -51,6 +53,7 @@ const scene=new THREE.Scene();scene.background=new THREE.Color(0x8aa4c8);   // �
 const camera=new THREE.PerspectiveCamera(60,W/H,.1,400);camera.position.set(0,1.6,0);camera.lookAt(0,1.3,-30);camera.updateMatrixWorld(true);
 scene.add(new THREE.HemisphereLight(0xc7d3df,0x51483d,1.2));
 const vfx=new VfxSystem(scene,null,{quality:"high",maxParticles:4000});vfx.SetFog(null);
+vfx.SetSun(new THREE.Vector3(-20,30,15),0xffe9c8,0xbcd0e2,{sunIntensity:1.1,skyIntensity:.35});
 vfx.shared.uResolution.value.set(W,H);
 let clock=1;
 // Match real frames: Vfx clamps long input deltas to protect continuous emitters.
@@ -66,20 +69,33 @@ function Changed(pools){const on=Pixels();for(const p of pools)vfx.pools[p].mesh
 function ColumnWidth(mask,world,span=40){const v=world.clone().project(camera),x=Math.round((v.x*.5+.5)*W),y=Math.round((v.y*.5+.5)*H);
   let n=0;for(let dy=-span;dy<=span;dy++){const yy=y+dy;if(yy<0||yy>=H||x<0||x>=W)continue;n+=mask[yy*W+x];}return {x,y,n};}
 const r={};
-// 1) 30 m 横穿画面的一条弹道：光束 vs 旧曳光
+// 1) 30 m 横穿画面的一条弹道：飞行中段白热曳光弹头 vs 旧曳光 + 命中后熄灭与受光烟丝交代来向
 {const from=new THREE.Vector3(-14,1.2,-44),to=new THREE.Vector3(12,1.5,-30);
  vfx.ClearParticles();vfx.TracerBeam(from,to,{kind:"ija"});const flight=vfx.lastTracerBeam.flight;
- Advance(flight+1/60);const beam=Changed(["beam"]);
- r.beam={count:beam.count,flight,life:vfx.lastTracerBeam.life,
-   far:ColumnWidth(beam.mask,from.clone().lerp(to,.12)),mid:ColumnWidth(beam.mask,from.clone().lerp(to,.5))};
+ const midT=.58;
+ Advance(flight*midT);const midBeam=Changed(["beam"]);
+ const actualT=Math.min(.95,Math.max(.08,vfx.pools.beam.system.time/flight));
+ const smokeDarkBg=scene.background.clone();
+ r.beam={count:midBeam.count,flight,life:vfx.lastTracerBeam.life,smokeLife:vfx.lastTracerBeam.smokeLife,
+   head:ColumnWidth(midBeam.mask,from.clone().lerp(to,Math.max(.05,actualT-.04)))};
+ // 命中后 0.05 s：灼热弹头与激光长尾已熄灭，绝不再留横贯 30 m 的橙色光棒
+ Advance(flight*(1-midT)+.05);
+ r.postBeam=Changed(["beam"]).count;
+ // 受光烟丝在暗色地景背景前清晰可见，且到 smokeLife 彻底消散
+ scene.background.setHex(0x3a352c);
+ r.smoke=Changed(["beamSmoke"]).count;
+ scene.background.copy(smokeDarkBg);
  Advance(vfx.lastTracerBeam.life);r.beamGone=Changed(["beam"]).count;
+ Advance(vfx.lastTracerBeam.smokeLife);r.smokeGone=Changed(["beamSmoke"]).count;
  vfx.ClearParticles();vfx.Tracer(from,to,{kind:"ija"});Advance(from.distanceTo(to)/480*.5);r.tracer=Changed(["streak"]).count;}
-// 2) 贴着脸飞过去：离相机 2 m 处的线宽不超过像素上限
+// 2) 贴着脸飞过去：弹头掠过离相机约 2.5 m 处时线宽不超过像素上限
 {const from=new THREE.Vector3(-18,1.2,-40),to=new THREE.Vector3(3.5,1.45,6);
- vfx.ClearParticles();vfx.TracerBeam(from,to,{kind:"ija"});Advance(vfx.lastTracerBeam.flight+1/60);
- const near=Changed(["beam"]);const dir=to.clone().sub(from).normalize();
- // 光束上离相机约 2.5 m 的那一点（取线上与相机最近点往回退 2 m）
- const t=camera.position.clone().sub(from).dot(dir),closest=from.clone().addScaledVector(dir,t-2);
+ vfx.ClearParticles();vfx.TracerBeam(from,to,{kind:"ija"});
+ const dir=to.clone().sub(from).normalize(),dist=from.distanceTo(to);
+ // 线上离相机最近点往回退 2.5 m 处的弹头位置
+ const t=camera.position.clone().sub(from).dot(dir),sDist=Math.max(2,t-2.5),closest=from.clone().addScaledVector(dir,sDist);
+ Advance(vfx.lastTracerBeam.flight*(sDist/dist)+.004);
+ const near=Changed(["beam"]);
  r.near={count:near.count,at:closest.toArray(),width:ColumnWidth(near.mask,closest,80),distance:closest.distanceTo(camera.position)};}
 // 3) 砖墙溅火星；沙袋、土、以及不传 hardSparks 的步枪都不溅
 {const wall=new THREE.Mesh(new THREE.PlaneGeometry(8,4),new THREE.MeshStandardMaterial({color:0x5a6d80,roughness:.9}));
@@ -121,12 +137,14 @@ try {
   fs.writeFileSync(path.join(shots, "Data_VehicleTracerResults.json"), JSON.stringify({ r, errors }, null, 2));
   const T = r.tuning.VEHICLE_TRACER;
 
-  // 1) 光束读得出来，而且是一整条线
-  assert(r.beam.count >= 1200, `beam lights a whole line across the frame: ${JSON.stringify(r.beam)}`);
-  assert(r.beam.count >= 6 * Math.max(1, r.tracer), `beam is far more visible than the old streak tracer: beam ${r.beam.count} vs tracer ${r.tracer}`);
-  assert(r.beam.far.n >= 2, `far end keeps a pixel floor: ${JSON.stringify(r.beam.far)}`);
-  assert(r.beam.mid.n >= 2, `mid span keeps a pixel floor: ${JSON.stringify(r.beam.mid)}`);
+  // 1) 真实曳光弹头清晰可读、命中后迅速熄灭不留激光管，并伴生受光烟丝自然消散
+  assert(r.beam.count >= 160, `mid-flight tracer dart is clearly visible across the frame: ${JSON.stringify(r.beam)}`);
+  assert(r.beam.count >= 6 * Math.max(1, r.tracer), `tracer dart is far more visible than the old streak tracer: beam ${r.beam.count} vs tracer ${r.tracer}`);
+  assert(r.beam.head.n >= 2, `tracer head keeps a crisp pixel floor: ${JSON.stringify(r.beam.head)}`);
+  assert(r.postBeam < r.beam.count * 0.45, `post-impact ember extinguishes rapidly instead of staying a full-length laser rod: post ${r.postBeam} vs mid ${r.beam.count}`);
+  assert(r.smoke >= 120, `sunlit pyrotechnic smoke thread remains readable behind the dart: ${r.smoke}px`);
   assert.equal(r.beamGone, 0, "beam fully fades by the end of its life");
+  assert.equal(r.smokeGone, 0, "beamSmoke fully fades by the end of its life");
   // 2) 贴脸：像素上限（全宽 = 2 × 半宽，留 2 px 给光栅化取整）
   assert(r.near.count > 0, "near pass is drawn");
   assert(r.near.width.n <= 2 * T.maxHalfWidthPx + 2, `near pass is capped, not a light bar: ${JSON.stringify(r.near)}`);
@@ -149,7 +167,7 @@ try {
   assert.deepEqual(r.sink, ["sandbag", null]);
   assert.equal(r.glError, 0);
   assert.deepEqual(errors, []);
-  console.log(`PASS VehicleTracer: beam ${r.beam.count}px vs tracer ${r.tracer}px, far ${r.beam.far.n}px, near ${r.near.width.n}px, ` +
+  console.log(`PASS VehicleTracer: mid-flight ${r.beam.count}px vs tracer ${r.tracer}px, head ${r.beam.head.n}px, post ${r.postBeam}px, smoke ${r.smoke}px, near ${r.near.width.n}px, ` +
     `brick ${r.brick.streaks} sparks/${r.brick.pixels}px, sandbag/dirt/rifle quiet, whitebox surfaces resolved`);
 } finally {
   await page.close();

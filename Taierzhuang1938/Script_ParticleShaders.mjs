@@ -47,19 +47,21 @@ attribute vec3 iNormal;
 #endif
 
 uniform float uTime;
-#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM) || defined(SHAPE_SOILGRAIN)
+#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE) || defined(SHAPE_SOILGRAIN)
 uniform vec2 uResolution;      // 渲染分辨率：拉伸池按它把「几个像素」换算成米
 #endif
 #ifdef SHAPE_SOILGRAIN
 uniform vec4 uSoilArt;
 varying vec2 vSoilMotion;
 #endif
-#ifdef SHAPE_BEAM
-// 光束不走弹道积分，iSpin / iAccel 空着，借来递光束参数：
-// x 飞行时间(秒) y 余辉时间常数(秒) z 全长(米) w 弹头亮段(米)
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+// 光束与曳光烟丝不走弹道积分，iSpin / iAccel 空着，借来递参数：
+// SHAPE_BEAM:      x 飞行时间(秒) y 余烬冷却常数(秒) z 全长(米) w 弹头亮段(米)
+// SHAPE_BEAMSMOKE: x 飞行时间(秒) y 烟丝寿命(秒)     z 全长(米) w 上浮漂移(米/秒)
 varying vec4 vBeam;
-varying float vBeamTrail;      // 余辉相对弹头的亮度（iAccel.y）
+varying float vBeamTrail;      // 余烬亮度 / 烟丝不透明度（iAccel.y）
 varying float vBeamMuzzleFade; // 枪口端淡入长度（米，iAccel.z）
+varying float vBeamAlign;      // 视线与弹道对齐度 |dot(dir, toCam)|，用于迎面/侧视光学适配
 #endif
 uniform float uGlobalFade;
 uniform float uFadeOutStart;   // 淡出起点：普通池 0.45，序列帧火球 0.82（16 帧要播完）
@@ -127,8 +129,8 @@ void main() {
   vec3 world = iOrigin
     + (iVelocity - iAccel / k) * ((1.0 - exp(-k * age)) / k)
     + iAccel * (age / k);
-#ifdef SHAPE_BEAM
-  // 光束钉在弹着点上不动：弹头的飞行在片元里按寿命揭开，iVelocity 只给方向。
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+  // 光束与烟丝钉在弹着点上不动：弹头的飞行在片元里按寿命揭开，iVelocity 只给方向。
   world = iOrigin;
   vBeam = vec4(iSpin.x, iSpin.y, iExtra.x, iAccel.x);
   vBeamTrail = iAccel.y;
@@ -197,13 +199,14 @@ void main() {
 #elif defined(ORIENT_STRETCH)
   // 沿飞行方向拉长：曳光弹与火星。头在 corner.x = +1 处。
   vec3 toCam = cameraPosition - world;
-#if !defined(SHAPE_BEAM)
+#if !defined(SHAPE_BEAM) && !defined(SHAPE_BEAMSMOKE)
   vec3 instant=iVelocity*exp(-k*age)+iAccel*((1.0-exp(-k*age))/k);
   vec3 dir=normalize(instant+vec3(0.0,1e-5,0.0));
 #else
   vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
 #endif
-  vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
+  vec3 sideRaw = cross(dir, normalize(toCam + vec3(1e-5)));
+  vec3 side = length(sideRaw) < 1e-4 ? vec3(0.0, 1.0, 0.0) : normalize(sideRaw);
 #ifdef SHAPE_BLOODDROP
   // Sample the same damped ballistic curve as the head, instead of drawing a straight
   // dash behind it. Clamp to birth so a fresh jet cannot extend through the source.
@@ -229,30 +232,44 @@ void main() {
   vec3 along = dir * ((corner.x - 1.0) * 0.5 * iExtra.x);
 #endif
   float halfWidth = size;
+#ifdef SHAPE_BEAMSMOKE
+  // 烟丝按该段已被弹头掠过的时长逐步舒展并微微上浮扭动，打破直尺般的僵硬感
+  float beamAlong01 = corner.x * 0.5 + 0.5;
+  float beamSince = max(0.0, age - beamAlong01 * iSpin.x);
+  float beamSmokeAge01 = clamp(beamSince / max(iSpin.y, 1e-3), 0.0, 1.0);
+  halfWidth = mix(iSize.x, iSize.y, pow(beamSmokeAge01, 0.58));
+  float beamSwayPhase = beamAlong01 * max(iExtra.x, 1.0) * 0.52 + iParams.w * 29.0;
+  along.y += iAccel.x * beamSince * (0.55 + 0.45 * sin(beamSwayPhase));
+  along += side * (sin(beamSwayPhase * 1.43 + beamSince * 3.8) * 0.085 * pow(beamSmokeAge01, 0.8));
+#endif
 #ifdef SHAPE_SOILGRAIN
   float metresPerPixel=length(cameraPosition-world)*2.0/(projectionMatrix[1][1]*uResolution.y);
   halfWidth=max(size,metresPerPixel*uSoilArt.z);
   vSoilMotion=vec2(sqrt(clamp(size/max(halfWidth,1e-6),0.0,1.0))*mix(1.0,uSoilArt.w,smoothstep(size*2.0,size*6.0,length(instant)*uSoilArt.y)),iSpin.x+moduleParameters.y*life);
 #endif
-#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
+#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
   // 像素保底（iExtra.w > 0 才开；旧的曳光/火星写 0，行为不变）。按**这个顶点自己**
   // 离相机的距离换算：一条四十米的光束两端远近差得多，只按头部算的话尾巴会细成头发。
   // side 对整条线是同一个方向（线与相机张成的平面的法线），所以逐顶点改宽度不会扭。
+  vec3 vertexToCam = cameraPosition - (world + along);
+  float camDist = length(vertexToCam);
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+  vBeamAlign = abs(dot(dir, vertexToCam / max(camDist, 1e-4)));
+#endif
   if (iExtra.w > 0.0) {
-    float camDist = length(cameraPosition - (world + along));
     float metresPerPixel = camDist * 2.0 / (projectionMatrix[1][1] * uResolution.y);
     halfWidth = max(halfWidth, metresPerPixel * iExtra.w);
-#ifdef SHAPE_BEAM
-    // 上限（iExtra.z，光束池没有 GROUND_BOUNCE，这一格空着）：子弹贴着脸飞过去时
-    // 3 cm 的物理宽度能占三四十个像素，读起来是一根光棍，不是一发弹。
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+    // 上限（iExtra.z，光束/烟丝池没有 GROUND_BOUNCE，这一格空着）：子弹贴着脸飞过去时
+    // 物理宽度会占几十个像素，压在像素上限内保持锐利。
     if (iExtra.z > 0.0) halfWidth = min(halfWidth, metresPerPixel * iExtra.z);
 #endif
   }
 #endif
   offset = along + side * (corner.y * halfWidth);
   #ifdef LIT
-    // 受光的拉伸片（泥浆池）：假圆柱法线 —— 横向两侧往外、中间朝相机，略朝上
-    vec3 camDir = normalize(toCamOrZ(world));
+    // 受光的拉伸片（泥浆池 / 曳光烟丝）：假圆柱法线 —— 横向两侧往外、中间朝相机，略朝上
+    vec3 camDir = normalize(toCamOrZ(world + along));
     vLitNormal = normalize(side * corner.y * 0.8 + camDir * 0.7 + vec3(0.0, 0.25, 0.0));
     vViewDir = -camDir;
   #endif
@@ -288,8 +305,8 @@ void main() {
   vColor = mix(iColorA, iColorB, smoothstep(0.0, 0.8, t01));
   vColorAlt = iColorB;
   vColor *= moduleColor.rgb;
-#ifdef SHAPE_BEAM
-  vColor = iColorA;        // 弹头色；余辉色是 vColorAlt。两段按位置分，不按寿命渐变
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+  vColor = iColorA;        // 弹头/新烟色；冷却余烬/消散烟色是 vColorAlt。两段按局部经过时间分，不按整条寿命渐变
 #endif
 #ifdef SHAPE_DECAL
   vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
@@ -394,10 +411,11 @@ varying vec3 vDecalTangent;
 varying vec3 vDecalBitangent;
 varying vec3 vDecalWorldPosition;
 #endif
-#ifdef SHAPE_BEAM
-varying vec4 vBeam;        // x 飞行时间 y 余辉时间常数 z 全长 w 弹头亮段
+#if defined(SHAPE_BEAM) || defined(SHAPE_BEAMSMOKE)
+varying vec4 vBeam;        // x 飞行时间 y 余烬冷却/烟丝寿命 z 全长 w 弹头亮段/上浮速度
 varying float vBeamTrail;
 varying float vBeamMuzzleFade;
+varying float vBeamAlign;
 #endif
 #ifdef SHAPE_MARKER
 uniform vec3 uMarkerSoil;  // 焦土颗粒色（受光）
@@ -528,24 +546,132 @@ void main() {
   mask = across * mix(0.03, 1.0, pow(head, 2.2));
   mask*=smoothstep(0.,${PARTICLE_SURFACE_ART.streakTailFade.toFixed(2)},head)*(1.-smoothstep(${PARTICLE_SURFACE_ART.streakHeadFade.toFixed(2)},1.,head));
 #elif defined(SHAPE_BEAM)
-  // 一发子弹的光束（TracerBeam）。整条线从枪口铺到弹着点，但不是一下子全亮：
-  // 弹头按「已活秒数 / 飞行时间」从枪口飞过去，掠过的那一段按余辉常数暗下去。
-  // vShape.x：-1 是枪口，+1 是弹着点。
+  // 真实战车机枪曳光弹（TracerBeam）：针尖白热药芯 + 炽烈橙金彗尾 + 渐收冷却余烬丝与剥离火星。
+  // vShape.x：-1 是枪口，+1 是弹着点；vShape.y：横向 [-1, 1]。
   float flight = max(vBeam.x, 1e-4);
+  float distTotal = max(vBeam.z, 0.05);
   float along = p.x * 0.5 + 0.5;
+  float distAlong = along * distTotal;
   float since = vAgeS - along * flight;            // 弹头掠过这一点多久了；负 = 还没飞到
-  float reached = step(0.0, since);
-  float behind = since / flight * vBeam.z;         // 这一点落后弹头几米
-  // 弹头到了弹着点就没了 —— 它打进墙里了，只剩余辉。
-  float headAlive = 1.0 - smoothstep(flight, flight + 0.012, vAgeS);
-  float head = reached * headAlive * (1.0 - smoothstep(0.0, max(vBeam.w, 0.01), behind));
-  float trail = reached * exp(-max(since, 0.0) / max(vBeam.y, 1e-3)) * vBeamTrail;
-  float muzzle = smoothstep(0.0, max(vBeamMuzzleFade, 1e-3), along * vBeam.z);
-  // 弹头胖一点、余辉细一点：线宽由顶点给的是像素保底，这里只分配亮度的横向分布。
-  float across = exp(-p.y * p.y * mix(3.2, 1.8, head));
-  across*=1.-smoothstep(${PARTICLE_SURFACE_ART.beamSideFade.toFixed(2)},1.,abs(p.y));
-  mask = across * max(head, trail) * muzzle;
-  color = mix(vColorAlt, vColor, clamp(head * 1.5, 0.0, 1.0));
+  if (since <= 0.0) discard;
+
+  float speedMps = distTotal / flight;
+  float behind = since * speedMps;                 // 这一点落后弹头前沿几米
+  float headLen = max(vBeam.w, 0.25);
+
+  // 弹头到达弹着点后干脆熄灭（打进墙/地，由弹着火光与火星接力），只留极短冷却余烬
+  float headAlive = 1.0 - smoothstep(flight, flight + 0.010, vAgeS);
+
+  // 梭形燃烧弹头：前沿气动锥尖平滑切入，紧随其后的燃烧药柱形成最炽亮的亮点，向后平滑收成彗尾
+  float headU = clamp(behind / headLen, 0.0, 1.0);
+  float noseTaper = smoothstep(0.0, min(0.32, headLen * 0.12), behind);
+  float headTail = pow(1.0 - headU, 1.85);
+  // 弹头前段额外叠加一颗灼热燃烧药珠（真实曳光弹底火药在运动模糊前端最亮）
+  float hotBead = exp(-pow((behind - min(0.45, headLen * 0.14)) / max(headLen * 0.20, 0.15), 2.0)) * headAlive;
+  float headShape = headAlive * noseTaper * headTail;
+
+  // 高速自旋燃烧药柱的细微高频明暗起伏，消除死板矢量线条感
+  float burnNoise = Vnoise(vec2(distAlong * 2.1 + vSeed * 53.0, vAgeS * 32.0 + vSeed * 19.0));
+  float head = (headShape * 0.88 + hotBead * 0.42) * (0.86 + 0.26 * burnNoise);
+
+  // 紧贴弹尾的高温余烬细丝：指数+二次快速冷却，杜绝横贯全场的橙色实心激光棒
+  float glowTau = max(vBeam.y, 1e-3);
+  float wakeDecay = exp(-since / glowTau) * exp(-(since * since) / max(glowTau * glowTau * 2.6, 1e-5));
+  float wakeBreak = Vnoise(vec2(distAlong * 2.8 + vSeed * 71.0, vSeed * 11.0 + vAgeS * 5.0));
+  float wakeMod = smoothstep(0.22, 0.88, wakeBreak) * 0.72 + 0.28;
+  float wake = wakeDecay * wakeMod * vBeamTrail * smoothstep(0.0, 0.25, behind);
+
+  // 弹尾剥离的细碎炽橙火星粒：严格限定在弹头紧后方 1~8 m 冷却区，偏暗橙金而非白点，绝不挂在远处烟丝上
+  float sparkPos = distAlong * 3.4 + vSeed * 37.0;
+  float sparkCell = floor(sparkPos);
+  float sparkCellT = fract(sparkPos);
+  float sparkRand = Hash21(vec2(sparkCell, vSeed * 97.0 + 3.1));
+  float sparkExist = step(0.68, sparkRand);
+  float sparkDrift = (Hash21(vec2(sparkCell, vSeed * 41.0 + 17.3)) - 0.5) * 0.85 * clamp(since / (glowTau * 1.1), 0.16, 1.0);
+  float sparkAlong = exp(-pow((sparkCellT - 0.5) * 6.2, 2.0));
+  float sparkAcross = exp(-pow((p.y - sparkDrift) * 7.5, 2.0));
+  float sparkZone = smoothstep(headLen * 0.35, headLen * 0.85, behind)
+    * (1.0 - smoothstep(headLen * 1.4, headLen * 2.4, behind))
+    * exp(-since / (glowTau * 0.95));
+  float microSparks = sparkExist * sparkAlong * sparkAcross * sparkZone * (0.65 + 0.55 * sparkRand);
+
+  // 枪口引燃淡入（离开枪口火光一小段后曳光药才完全燃亮）
+  float muzzle = smoothstep(0.15, max(vBeamMuzzleFade, 0.25), distAlong);
+
+  // 横向三层物理光学剖面：针尖白热芯 + 炽烈橙金鞘 + 低能深橙大气散射晕
+  // 弹头略丰满、弹尖与尾迹急剧收细成发丝状，彻底告别霓虹光管
+  float envBase = clamp(headShape + hotBead * 0.35, 0.0, 1.0);
+  float widthEnv = mix(0.18, 1.0, pow(envBase, 0.6)) * mix(0.28, 1.0, noseTaper);
+  float headOn = smoothstep(0.80, 0.98, vBeamAlign);
+  float edgeFade = 1.0 - smoothstep(${PARTICLE_SURFACE_ART.beamSideFade.toFixed(2)}, 1.0, abs(p.y));
+
+  float coreW = max(0.08, 0.18 * widthEnv);
+  float sheathW = max(0.16, 0.38 * widthEnv);
+  float haloW = max(0.38, 0.84 * mix(0.36, 1.0, envBase));
+
+  float coreProf = exp(-(p.y * p.y) / (coreW * coreW));
+  float sheathProf = exp(-(p.y * p.y) / (sheathW * sheathW));
+  float haloProf = exp(-(p.y * p.y) / (haloW * haloW)) * edgeFade;
+
+  float headEnergy = head * (1.0 + headOn * 0.35);
+  float wakeEnergy = wake * (1.0 - headOn * 0.50);
+
+  // 沿弹头纵向也有黑体降温：前端白热集中，后半段自然过渡成饱和炽橙再冷却到深红余烬
+  float tipHeat = clamp((1.0 - headU * 1.15) * headAlive + hotBead * 0.6, 0.0, 1.0);
+  float coreWgt = (headEnergy * (0.55 + 0.85 * tipHeat) + wakeEnergy * 0.12) * coreProf;
+  float sheathWgt = (headEnergy * 0.68 + wakeEnergy * 0.42) * sheathProf;
+  float haloWgt = (headEnergy * 0.24 + wakeEnergy * 0.08) * haloProf;
+
+  vec3 coreHot = mix(vColor, vec3(1.0, 0.97, 0.88) * 2.35, 0.78);
+  float cool01 = clamp(since / (glowTau * 1.9), 0.0, 1.0);
+  vec3 emberCol = mix(vColorAlt, vColorAlt * vec3(1.0, 0.34, 0.10), cool01);
+  vec3 sheathCol = mix(emberCol, vColor, smoothstep(0.0, 0.75, tipHeat));
+  vec3 sparkCol = mix(vColor, emberCol, 0.62);
+
+  vec3 radiance = (
+    coreHot * coreWgt
+    + sheathCol * sheathWgt
+    + emberCol * haloWgt
+    + sparkCol * (microSparks * 0.78)
+  ) * muzzle * edgeFade;
+
+  mask = clamp(max(max(coreWgt, sheathWgt * 0.85), max(haloWgt * 0.65, microSparks * 0.8)) * muzzle * edgeFade, 0.0, 1.0);
+  color = radiance / max(mask, 1e-4);
+#elif defined(SHAPE_BEAMSMOKE)
+  // 真实镁/磷曳光弹留下的受光轻薄烟丝：弹头掠过后凝出，迅速舒展、卷曲、断成缕状轻烟消散。
+  float flight = max(vBeam.x, 1e-4);
+  float smokeLife = max(vBeam.y, 0.05);
+  float distTotal = max(vBeam.z, 0.05);
+  float along = p.x * 0.5 + 0.5;
+  float distAlong = along * distTotal;
+  float since = vAgeS - along * flight;
+  if (since <= 0.0 || since >= smokeLife) discard;
+
+  float age01 = clamp(since / smokeLife, 0.0, 1.0);
+  float muzzle = smoothstep(0.6, max(vBeamMuzzleFade * 1.4, 1.0), distAlong);
+  float impactTail = 1.0 - smoothstep(distTotal - 0.8, distTotal, distAlong);
+  float appear = smoothstep(0.012, 0.055, since);
+  float vanish = pow(1.0 - smoothstep(0.10, 1.0, age01), 1.65);
+
+  // 两层高低频湍流：大尺度把烟丝扯成不均匀的断续轻缕，小尺度给边缘做出蓬松烟絮感
+  float nCoord = distAlong * 0.92 + vSeed * 43.0;
+  float curl = (Vnoise(vec2(nCoord * 0.62, vAgeS * 0.85 + vSeed * 17.0)) - 0.5) * mix(0.18, 0.78, pow(age01, 0.75));
+  float tuft = Vnoise(vec2(nCoord * 0.85 + 3.7, vSeed * 19.0 - vAgeS * 0.35));
+  float wispCoarse = Vnoise(vec2(nCoord * 1.55, p.y * 1.35 - vAgeS * 0.6 + vSeed * 23.0));
+  float wispFine = Vnoise(vec2(nCoord * 4.1 + 7.1, p.y * 2.8 + vAgeS * 1.1 + vSeed * 31.0));
+  float wisp = mix(wispCoarse, wispFine, 0.36);
+
+  float halfSpread = mix(0.32, 0.92, pow(age01, 0.55)) * (0.65 + 0.55 * wispCoarse);
+  float yDist = abs(p.y - curl) / max(halfSpread, 0.10);
+  float across = pow(exp(-yDist * yDist * 2.3), 1.25) * (1.0 - smoothstep(0.72, 1.0, abs(p.y)));
+  // 随烟龄侵蚀出真实的空气间隙，彻底消除“拉紧的灰色细线”感
+  float gapMask = smoothstep(0.16 + age01 * 0.34, 0.76 + age01 * 0.14, tuft * 0.55 + wisp * 0.45 + (1.0 - yDist) * 0.24);
+
+  // 刚出弹头极短瞬间略受弹尾暖光照亮，随即回归纯受环境日光/天光照明的淡灰烟
+  float warmGlow = exp(-since / 0.028) * 0.16;
+  color = mix(vColor, vColorAlt, smoothstep(0.0, 0.50, age01)) + vec3(0.38, 0.18, 0.06) * warmGlow;
+  float headOn = smoothstep(0.80, 0.98, vBeamAlign);
+  mask = across * gapMask * appear * vanish * muzzle * mix(0.35, 1.0, impactTail) * vBeamTrail * (1.0 - headOn * 0.55);
 #elif defined(SHAPE_RING)
   // 贴地扩散的尘环 —— 爆炸"有当量"的关键一笔
   float n = Vnoise(p * 3.4 + vec2(vSeed * 23.0, 7.0));

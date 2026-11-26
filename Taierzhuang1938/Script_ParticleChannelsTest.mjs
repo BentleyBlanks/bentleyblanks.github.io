@@ -94,7 +94,7 @@ try{
  await page.goto('http://127.0.0.1:'+server.address().port+'/Taierzhuang1938/_check_ParticleChannels.html');
  await page.waitForFunction(()=>window.result,null,{timeout:90000});await page.screenshot({path:path.join(out,'Channels.png')});
  const result=await page.evaluate(()=>window.finish());await fs.writeFile(path.join(out,'Report.json'),JSON.stringify({result,errors},null,2));
- assert.deepEqual(errors,[]);assert.equal(result.routes.length,19);
+ assert.deepEqual(errors,[]);assert.equal(result.routes.length,20);
  for(const volume of result.boundaries.volumes){assert.ok(volume.full>500&&volume.partial>100,volume.mode+' retains the visible front lobe: '+JSON.stringify(volume));assert.ok(volume.partial<volume.full,volume.mode+' clips the rear volume');assert.equal(volume.blocked,0,volume.mode+' fully blocked');}
  assert.ok(result.boundaries.ring.outerBand>.01,'ring band beyond the old quad remains visible');assert.equal(result.boundaries.ring.supportEdge,0,'ring support ends in zero density');
  for(const route of result.routes){assert.ok(route.owned,route.name);assert.equal(route.backend,'modules');assert.equal(route.glError,0,route.name);}

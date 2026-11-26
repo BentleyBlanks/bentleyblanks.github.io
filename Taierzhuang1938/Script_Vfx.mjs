@@ -100,11 +100,14 @@ export const VFX_PALETTE = {
   flashCore: LinearOf(0xFFF3D6, 22.0),   // 爆炸中心的短命强光
   muzzleCore: LinearOf(0xFFF0CC, 8.0),
   muzzleEdge: LinearOf(0xFF9A3A, 3.2),
-  tracerNra: LinearOf(0xFFE3B0, 5.5),    // 中方：偏暖白
-  tracerIja: LinearOf(0xFFB028, 5.0),    // 日方：橙黄 —— 比中方的暖白更饱和、更偏橙，靠饱和度分敌我
-  // 光束的余辉：比弹头暗一档、色相更饱和，弹头掠过之后留下的那条线（TracerBeam）
-  tracerTrailNra: LinearOf(0xFFB45E, 3.2),
-  tracerTrailIja: LinearOf(0xFF8A12, 2.8),
+  tracerNra: LinearOf(0xFFE5B8, 6.2),    // 中方：偏暖金白（白热芯由着色器叠高色温）
+  tracerIja: LinearOf(0xFFA024, 5.8),    // 日方：炽橙金 —— 比中方更偏橙，靠黑体色温鞘区分敌我
+  // 曳光冷却余烬与剥离火星色（TracerBeam）：比弹头更深更红，模拟镁/锶曳光药冷却过程
+  tracerTrailNra: LinearOf(0xE89542, 2.6),
+  tracerTrailIja: LinearOf(0xE85610, 2.4),
+  // 曳光弹受光细烟丝（beamSmoke）：刚出弹尾偏暖灰，扩散后回落到淡灰白
+  tracerSmokeFresh: LinearOf(0xD2C9BC),
+  tracerSmokeFade: LinearOf(0xB8B5AE),
   sparkHot: LinearOf(0xFFE2B0, 6.5),
   sparkCool: LinearOf(0xD05A16, 2.0),
   // 砖墙/铁件上的弹着火星（_HardSurfaceSparks）：比铁板那档更偏橙，一眼读成「火」
@@ -634,9 +637,16 @@ export class VfxSystem {
         shape: "streak", orient: "stretch", blending: THREE.AdditiveBlending,
         bounce: true, softRange: 0.12, renderOrder: 9,
       }, this.shared),
-      // 一发一条的弹道光束（TracerBeam，战车机枪）。容量固定、不吃画质档预算：
+      // 战车机枪曳光弹尾的受光细烟丝（TracerBeam 伴生，NormalBlending 受日光/天光与前向散射照明）。
+      // 排在 beam 之前绘制，无活槽时整网格隐藏零开销。
+      beamSmoke: this.particles.Channel('beamSmoke', 48, {
+        shape: "beamsmoke", orient: "stretch", blending: THREE.NormalBlending,
+        lit: true, aerial: true, softRange: 0.16, renderOrder: 8,
+        fadeOutStart: 0.995, segments: 32, hideWhenIdle: true,
+      }, this.shared),
+      // 一发一条的弹道曳光（TracerBeam，战车机枪）。容量固定、不吃画质档预算：
       // 它是「火力从哪儿来」的玩法信号，与落点预警准星同一个待遇。
-      // 淡出全交给片元里的余辉，池级淡出推到寿命最末。
+      // 淡出全交给片元里的弹头熄灭与余烬冷却，池级淡出推到寿命最末。
       beam: this.particles.Channel('beam',48, {
         shape: "beam", orient: "stretch", blending: THREE.AdditiveBlending,
         softRange: 0.12, renderOrder: 9, fadeOutStart: 0.995, segments: 32,
@@ -1211,25 +1221,53 @@ export class VfxSystem {
     TMP_A.divideScalar(distance);
     const T = VEHICLE_TRACER;
     const flight = distance / Math.max(speed, 1);
+    const seed = this.random();
+    // 轻微的逐发燃烧差异，让一梭子连射像真实药柱燃烧而非复制粘贴的激光线
+    const headScale = 0.88 + this.random() * 0.24;
+    const glowScale = 0.85 + this.random() * 0.30;
+    const glowS = T.glowS * glowScale;
+    const beamLife = flight + glowS * 4.8;
     const s = ResetSpawn();
     // 钉在弹着点上（着色器里 SHAPE_BEAM 不积分弹道），iVelocity 只给方向
     s.x = to.x; s.y = to.y; s.z = to.z;
     s.vx = TMP_A.x; s.vy = TMP_A.y; s.vz = TMP_A.z;
-    s.life = flight + T.glowS * 5;
+    s.life = beamLife;
     s.sizeStart = T.halfWidthM; s.sizeEnd = T.halfWidthM;
     s.stretch = distance;
     s.minPx = T.minHalfWidthPx;
     s.groundY = T.maxHalfWidthPx;        // 光束池没有地面回弹，这一格借来放像素上限
     // 光束参数借空着的弹道槽递进着色器（见 VERT_PARTICLE 的 SHAPE_BEAM 抬头）
-    s.angle = flight; s.spin = T.glowS;
-    s.ax = T.headLengthM; s.ay = T.trailOpacity; s.az = T.muzzleFadeM;
-    s.opacity = 1; s.fadeIn = 0;
+    s.angle = flight; s.spin = glowS;
+    s.ax = T.headLengthM * headScale; s.ay = T.trailOpacity; s.az = T.muzzleFadeM;
+    s.opacity = 0.90 + this.random() * 0.18; s.fadeIn = 0;
     const warm = kind !== "ija";
     s.colorA = warm ? VFX_PALETTE.tracerNra : VFX_PALETTE.tracerIja;
     s.colorB = warm ? VFX_PALETTE.tracerTrailNra : VFX_PALETTE.tracerTrailIja;
-    s.seed = this.random();
+    s.seed = seed;
     this.pools.beam.Spawn(s, this.time);
-    this.lastTracerBeam = { kind: warm ? "nra" : "ija", distance, flight, life: s.life };
+
+    // 伴生受光曳光细烟丝：与弹头共享起止点、方向与飞行时间，掠过后在空中留下短暂舒展消散的烟丝
+    let smokeLife = 0;
+    if (this.pools.beamSmoke && T.smokeOpacity > 0 && T.smokeLifeS > 0) {
+      const smokeDur = T.smokeLifeS * (0.85 + this.random() * 0.30);
+      smokeLife = flight + smokeDur;
+      const sm = ResetSpawn();
+      sm.x = to.x; sm.y = to.y; sm.z = to.z;
+      sm.vx = TMP_A.x; sm.vy = TMP_A.y; sm.vz = TMP_A.z;
+      sm.life = smokeLife;
+      sm.sizeStart = T.smokeWidthStartM; sm.sizeEnd = T.smokeWidthEndM;
+      sm.stretch = distance;
+      sm.minPx = T.smokeMinHalfWidthPx;
+      sm.groundY = T.smokeMaxHalfWidthPx;
+      sm.angle = flight; sm.spin = smokeDur;
+      sm.ax = T.smokeDriftMps; sm.ay = T.smokeOpacity * (0.82 + this.random() * 0.32); sm.az = T.muzzleFadeM;
+      sm.opacity = 1; sm.fadeIn = 0;
+      sm.colorA = VFX_PALETTE.tracerSmokeFresh;
+      sm.colorB = VFX_PALETTE.tracerSmokeFade;
+      sm.seed = seed;
+      this.pools.beamSmoke.Spawn(sm, this.time);
+    }
+    this.lastTracerBeam = { kind: warm ? "nra" : "ija", distance, flight, life: beamLife, smokeLife };
   }
 
   /**
