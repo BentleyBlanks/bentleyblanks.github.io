@@ -20,6 +20,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -251,25 +252,122 @@ def wait_comfy_ready(port=8188, timeout=120):
     raise RuntimeError("ComfyUI 8188 端口启动超时")
 
 
-def find_official_h3_template(has_frames: bool):
-    # Locate official ComfyUI MiniMax-H3 template bundled with ComfyUI / comfyui_workflow_templates
-    search_roots = [COMFY_DIR]
-    try:
-        import comfyui_workflow_templates  # type: ignore
-        search_roots.append(Path(comfyui_workflow_templates.__file__).parent)
-    except Exception:
-        pass
-    matches = []
-    for root in search_roots:
-        for p in root.rglob("*minimax*h3*.json"):
-            matches.append(p)
-    if not matches:
-        return None
-    if has_frames:
-        for p in matches:
-            if any(k in p.name.lower() for k in ("fl2v", "i2v", "first", "frame")):
-                return p
-    return matches[0]
+def build_minimax_h3_api_workflow(weights: dict, has_start: bool, has_end: bool):
+    """Build the official ComfyUI API-format workflow graph for MiniMax-H3 FL2VA/I2V/T2V.
+
+    Matches Comfy-Org/workflow_templates benchmarks/video_minimax_h3_t2v.json & blueprints/image_to_video_minimax_h3.json:
+      - Width/Height must be multiples of 32 (480p -> 832x480, 720p/1080p -> 1280x736)
+      - Frame length must satisfy length % 17 == 5
+      - Uses MiniMaxH3ImageToVideo + UNETLoader + CLIPLoader(type="minimax") + LoraLoaderModelOnly (8step turbo)
+    """
+    gen_w, gen_h = (832, 480) if RESOLUTION == "480p" else (1280, 736)
+    base_len = max(5, int(round(DURATION_SEC * 24)))
+    target_frames = base_len + (5 - (base_len % 17)) % 17
+    seed = int(time.time() * 1000) & 0x7FFFFFFF
+
+    unet_name = Path(weights["diffusion"]).name
+    clip_name = Path(weights["text_encoder"]).name
+    video_vae_name = Path(weights["vae"]).name
+    audio_vae_name = Path(weights["audio_vae"]).name if weights.get("audio_vae") else None
+    turbo_lora_name = Path(weights["turbo_lora"]).name if weights.get("turbo_lora") else None
+
+    wf = {
+        "1": {
+            "class_type": "UNETLoader",
+            "inputs": {"unet_name": unet_name, "weight_dtype": "default"},
+        },
+        "2": {
+            "class_type": "CLIPLoader",
+            "inputs": {"clip_name": clip_name, "type": "minimax", "device": "default"},
+        },
+        "3": {
+            "class_type": "VAELoader",
+            "inputs": {"vae_name": video_vae_name},
+        },
+    }
+
+    model_ref = ["1", 0]
+    steps = 20
+    if turbo_lora_name:
+        wf["4"] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "lora_name": turbo_lora_name,
+                "strength_model": 1.0,
+                "model": ["1", 0],
+            },
+        }
+        model_ref = ["4", 0]
+        steps = 8
+
+    h3_inputs = {
+        "prompt": PROMPT,
+        "width": gen_w,
+        "height": gen_h,
+        "length": target_frames,
+        "clip": ["2", 0],
+        "vae": ["3", 0],
+    }
+    if has_start:
+        wf["5"] = {"class_type": "LoadImage", "inputs": {"image": "mw_start.png"}}
+        h3_inputs["first_frame"] = ["5", 0]
+    if has_end:
+        wf["6"] = {"class_type": "LoadImage", "inputs": {"image": "mw_end.png"}}
+        h3_inputs["last_frame"] = ["6", 0]
+
+    wf["7"] = {"class_type": "MiniMaxH3ImageToVideo", "inputs": h3_inputs}
+    wf["8"] = {
+        "class_type": "BasicGuider",
+        "inputs": {"model": model_ref, "conditioning": ["7", 0]},
+    }
+    wf["9"] = {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "res_multistep"}}
+    wf["10"] = {
+        "class_type": "BasicScheduler",
+        "inputs": {"scheduler": "simple", "steps": steps, "denoise": 1.0, "model": model_ref},
+    }
+    wf["11"] = {"class_type": "RandomNoise", "inputs": {"noise_seed": seed}}
+    wf["12"] = {
+        "class_type": "SamplerCustomAdvanced",
+        "inputs": {
+            "noise": ["11", 0],
+            "guider": ["8", 0],
+            "sampler": ["9", 0],
+            "sigmas": ["10", 0],
+            "latent_image": ["7", 1],
+        },
+    }
+    wf["13"] = {
+        "class_type": "VAEDecode",
+        "inputs": {"samples": ["12", 0], "vae": ["3", 0]},
+    }
+
+    create_video_inputs = {
+        "fps": 24,
+        "bit_depth": 8,
+        "color_space": "sRGB",
+        "codec": "none",
+        "images": ["13", 0],
+    }
+    if audio_vae_name:
+        wf["14"] = {"class_type": "VAELoader", "inputs": {"vae_name": audio_vae_name}}
+        wf["15"] = {
+            "class_type": "VAEDecodeAudio",
+            "inputs": {"samples": ["12", 0], "vae": ["14", 0]},
+        }
+        create_video_inputs["audio"] = ["15", 0]
+
+    wf["16"] = {"class_type": "CreateVideo", "inputs": create_video_inputs}
+    wf["17"] = {
+        "class_type": "SaveVideo",
+        "inputs": {
+            "filename_prefix": "video/MiniMax_H3",
+            "format": "auto",
+            "format.codec": "auto",
+            "codec": "auto",
+            "video": ["16", 0],
+        },
+    }
+    return wf, gen_w, gen_h, target_frames, steps
 
 
 def main():
@@ -307,74 +405,35 @@ def main():
         if has_end:
             shutil.copy2(END_IMG, input_dir / "mw_end.png")
 
-        tpl_path = find_official_h3_template(has_start)
-        if tpl_path is None:
-            raise RuntimeError(
-                "未在当前 ComfyUI 版本中找到内置 MiniMax-H3 API 工作流模板，请先执行 `colab ssh` 打开 8188 导出 API JSON"
-            )
+        wf, gen_w, gen_h, target_frames, steps = build_minimax_h3_api_workflow(weights, has_start, has_end)
+        emit_progress(54, f"提交 MiniMax-H3 官方节点图到 G4（{gen_w}x{gen_h} · {target_frames}帧 · {steps}步）…")
 
-        emit_progress(54, f"载入官方模板 {tpl_path.name} 并提交 G4 8-step Turbo 推理…")
-        wf = json.loads(tpl_path.read_text(encoding="utf-8"))
-        # Resolution mapping: 480p -> 832x480, 720p -> 1280x720, 1080p -> native 1280x720 + post upscale to 1920x1080
-        gen_w, gen_h = (832, 480) if RESOLUTION == "480p" else (1280, 720)
-        target_frames = max(25, int(round(DURATION_SEC * 24)) + 1)
-        has_turbo = bool(weights.get("turbo_lora"))
-
-        # Patch prompt, frame images, resolution, duration, and Blackwell fast stack weights in API-format workflow nodes
-        if isinstance(wf, dict) and "nodes" not in wf:
-            lora_patched = False
-            for node in wf.values():
-                if not isinstance(node, dict):
-                    continue
-                ctype = str(node.get("class_type", ""))
-                inp = node.get("inputs", {})
-                if "CLIPTextEncode" in ctype and isinstance(inp.get("text"), str) and "negative" not in str(node.get("_meta", {}).get("title", "")).lower():
-                    inp["text"] = PROMPT
-                if ctype == "LoadImage":
-                    title = str(node.get("_meta", {}).get("title", "")).lower()
-                    if has_end and ("end" in title or "last" in title):
-                        inp["image"] = "mw_end.png"
-                    elif has_start:
-                        inp["image"] = "mw_start.png"
-                if weights.get("diffusion") and "unet_name" in inp:
-                    inp["unet_name"] = Path(weights["diffusion"]).name
-                if weights.get("text_encoder") and "clip_name" in inp:
-                    inp["clip_name"] = Path(weights["text_encoder"]).name
-                if weights.get("vae") and "vae_name" in inp:
-                    if "audio" in str(inp.get("vae_name", "")).lower() and weights.get("audio_vae"):
-                        inp["vae_name"] = Path(weights["audio_vae"]).name
-                    else:
-                        inp["vae_name"] = Path(weights["vae"]).name
-                if has_turbo and "lora_name" in inp:
-                    inp["lora_name"] = Path(weights["turbo_lora"]).name
-                    lora_patched = True
-                if "width" in inp and "height" in inp and isinstance(inp["width"], int) and isinstance(inp["height"], int):
-                    if inp["width"] >= 480 and inp["height"] >= 320:
-                        inp["width"] = gen_w
-                        inp["height"] = gen_h
-                if "length" in inp and isinstance(inp["length"], int) and inp["length"] >= 16:
-                    inp["length"] = target_frames
-                if has_turbo and lora_patched and "steps" in inp and isinstance(inp["steps"], int) and inp["steps"] > 8:
-                    inp["steps"] = 8
-
-            payload = json.dumps({"prompt": wf}).encode("utf-8")
-            req = urllib.request.Request(
-                "http://127.0.0.1:8188/prompt",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
+        payload = json.dumps({"prompt": wf}).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:8188/prompt",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 queued = json.loads(resp.read().decode("utf-8"))
-            pid = queued["prompt_id"]
-            emit_progress(60, f"MiniMax-H3 渲染中（{RESOLUTION} · {DURATION_SEC:g}s · prompt_id={pid[:8]}）…")
+        except urllib.error.HTTPError as he:
+            detail = he.read().decode("utf-8", errors="ignore")[:600]
+            raise RuntimeError(f"ComfyUI /prompt 校验失败 ({he.code}): {detail}")
+        pid = queued["prompt_id"]
+        emit_progress(60, f"MiniMax-H3 渲染中（{RESOLUTION} · {DURATION_SEC:g}s · {steps}步 · prompt_id={pid[:8]}）…")
 
-            while True:
-                time.sleep(4)
-                with urllib.request.urlopen(f"http://127.0.0.1:8188/history/{pid}", timeout=10) as hr:
-                    hist = json.loads(hr.read().decode("utf-8"))
-                if pid in hist:
-                    break
+        while True:
+            time.sleep(4)
+            with urllib.request.urlopen(f"http://127.0.0.1:8188/history/{pid}", timeout=10) as hr:
+                hist = json.loads(hr.read().decode("utf-8"))
+            if pid in hist:
+                status_obj = hist[pid].get("status", {})
+                if status_obj.get("status_str") == "error":
+                    msgs = status_obj.get("messages", [])
+                    raise RuntimeError(f"ComfyUI 推理执行失败: {json.dumps(msgs, ensure_ascii=False)[:600]}")
+                break
 
         out_dir = COMFY_DIR / "output"
         mp4s = sorted(out_dir.rglob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)

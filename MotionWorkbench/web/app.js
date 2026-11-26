@@ -1746,7 +1746,10 @@ function setScheduleDrawer(open) {
   $("#schDrawer")?.classList.toggle("hidden", !appState.schOpen);
   $("#schScrim")?.classList.toggle("hidden", !appState.schOpen);
   $("#btnSchedule")?.setAttribute("aria-expanded", String(appState.schOpen));
-  if (appState.schOpen) renderScheduleUI();
+  if (appState.schOpen) {
+    renderScheduleUI();
+    syncLiveState({ includeBootstrap: true }).catch(() => {});
+  }
 }
 
 function renderAll() {
@@ -2496,6 +2499,36 @@ $("#btnSchRunNow").onclick = async () => {
   }
 };
 
+let syncInflight = false;
+async function syncLiveState({ includeBootstrap = false } = {}) {
+  if (syncInflight) return;
+  syncInflight = true;
+  try {
+    if (includeBootstrap) {
+      const [tasksRes, bootRes] = await Promise.all([
+        api("/api/tasks", { silent: true }),
+        api("/api/bootstrap", { silent: true }),
+      ]);
+      appState.tasks = tasksRes.tasks;
+      appState.dreamina = bootRes.dreamina;
+      appState.cloud = bootRes.cloud || appState.cloud;
+      appState.schedule = bootRes.schedule || appState.schedule;
+      appState.recentLogs = bootRes.recentLogs || [];
+    } else {
+      const [tasksRes, schRes] = await Promise.all([
+        api("/api/tasks", { silent: true }),
+        api("/api/schedule", { silent: true }),
+      ]);
+      appState.tasks = tasksRes.tasks;
+      if (schRes?.schedule) appState.schedule = schRes.schedule;
+    }
+    renderAll();
+  } catch {}
+  finally {
+    syncInflight = false;
+  }
+}
+
 async function boot() {
   try {
     const data = await api("/api/bootstrap");
@@ -2518,7 +2551,19 @@ async function boot() {
     updateGlobalBusyUI();
   }
 
-  setInterval(async () => {
+  // Immediately refresh when returning to this browser tab (fixes overnight stale snapshot)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      syncLiveState({ includeBootstrap: true });
+    }
+  });
+  window.addEventListener("focus", () => {
+    syncLiveState({ includeBootstrap: false });
+  });
+
+  // Always poll: 2.5s while any job/batch is active; every 15s while idle so 06:00 auto-triggers & countdowns stay live
+  let idleTickCount = 0;
+  setInterval(() => {
     const anyActive =
       Boolean(appState.schedule?.runningBatch) ||
       appState.tasks.some(
@@ -2528,18 +2573,16 @@ async function boot() {
           (t.stage4?.runs || []).some((r) => r.status === "queued" || r.status === "running") ||
           (t.stage6?.runs || []).some((r) => r.status === "running")
       );
-    if (!anyActive) return;
-    try {
-      const [tasksRes, bootRes] = await Promise.all([
-        api("/api/tasks", { silent: true }),
-        api("/api/bootstrap", { silent: true }),
-      ]);
-      appState.tasks = tasksRes.tasks;
-      appState.dreamina = bootRes.dreamina;
-      appState.schedule = bootRes.schedule || appState.schedule;
-      appState.recentLogs = bootRes.recentLogs || [];
-      renderAll();
-    } catch {}
+    if (anyActive) {
+      idleTickCount = 0;
+      syncLiveState({ includeBootstrap: true });
+      return;
+    }
+    idleTickCount += 1;
+    if (idleTickCount >= 6) {
+      idleTickCount = 0;
+      syncLiveState({ includeBootstrap: false });
+    }
   }, 2500);
 }
 

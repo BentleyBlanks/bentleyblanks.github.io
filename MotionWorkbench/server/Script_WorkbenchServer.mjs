@@ -587,9 +587,12 @@ function startScheduleTicker() {
     const hasPending = (sch.items || []).some((x) => x.status === "pending");
     if (!hasPending) return;
     const now = new Date();
-    const hhmm = localTimeHHMM(now);
     const today = localDateKey(now);
-    if (hhmm === sch.runTime && sch.lastTriggeredDate !== today) {
+    const [th, tm] = String(sch.runTime || "06:00").split(":").map(Number);
+    const targetMin = (Number.isFinite(th) ? th : 6) * 60 + (Number.isFinite(tm) ? tm : 0);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    // 15-minute grace window so a brief timer drift or wake-up at 06:01 still fires reliably
+    if (nowMin >= targetMin && nowMin < targetMin + 15 && sch.lastTriggeredDate !== today) {
       sch.lastTriggeredDate = today;
       saveSchedule().catch(() => {});
       runScheduledBatch(`定时 ${sch.runTime} 自动触发`).catch((err) => {
