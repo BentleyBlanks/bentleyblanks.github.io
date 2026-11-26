@@ -46,7 +46,7 @@ try{
   });
   return finish;
  });
- assert(evidence.gripDirection?.physical&&evidence.gripDirection.strength>.3&&evidence.gripDirection.data==='');
+ assert(evidence.gripDirection?.physical&&evidence.gripDirection.strength>=.18&&evidence.gripDirection.strength<=.27&&evidence.gripDirection.data==='');
  assert.deepEqual(evidence.gripDirection.scale,[128/1024,24/1024],'directional data must use its own padded atlas tile');
  assert.equal(evidence.identity.npcTriangles,specification.npcTriangles);assert.equal(evidence.identity.nearNpcTriangles,specification.triangles);
  assert.equal(evidence.identity.worldTriangles,specification.triangles);assert.equal(evidence.identity.worldParts,45);assert.equal(evidence.identity.npcSource,'model');assert(evidence.identity.privateGeometry);
@@ -120,29 +120,37 @@ try{
   assert(lower.steelCount>70&&lower.steelRoughnessMedian>121&&lower.steelRoughnessMedian<176,
    'the dark inlay should have a worn satin reflection, not a bright polished stripe');
   evidence.gripFinish=await page.evaluate(()=>{
-   const rig=window.Tengxian.viewmodel.rig.group;let maps,direction;
+   const rig=window.Tengxian.viewmodel.rig.group;
+   let handle,cover;
    rig.traverse(mesh=>{
-    if(mesh.userData.type38Part==='Exterior_HandleOval08'){maps=mesh.material.roughnessMap.image;direction=mesh.material.anisotropyMap;}
+    if(mesh.userData.type38Part==='Exterior_HandleOval08')handle=mesh.material;
+    if(mesh.userData.type38Part==='T38_430B_IndependentLeftCoverSkin')cover=mesh.material;
    });
-   const canvas=document.createElement('canvas');canvas.width=maps.width;canvas.height=maps.height;
-   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(maps,0,0);
-   const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-   const Sample=(left,right)=>{
-    const roughness=[],metalness=[];
-    for(let row=Math.ceil(canvas.height*.08);row<canvas.height*.92;row+=5)
-     for(let col=Math.ceil(canvas.width*left);col<canvas.width*right;col+=5){
-      const offset=4*(row*canvas.width+col);
-      if(data[offset]<230)continue;
-      roughness.push(data[offset+1]);metalness.push(data[offset+2]);
-     }
-    const Median=values=>values.sort((first,second)=>first-second)[Math.floor(values.length/2)];
-    const oxideRough=roughness.filter((_,i)=>metalness[i]<235);
-    const steelRough=roughness.filter((_,i)=>metalness[i]>249);
-    return {count:roughness.length,roughness:Median(roughness),metalness:Median(metalness),
-     oxideFraction:oxideRough.length/roughness.length,steelFraction:steelRough.length/roughness.length,
-     oxideRoughness:Median(oxideRough),steelRoughness:Median(steelRough)};
+   const canvas=document.createElement('canvas');
+   const ctx=canvas.getContext('2d',{willReadFrequently:true});
+   const Read=image=>{
+    canvas.width=image.width;canvas.height=image.height;
+    ctx.drawImage(image,0,0);
+    return ctx.getImageData(0,0,canvas.width,canvas.height).data;
    };
-   const neck=Sample(.13,.40),oval=Sample(.65,.90);
+   const Sample=(material,left,right)=>{
+    const {width,height}=material.roughnessMap.image;
+    const data=Read(material.roughnessMap.image),color=Read(material.map.image);
+    const roughness=[],metalness=[],base=[];
+    for(let row=Math.ceil(height*.08);row<height*.92;row+=5)
+     for(let col=Math.ceil(width*left);col<width*right;col+=5){
+      const offset=4*(row*width+col);
+      if(data[offset]<230||!data[offset+1])continue;
+      roughness.push(data[offset+1]);metalness.push(data[offset+2]);
+      base.push(.2126*color[offset]+.7152*color[offset+1]+.0722*color[offset+2]);
+     }
+    for(const channel of [roughness,metalness,base])channel.sort((first,second)=>first-second);
+    const Pick=(values,q)=>values[Math.round((values.length-1)*q)];
+    return {count:roughness.length,base:Pick(base,.5),roughness:Pick(roughness,.5),metalness:Pick(metalness,.5),
+     roughnessRange:Pick(roughness,.9)-Pick(roughness,.1),baseRange:Pick(base,.9)-Pick(base,.1)};
+   };
+   const neck=Sample(handle,.13,.40),oval=Sample(handle,.65,.90),coverFinish=Sample(cover,0,1);
+   const direction=handle.anisotropyMap;
    canvas.width=direction.image.width;canvas.height=direction.image.height;
    ctx.drawImage(direction.image,0,0);
    const brushSamples=[[.27,.20],[.60,.50],[.91,.74],[.99,.74],[.91,.20]].map(([u,v])=>{
@@ -150,13 +158,18 @@ try{
     const y=Math.floor(canvas.height*(direction.offset.y+v*direction.repeat.y));
     return Array.from(ctx.getImageData(x,y,1,1).data).slice(0,3);
    });
-   return {neck,oval,brushSamples};
+   return {neck,oval,coverFinish,brushSamples};
   });
-  const {neck,oval}=evidence.gripFinish;
-  assert(neck.count>100&&oval.count>100&&neck.metalness>245&&oval.metalness>245&&oval.roughness-neck.roughness>18,
-   'the neck and oval must both reflect as steel, with a broader highlight on the oval');
-  assert(neck.oxideFraction<.02&&oval.oxideFraction>.025&&oval.oxideFraction<.20&&oval.steelFraction>.60&&
-   oval.oxideRoughness>oval.steelRoughness+8,'scattered dull speckles must break up the worn oval reflection');
+  const {neck,oval,coverFinish}=evidence.gripFinish;
+  assert(coverFinish.count>100,'measure the adjacent cover with the grip');
+  for(const [label,finish] of Object.entries({neck,oval})){
+   assert(finish.count>100&&Math.abs(finish.base-coverFinish.base)<20,
+    `${label} base color must stay in the adjacent steel range`);
+   assert(finish.roughness>=coverFinish.roughness-5&&finish.roughness<=coverFinish.roughness+42,
+    `${label} must have a satin reflection comparable to the adjacent cover`);
+   assert(finish.metalness>210&&Math.abs(finish.metalness-coverFinish.metalness)<26&&finish.roughnessRange>15&&finish.baseRange>10,
+    `${label} must retain metallic response and visible wear variation`);
+  }
   const [stem,gap,outer,pole,wornFlank]=evidence.gripFinish.brushSamples;
   assert(stem[0]<75&&stem[1]>200&&stem[2]>180&&outer[0]>245&&outer[2]>235&&wornFlank[2]<160&&gap[2]<8&&pole[2]<8,
    'the brush direction must fade through the junction and close smoothly at the tip');

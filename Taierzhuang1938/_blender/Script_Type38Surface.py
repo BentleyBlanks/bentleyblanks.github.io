@@ -32,6 +32,7 @@ METAL_SOURCES = {
     'Metal046B': {'Color':'8263145285430210a6867010abeb09402aad5b9195366e18817a07ab5badc6fe',
                   'Roughness':'82cf613070e28568613b8ed71093c04664015da4f925f13e91928c692edd958a'}
 }
+COVER_STEEL_TONES = ([59,55,49],[155,149,138])
 
 
 def ReadSamples(cache):
@@ -684,8 +685,7 @@ def FinishSteelAtlas(doc, views, source, load, store):
     border = 8
     along = (np.arange(tileW)+.5-border)/(tileW-2*border)
     around = (np.arange(tileH)+.5-border)/(tileH-2*border)
-    # The two photographs resolve a narrow stripe on the stem and a stretched
-    # reflection at the outer oval. Fade directional detail at the pole,
+    # Keep directional wear along the stem and oval. Fade it at the pole,
     # where the longitudinal tangent is undefined.
     stemFinish = 1-Ramp(.36,.57,along)
     ovalFinish = Ramp(.64,.89,along)*(1-Ramp(.944,.979,along))
@@ -705,7 +705,7 @@ def FinishSteelAtlas(doc, views, source, load, store):
     directionMap = dict(atlas['metallicRoughnessTexture'],extensions={'KHR_texture_transform':uvTransform})
     handleMaterial = doc['materials'][primitives['Exterior_HandleOval08']['material']]
     handleMaterial.setdefault('extensions',{})['KHR_materials_anisotropy'] = dict(
-        anisotropyStrength=.43,anisotropyRotation=0,anisotropyTexture=directionMap)
+        anisotropyStrength=.24,anisotropyRotation=0,anisotropyTexture=directionMap)
     for extension in ('KHR_materials_anisotropy','KHR_texture_transform'):
         if extension not in doc['extensionsUsed']:
             doc['extensionsUsed'].append(extension)
@@ -1022,13 +1022,13 @@ def Build(cache):
                 # The adjoining rear steel pieces share the same oxide and wear tones.
                 # Fine directional marks break up the highlight across each surface.
                 wear = np.clip(.58+.19*flow+.18*stain+.16*edge-.13*oxidation,.20,.94)
-                rearSteel = Tint([95,86,77],[159,148,135],wear+.042*brush)
+                rearSteel = Tint(*COVER_STEEL_TONES,.43+.27*wear+.042*brush)
                 color = rearSteel
                 rough = (145 if collar else 132)-19*wear+10*stain+10*brush
                 metal = 238+10*wear-11*oxidation
                 if collar:
                     rim = Ramp(.13,.76,np.abs(normalLength))*np.clip(.74+.14*stain,.48,.95)
-                    color = Blend(color,np.array([118,109,99],dtype='f'),rim*.42)
+                    color = Blend(color,np.array([108,101,92],dtype='f'),rim*.42)
                     rough += 23*rim
                     metal -= 9*rim
             if backing:
@@ -1076,7 +1076,7 @@ def Build(cache):
                         rough = 97-37*rub+10*brush+5*tarnish+5*speckle
                         metal = 246+9*rub-3*tarnish
                     else:
-                        color = Tint([59,55,49],[155,149,138],.12+.64*rub+.055*grain)
+                        color = Tint(*COVER_STEEL_TONES,.12+.64*rub+.055*grain)
                         satin = OxideField(length*18.3+.18,(up+.57*side)*43.2+.39,6131)
                         rough = 122-40*rub+8*brush+7*tarnish+6*speckle+16*satin
                         metal = 217+29*rub-8*tarnish
@@ -1087,29 +1087,17 @@ def Build(cache):
                     metal = 231+18*rub-5*tarnish
                 else:
                     knob = Ramp(.044,.054,side)
-                    rub = np.clip(.49+.18*flow+.15*stain+.09*grain,0,1)
-                    bareOval = Tint([103,96,90],[165,153,143],.59+.11*speckle+.12*flow)
-                    oval = Blend(bareOval,np.array([93,70,60],dtype='f'),pits*.54)
-                    outward = Ramp(.030,.039,side)
                     chartV = (np.arange(height,dtype='f')+.5)/height
                     wornSide = Ramp(.48,.96,-np.sin((chartV-.02)*(2*np.pi/.96)))[:,None]
-                    neck = Tint([104,98,94],[167,155,149],.34+.56*rub)
-                    neckGain = (1.17-.33*outward)*(1.69+.13*wornSide)
-                    neck = (neck+14.025)*neckGain[:,:,None]**(1/2.4)-14.025
-                    color = Blend(neck,oval,knob)
-                    patina = Ramp(.07,.92,.42*tarnish+.31*grainSteel-.28*flow)
-                    color = Blend(color,Tint([68,60,54],[117,106,93],.53+.12*stain),patina*(.18+.39*knob))
-                    neckRough = 78-4*outward+7*brush+6*tarnish+13*wornSide
-                    rough = neckRough+knob*(104+8*speckle+20*pits+4*grain-neckRough)
-                    rough += patina*(9+8*knob)
-                    # The shaded flank in the oblique photo is more worn and lightly oxidized.
-                    flank = wornSide*knob
-                    flank *= np.clip(.88+.13*stain+.09*grainSteel,.54,1)
-                    rough += 20*flank
-                    color *= (1-.026*flank)[:,:,None]
-                    neckMetal = 248-1.5*tarnish-1.4*wornSide
-                    outerEnd = Ramp(.875,.955,(np.arange(width,dtype='f')+.5)/width)
-                    metal = neckMetal+knob*(251-49*pits-3*outerEnd-neckMetal)
+                    patina = Ramp(-.12,1.04,.42*tarnish+.31*grainSteel-.28*flow+.18*pits)
+                    wear = Ramp(.62,.95,.42+.23*flow+.18*grain+.14*wornSide+.12*edge)
+                    wear *= (1-.64*pits)*(1-.47*patina)
+                    tone = .48+.13*flow+.11*stain+.071*grain-.19*patina+.24*wear
+                    tone += knob*(.028+.051*speckle)-.055*pits
+                    color = Tint(*COVER_STEEL_TONES,tone)
+                    rough = 116+12*brush+8*tarnish+16*patina+10*pits-33*wear
+                    rough += knob*(5+8*speckle)
+                    metal = 234+17*wear-16*patina-17*pits
                 relief = .18*scoring+.064*tarnish-.25*pits
                 if handle:
                     relief -= .085*pits*knob
@@ -1125,14 +1113,14 @@ def Build(cache):
                 beads,center,radius = RearFace(side,up)
                 centerPlate = 1-Ramp(.145,.227,radius)
                 wear = Ramp(.10,.62,beads)
-                diskColor = Tint([115,104,93],[217,205,190],.32+.58*wear+.09*center+.084*flow+.045*brush)
-                basin = Tint([85,76,68],[128,116,105],.55+.13*stain+.10*brush)
+                diskColor = Tint(*COVER_STEEL_TONES,.39+.48*wear+.06*center+.072*flow+.045*brush)
+                basin = Tint(*COVER_STEEL_TONES,.26+.07*stain+.09*brush)
                 diskColor = Blend(diskColor,basin,centerPlate)
                 color = Blend(color,diskColor,face)
-                diskRough = 177-63*wear-17*center+10*stain+7*brush
-                diskRough += centerPlate*(174+3*brush-diskRough)
+                diskRough = 168-39*wear-13*center+9*stain+7*brush
+                diskRough += centerPlate*(173+3*brush-diskRough)
                 rough += (diskRough-rough)*face
-                diskMetal = 215+26*wear+6*center-9*centerPlate+4*flow
+                diskMetal = 217+22*wear+6*center-9*centerPlate+4*flow
                 metal += (diskMetal-metal)*face
                 relief += face*(.94*beads + .32*center)
             if part == 'Exterior_FoldedFrame12':
@@ -1205,7 +1193,7 @@ def Build(cache):
         stats[part] = np.percentile(orm[:, :, 1][valid], [10, 50, 90]).round(1).tolist()
         print(part, stats[part], flush=True)
     stats.update(FinishSteelAtlas(doc,views,source,Load,Store))
-    doc['asset']['extras']['version'] = 'Type38_NaturalMaterials19'
+    doc['asset']['extras']['version'] = 'Type38_WeatheredSteel20'
     triangles = sum(doc['accessors'][prim['indices']]['count']//3 for mesh in doc['meshes'] for prim in mesh['primitives'])
     assert triangles == baselineTriangles+sum(profileDeltas.values()) and triangles <= 80000
     doc['asset']['extras']['runtimeTriangles'] = triangles
@@ -1213,7 +1201,7 @@ def Build(cache):
     manifest = json.loads(Original('Data_Type38_511.json'))
     for part,delta in profileDeltas.items():
         manifest['exteriorTriangleDeltas'][part] = manifest['exteriorTriangleDeltas'].get(part,0)+delta
-    manifest.update(version=21, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
+    manifest.update(version=22, runtimeSha256=digest, triangles=triangles, generator='_blender/Script_Type38Surface.py',
                     finishRoughnessP10P50P90=stats, surfaceSources={key: value[3] for key,value in SAMPLES.items()},
                     metalSurfaceSources=METAL_SOURCES,
                     markings=['scale graduations and numerals only'])
