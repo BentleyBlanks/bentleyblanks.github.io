@@ -741,6 +741,18 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             base += .076 * (warmOxide - .55 * bareSteel)[..., None] * LUMA_NEUTRAL_WARMTH
         else:
             base += .072 * warmOxide[..., None] * LUMA_NEUTRAL_WARMTH
+        response = closeup.get("surfaceResponseCalibration")
+        if barrelSampling is not None and response is not None:
+            if (response["photoSha256"] != closeup["source"]["sha256"]
+                    or response["projection"] != closeup["source"]["projection"]
+                    or response["footprint"] != closeup["footprint"]):
+                raise ValueError("The barrel response does not match the source photo and projection")
+            # The measured response scales the base color seen by the renderer in linear light.
+            baseResponse = ReferenceField(response, xx, vv, "base") / 1000
+            corrected = LinearToSrgb(SrgbToLinear(np.clip(base, 0, 1)) * np.exp(baseResponse)[..., None])
+            base = np.where((baseResponse != 0)[..., None], corrected, base)
+            rough *= np.exp(ReferenceField(response, xx, vv, "roughness") / 1000)
+            metal *= np.exp(ReferenceField(response, xx, vv, "metalness") / 1000)
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100

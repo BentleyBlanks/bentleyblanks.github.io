@@ -57,6 +57,7 @@
 - 在原 2K 图集内重新分配筒身 UV，近照覆盖区域的有效采样由约 288×160 增至 493×197 纹素，沿原外观网格环分配角向密度。从第 7 张照片提取露钢斑，单独校准露钢和褐锈的反光。检查台中性灯下正视同一区域的亮度中值由 97.4 降至 93.3，近照为 89.0。另在同一盏灯下斜视复测，并核对整段筒身、背面和窄条接缝。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 对第 7 张近照的筒身褐锈区域，按固定中性灯正视、斜视共同出现的亮度余差校准局部对比和露钢高光，由默认灯光约束修正量。近照配准区域的本地平均亮度误差在正视下从 25.3 降至 21.1，柔光下从 23.8 降至 19.5，默认灯光下从 16.52 降至 16.23。另复测整段筒身、背面和箍圈。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 按第 1 张馆藏照的实际像素密度校准外套筒底色。以近似馆藏布光和默认灯下都能测到的局部对比补足点蚀和擦痕。用独立的中性灯正视和斜视复测，按原图尺度衡量的细纹相关系数分别由 0.531 升到 0.909、由 0.539 升到 0.909。中性正视的亮度中值为 35.51，原照为 35.71。默认灯下的中值为 52.07，仍亮于原照。 [套筒采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 对第 7 张近照覆盖的筒身钢面，在固定中性灯和默认灯下分别测底色、粗糙度和金属度对亮度的影响，按配准落点校准暗锈和露钢。整张近照覆盖面的本地平均亮度误差在正视下从 18.47 降到 15.70，默认灯下从 35.64 降到 23.01。独立斜视和柔光均复测，并用第 1 张整体照核对整段筒身。默认灯下右下部褐锈区的局部平均误差增加约 1.16 个灰阶，该区最亮一成的亮度偏差缩小约 4.80 个灰阶。 [筒身采样](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -64,4 +65,5 @@
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 重新推导筒身亮度修正时，为采样命令加 `--barrel-evidence <MetalFinishV38/Evidence>`。三组控制帧的 SHA-256 与原照投影记录在 `registeredCalibration` 中。只重算照片采样时，匹配同一照片和投影的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 重新推导外套筒底色时加 `--sleeve-evidence <MetalFinishV39/Evidence>`。记录包含两组配准帧哈希、原照哈希和表面采样范围。只重算照片采样时，原照、采样线和采样范围一致的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV40/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 重新推导筒身对两套灯光的响应时加 `--barrel-response-evidence <MetalFinishV40/Evidence>`，使用 `V41ResponseDirect` 和 `V41ResponseDefault` 各自的基准帧、UV 帧与六张材质变化帧。原照与投影一致时，仅重算照片的命令保留这次响应校准。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV41/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
