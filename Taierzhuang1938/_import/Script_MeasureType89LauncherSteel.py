@@ -9,7 +9,7 @@ import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
-from scipy.ndimage import binary_erosion, gaussian_filter
+from scipy.ndimage import binary_erosion, gaussian_filter, map_coordinates
 
 
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
@@ -450,7 +450,216 @@ def BarrelDetail(image, projection, halfSpan, stampTrace):
             "maskFeatherPixels": feather, "registrationOffsetInFootprint": [.003937, -.005615]}
 
 
-def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None):
+BARREL_MATERIAL_GRID = (151, 109)
+BARREL_HIGHLIGHT_GRID = (239, 159)
+BARREL_METAL_TRIALS = ((.89, 0), (.89, .32), (.19, .28))
+BARREL_ROUGHNESS_TRIALS = ((.27, 0), (.27, .38), (.27, .74), (.90, .48))
+BARREL_MATERIAL_CHANNELS = ("base", "polish", "matte", "metal", "oxide")
+
+
+def ReadBarrelMaterialViews(photo, barrel, evidence, names):
+    folders = tuple(evidence / name for name in names)
+    u, v, inside, colors, direct, directHashes = RegisteredBarrelPhotoFrame(photo, barrel, folders[0])
+    otherU, otherV, otherInside, _, default, defaultHashes = RegisteredBarrelPhotoFrame(photo, barrel, folders[1])
+    if not (np.array_equal(u, otherU) and np.array_equal(v, otherV)):
+        raise ValueError("The barrel material views must use the same camera and surface coordinates")
+    frames = (directHashes, defaultHashes)
+    rendered = np.stack((direct @ REGISTERED_LUMA, default @ REGISTERED_LUMA), axis=-1)
+
+    def Sample(name, valid):
+        return np.stack([ReadRegisteredLuma(folder, name + ".png", hashes)[valid]
+                         for folder, hashes in zip(folders, frames)], axis=-1)
+
+    return u, v, inside & otherInside, colors @ REGISTERED_LUMA, rendered, Sample, dict(zip(names, frames))
+
+
+def FitBarrelMaterialResponse(source, baseline, coords, sample):
+    rows, columns = BARREL_MATERIAL_GRID
+    row, col = np.rint(coords).astype(int)
+    cells = row * columns + col
+    reliability = 1 + .72 * np.clip((source - 112) / 42, 0, 1)
+    faceWeight = .56 + .10 * np.clip((source - 127) / 30, 0, 1)
+    weights = np.stack((faceWeight, 1 - faceWeight), axis=-1)
+    counts = np.bincount(cells, weights=reliability, minlength=rows * columns).reshape(BARREL_MATERIAL_GRID)
+    sigma = (1.03, 1.08)
+    support = gaussian_filter(counts, sigma)
+
+    def Smooth(values):
+        sums = np.bincount(cells, weights=reliability * values, minlength=rows * columns).reshape(BARREL_MATERIAL_GRID)
+        return gaussian_filter(sums, sigma) / np.maximum(support, .28)
+
+    target = np.log(source + 14)
+    lowerDefault = np.minimum(Smooth(target - np.log(baseline[:, 1] + 14)) - .013, -.038)
+    best = np.full(BARREL_MATERIAL_GRID, np.inf)
+    selected = np.zeros((*BARREL_MATERIAL_GRID, len(BARREL_MATERIAL_CHANNELS)))
+    guard = .58
+    for i, (metalTarget, metal) in enumerate(BARREL_METAL_TRIALS):
+        for j, (roughTarget, rough) in enumerate(BARREL_ROUGHNESS_TRIALS):
+            prefix = f"Fit{i}{j}"
+            centers = sample(prefix + "At")
+            if i == 0 and j == 0 and np.percentile(np.abs(centers - baseline), 99) >= 1:
+                raise ValueError("The unmodified barrel response frame differs from its baseline")
+            current = np.log(centers + 14)
+            residual = target[:, None] - current
+            defaultError = Smooth(residual[:, 1])
+            zeroLoss = Smooth((weights * residual**2).sum(axis=-1))
+            lowest = np.full(BARREL_MATERIAL_GRID, np.inf)
+            chosen = np.zeros(BARREL_MATERIAL_GRID)
+            for direction, limit in (("Minus", -.40), ("Plus", .48)):
+                slope = np.clip((np.log(sample(prefix + direction) + 14) - current) / limit, .12, 1.10)
+                pull = Smooth((weights * residual * slope).sum(axis=-1))
+                power = Smooth((weights * slope**2).sum(axis=-1)) + .0025
+                slopeDefault = np.maximum(.08, Smooth(slope[:, 1]))
+                allowed = defaultError - lowerDefault
+                gain = ((pull + guard * slopeDefault * np.minimum(allowed, 0))
+                        / (power + guard * slopeDefault**2 * (allowed < 0)))
+                limited = np.minimum(gain, allowed / slopeDefault)
+                gain = np.where(gain > limited, .25 * gain + .75 * limited, gain)
+                gain = np.clip(gain, min(0, limit), max(0, limit))
+                risk = np.maximum(lowerDefault - (defaultError - slopeDefault * gain), 0)
+                loss = zeroLoss - 2 * gain * pull + gain**2 * power + guard * risk**2
+                improved = loss < lowest
+                lowest[improved] = loss[improved]
+                chosen[improved] = gain[improved]
+            loss = lowest + .0040 * rough**2 + .0030 * metal**2
+            improved = loss < best
+            best[improved] = loss[improved]
+            selected[..., 0][improved] = chosen[improved]
+            selected[..., 1][improved] = rough if roughTarget == .27 else 0
+            selected[..., 2][improved] = rough if roughTarget == .90 else 0
+            selected[..., 3][improved] = metal if metalTarget == .89 else 0
+            selected[..., 4][improved] = metal if metalTarget == .19 else 0
+    fields = gaussian_filter(selected * np.clip(support / .80, 0, 1)[..., None], (.62, .80, 0))
+    return np.rint(fields * 1000) / 1000
+
+
+def RefineBarrelMaterialPeaks(photo, barrel, source, baseline, coords, sample, base):
+    u = coords[0] / (BARREL_MATERIAL_GRID[0] - 1)
+    v = coords[1] / (BARREL_MATERIAL_GRID[1] - 1)
+    glints = (u > .58) & (v > .56) & (source > 123) & (source < 233)
+    target, original = source[glints], baseline[glints]
+    allowed = np.maximum(3.5, .66 * np.abs(original[:, 1] - target) + .9)
+    wanted = np.log(target + 14)
+    lowerDefault = np.log(np.maximum(1, target - allowed) + 14)
+    upperDefault = np.log(target + allowed + 14)
+    weights = np.array([.73, .27])
+    peaks = np.zeros((len(target), len(BARREL_MATERIAL_CHANNELS)))
+    best = np.full(len(target), np.inf)
+
+    # Keep the default-light error bounded at each photographed bright fleck before filtering.
+    for i, (metalTarget, metal) in enumerate(BARREL_METAL_TRIALS):
+        for j, (roughTarget, rough) in enumerate(BARREL_ROUGHNESS_TRIALS):
+            prefix = f"Fit{i}{j}"
+            center = np.log(sample(prefix + "At")[glints] + 14)
+            for name, limit in (("Minus", -.40), ("Plus", .48)):
+                end = np.log(sample(prefix + name)[glints] + 14)
+                slope = np.clip((end - center) / limit, .13, 1.10)
+                lower = np.maximum((lowerDefault - center[:, 1]) / slope[:, 1], min(limit, 0))
+                upper = np.minimum((upperDefault - center[:, 1]) / slope[:, 1], max(limit, 0))
+                gain = np.sum(slope * (wanted[:, None] - center) * weights, axis=-1) / np.sum(slope**2 * weights, axis=-1)
+                gain = np.clip(gain, lower, upper)
+                prediction = center + slope * gain[:, None]
+                loss = np.sum((prediction - wanted[:, None])**2 * weights, axis=-1) + .0014 * rough**2 + .0012 * metal**2
+                improved = (lower <= upper) & (loss < best)
+                best[improved] = loss[improved]
+                peaks[improved, 0] = gain[improved]
+                peaks[improved, 1] = rough if roughTarget == .27 else 0
+                peaks[improved, 2] = rough if roughTarget == .90 else 0
+                peaks[improved, 3] = metal if metalTarget == .89 else 0
+                peaks[improved, 4] = metal if metalTarget == .19 else 0
+
+    supported = np.isfinite(best)
+    rows, columns = BARREL_HIGHLIGHT_GRID
+    cells = np.rint(u[glints][supported] * (rows - 1)).astype(int) * columns
+    cells += np.rint(v[glints][supported] * (columns - 1)).astype(int)
+    reliability = 1 + 1.5 * np.clip((target[supported] - 132) / 22, 0, 1)
+
+    def Smooth(values):
+        field = np.bincount(cells, weights=values, minlength=rows * columns).reshape(BARREL_HIGHLIGHT_GRID)
+        return gaussian_filter(field, (.72, .76))
+
+    support = Smooth(reliability)
+    u, v = np.meshgrid(np.linspace(0, 1, rows), np.linspace(0, 1, columns), indexing="ij")
+    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
+    source = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ REGISTERED_LUMA
+    confidence = np.clip(support / .42, 0, 1) * np.clip((u - .58) / .10, 0, 1) * np.clip((v - .56) / .12, 0, 1)
+    blend = np.clip(np.clip((source - 127) / 24, 0, 1) * confidence * 1.14, 0, 1)
+    resample = [u * (base.shape[0] - 1), v * (base.shape[1] - 1)]
+    merged = {}
+    for index, name in enumerate(BARREL_MATERIAL_CHANNELS):
+        ordinary = map_coordinates(base[..., index], resample, order=1)
+        highlight = Smooth(reliability * peaks[supported, index]) / np.maximum(.22, support)
+        merged[name] = np.rint(1000 * (ordinary * (1 - blend) + highlight * blend)).astype(int).tolist()
+    return merged
+
+
+def SettleBarrelMaterialPeaks(photo, barrel, evidence):
+    names = ("V45BarrelResolveDirect", "V45BarrelResolveDefault")
+    u, v, inside, source, rendered, sample, hashes = ReadBarrelMaterialViews(photo, barrel, evidence, names)
+    valid = inside & (u > .55) & (v > .53) & (source > 119) & (source < 232)
+    if not np.any(valid):
+        raise ValueError("The final barrel response views do not cover the photographed highlights")
+    luminance = source[valid]
+    current = np.log(rendered[valid] + 14)
+    initial = np.log(luminance[:, None] + 14) - current
+    baseSlope = np.clip((np.log(sample("FinalBaseTest", valid) + 14) - current) / .28, .15, 1.10)
+    metalSlope = np.clip((np.log(sample("FinalMetalTest", valid) + 14) - current) / .26, -.65, .25)
+    weights = np.array([.82, .18])
+    headroom = np.maximum(initial[:, 1], 0) + .012
+    fit = np.zeros((len(luminance), 2))
+    best = np.sum(weights * initial**2, axis=-1)
+    for metal in (0, .05, .10, .15, .20, .25):
+        remaining = initial - metal * metalSlope
+        base = np.sum(weights * baseSlope * remaining, axis=-1) / np.sum(weights * baseSlope**2, axis=-1)
+        ceiling = np.minimum(.31, (headroom - metalSlope[:, 1] * metal) / baseSlope[:, 1])
+        base = np.clip(base, 0, np.maximum(0, ceiling))
+        residual = remaining - baseSlope * base[:, None]
+        loss = np.sum(weights * residual**2, axis=-1) + .0009 * metal**2 + .0004 * base**2
+        improved = (ceiling >= 0) & (initial[:, 0] > .013) & (loss < best) & (residual[:, 0] < initial[:, 0] - .005)
+        best[improved] = loss[improved]
+        fit[improved, 0] = base[improved]
+        fit[improved, 1] = metal
+
+    rows, columns = BARREL_HIGHLIGHT_GRID
+    cells = np.rint(u[valid] * (rows - 1)).astype(int) * columns + np.rint(v[valid] * (columns - 1)).astype(int)
+    reliability = 1 + 1.9 * np.clip((luminance - 129) / 26, 0, 1)
+
+    def Smooth(values):
+        table = np.bincount(cells, weights=values, minlength=rows * columns).reshape(BARREL_HIGHLIGHT_GRID)
+        return gaussian_filter(table, (.66, .70))
+
+    confidence = Smooth(reliability)
+    u, v = np.meshgrid(np.linspace(0, 1, rows), np.linspace(0, 1, columns), indexing="ij")
+    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
+    cue = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1) @ REGISTERED_LUMA
+    patch = np.clip((cue - 119) / 25, 0, 1) * np.clip((u - .55) / .09, 0, 1) * np.clip((v - .53) / .10, 0, 1)
+    result = {name: np.rint(1000 * Smooth(values * reliability) / np.maximum(confidence, .32) * patch).astype(int).tolist()
+              for name, values in zip(("highlightBase", "highlightMetal"), fit.T)}
+    return result, hashes
+
+
+def BarrelMaterialCalibration(photo, barrel, evidence):
+    names = ("V45BarrelStudyDirect", "V45BarrelStudyDefault")
+    u, v, inside, source, rendered, read, hashes = ReadBarrelMaterialViews(photo, barrel, evidence, names)
+    valid = inside & (source > 24) & (source < 240) & (np.min(rendered, axis=-1) > 22)
+    if np.count_nonzero(valid) < 1000:
+        raise ValueError("The barrel material views do not cover the photographed steel")
+    rows, columns = BARREL_MATERIAL_GRID
+    coordinates = np.stack((u[valid] * (rows - 1), v[valid] * (columns - 1)))
+    frames = {}
+
+    def Sample(name):
+        if name not in frames:
+            frames[name] = read(name, valid)
+        return frames[name]
+
+    ordinary = FitBarrelMaterialResponse(source[valid], rendered[valid], coordinates, Sample)
+    peaks = RefineBarrelMaterialPeaks(photo, barrel, source[valid], rendered[valid], coordinates, Sample, ordinary)
+    highlights, measured = SettleBarrelMaterialPeaks(photo, barrel, evidence)
+    return {**BarrelCalibrationIdentity(barrel), "frameSha256": {**hashes, **measured}, **peaks, **highlights}
+
+
+def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None, materialEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -494,7 +703,8 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
     identity = BarrelCalibrationIdentity(result)
     for name, frames, measure in (("registeredCalibration", evidence, BarrelCalibration),
                                   ("surfaceResponseCalibration", responseEvidence, BarrelResponseCalibration),
-                                  ("finishCalibration", finishEvidence, BarrelFinishCalibration)):
+                                  ("finishCalibration", finishEvidence, BarrelFinishCalibration),
+                                  ("materialCalibration", materialEvidence, BarrelMaterialCalibration)):
         prior = previous.get(name)
         if frames is not None:
             result[name] = measure(image, result, frames)
@@ -1334,6 +1544,7 @@ def Main():
     options.add_argument("--barrel-evidence", type=Path, help="V38 Evidence directory containing fixed-light views and the default-light control")
     options.add_argument("--barrel-response-evidence", type=Path, help="V40 Evidence directory containing the two captures with steel response variants")
     options.add_argument("--barrel-finish-evidence", type=Path, help="V41 Evidence directory with barrel color and fine-response captures")
+    options.add_argument("--barrel-material-evidence", type=Path, help="V44 Evidence directory with barrel material and highlight-response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1341,7 +1552,8 @@ def Main():
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
-                          responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence)
+                          responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
+                          materialEvidence=args.barrel_material_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

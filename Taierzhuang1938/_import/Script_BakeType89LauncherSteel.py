@@ -769,6 +769,16 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
             chroma = np.stack([ReferenceField(finish, xx, vv, channel) / 1000
                                for channel in ("red", "green", "blue")], axis=-1)
             base += .90 * (base @ np.array([.2126, .7152, .0722]))[..., None] * chroma
+        materialFit = closeup.get("materialCalibration")
+        if barrelSampling is not None and materialFit is not None:
+            CheckBarrelRegistration(materialFit, closeup)
+            base = ApplyBaseLogGain(base, ReferenceField(materialFit, xx, vv, "base") / 1000)
+            rough += (ReferenceField(materialFit, xx, vv, "polish") * (.27 - rough)
+                      + ReferenceField(materialFit, xx, vv, "matte") * (.90 - rough)) / 1000
+            metal += (ReferenceField(materialFit, xx, vv, "metal") * (.89 - metal)
+                      + ReferenceField(materialFit, xx, vv, "oxide") * (.19 - metal)) / 1000
+            base = ApplyBaseLogGain(base, ReferenceField(materialFit, xx, vv, "highlightBase") / 1000)
+            metal += ReferenceField(materialFit, xx, vv, "highlightMetal") * (.93 - metal) / 1000
     if name == "Sleeve":
         patina = closeup["endPatina"]
         darkPatina = ReferenceField(patina, xx, vv, "darkPatinaCoverage") / 100
