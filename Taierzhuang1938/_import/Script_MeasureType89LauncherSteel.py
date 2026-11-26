@@ -776,6 +776,8 @@ def ShoulderFinish(folder):
             # reflection is removed by FinishMap.
             wear = np.clip((relative - 2) / 20, 0, 1) * clean
             field["exposedSteelCoverage"] = np.rint(100 * wear).astype(int).tolist()
+            # Surface correspondence measured with the shoulder UV islands.
+            field["fineUvOffset"] = [-.00199, -.00255]
         x, y = ShoulderPhotoGrid(uRange, vRange, viewCenter, rails, width, 108)
         if name == "Flank":
             # Keep the blur in PhotoResiduals inside the visible strip so

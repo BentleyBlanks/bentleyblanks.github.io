@@ -719,7 +719,8 @@ def BakeShoulder(quadrants, width, height, index, reference):
     main = [SampleShoulder(pixels, mainU, mainV) for pixels in maps]
     flank = [SampleShoulder(pixels, flankU, flankV) for pixels in maps]
     previous = PhotoColor(Fraction(width), mainV, 122)
-    grain = PhotoColor(flankU, flankV, 166) - SampleShoulder(previous, flankU, flankV)
+    offsetU, offsetV = photo["fineUvOffset"]
+    grain = PhotoColor(flankU + offsetU, flankV + offsetV, 166) - SampleShoulder(previous, flankU, flankV)
     xx, vv = np.meshgrid(flankU, flankV)
     oxide = ReferenceField(photo, xx, vv, "oxideCoverage") / 100
     exposed = ReferenceField(photo, xx, vv, "exposedSteelCoverage") / 100
