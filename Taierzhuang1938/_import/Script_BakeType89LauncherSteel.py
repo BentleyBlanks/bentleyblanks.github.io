@@ -122,30 +122,32 @@ def BarrelTexelCenters(width, height, sampling):
     return np.meshgrid(np.interp(column, packed, arc), last - row * (last - first))
 
 
-def ApplyBarrelResponse(tile, closeup, calibration, fieldCount):
+def ApplyBarrelResponse(tile, closeup, calibration, channels):
     CheckBarrelRegistration(calibration, closeup)
     path = REFERENCE.with_name(calibration["file"])
     if Sha256(path) != calibration["sha256"]:
         raise ValueError(f"Barrel response does not match the measured reference: {path}")
     with Image.open(path) as image:
         encoded = (np.asarray(image, dtype=float) - 32768) / calibration["scale"]
-    if encoded.ndim != 2 or encoded.shape[1] % fieldCount:
+    if encoded.ndim != 2 or encoded.shape[1] % len(channels):
         raise ValueError(f"Invalid barrel response fields: {path}")
     base, normal, orm = tile
     height, width = base.shape[:2]
     uu, vv = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
-    tilt, gain, *roughnessFields = (
-        ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
-        for field in np.split(encoded, fieldCount, axis=1))
+    fields = {name: ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
+              for name, field in zip(channels, np.split(encoded, len(channels), axis=1))}
+    gain = fields["gain"]
     base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
-    # Bias the tangent direction of the existing relief before normalizing it.
-    active = abs(tilt) > 1e-8
-    vector = normal[active].astype(float) / 127.5 - 1
-    vector[:, 0] += tilt[active] * vector[:, 2]
-    unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
-    normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
-    if roughnessFields:
-        roughness = roughnessFields[0]
+    if "tilt" in fields:
+        # Bias the tangent direction of the existing relief before normalizing it.
+        tilt = fields["tilt"]
+        active = abs(tilt) > 1e-8
+        vector = normal[active].astype(float) / 127.5 - 1
+        vector[:, 0] += tilt[active] * vector[:, 2]
+        unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
+        normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
+    if "roughness" in fields:
+        roughness = fields["roughness"]
         active = abs(roughness) > 1e-8
         channel = orm[..., 1]
         channel[active] = np.rint(255 * np.clip(channel[active] / 255 + roughness[active], .17, .92)).astype(np.uint8)
@@ -1024,10 +1026,12 @@ def BuildAtlas(reference):
                                    barrelSampling=ATLAS["barrelSampling"])
             tile = RepackBarrelTile(denseTile, oldTile, reference)
             closeup = reference["closeups"]["Barrel"]
-            for key, fieldCount in (("facetCalibration", 2), ("bandCalibration", 3)):
+            for key, channels in (("facetCalibration", ("tilt", "gain")),
+                                  ("bandCalibration", ("tilt", "gain", "roughness")),
+                                  ("grainCalibration", ("gain",))):
                 calibration = closeup.get(key)
                 if calibration is not None:
-                    ApplyBarrelResponse(tile, closeup, calibration, fieldCount)
+                    ApplyBarrelResponse(tile, closeup, calibration, channels)
         else:
             tile = BakeRegion(name, quadrants, (width, height), index, reference)
         for atlas, pixels in zip(maps, tile):
@@ -1065,7 +1069,8 @@ def Bake():
                "shoulderDirect": reference["shoulder"]["Direct"]["detail"],
                "shoulderFlank": reference["shoulder"]["Flank"]["detail"]}
     for key, name in (("markCalibration", "barrelMarks"), ("smallMarkCalibration", "smallBarrelMarks"),
-                      ("facetCalibration", "barrelFacets"), ("bandCalibration", "barrelBand")):
+                      ("facetCalibration", "barrelFacets"), ("bandCalibration", "barrelBand"),
+                      ("grainCalibration", "barrelGrain")):
         calibration = reference["closeups"]["Barrel"].get(key)
         if calibration is not None:
             details[name] = calibration

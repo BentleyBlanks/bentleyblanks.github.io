@@ -3794,6 +3794,34 @@
           }
         }
       },
+      "grainCalibration": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "projection": [509, 540, 23, 400],
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.722, 0.849]
+        },
+        "file": "Texture_Type89LauncherBarrelGrain.png",
+        "sha256": "deada64094112696684a3b028cfc012fe7d4a4bd4b4264af9efaa6f581acbf7c",
+        "scale": 120000,
+        "frameSha256": {
+          "V51ReferenceRigDirect": {
+            "beauty.png": "a5b3f0cf727d152739325d5864ba0adc615add948e8e39adf72b7658cf59c736",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "BasePlus.png": "9e50d7004fcc52550885fb77f3d51c3d97020a888e8efd43650c640467e94e16",
+            "BaseMinus.png": "b20241350b6c75edc7ed5f1ce4e9810680fd329b45af89e2525d3b8c4fa15662"
+          },
+          "V51DefaultStudy": {
+            "beauty.png": "2f6a428c61c479cdc2f0107959c707eb0669df81de6396618c3136f041cb1abb",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "BasePlus.png": "a89966cf92610d625312a858d7aa9203aabfb397e47ad7aec9538d1171a63ce2",
+            "BaseMinus.png": "4a6660657d6f38ae638f46569f82294ef3a2150e421369e6e174430786296aa4"
+          }
+        }
+      },
       "smallMarkCalibration": {
         "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
         "projection": [509, 540, 23, 400],

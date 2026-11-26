@@ -20,6 +20,7 @@ BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
 BARREL_FACETS = RECORD.with_name("Texture_Type89LauncherBarrelFacets.png")
 BARREL_BAND = RECORD.with_name("Texture_Type89LauncherBarrelBand.png")
+BARREL_GRAIN = RECORD.with_name("Texture_Type89LauncherBarrelGrain.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
@@ -820,6 +821,56 @@ def BarrelBandCalibration(photo, barrel, evidence):
     return WriteBarrelResponseFields(BARREL_BAND, barrel, (tilt, gain, roughness), hashes)
 
 
+def BarrelGrainCalibration(photo, barrel, evidence):
+    names = ("V51ReferenceRigDirect", "V51DefaultStudy")
+    u, v, inside, wanted, observed, read, hashes = ReadBarrelMaterialViews(photo, barrel, evidence, names)
+    inside &= (wanted > 21) & (wanted < 235)
+    shape = (239, 159)
+    index = np.rint(u[inside] * (shape[0] - 1)).astype(int) * shape[1]
+    index += np.rint(v[inside] * (shape[1] - 1)).astype(int)
+    counts = np.bincount(index, minlength=np.prod(shape)).reshape(shape).astype(float)
+    fineScale, broadScale = (.82, .86), (3.50, 4.25)
+    fineSupport = gaussian_filter(counts, fineScale)
+    broadSupport = gaussian_filter(counts, broadScale)
+    if np.count_nonzero(fineSupport > 1.4) < 15000:
+        raise ValueError("The response views do not resolve the photographed steel grain")
+
+    def Deposit(luma):
+        return np.bincount(index, weights=np.log(luma + 18), minlength=np.prod(shape)).reshape(shape)
+
+    def Band(sums):
+        return (gaussian_filter(sums, fineScale) / np.maximum(fineSupport, .01) -
+                gaussian_filter(sums, broadScale) / np.maximum(broadSupport, .01))
+
+    expected = Band(Deposit(wanted[inside]))
+    close, default = [expected - Band(Deposit(values)) for values in observed[inside].T]
+    plus, minus = (read("Base" + side, inside).T for side in ("Plus", "Minus"))
+    closeSlope, defaultSlope = [np.clip(gaussian_filter(Deposit(a) - Deposit(b), fineScale) /
+                                      (.62 * np.maximum(fineSupport, .01)), .21, .94)
+                               for a, b in zip(plus, minus)]
+    agree = (np.sign(close) == np.sign(default)) & (fineSupport > 1.4)
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], uu, vv)
+    trace = barrel["stampTrace"]
+    distances = BarrelStampDistances(photo, trace["strokes"] + trace["smallStrokes"])
+    clearance = np.clip((map_coordinates(distances, (y, x), order=1) - 12) / 8, 0, 1)
+    confidence = np.clip(np.minimum(abs(close), abs(default)) / .045, 0, 1) * agree * clearance
+    coverage = np.clip((uu - .08) / .045, 0, 1) * np.clip((.92 - uu) / .045, 0, 1)
+    coverage *= np.clip((vv - .09) / .042, 0, 1) * np.clip((.91 - vv) / .042, 0, 1)
+    residual = .55 * close + .45 * default
+    slope = .55 * closeSlope + .45 * defaultSlope
+    gain = gaussian_filter(np.clip(residual / slope, -.195, .195) * confidence, (.44, .46))
+    # The broad field follows the earlier steel calibration. Fit only the
+    # small contrast differences that recur in both measured lighting setups.
+    gain = 1.15 * (gain - gaussian_filter(gain, broadScale)) * coverage * clearance
+    # Preserve the earlier calibration on the photographed exposed-steel highlights.
+    photoLuma = SampleBilinear(photo @ REGISTERED_LUMA, x, y)
+    brightSteel = np.clip((uu - .63) / .06, 0, 1) * np.clip((vv - .62) / .07, 0, 1)
+    brightSteel *= np.clip((photoLuma - 119) / 25, 0, 1)
+    gain *= 1 - brightSteel * (gain < 0)
+    return WriteBarrelResponseFields(BARREL_GRAIN, barrel, (gain,), hashes)
+
+
 def RegisteredBarrelMarks(photo, barrel, folder, distances):
     u, v, inside, reference, render, hashes = RegisteredBarrelPhotoFrame(photo, barrel, folder)
     x, y = BarrelPhotoCoordinates(barrel["source"]["projection"], barrel["footprint"]["uHalfSpan"], u, v)
@@ -896,7 +947,7 @@ def BarrelMarkCalibration(photo, barrel, evidence, *, small=False):
 
 def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, finishEvidence=None,
                  materialEvidence=None, markEvidence=None, smallMarkEvidence=None, facetEvidence=None,
-                 bandEvidence=None):
+                 bandEvidence=None, grainEvidence=None):
     image, source = Photo(folder, 7)
     projection = [509, 540, 23, 400]
     center, radius, first, last = projection
@@ -953,7 +1004,8 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
                                   ("materialCalibration", materialEvidence, BarrelMaterialCalibration),
                                   ("markCalibration", markEvidence, BarrelMarkCalibration),
                                   ("facetCalibration", facetEvidence, BarrelFacetCalibration),
-                                  ("bandCalibration", bandEvidence, BarrelBandCalibration)):
+                                  ("bandCalibration", bandEvidence, BarrelBandCalibration),
+                                  ("grainCalibration", grainEvidence, BarrelGrainCalibration)):
         prior = previous.get(name)
         if frames is not None:
             result[name] = measure(image, result, frames)
@@ -1803,6 +1855,7 @@ def Main():
     options.add_argument("--barrel-small-mark-evidence", type=Path, help="V47 Evidence directory with the small barrel stamp response captures")
     options.add_argument("--barrel-facet-evidence", type=Path, help="V49 Evidence directory with tangent-normal and base-color response captures")
     options.add_argument("--barrel-band-evidence", type=Path, help="V50 Evidence directory with three-light barrel response captures")
+    options.add_argument("--barrel-grain-evidence", type=Path, help="V51 Evidence directory with registered fine-grain color response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1813,7 +1866,7 @@ def Main():
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
                           smallMarkEvidence=args.barrel_small_mark_evidence, facetEvidence=args.barrel_facet_evidence,
-                          bandEvidence=args.barrel_band_evidence)
+                          bandEvidence=args.barrel_band_evidence, grainEvidence=args.barrel_grain_evidence)
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])

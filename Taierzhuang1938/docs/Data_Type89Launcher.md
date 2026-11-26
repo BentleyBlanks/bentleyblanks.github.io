@@ -67,6 +67,7 @@
 - 在原 2K 图集中按纹素中心重采样主刻印和两处小印，校正印边的亚像素落点。默认灯下主刻印与原照的亮暗相关系数由 0.82 提高到 0.86，左小印由 0.82 提高到 0.91，右小印由 0.79 提高到 0.87。中性正视、独立斜视和柔光下三处刻印的对比误差均降低。 [烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 筒身褐锈区按第 7 张近照校准露钢反光。在同机位实测横向切线法线和线性底色对中性灯、默认灯的响应，回烘后在亮斑上再校正一次。本地默认灯下，原照最亮一成的中位亮度偏差从偏亮约 8.3 降至约 0.1 个灰阶，该组像素的平均绝对误差从 15.5 降至 14.0。中性正视、独立斜视和柔光下这组亮斑也更接近原照。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身中段用中性灯、默认灯与柔光共同测量横向切线法线、粗糙度和线性底色的正负响应。沿近照的氧化钢面重烘，并在刻印和外围逐渐衰减。默认灯下，本地中段亮度平均绝对误差由约 24.3 降至 20.5 个灰阶。中性灯、柔光和独立斜视、暖光复测的中段误差也降低。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 筒身细纹以第 7 张近照为准。用近似馆藏布光和默认灯共同测量点蚀及磨痕周围的对比度，将两套灯光均支持的修正烘入 2K 底色，在刻印周围衰减，并保留早先校准的露钢亮斑。本地近似馆藏布光正视的细纹相关系数由 0.918 提高到 0.951，独立斜视由 0.915 提高到 0.942。另用默认灯和柔光复测。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -83,4 +84,5 @@
 - 带 `--barrel-small-mark-evidence <MetalFinishV47/Evidence>` 的照片采样命令从 `V47StampStudyDirect`、`V47StampStudyDefault` 和回烘后的 `V47StampResolveDirect`、`V47StampResolveDefault` 重算小印底色。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 带 `--barrel-facet-evidence <MetalFinishV49/Evidence>` 的照片采样命令使用 `V49BrdfDirect`、`V49BrdfDefault` 及回烘后的 `V49FacetSettleDirect`、`V49FacetSettleDefault` 重算横向法线与底色。烘焙脚本在图集纹素中心采样，并用两组修正调整最终的底色和切线法线。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 带 `--barrel-band-evidence <MetalFinishV50/Evidence>` 的照片采样命令读取 `V50BandStudyDirect`、`V50BandStudyDefault` 和 `V50BandStudySoft`，重算中段的法线、底色与粗糙度。三张通道图以 16 位精度并排保存为一张采样板。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV50/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 带 `--barrel-grain-evidence <MetalFinishV51/Evidence>` 的照片采样命令使用 `V51ReferenceRigDirect` 和 `V51DefaultStudy` 的配准底色响应重算细纹。近似馆藏布光由中性灯设置调整环境亮度和补光强度，并通过独立斜视和未参与布光拟合的筒身区域复核。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV51/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
