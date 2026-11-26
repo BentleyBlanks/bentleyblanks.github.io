@@ -13,7 +13,9 @@ const KIND = {
   throwable: "投掷物", melee: "刀具", mortar: "架设武器", vehicle: "战车",
 };
 const SIDE = { nra: "中方", ija: "日方", neutral: "待考" };
-const SCALE_METERS = [.005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
+const SCALE_METERS = [.001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
+const MIN_SCALE_WIDTH = 56;
+const CLOSEUP_SCALE_WIDTH = 80;
 const number = new Intl.NumberFormat("zh-CN");
 const ById = (id) => document.getElementById(id);
 const Text = (id, value) => { ById(id).textContent = value; };
@@ -94,7 +96,7 @@ function DrawOverlays() {
   scale.hidden = !model;
   if (model) {
     const pixelsPerMeter = stage.height * stage.zoom / stage.span;
-    const length = SCALE_METERS.find((value) => value * pixelsPerMeter >= 56) ?? SCALE_METERS.at(-1);
+    const length = SCALE_METERS.find((value) => value * pixelsPerMeter >= MIN_SCALE_WIDTH) ?? SCALE_METERS.at(-1);
     scale.style.width = `${length * pixelsPerMeter}px`;
     Text("scaleValue", length < .01 ? `${length * 1000} mm` : length < 1 ? `${length * 100} cm` : `${length} m`);
   }
@@ -177,7 +179,8 @@ function BindViewport() {
   };
   const Zoom = (factor, offsetX = 0, offsetY = 0) => {
     const before = stage.span / (stage.zoom * stage.height);
-    stage.zoom = Math.max(.38, Math.min(7, stage.zoom * factor));
+    const maxZoom = Math.max(7, stage.span * CLOSEUP_SCALE_WIDTH / (stage.height * SCALE_METERS[0]));
+    stage.zoom = THREE.MathUtils.clamp(stage.zoom * factor, .38, maxZoom);
     const shift = before - stage.span / (stage.zoom * stage.height);
     if (shift && (offsetX || offsetY)) {
       stage.center.addScaledVector(panAxis.setFromMatrixColumn(stage.camera.matrixWorld, 0), offsetX * shift);
@@ -302,7 +305,8 @@ function BindViewport() {
     if (!stage.model) return;
     event.preventDefault();
     const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? stage.height : 1);
-    Zoom(Math.exp(-pixels * .0014));
+    const rect = canvas.getBoundingClientRect();
+    Zoom(Math.exp(-pixels * .0014), event.clientX - rect.left - rect.width / 2, event.clientY - rect.top - rect.height / 2);
   }, { passive: false });
   const arrows = { ArrowLeft: [-13, 0], ArrowRight: [13, 0], ArrowUp: [0, -13], ArrowDown: [0, 13] };
   canvas.addEventListener("keydown", (event) => {

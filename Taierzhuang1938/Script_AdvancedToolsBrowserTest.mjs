@@ -255,6 +255,23 @@ try {
       && pixels.triangles === 6703 && pixels.quiet, JSON.stringify(pixels));
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
 
+    const canvas = page.locator("#view");
+    const fittedRect = await canvas.boundingBox();
+    await canvas.hover({ position: { x: fittedRect.width * .375, y: fittedRect.height * .475 } });
+    await page.mouse.wheel(0, -8000);
+    await page.waitForFunction(() => window.WeaponInspection.scene.zoom > 1);
+    const closeupPixels = await ReadPixels();
+    const closeup = await page.locator("#viewScale").evaluate((scale) => {
+      const { camera, height } = window.WeaponInspection.scene;
+      return { label: scale.textContent, width: scale.getBoundingClientRect().width,
+        projectedMillimeter: .001 * height / (camera.top - camera.bottom) };
+    });
+    Check("滚轮放大到 1 mm 比例尺时仍能绘制模型细节",
+      closeup.label === "1 mm" && closeup.width >= 56 && Math.abs(closeup.width - closeup.projectedMillimeter) < 1
+      && closeupPixels.count > 2500, JSON.stringify(closeup));
+    if (shots) await page.locator(".stage").screenshot({ path: path.join(shotDir, "WeaponInspectionCloseup.png") });
+    await canvas.press("Home");
+
     const channels = ["beauty", "normal", "tangent", "albedo", "roughness", "metallic", "ao", "reflection", "shadow"];
     const Channel = (id) => page.locator(`[data-channel="${id}"]`).click();
     const activeChannel = page.locator('.view-bar button[aria-pressed="true"]');
@@ -353,9 +370,8 @@ try {
     await Channel("beauty");
     await page.locator("#gridToggle").click();
 
-    const canvas = page.locator("#view");
     const rect = await canvas.boundingBox();
-    const [beforeYaw, beforePitch] = await CameraState();
+    const [beforeYaw, beforePitch, , ...fitCenter] = await CameraState();
     await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
     await page.mouse.down();
     await page.mouse.move(rect.x + rect.width / 2 + 65, rect.y + rect.height / 2 + 25, { steps: 4 });
@@ -372,7 +388,7 @@ try {
       .some((value, index) => Math.abs(value - before[index]) > .01), beforePan));
     await canvas.press("Home");
     const [, , resetZoom, ...resetCenter] = await CameraState();
-    Check("Home 适配复位倍率和中心", resetZoom === 1 && resetCenter.every((value, index) => Math.abs(value - beforePan[index]) < .001));
+    Check("Home 适配复位倍率和中心", resetZoom === 1 && resetCenter.every((value, index) => Math.abs(value - fitCenter[index]) < .001));
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
     const Touch = (type, points) => cdp.send("Input.dispatchTouchEvent", {
@@ -428,7 +444,7 @@ try {
     await Touch("touchEnd", []);
     await Frames();
     const [, , tapZoom, ...tapCenter] = await CameraState();
-    Check("双击适配复位倍率和中心", tapZoom === 1 && tapCenter.every((value, index) => Math.abs(value - beforePan[index]) < .001));
+    Check("双击适配复位倍率和中心", tapZoom === 1 && tapCenter.every((value, index) => Math.abs(value - fitCenter[index]) < .001));
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
     await cdp.detach();
     await page.locator("#gridToggle").click();
