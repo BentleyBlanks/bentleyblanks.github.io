@@ -74,6 +74,9 @@ try {
   Check("物件数 = 场景文件", state.objects === sceneDoc.objects.length, `${state.objects} / ${sceneDoc.objects.length}`);
   Check("按材质分批实例化（白盒体块 + 远景）", state.layers.length >= 8 && state.layers.some(l => l.key.startsWith("bd:")), JSON.stringify(state.layers.slice(0, 6)));
   Check("存盘口可写（拦截的 status）", state.writable === true && state.revision === diskRevision);
+  Check("编辑视口已烘焙 PMREM 反射球并加载场景环境",
+    state.environment?.hasProbe === true && state.environment.active === true && state.environment.bakes >= 1,
+    JSON.stringify(state.environment));
   const px = await E(() => window.SceneEditor.PixelStats());
   Check("地形画出来了：不是满屏天空色、颜色够多", px.skyFraction < 0.6 && px.colors > 25, JSON.stringify(px));
   await Shot("01_Open");
@@ -300,6 +303,35 @@ try {
     inhInsp.sel === "ParapetWest" && !inhInsp.dirty && inhInsp.card && /FirstLevelEncounter/.test(inhInsp.text),
     JSON.stringify({ sel: inhInsp.sel, dirty: inhInsp.dirty, card: inhInsp.card }));
   await Shot("07_MergedInherited");
+
+  // 9. 遭遇场景环境氛围与 PMREM 反射球：阴天白天高光展宽 + 反射球补足 ↔ 南段 BeishaheDusk 黄昏实时切换与重烘
+  const dayEnv = await E(() => window.SceneEditor.State().environment);
+  Check("遭遇场景白天区域烘焙阴天反射球并收窄点状太阳高光",
+    dayEnv?.active === true && dayEnv.hasProbe === true && dayEnv.volume === "Fallback"
+    && dayEnv.sunClarity < 0.2 && dayEnv.specIblScale > 2,
+    JSON.stringify(dayEnv));
+  await E(() => {
+    const app = window.SceneEditor;
+    const g = app.HeightAt(20, 760).carved;
+    app.SetCamera({ position: [20, g + 3.2, 760], yawDeg: 84, pitchDeg: -10 });
+  });
+  await Wait(350);
+  const duskEnv = await E(() => window.SceneEditor.State().environment);
+  Check("切入北沙河黄昏区域同步日落光源并重烘黄昏反射球",
+    duskEnv?.hasProbe === true && duskEnv.volume === "BeishaheDusk" && duskEnv.bakes > dayEnv.bakes
+    && duskEnv.sunColor !== dayEnv.sunColor && duskEnv.sunClarity > 0.8,
+    JSON.stringify(duskEnv));
+  await Shot("08_MergedDuskEnv");
+
+  // 无 Environment_*.json 的测试场景仍保有默认天空反射球且不产生 404 报错
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/SceneEditor.html?scene=TestRange`, { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() => window.SceneEditor?.State().objects > 0, null, { timeout: 60000 });
+  await E(() => window.SceneEditor.ready);
+  await Wait(250);
+  const testEnv = await E(() => window.SceneEditor.State().environment);
+  Check("无独立环境文件的测试场景回退基准天空并保留反射球",
+    testEnv?.hasProbe === true && testEnv.active === false && testEnv.preset === "testSceneDay" && testEnv.bakes >= 1,
+    JSON.stringify(testEnv));
 } catch (error) {
   Check("跑完没抛错", false, String(error?.stack || error).slice(0, 600));
 } finally {

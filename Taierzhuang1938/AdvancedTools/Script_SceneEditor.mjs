@@ -25,6 +25,7 @@ import { ApplyPatches } from "../Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "../Script_WhiteboxGrid.mjs";
 import { WHITEBOX_MATERIAL } from "../Data_Tuning_WhiteboxMaterial.mjs";
 import { ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
+import { SceneEditorEnvironment } from "./Script_SceneEditorEnvironment.mjs";
 
 export const SCENE_EDITOR = Object.freeze({
   pollMs: 2000,
@@ -125,14 +126,9 @@ class SceneEditorApp {
     this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(E.sky);
-    this.scene.fog = new THREE.Fog(E.sky, E.fog[0], E.fog[1]);
     this.camera = new THREE.PerspectiveCamera(E.fov, 1, E.near, E.far);
     this.camera.rotation.order = "YXZ";
-    this.scene.add(new THREE.HemisphereLight(0xe4ebf2, 0x6b6656, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 2.1);
-    sun.position.set(40, 70, 25);
-    this.scene.add(sun);
+    this.environment = new SceneEditorEnvironment(this.renderer, this.scene);
     this.world = new THREE.Group();
     this.scene.add(this.world);
     this.inheritedGroup = new THREE.Group();
@@ -148,6 +144,7 @@ class SceneEditorApp {
     this.shotHelper = new THREE.CameraHelper(this.shotCamera);
     this.shotHelper.name = "SceneEditor_ReferenceCamera";
     this.shotHelper.material.depthTest = false;
+    this.shotHelper.material.toneMapped = false;
     this.shotHelper.renderOrder = 23;
     this.shotHelper.visible = false;
     this.scene.add(this.shotHelper);
@@ -157,8 +154,8 @@ class SceneEditorApp {
       cone: new THREE.ConeGeometry(0.5, 1, 8),
     };
     this.edges = new THREE.EdgesGeometry(this.geometry.box);
-    this.edgeMaterial = new THREE.LineBasicMaterial({ color: 0xedca83, depthTest: false, transparent: true, opacity: 0.95 });
-    this.inheritedEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x72cae8, depthTest: false, transparent: true, opacity: 0.95 });
+    this.edgeMaterial = new THREE.LineBasicMaterial({ color: 0xedca83, depthTest: false, transparent: true, opacity: 0.95, toneMapped: false });
+    this.inheritedEdgeMaterial = new THREE.LineBasicMaterial({ color: 0x72cae8, depthTest: false, transparent: true, opacity: 0.95, toneMapped: false });
     new ResizeObserver(() => this.Resize()).observe(canvas.parentElement);
     this.Resize();
   }
@@ -237,6 +234,7 @@ class SceneEditorApp {
         this.Frame([targetId]);
       } else this.Home();
     }
+    await this.environment.LoadForScene(this.sceneId, this.camera.position);
     this.RenderTree();
     this.RenderInspector();
     this.SyncPreviewControls();
@@ -415,7 +413,7 @@ class SceneEditorApp {
       const pts = compiled ? compiled.path.points : seg.points;
       const line = new THREE.Line(
         new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => Lift(x, z, 0.25))),
-        new THREE.LineBasicMaterial({ color: 0xc98a4b, depthTest: false, transparent: true, opacity: 0.6 }),
+        new THREE.LineBasicMaterial({ color: 0xc98a4b, depthTest: false, transparent: true, opacity: 0.6, toneMapped: false }),
       );
       line.renderOrder = 25;
       group.add(line);
@@ -439,7 +437,7 @@ class SceneEditorApp {
     if (seamPts.length && seamPts[seamPts.length - 1].x !== maxX) seamPts.push(At(maxX, maxZ));
     const seamLine = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(seamPts),
-      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 3.5, gapSize: 2, depthTest: false, transparent: true, opacity: 0.92 }),
+      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 3.5, gapSize: 2, depthTest: false, transparent: true, opacity: 0.92, toneMapped: false }),
     );
     seamLine.computeLineDistances();
     seamLine.renderOrder = 24;
@@ -456,7 +454,7 @@ class SceneEditorApp {
     if (chevronPts.length) {
       const chevrons = new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(chevronPts),
-        new THREE.LineBasicMaterial({ color: 0x76cde8, depthTest: false, transparent: true, opacity: 0.85 }),
+        new THREE.LineBasicMaterial({ color: 0x76cde8, depthTest: false, transparent: true, opacity: 0.85, toneMapped: false }),
       );
       chevrons.renderOrder = 24;
       this.inheritedOverlayGroup.add(chevrons);
@@ -472,7 +470,7 @@ class SceneEditorApp {
     outerPts.push(At(maxX, maxZ, 0.4));
     const outerLine = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(outerPts),
-      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 6, gapSize: 5, depthTest: false, transparent: true, opacity: 0.42 }),
+      new THREE.LineDashedMaterial({ color: 0x76cde8, dashSize: 6, gapSize: 5, depthTest: false, transparent: true, opacity: 0.42, toneMapped: false }),
     );
     outerLine.computeLineDistances();
     outerLine.renderOrder = 23;
@@ -555,6 +553,7 @@ class SceneEditorApp {
       geo.computeVertexNormals();
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
       ApplyPatches(mat, [MakeWhiteboxGridPatch(E.grid)]);
+      this.environment.AttachMaterial(mat);
       const northTerrain = new THREE.Mesh(geo, mat);
       northTerrain.name = "SceneEditor_InheritedTerrain";
       this.inheritedTerrain = northTerrain;
@@ -673,7 +672,8 @@ class SceneEditorApp {
     for (const b of blocks) { if (!bySemantic.has(b.semantic)) bySemantic.set(b.semantic, []); bySemantic.get(b.semantic).push(b); }
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     for (const [semantic, list] of bySemantic) {
-      const mesh = new THREE.InstancedMesh(this.geometry.box, new THREE.MeshStandardMaterial({ color: this.SemanticColor(semantic), roughness: 0.9, transparent: true, opacity: 0.85 }), list.length);
+      const mat = this.environment.AttachMaterial(new THREE.MeshStandardMaterial({ color: this.SemanticColor(semantic), roughness: 0.9, transparent: true, opacity: 0.85 }));
+      const mesh = new THREE.InstancedMesh(this.geometry.box, mat, list.length);
       list.forEach((b, i) => { m.compose(new THREE.Vector3(b.x, b.y, b.z), q.setFromAxisAngle(up, b.ry || 0), new THREE.Vector3(b.w, b.h, b.d)); mesh.setMatrixAt(i, m); });
       mesh.frustumCulled = false;
       group.add(mesh);
@@ -701,19 +701,19 @@ class SceneEditorApp {
       const pts = preview && selected ? preview : seg.points;
       const path = preview && selected || !compiled ? pts.map(([x, z]) => Lift(x, z, 0.25)) : compiled.path.points.map(([x, z]) => Lift(x, z, 0.25));
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(path),
-        new THREE.LineBasicMaterial({ color: selected ? 0xedca83 : 0xc98a4b, depthTest: false, transparent: true, opacity: selected ? 1 : 0.75 }));
+        new THREE.LineBasicMaterial({ color: selected ? 0xedca83 : 0xc98a4b, depthTest: false, transparent: true, opacity: selected ? 1 : 0.75, toneMapped: false }));
       line.renderOrder = selected ? 26 : 25;
       group.add(line);
       if (!selected) continue;
       // 控制点折线 + 点
       const poly = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => Lift(x, z, 0.9))),
-        new THREE.LineDashedMaterial({ color: 0xedca83, dashSize: 0.6, gapSize: 0.4, depthTest: false, transparent: true, opacity: 0.7 }));
+        new THREE.LineDashedMaterial({ color: 0xedca83, dashSize: 0.6, gapSize: 0.4, depthTest: false, transparent: true, opacity: 0.7, toneMapped: false }));
       poly.computeLineDistances();
       poly.renderOrder = 26;
       group.add(poly);
       pts.forEach(([x, z], i) => {
         const dot = new THREE.Mesh(this.geometry.sphere, new THREE.MeshBasicMaterial({
-          color: i === this.model.trenchPoint ? 0xffffff : 0xedca83, depthTest: false, transparent: true }));
+          color: i === this.model.trenchPoint ? 0xffffff : 0xedca83, depthTest: false, transparent: true, toneMapped: false }));
         dot.position.copy(Lift(x, z, 0.9));
         // 屏幕上大约一样大（离相机越远放得越大）
         dot.scale.setScalar(Math.max(0.15, Math.min(3, this.camera.position.distanceTo(dot.position) * 0.006)));
@@ -838,6 +838,7 @@ class SceneEditorApp {
     geometry.computeVertexNormals();
     const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
     ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
+    this.environment.AttachMaterial(material);
     this.terrain = new THREE.Mesh(geometry, material);
     this.terrain.name = "SceneEditor_Terrain";
     this.world.add(this.terrain);
@@ -851,7 +852,7 @@ class SceneEditorApp {
       const r = bd.ground.radiusM || 3000;
       const cx = (doc.bounds.minX + doc.bounds.maxX) / 2, cz = (doc.bounds.minZ + doc.bounds.maxZ) / 2;
       const plane = new THREE.Mesh(new THREE.CircleGeometry(r + 800, 48),
-        new THREE.MeshStandardMaterial({ color: HexInt(bd.ground.color), roughness: 1 }));
+        this.environment.AttachMaterial(new THREE.MeshStandardMaterial({ color: HexInt(bd.ground.color), roughness: 1 })));
       plane.rotation.x = -Math.PI / 2;
       plane.position.set(cx, bd.ground.y - 0.6, cz);
       plane.name = "SceneEditor_BackdropGround";
@@ -889,9 +890,10 @@ class SceneEditorApp {
     const token = (this.terrainTokens[tokenKey] = (this.terrainTokens[tokenKey] || 0) + 1);
     const targetName = setName || doc.look?.terrainLayers || MISSION_LAYOUT.ground.terrainLayers;
     try {
-      const [{ MaterialLibrary }, { CreateTerrainMaterial }, pack] = await Promise.all([
+      const [{ MaterialLibrary }, { CreateTerrainMaterial }, { MakeMaterialShadingUniforms }, pack] = await Promise.all([
         import("../Script_Materials.mjs"),
         import("../Script_TerrainMaterial.mjs"),
+        import("../Script_MaterialShading.mjs"),
         this.EnsureTerrainPack(targetName),
       ]);
       const expected = tokenKey === "main" ? this.terrain : this.inheritedTerrain;
@@ -907,10 +909,18 @@ class SceneEditorApp {
       }
       mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
       mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 4));
-      this.materialLibrary ||= new MaterialLibrary(this.renderer);
+      if (!this.materialLibrary) {
+        const shading = MakeMaterialShadingUniforms();
+        shading.quality = {
+          pomSteps: 0, pomRefine: 0, pomSelfShadow: false,
+          detailNormal: false, microShadow: true, horizonOcclusion: true, skinSss: false,
+        };
+        this.materialLibrary = new MaterialLibrary(this.renderer, { shading });
+      }
       const material = CreateTerrainMaterial(this.materialLibrary, pack, {
         quality: "medium", name: tokenKey === "main" ? "SceneEditor_TerrainLayers" : "SceneEditor_InheritedTerrainLayers",
       });
+      this.environment.AttachMaterial(material);
       mesh.material.dispose();
       mesh.material = material;
       if (tokenKey === "main") this.terrainLook = "layers";
@@ -987,24 +997,24 @@ class SceneEditorApp {
   }
 
   MakeLayerMaterial(key, doc = this.model.doc) {
-    if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide });
-    if (key === "ghostGate") return new THREE.MeshBasicMaterial({ color: 0xf08c28, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide });
-    if (key.startsWith("bd:")) return new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
-    if (key === "tree") return new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 });
+    if (key === "ghost") return new THREE.MeshBasicMaterial({ color: 0xd6604a, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+    if (key === "ghostGate") return new THREE.MeshBasicMaterial({ color: 0xf08c28, transparent: true, opacity: 0.30, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
+    if (key.startsWith("bd:")) return this.environment.AttachMaterial(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }));
+    if (key === "tree") return this.environment.AttachMaterial(new THREE.MeshStandardMaterial({ color: HexInt("#5a5446"), roughness: 1 }));
     if (key.startsWith("color:")) {
       const material = new THREE.MeshStandardMaterial({ color: HexInt(key.slice(6)), roughness: 0.9 });
       ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
-      return material;
+      return this.environment.AttachMaterial(material);
     }
     // 道具：按弹着表面的语义色画、提亮一档（只是预览，真样子是模型）
     if (key.startsWith("prop:")) {
       const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_ASSETS[key.slice(5)]?.semantic, doc), roughness: 0.8 });
       material.color.multiplyScalar(1.25);
-      return material;
+      return this.environment.AttachMaterial(material);
     }
     const material = new THREE.MeshStandardMaterial({ color: this.SemanticColor(SCENE_MATERIALS[key.slice(4)]?.semantic, doc), roughness: 0.95 });
     ApplyPatches(material, [MakeWhiteboxGridPatch(E.grid)]);
-    return material;
+    return this.environment.AttachMaterial(material);
   }
 
   RebuildObjects() {
@@ -1101,7 +1111,7 @@ class SceneEditorApp {
     const gizmo = new THREE.Group();
     gizmo.name = "SceneEditor_Gizmo";
     gizmo.visible = false;
-    const Basic = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true, opacity });
+    const Basic = (color, opacity = 1) => new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true, opacity, toneMapped: false });
     const Pick = () => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false });
     const axes = [["x", 0xd6604a, [1, 0, 0]], ["y", 0x9dc07a, [0, 1, 0]], ["z", 0x9dc0e4, [0, 0, 1]]];
     for (const [name, color, dir] of axes) {
@@ -1335,6 +1345,7 @@ class SceneEditorApp {
     this.ApplyCamera();
     if (this.previewFrame) this.SyncFormalPreview(now);
     else {
+      this.environment.Update(dt, this.camera);
       this.SyncShotGizmo();
       this.UpdateGizmo();
       this.renderer.render(this.scene, this.camera);
@@ -2749,6 +2760,7 @@ ${seg.note}` : ""}`;
           yawDeg: this.camera.rotation.y / DEG, pitchDeg: this.camera.rotation.x / DEG, fovDeg: this.camera.fov },
         viewMode: this.viewMode, shotGizmo: this.shotHelper?.visible ?? false, cameraSelected: this.cameraSelected,
         hiddenStages: [...this.hiddenStages], preview: this.previewFrame ? (this.previewReady ? "ready" : "loading") : "closed",
+        environment: this.environment?.State() || null,
       }),
       PreviewDocument: (token, id) => {
         const snapshot = this.previewSnapshot;
@@ -2757,6 +2769,14 @@ ${seg.note}` : ""}`;
       Find: (id) => this.model.Find(id),
       Select: (ids) => this.SelectIds(ids),
       Frame: (ids) => this.Frame(ids),
+      SetCamera: ({ position, yawDeg, pitchDeg } = {}) => {
+        this.SetView("free");
+        if (Array.isArray(position) && position.length === 3) this.cam.pos.fromArray(position);
+        if (Number.isFinite(yawDeg)) this.cam.yaw = yawDeg * DEG;
+        if (Number.isFinite(pitchDeg)) this.cam.pitch = Math.max(-1.55, Math.min(1.55, pitchDeg * DEG));
+        this.ApplyCamera();
+        this.environment?.SnapAt(this.camera.position);
+      },
       MoveBy: (dx, dy, dz) => { const ids = [...this.model.selection]; this.model.MoveBy(ids, dx, dy, dz, { groundY: (o) => this.GroundY(o) }); this.AfterEdit(ids); },
       RotateBy: (deg) => { const ids = [...this.model.selection]; this.model.RotateBy(ids, deg); this.AfterEdit(ids); },
       SetField: (key, value) => { this.model.SetField([...this.model.selection], key, value); this.AfterEdit(null, { structural: true }); },
@@ -2782,6 +2802,7 @@ ${seg.note}` : ""}`;
       /** 立刻画一帧，缩到 160 宽数像素：天空色占多少、量化后有多少种颜色（「画出来了」要靠像素证明）。 */
       PixelStats: () => {
         this.ApplyCamera();
+        this.environment?.Update(0, this.camera);
         this.UpdateGizmo();
         this.renderer.render(this.scene, this.camera);
         const src = this.renderer.domElement, w = 160, h = Math.max(1, Math.round(160 * src.height / src.width));
