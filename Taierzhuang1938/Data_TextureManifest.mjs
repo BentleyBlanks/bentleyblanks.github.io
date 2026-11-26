@@ -503,14 +503,14 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "Dadao", kind: "material", tier: "boot",
     toneClass: null,
-    toneReason: "刀身两侧、布缠柄与铁件共用的 UV 图集",
-    sizeReason: "2K 基色保留刀面顺向细磨痕与布纹，供第一人称近观。法线与 ORM 为 1K。",
+    toneReason: "刀身两侧、裸铆接柄与铁件共用的 UV 图集",
+    sizeReason: "2K 基色保留钢面细点蚀与柄上铆接痕迹，供第一人称近观。法线与 ORM 为 1K。",
     metersPerTile: null,
     bake: "_import/Script_BakeDadaoPbr.py",
     bakeRecord: "_import/TextureBakes/Texture_Dadao.json",
     source: { provider: "openaiImageApi", date: "2026-11-26",
-      ref: "三视图提供护手、缠柄和环首底色。刀身钢纹及未拍表面的底图由 gpt-image-2.6-sunburst 分别生成（max，3840 × 2160）。",
-      prompt: "_import/Reference/SichuanDadao/Prompt_SichuanDadaoFieldSteel.txt" },
+      ref: "02 国博馆藏照片提供护手、裸铆接柄和环首底色。03 杨云峰大刀的钢面样片由 gpt-image-2 生成（high，2048 × 1152）。",
+      prompt: "_import/Reference/SichuanDadao/Prompt_YangYunfengSteel03Surface.txt" },
     consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" },
       { file: "AdvancedTools/Data_ToolStudioPbrSets.mjs", token: "Texture_DadaoBase" }],
     files: [

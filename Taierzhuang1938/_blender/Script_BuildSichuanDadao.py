@@ -1,8 +1,4 @@
-"""Build the exterior game prop from the three-view contour fit.
-
-The approved sheet supplies shape and color in three orthographic projections.
-The frame places that exterior on the existing game rig.
-"""
+"""Build the museum-profile exterior and fit it to the existing game rig."""
 
 import json
 import math
@@ -14,7 +10,7 @@ from mathutils import Vector
 from TzmCore import Node
 
 
-FIT = json.loads(Path(__file__).with_name("Data_SichuanDadaoThreeViewFit.json").read_text(encoding="utf-8"))
+FIT = json.loads(Path(__file__).with_name("Data_SichuanDadaoMuseumFit.json").read_text(encoding="utf-8"))
 FRAME = FIT["frame"]
 ATLAS = FIT["atlas"]
 
@@ -94,13 +90,16 @@ def BuildBlade():
 
 def BuildGrip():
     mesh = bmesh.new()
-    circle = [(math.sin(i * math.tau / 24), math.cos(i * math.tau / 24)) for i in range(24)]
+    section = []
+    for angle in (i * math.tau / 24 for i in range(24)):
+        v, x = math.sin(angle), math.cos(angle)
+        section.append((math.copysign(abs(v) ** .46, v), math.copysign(abs(x) ** .46, x)))
     rows = []
     for u, top, bottom, near, far in FIT["grip"]:
         centerV, radiusV = (top + bottom) / 2, (bottom - top) / 2
         centerX, radiusX = (near + far) / 2, (far - near) / 2
         rows.append([mesh.verts.new(FromPhoto(u, centerV + radiusV * v, centerX + radiusX * x))
-                     for v, x in circle])
+                     for v, x in section])
     return CompletePart(LoftFaces(mesh, rows))
 
 
@@ -127,6 +126,7 @@ def BuildGuard():
     mesh.normal_update()
     bmesh.ops.triangulate(mesh, faces=list(mesh.faces))
     depthControls = FIT["guardDepth"]
+    shoulderEnd = depthControls[0][0] + .22 * (depthControls[-1][0] - depthControls[0][0])
     for u, _, _ in depthControls[1:-1]:
         bmesh.ops.bisect_plane(mesh, geom=[*mesh.verts, *mesh.edges, *mesh.faces],
                               dist=1e-5, plane_co=(0, 0, u), plane_no=(0, 0, 1))
@@ -139,7 +139,7 @@ def BuildGuard():
                 near = near0 + (near1 - near0) * along
                 far = far0 + (far1 - far0) * along
                 # Hide the cap under the cheek while the guard and blade overlap.
-                shoulder = min(1, max(0, (u - 1470) / 12))
+                shoulder = min(1, max(0, (u - shoulderEnd) / 12))
                 thickness = .5 + (thickness - .5) * (.76 + .24 * shoulder)
                 vert.co = FromPhoto(u, v, near + (far - near) * thickness)
                 break
@@ -162,7 +162,7 @@ def BuildRing():
 
 def BuildParts():
     return [("Blade", BuildBlade()), ("Guard", BuildGuard()),
-            ("CottonWrap", BuildGrip()), ("PommelRing", BuildRing())]
+            ("RivetedHilt", BuildGrip()), ("PommelRing", BuildRing())]
 
 
 def BuildDadao():
