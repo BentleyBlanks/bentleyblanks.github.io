@@ -286,7 +286,8 @@ def BakeRegion(name, sample, size, index, reference):
     if name in ("Tab", "TabBack"):
         tabTone, tabWarmth, tabCoverage = PhotographicGrain(closeup, xx, sampledV)
         tabDetail = tabTone * tabCoverage
-        tonalDelta += 107 * tabDetail - (2.7 * detail + 1.0 * medium) * tabCoverage
+        photoGain = 94 if name == "Tab" else 103
+        tonalDelta += photoGain * tabDetail - (2.7 * detail + 1.0 * medium) * tabCoverage
         warmth += .28 * tabWarmth * tabCoverage
     if name == "Saddle":
         # Trade the generic grain for the photographed pits and rub marks.
@@ -585,6 +586,24 @@ def BakeRegion(name, sample, size, index, reference):
         linear += (polishedColor - linear) * polished[..., None]
         rough += (.345 - rough) * polished
         metal += (.83 - metal) * polished
+    if name in ("Tab", "TabBack"):
+        rubbedSteel = ReferenceField(closeup, xx, sampledV, "rubbedCoverage") / 100
+        wear = np.clip((rubbedSteel - .22) / .68, 0, 1) ** 1.2
+        if name == "Tab":
+            # The front has small rubbed scratches amid the oxidized steel.
+            scratches = .075 * np.clip((tabDetail - .021) / .16, 0, 1)
+            polished = np.maximum(.74 * wear, scratches)
+            tint, gloss, metalFinish = (191, 180, 167), .325, .86
+        else:
+            polished = .77 * wear
+            tint, gloss, metalFinish = (204, 194, 178), .31, .87
+            relative = ReferenceField(closeup, xx, sampledV, "relativeLuminance")
+            oxideShade = np.clip((-relative - 6) / 24, 0, 1) * (1 - rubbedSteel)
+            linear *= (1 - .25 * oxideShade)[..., None]
+        exposed = SrgbToLinear(np.asarray(tint, dtype=np.float32) / 255)
+        linear += (exposed - linear) * polished[..., None]
+        rough += (gloss - rough) * polished
+        metal += (metalFinish - metal) * polished
     if name == "RearEye":
         front, reverse = EyeWear(reference["ringFinish"], xx, vv)
         front *= (1 - .31 * darkPits)
@@ -605,6 +624,9 @@ def BakeRegion(name, sample, size, index, reference):
         metal += (.82 - metal) * wheelWear
     base = LinearToSrgb(linear)
     base += tonalDelta[..., None] / 255 + warmth[..., None] * np.array([.39, .055, -.27])
+    if name in ("Tab", "TabBack"):
+        coolTab = .017 if name == "Tab" else .009
+        base -= coolTab * tabCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Barrel":
         coolPatina = .029 * near * (.40 + .60 * oxideCoverage)
         base -= coolPatina[..., None] * LUMA_NEUTRAL_WARMTH

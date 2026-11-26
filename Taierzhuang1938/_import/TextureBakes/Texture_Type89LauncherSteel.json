@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 527290,
-      "sha256": "983dc90fe47b2bc68d1f5c1c6bff68fa69d430eea8216ffd376f62d8553fa907"
+      "bytes": 527620,
+      "sha256": "33e046ef12a1b0d082b9dc3af8d8c7a689b3b5441e877bbae50b0bf7827720ed"
     },
     {
       "channel": "Normal",
@@ -35,28 +35,28 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 58124,
-      "sha256": "53424707b39d7d9f7ac2d3ee35c0143ea519d65740a14a097b443becfa5623d2"
+      "bytes": 58472,
+      "sha256": "5d1407488c96d0dcb444c471c6423119c5e9f4778732838e22779868422c9b66"
     }
   ],
-  "totalBytes": 1002450,
+  "totalBytes": 1003128,
   "metrics": {
     "meanSrgb": [
-      0.4303,
-      0.4207,
-      0.3931
+      0.4305,
+      0.4211,
+      0.3935
     ],
-    "luma": 0.4147,
-    "lumaStd": 0.1016,
-    "sat": 0.0864,
+    "luma": 0.415,
+    "lumaStd": 0.1024,
+    "sat": 0.086,
     "clipLow": 0.0001,
     "clipHigh": 0.0,
-    "lowFreq": 0.1068,
+    "lowFreq": 0.1069,
     "seam": 0.1135,
-    "interior": 0.0212,
-    "seamRatio": 5.35,
+    "interior": 0.0217,
+    "seamRatio": 5.224,
     "border": 0.809,
-    "swing": 0.0984,
+    "swing": 0.0992,
     "texelsPerMeter": null
   },
   "gateProblems": [],
