@@ -168,6 +168,15 @@ def CollarReflectanceIdentity(reference):
     }
 
 
+def SaddleReflectanceIdentity(reference):
+    previous = json.dumps(reference.get("saddleJointFinish"), sort_keys=True, separators=(",", ":"))
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return SaddleJointIdentity(reference) | {
+        "previousSaddleSha256": sha256(previous.encode("utf-8")).hexdigest(),
+        "contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest(),
+    }
+
+
 def BarrelJointIdentity(reference):
     identity = JointSteelIdentity(reference, "Barrel")
     previous = json.dumps(reference.get("reverseReflectionBalance"), sort_keys=True, separators=(",", ":"))
@@ -2666,7 +2675,7 @@ def Main():
         ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity),
         ("neckJointFinish", NeckJointIdentity), ("sleeveJointFinish", SleeveJointIdentity),
         ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity),
-        ("stemJointFinish", StemJointIdentity))]
+        ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

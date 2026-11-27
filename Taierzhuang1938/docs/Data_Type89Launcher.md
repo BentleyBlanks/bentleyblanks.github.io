@@ -99,6 +99,7 @@
 - 外套筒背面按第 8 张馆藏照复校钢色、粗糙度和金属度。用两组实渲响应提取去掉周期性沟槽明暗后的磨蚀细纹，把修正合入原有图集。独立布光下平均亮度误差从 16.8 降到 14.2 个灰阶，细纹相关系数从 0.543 提至 0.564。另在新版检查台复测正面默认灯和斜视，并用开关 AO 的对照核对十个视角的深缝和相邻部件。 [套筒采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 支柱背面按第 8 张馆藏照复校发蓝钢的色调、反光和磨蚀，并由第 4 张近照约束正面共见区。用两套灯的实渲响应提取磨损细纹，从细纹修正里衰减沿轴延续的槽壁明暗。在独立布光下平均亮度误差从 17.2 降到 11.2 个灰阶，磨蚀细纹相关系数由 -0.070 提至 0.245。同机位复测正面、斜视和十个接缝 AO 视角。 [支柱采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身正面的亮带在新版检查台下重新校准。用第 1 张馆藏照和两组实渲响应修正横向反光，按两组布光共有的色差和磨蚀细节补回细纹。默认灯下平均亮度误差从 19.9 降到 17.8 个灰阶，高精度配准的细纹相关系数从 0.104 提至 0.250。独立斜视下平均亮度误差从 15.1 降到 13.7。另复测第 7 张刻印近照、第 8 张背面照和十个接缝 AO 视角。 [筒身采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 驻钣正背面按第 1、8 张馆藏照复校钢色、粗糙度和反光。按默认灯与近似馆藏布光的共同响应恢复正面磨蚀细纹，近似馆藏布光下的亮度误差从 6.65 降到 5.28 个灰阶，默认灯下从 38.3 降到 33.7。另以独立斜视、背面三组布光和十个接缝 AO 视角复测。用现有 AO 视图映回 UV，在交界暗部平滑衰减材质修正。 [驻钣采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -112,6 +113,7 @@
 - 外套筒背面的修正合入 `sleeveJointFinish.detail` 的 16 位采样图。`rearResponse` 记录配准后的照片、背面布光和响应帧的哈希。底色与粗糙度、金属度从原有图集重烘，第二套 UV 继续读取装配遮蔽。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 支柱背面联合校准保存在 `stemJointFinish`。16 位采样图记录背面的 UV 覆盖范围和磨蚀细纹。正式回烘会校验原图、正面材质和接缝 AO 的哈希，再把材质修正合入现有三张贴图。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 新版检查台的筒身采样保存在 `barrelJointFinish.currentCameraCalibration`。记录包含默认灯与近似馆藏布光的响应帧、拍摄用灯光参数和上一版采样图的哈希。最终亮带和细纹使用同一张 16 位 UV 采样图烘焙。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 驻钣新版反光校准保存在 `saddleReflectanceFinish`。16 位覆盖和磨蚀源图保留交界处的柔和过渡。烘焙校验已有驻钣拟合和接缝 AO 后，把正背面材质修正合入三张运行时贴图。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 重新推导筒身亮度修正时，为采样命令加 `--barrel-evidence <MetalFinishV38/Evidence>`。三组控制帧的 SHA-256 与原照投影记录在 `registeredCalibration` 中。只重算照片采样时，匹配同一照片和投影的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 重新推导外套筒底色时加 `--sleeve-evidence <MetalFinishV39/Evidence>`。记录包含两组配准帧哈希、原照哈希和表面采样范围。只重算照片采样时，原照、采样线和采样范围一致的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
@@ -144,4 +146,4 @@
 - 尾套背面校准保存在 `sleeveReverseFinish`。烘焙核对原正面拟合、沟槽方向遮挡、接缝 AO 及背面 16 位磨蚀采样的哈希。系数只应用于尾套的底色和切线法线图集区域。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 箍圈联合校准保存在 `collarJointFinish`。底色和法线按周向、轴向响应表合成，粗糙度在校验既有 AO 烘焙后写入 ORM 绿通道。磨蚀细纹、红蓝色差来自 16 位采样图。重新编码后，在实际渲染中检查接缝暗度和阴影覆盖。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 驻钣联合校准保存在 `saddleJointFinish`。背面色差和明暗细纹来自 16 位采样图。烘焙核对正面拟合、原钢材和接缝 AO 的哈希，粗糙度修正在恢复已烘焙的接触遮蔽后合入绿通道。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV82/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV83/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
