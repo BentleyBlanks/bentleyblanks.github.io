@@ -116,7 +116,7 @@
     "Dadao": {
       "name": "川军大刀",
       "group": "melee",
-      "sourceTriangles": 8472,
+      "sourceTriangles": 9632,
       "sourceTexture": "杨云峰大刀照片投影与 OpenAI Image API 钢面、纤维样片",
       "runtimeTexture": "专用 2K 基色、1K 法线和 1K ORM",
       "note": "按确认的整把加宽参考图重建，导出上限 10,812 三角。"

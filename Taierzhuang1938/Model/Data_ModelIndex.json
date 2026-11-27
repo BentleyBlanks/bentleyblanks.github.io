@@ -519,11 +519,11 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Model_Dadao.tzm.json",
-   "triangles": 8472,
+   "triangles": 9632,
    "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 172295,
+   "bytes": 184335,
    "materials": [
     "dadao"
    ],
@@ -535,18 +535,18 @@
    ],
    "bounds": {
     "min": [
-     -0.01446,
+     -0.01345,
      -0.08034,
      -0.6302
     ],
     "max": [
-     0.01446,
-     0.06802,
-     0.2702
+     0.01345,
+     0.06791,
+     0.26988
     ]
    },
-   "sourceTriangles": 8472,
-   "targetTriangles": 8472,
+   "sourceTriangles": 9632,
+   "targetTriangles": 9632,
    "triangleLimit": 10812
   },
   {

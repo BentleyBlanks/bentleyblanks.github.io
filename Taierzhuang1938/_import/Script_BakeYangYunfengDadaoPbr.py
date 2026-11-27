@@ -165,6 +165,45 @@ def EdgeProjection(color, tags, visible, fromBottom, fabric):
             np.broadcast_to(tags[edge, known], tags.shape))
 
 
+def TidyTailProjection(color, tags, fit, factor):
+    height, width = tags.shape
+    atlas, frame = fit["atlas"], fit["frame"]
+    size = np.array((atlas["right"] - atlas["left"], atlas["bottom"] - atlas["top"]))
+    low = np.array((atlas["left"], atlas["top"]))
+    rotation = np.array(((frame["cos"], -frame["sin"]), (frame["sin"], frame["cos"])))
+    holes = [np.array(loop) @ rotation for loop in fit["parts"]["Pommel"]["loops"][1:]]
+    aperture = np.zeros(tags.shape, dtype=np.uint8)
+    for loop in holes:
+        pixels = (loop - low) / size * (width - 1, height - 1)
+        cv2.fillPoly(aperture, [np.rint(pixels).astype(np.int32)], 1)
+
+    r, g, b = np.moveaxis(color, -1, 0)
+    thread = (tags == 4) & (r - g > .25) & (g < .21) & (b < .24)
+    distance = distance_transform_edt(aperture == 0)
+    close = 1 - Smoothstep(11 * factor, 24 * factor, distance)
+    pale = (tags == 4) * close * Smoothstep(.18, .36, np.minimum(g, b))
+    nearby = distance_transform_edt(~thread, return_distances=False, return_indices=True)
+    # Continue the dyed fibres around the hole, including highlights carried over
+    # from the reference background. The opening remains in the mesh.
+    finish = color + pale[..., None] * (.87 * color[tuple(nearby)] - color)
+
+    along = np.linspace(atlas["left"], atlas["right"], width)[None, :]
+    gripEnd = fit["grip"][-1][0]
+    opening = min(loop[:, 0].min() for loop in holes)
+    cloth = (tags == 3) & (along < gripEnd - 51) & (r - b > .15) & (g > .39)
+    sample = distance_transform_edt(~cloth, return_distances=False, return_indices=True)
+    shift = round(57 * (width - 1) / size[0])
+    sourceColumns = np.maximum(0, np.arange(width) - shift)
+    weave = color[tuple(sample)][:, sourceColumns]
+    # Continue the cloth into the overlap using the grain from its interior.
+    # The baked contact AO supplies the small shadow where the layers meet.
+    lap = (tags == 3) * Smoothstep(gripEnd - 69, gripEnd - 23, along)
+    hem = (tags == 4) * (1 - Smoothstep(opening - 4, opening, along)) * (1 - Smoothstep(.13, .28, r - g))
+    finish += lap[..., None] * (.93 * weave - finish)
+    finish += hem[..., None] * (.77 * weave - finish)
+    return finish.astype(np.float32)
+
+
 def Tiles(photo, labels, fit, size, samples, balanced=None):
     factor = size // DATA_SIZE
     shape = (992 * factor, 216 * factor)
@@ -173,6 +212,7 @@ def Tiles(photo, labels, fit, size, samples, balanced=None):
     if size == BASE_SIZE:
         detail = front - gaussian_filter(front, (.9, .9, 0))
         front = np.clip(front + .32 * detail, 0, 1)
+    front = TidyTailProjection(front, tags, fit, factor)
     front, rimCloth = CleanClothEdges(front, tags, visible, factor)
     guide = np.where(tags[..., None] >= 3, front, color)
     yield 0, front, tags, guide
@@ -212,8 +252,20 @@ def WrapRimCloth(color, guide, tags, coverage, factor):
 def BaseTile(color, details):
     textile, fibers, _ = details
     adjusted = color.copy()
-    adjusted[textile] *= 1 + .34 * fibers[textile, None]
+    adjusted[textile] *= 1 + .68 * fibers[textile, None]
     return np.clip(adjusted, 0, 1)
+
+
+def GuardGrain(color, tags, steel):
+    guard = tags == 2
+    if not guard.any():
+        return color
+    height, width = guard.shape
+    swatch = Sample(steel, (width, height), (.57, .45)) @ LUMA
+    grain = swatch - gaussian_filter(swatch, (1.9, 2.3))
+    updated = color.copy()
+    updated[guard] *= 1 + .51 * np.clip(grain[guard, None], -.16, .14)
+    return np.clip(updated, 0, 1)
 
 
 def ApplyPatinaColor(color, tags):
@@ -254,17 +306,17 @@ def DataTiles(color, details, geometryAo):
     fine = gaussian_filter(luma, .55) - haze
     groove, pits = SteelCavities(luma)
     steelRelief = .51 * fine - .08 * groove - .06 * pits
-    relief = np.where(textile, .42 * fine + 1.35 * folds + .96 * fibers, steelRelief)
+    relief = np.where(textile, .42 * fine + 1.44 * folds + 1.82 * fibers, steelRelief)
     dy, dx = np.gradient(relief)
     direction = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
     normal = .5 + .5 * direction / np.linalg.norm(direction, axis=2, keepdims=True)
     age = 1 - Smoothstep(.40, .82, luma)
-    fabricRoughness = np.clip(.88 + .07 * age - .20 * fibers, .82, .98)
+    fabricRoughness = np.clip(.90 + .06 * age - .20 * fibers, .85, .99)
     rough = np.where(textile, fabricRoughness, .44 + .23 * age)
     metal = np.where(textile, 0, .91 - .24 * age)
     lapShade = Smoothstep(.010, .073, -folds)
     yarnShade = Smoothstep(.008, .085, -fibers)
-    clothAo = 1 - .44 * lapShade - .09 * yarnShade
+    clothAo = 1 - .44 * lapShade - .16 * yarnShade
     steelAo = 1 - .48 * groove - .25 * pits
     occlusion = np.maximum(.16, geometryAo ** 1.58 * np.where(textile, clothAo, steelAo))
     return normal, np.stack((occlusion, rough, metal), axis=2)
@@ -341,6 +393,7 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
         highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
         if strip:
             color, guide = WrapRimCloth(color, guide, tags, highCoverage, factor)
+        color = GuardGrain(color, tags, steel)
         tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
         if strip:
             tile = MatchRimMetal(gaussian_filter(tile, (.69, .69, 0)), tags >= 3)
@@ -354,6 +407,7 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
             color, guide = WrapRimCloth(color, guide, tags, coverage[strip], 1)
             color = MatchRimMetal(color, tags >= 3)
             ambient = np.where(tags >= 3, ambient, MirrorRim(ambient))
+        color = GuardGrain(color, tags, steel)
         details = TextileDetails(guide, tags, samples, strip)
         layers = DataTiles(color, details, ambient)
         data[strip] = PadTiles(layers, ((.5, .5, 1), (1, .74, .64)), coverage[strip])

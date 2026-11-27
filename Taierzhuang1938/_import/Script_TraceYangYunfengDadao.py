@@ -120,14 +120,19 @@ def PlateSamples(mask, tolerance, spacing, minHole=6):
     return {"loops": rim, "surface": points}
 
 
-def CleanBladeOutline(points):
-    outline = np.asarray(points, dtype=np.float64)
+def SampleOutline(outline):
     closed = np.vstack((outline, outline[0]))
     distance = np.r_[0, np.cumsum(np.linalg.norm(np.diff(closed, axis=0), axis=1))]
     count = math.ceil(distance[-1] / .8)
     step = distance[-1] / count
     positions = np.arange(count) * step
     samples = np.stack([np.interp(positions, distance, component) for component in closed.T], axis=1)
+    return samples, step
+
+
+def CleanBladeOutline(points):
+    outline = np.asarray(points, dtype=np.float64)
+    samples, step = SampleOutline(outline)
 
     radius = math.ceil(11 / step)
     border = np.pad(samples, ((radius, radius), (0, 0)), mode="wrap")
@@ -148,6 +153,16 @@ def CleanBladeOutline(points):
             nearest = np.argmin(np.linalg.norm(samples - anchor, axis=1))
             result[nearest] = anchor
     return cv2.approxPolyDP(result.astype(np.float32), .48, True).reshape(-1, 2).tolist()
+
+
+def RefineFitting(part, sigma, tolerance):
+    for i, points in enumerate(part["loops"]):
+        samples, step = SampleOutline(np.asarray(points, dtype=np.float64))
+        radius = math.ceil(3.5 * sigma / step)
+        border = np.pad(samples, ((radius, radius), (0, 0)), mode="wrap")
+        smooth = cv2.GaussianBlur(border, (1, 2 * radius + 1), 0, sigmaY=sigma / step)[radius:-radius]
+        part["loops"][i] = cv2.approxPolyDP(smooth.astype(np.float32), tolerance, True).reshape(-1, 2).tolist()
+    return part
 
 
 def GripRows(mask, frame, atlas):
@@ -183,8 +198,8 @@ def Fit(source):
         "atlas": atlas,
         "parts": {
             "Blade": blade,
-            "Guard": PlateSamples(joined["Guard"], .65, (7, 8)),
-            "Pommel": PlateSamples(joined["Pommel"], .63, (7, 8)),
+            "Guard": RefineFitting(PlateSamples(joined["Guard"], .65, (7, 8)), 1.13, .31),
+            "Pommel": RefineFitting(PlateSamples(joined["Pommel"], .63, (7, 8)), 1.22, .39),
         },
         "grip": GripRows(joined["Grip"], frame, atlas),
     }, masks

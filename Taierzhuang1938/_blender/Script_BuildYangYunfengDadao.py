@@ -129,6 +129,16 @@ def SmoothBladeWall(mesh, wall):
         bpy.data.meshes.remove(proxy)
 
 
+def RoundFitting(mesh, wall, scale, segments):
+    rim = set(wall)
+    edges = [edge for edge in mesh.edges if edge.is_manifold
+             and sum(face in rim for face in edge.link_faces) == 1]
+    bmesh.ops.bevel(mesh, geom=edges, offset=1.10 * scale, segments=segments,
+                    profile=.5, clamp_overlap=True, affect="EDGES")
+    for face in mesh.faces:
+        face.smooth = True
+
+
 def BuildPlate(fit, name):
     coordinates, shell, relief = TriangulatePlate(fit["parts"][name])
     mesh = bmesh.new()
@@ -154,10 +164,37 @@ def BuildPlate(fit, name):
                 edgeFace = mesh.faces.new((front[a], front[b], back[b], back[a]))
                 edgeFace.smooth = name != "Blade"
                 wall.append(edgeFace)
-    ApplyUv(mesh, fit)
     if name == "Blade":
+        ApplyUv(mesh, fit)
         SmoothBladeWall(mesh, wall)
+    else:
+        bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+        RoundFitting(mesh, wall, frame["scale"], 2 if name == "Guard" else 1)
+        ApplyUv(mesh, fit)
     return mesh
+
+
+def ClothEndAt(rows, v):
+    for outside, inside in zip(rows, rows[1:]):
+        u, low, high = outside
+        if low <= v <= high:
+            return u
+        if inside[1] <= v <= inside[2]:
+            side = 1 if v < low else 2
+            blend = (v - outside[side]) / (inside[side] - outside[side])
+            return u + blend * (inside[0] - u)
+    return rows[-1][0]
+
+
+def TuckRows(mesh, frame, section, photographedEnd, direction):
+    _, top, bottom = photographedEnd[-1]
+    center, radius = (top + bottom) / 2, (bottom - top) / 2
+    # Cross sections remain oval at the join. The outermost ring is recessed
+    # into the fitting so its closing face stays below the visible cloth edge.
+    return [[mesh.verts.new(World(frame, ClothEndAt(photographedEnd, center + radius * v) + direction * extension,
+                                  center + radius * v * width, .34 * .76 * radius * depth * thickness))
+             for v, depth in section]
+            for extension, width, thickness in ((14.0, .77, .52), (6.2, .96, .96), (.72, 1.0, 1.0))]
 
 
 def BuildGrip(fit):
@@ -165,11 +202,17 @@ def BuildGrip(fit):
     mesh = bmesh.new()
     count = 30
     section = [(math.sin(i * math.tau / count), math.cos(i * math.tau / count)) for i in range(count)]
-    rows = []
-    for u, top, bottom in fit["grip"]:
+    samples = fit["grip"]
+    widths = [bottom - top for _, top, bottom in samples]
+    start = next(i for i, width in enumerate(widths) if width >= .90 * max(widths[:8]))
+    end = next(i for i in reversed(range(len(widths))) if widths[i] >= .90 * max(widths[-12:]))
+    rows = TuckRows(mesh, frame, section, samples[:start + 1], -1)
+    for u, top, bottom in samples[start:end + 1]:
         center, radius = (top + bottom) / 2, max(.5, (bottom - top) / 2)
-        # Keep the photographed width and fit the oval depth to the existing arms.
-        rows.append([mesh.verts.new(World(frame, u, center + radius * v, radius * .34 * depth)) for v, depth in section])
+        nearby = min(1, (u - samples[start][0]) / 24, (samples[end][0] - u) / 27)
+        seated = .76 + .24 * nearby * nearby * (3 - 2 * nearby)
+        rows.append([mesh.verts.new(World(frame, u, center + radius * v, radius * .34 * seated * depth)) for v, depth in section])
+    rows.extend(reversed(TuckRows(mesh, frame, section, samples[end:][::-1], 1)))
     for a, b in zip(rows, rows[1:]):
         for i in range(count):
             j = (i + 1) % count

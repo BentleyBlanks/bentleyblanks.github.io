@@ -21,5 +21,6 @@
 - 运行 `python Taierzhuang1938/_import/Script_BakeYangYunfengDadaoPbr.py <Reference_YangYunfengWhiteWiderTogether15.png>` 烘焙 2K 基色、1K OpenGL 法线和 1K ORM。`Texture_YangYunfengDiffuseFit.png` 记录同机位实渲校准值。运行 `python Taierzhuang1938/_import/Script_BakePbrTexture.py --audit --name Dadao` 登记成品。
 - `Texture_YangYunfengGeometryAo.png` 保存现有网格的接触遮蔽，Alpha 通道记录 UV 岛覆盖。重算时在 BlenderMCP 会话中从 `_blender/Script_BakeYangYunfengDadaoAo.py` 调用 `BakeAo` 写入 NPZ，再给烘焙命令加 `--raycast <NPZ 路径>`。烘焙脚本将网格接触遮蔽、布带搭接暗部和钢面槽线及局部点蚀的暗部写入 ORM 红通道。钢面细节用相邻亮边夹住的凹纹估算，模型以全强度采样该通道。法线和 ORM 在 UV 岛外留出采样边距，远离网格的像素用中性值压缩。
 - `Scene_YangYunfengDadaoWider15.blend`、同机位对照、纯白背景三视图和原始纤维样片留在素材库的 `Blender/Taierzhuang1938/SichuanDadao/YangYunfengModel`。参考图在同级 `YangYunfengPhotoReference`。源工程包含独立部件、对照相机和打包贴图。
-- 配色按游戏美术调整。护手与尾环相邻布边采用旧棕色，钢面偏绿的斑纹改成灰褐。刀身轮廓先清理照片边缘的细碎锯齿，切面沿曲线连续着色，同一轮重烘 AO。成品为 8,472 三角。
-- `Scene_YangYunfengDadaoFinish.blend` 保存最新版模型与材质。同目录 `FinishReview` 有布柄、刀面与切面的同机位对照，`WrapReview` 与 `SideMatchReview` 保留此前的窄侧与正反面记录。
+- 配色按游戏美术调整。护手与尾环相邻布边采用旧棕色，钢面偏绿的斑纹改成灰褐。刀身轮廓沿连续曲线清理照片边缘的细碎锯齿。
+- 护手卷口及尾环转角圆润过渡。布柄两端沿照片里的斜边收进接合处，端盖藏入相邻件内侧。织纹来自纤维样片，尾环孔边的淡色斑点用相邻红纤维修补，布边从同一段布的内部取色。法线与接触 AO 随模型重烘，成品为 9,632 三角。
+- `Scene_YangYunfengDadaoDetail.blend` 保存最新版模型与材质。同目录 `DetailReview` 有护手、布纹、尾环与法线的同机位对照，`FinishReview`、`WrapReview` 与 `SideMatchReview` 保留此前的记录。
