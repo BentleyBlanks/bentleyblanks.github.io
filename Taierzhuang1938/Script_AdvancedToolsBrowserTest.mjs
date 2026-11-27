@@ -244,6 +244,7 @@ try {
       ctx.drawImage(stage.canvas, 0, 0);
       const data = ctx.getImageData(0, 0, copy.width, copy.height).data;
       let minX = copy.width, maxX = 0, count = 0, min = 255, max = 0, chromatic = 0, hash = 0;
+      let dark = 0, midtone = 0;
       for (let i = 3; i < data.length; i += 4) {
         if (data[i] < 245) continue;
         const x = ((i - 3) / 4) % copy.width;
@@ -252,11 +253,13 @@ try {
         maxX = Math.max(maxX, x);
         min = Math.min(min, r);
         max = Math.max(max, r);
+        if (r < 16) dark += 1;
+        else if (r < 250) midtone += 1;
         if (r !== g || g !== b) chromatic += 1;
         hash = Math.imul(hash ^ ((r << 16) | (g << 8) | b), 16777619);
         count += 1;
       }
-      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, chromatic, hash,
+      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, dark, midtone, chromatic, hash,
         triangles: stage.model.triangles, quiet: stage.model.blade?.visible === false };
     });
     const pixels = await ReadPixels();
@@ -368,8 +371,18 @@ try {
       && SpreadOf(timber.roughness, 0) < 24
       && timber.reflection.every(([r, g, b]) => r > 3 && g > 3 && b > 3 && Math.max(r, g, b) < 62)
       && SpreadOf(timber.reflection, 2) < 28, JSON.stringify([timber.roughness, timber.reflection]));
-    await page.evaluate(([yaw, pitch]) => window.WeaponInspection.scene.SetView(yaw, pitch), beforeChannels);
 
+    await Inspect("Dadao");
+    await Channel("shadow");
+    await page.evaluate(() => window.WeaponInspection.scene.SetView(0, .1));
+    const litBlade = await ReadPixels();
+    await page.evaluate(() => window.WeaponInspection.scene.SetView(Math.PI, .1));
+    const shadowedBlade = await ReadPixels();
+    Check("大刀正面保持受光和局部遮挡，背面没有密集阴影条纹",
+      litBlade.count > 2500 && litBlade.dark > 10 && (litBlade.dark + litBlade.midtone) < litBlade.count * .06
+      && shadowedBlade.count > 2500 && shadowedBlade.dark > shadowedBlade.count * .9,
+      JSON.stringify({ lit: litBlade, shadowed: shadowedBlade }));
+    await page.evaluate(([yaw, pitch]) => window.WeaponInspection.scene.SetView(yaw, pitch), beforeChannels);
     await Channel("ao");
     await Inspect("ZhongZheng");
     const packedAo = await ReadPixels();

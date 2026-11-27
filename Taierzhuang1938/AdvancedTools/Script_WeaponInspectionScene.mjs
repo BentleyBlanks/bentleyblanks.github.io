@@ -42,12 +42,49 @@ const WEAPON_PBR_NAMES = new Set([
   "LugouqiaoOfficerSword", "LugouqiaoType11AmmoBox", "LugouqiaoType11Body", "LugouqiaoType11BodyAlt", "LugouqiaoType11Fore",
 ]);
 
+const INSPECTION_SHADOW_GLSL = /* glsl */`
+  #if defined( USE_SHADOWMAP ) && defined( SHADOWMAP_TYPE_BASIC ) && NUM_DIR_LIGHT_SHADOWS > 0
+    float InspectionShadowTap(sampler2D shadowMap, vec2 texel, vec2 mapSize, vec3 receiver, vec2 depthSlope) {
+      vec2 uv = (clamp(texel, vec2(0.0), mapSize - 1.0) + 0.5) / mapSize;
+      float reference = receiver.z + dot(depthSlope, uv - receiver.xy);
+      return step(reference, texture2D(shadowMap, uv).r);
+    }
+
+    float InspectionShadow(sampler2D shadowMap, vec2 mapSize, float intensity, float bias, float radius, vec4 coord) {
+      vec3 receiver = coord.xyz / coord.w;
+      vec3 dx = dFdx(receiver);
+      vec3 dy = dFdy(receiver);
+      if (any(lessThan(receiver, vec3(0.0))) || any(greaterThan(receiver, vec3(1.0)))) return 1.0;
+      float det = dx.x * dy.y - dx.y * dy.x;
+      vec2 depthSlope = vec2(0.0);
+      if (abs(det) > 1e-16) {
+        depthSlope = clamp(vec2(dx.z * dy.y - dy.z * dx.y, dx.x * dy.z - dy.x * dx.z) / det, -16.0, 16.0);
+      }
+      receiver.z += bias;
+      // Compare at each actual texel center. Interpolating the comparisons keeps edges soft
+      // without comparing neighboring depths against the same point on a sloped surface.
+      vec2 grid = receiver.xy * mapSize - 0.5;
+      vec2 base = floor(grid);
+      vec2 weight = fract(grid);
+      float a = InspectionShadowTap(shadowMap, base, mapSize, receiver, depthSlope);
+      float b = InspectionShadowTap(shadowMap, base + vec2(1.0, 0.0), mapSize, receiver, depthSlope);
+      float c = InspectionShadowTap(shadowMap, base + vec2(0.0, 1.0), mapSize, receiver, depthSlope);
+      float d = InspectionShadowTap(shadowMap, base + vec2(1.0, 1.0), mapSize, receiver, depthSlope);
+      return mix(1.0, mix(mix(a, b, weight.x), mix(c, d, weight.x), weight.y), intensity);
+    }
+    // Keep the direct lighting and the Shadow channel on the same visibility calculation.
+    #define getShadow InspectionShadow
+  #endif
+`;
+
 function AttachInspectionChannels(material, channel) {
   const packedAo = material.userData.ormUniforms?.ao;
+  // Use the nearest surface for shadow visibility on thin parts, including the unlit side.
+  material.shadowSide ??= material.side;
   // A GLB can omit UVs or tangents. Constant zero attributes leave those parts neutral in Tangent.
   material.defaultAttributeValues = { ...material.defaultAttributeValues, uv: [0, 0], tangent: [0, 0, 0, 1] };
   const inspection = MakePatch({
-    key: packedAo ? "inspectionChannels1Orm" : "inspectionChannels1",
+    key: packedAo ? "inspectionChannels2Orm" : "inspectionChannels2",
     defines: { USE_UV: "" },
     uniforms: (uniforms) => { uniforms.uInspectionChannel = channel; },
     vertex: [
@@ -62,6 +99,7 @@ function AttachInspectionChannels(material, channel) {
         #endif`],
     ],
     fragment: [
+      ["#include <shadowmap_pars_fragment>", INSPECTION_SHADOW_GLSL],
       ["#include <common>", /* glsl */`
         uniform int uInspectionChannel;
         #ifndef USE_TANGENT
@@ -167,8 +205,8 @@ function CreateLighting(renderer, scene) {
   key.castShadow = true;
   key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   key.shadow.autoUpdate = false;
-  key.shadow.bias = -2 / SHADOW_MAP_SIZE;
-  key.shadow.radius = .65;
+  // With equal depth and width spans, one texel covers curved surfaces' residual depth error.
+  key.shadow.bias = -1 / SHADOW_MAP_SIZE;
   scene.add(key, key.target);
   for (const [color, intensity, x, y, z] of [
     [0xd6eaff, 1.15, 3, 1, 3], [0xffffff, 1.75, 2, 3, -5],
@@ -209,7 +247,6 @@ function FitShadow(key, center, extent) {
   camera.near = radius;
   camera.far = 3 * radius;
   camera.updateProjectionMatrix();
-  shadow.normalBias = 2 * radius / SHADOW_MAP_SIZE;
   // The model and key light stay still during orbit, pan and zoom.
   shadow.needsUpdate = true;
 }
@@ -240,6 +277,7 @@ export class WeaponInspectionScene {
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera();
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
