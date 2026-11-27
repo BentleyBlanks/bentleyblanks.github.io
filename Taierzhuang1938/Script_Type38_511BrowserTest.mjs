@@ -249,13 +249,27 @@ try{
    Read(face.map.image);
    const cupColor=Patch(.408,.48,0),dotColor=Patch(.387,.28,0);
    Read(face.roughnessMap.image);
-   return {collarRough,cupColor,dotColor,cupRough:Patch(.408,.48,1),dotRough:Patch(.387,.28,1)};
+   const {width,height}=canvas;
+   const ao=ctx.getImageData(0,0,width,height).data;
+   const beadAo={count:0,cavity:0,open:0};
+   for(let pixel=0;pixel<width*height;pixel+=6){
+    const u=(pixel%width+.5)/width,v=(Math.floor(pixel/width)+.5)/height;
+    const radius=((u-.408)/.29)**2+((v-.48)/.40)**2;
+    if(radius<=.24**2||radius>=.75**2||ao[pixel*4+1]===0)continue;
+    const value=ao[pixel*4];
+    beadAo.count++;
+    if(value<221)beadAo.cavity++;
+    if(value>243)beadAo.open++;
+   }
+   return {collarRough,cupColor,dotColor,cupRough:Patch(.408,.48,1),dotRough:Patch(.387,.28,1),beadAo};
   });
-  const {collarRough,cupColor,dotColor,cupRough,dotRough}=evidence.rearSteel;
+  const {collarRough,cupColor,dotColor,cupRough,dotRough,beadAo}=evidence.rearSteel;
   assert(collarRough.count>100&&collarRough.median>120&&collarRough.median<165,
    'the collar needs a broad satin highlight');
   assert(dotColor-cupColor>55&&cupRough-dotRough>35,
    'the recessed center and worn dot surface need distinct reflectance');
+  assert(beadAo.count>1000&&beadAo.cavity>beadAo.count*.12&&beadAo.open>beadAo.count*.30,
+   'the rear disk needs visible occlusion between its raised dots');
   evidence.foreFinish=await page.evaluate(()=>{
    let mat;
    window.Tengxian.viewmodel.rig.group.traverse(mesh=>{if(mesh.userData.type38Part==='Exterior_LongRound44')mat=mesh.material;});

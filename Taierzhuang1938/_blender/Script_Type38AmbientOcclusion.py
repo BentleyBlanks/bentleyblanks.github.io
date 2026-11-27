@@ -26,16 +26,18 @@ def Normalize(vectors):
     return vectors / np.maximum(np.linalg.norm(vectors, axis=-1, keepdims=True), 1e-8)
 
 
-def TraceOcclusion(scene, points, normals, geometryGroups, group):
+def TraceOcclusion(scene, points, normals, geometryGroups, group, *, sampleCount=RAY_COUNT,
+                   distanceLimit=RAY_DISTANCE, bias=RAY_BIAS, faceDirections=None):
     result = np.empty(len(points), dtype=np.float32)
     rng = np.random.default_rng(7529)
-    samples = (np.arange(RAY_COUNT, dtype=np.float32) + .5) / RAY_COUNT
+    samples = (np.arange(sampleCount, dtype=np.float32) + .5) / sampleCount
     radial, axial = np.sqrt(samples), np.sqrt(1 - samples)
-    azimuth = np.arange(RAY_COUNT, dtype=np.float32) * 2.39996323
+    azimuth = np.arange(sampleCount, dtype=np.float32) * 2.39996323
     for start in range(0, len(points), 3072):
         stop = min(start + 3072, len(points))
         normal = Normalize(normals[start:stop])
-        origin = points[start:stop] + normal * RAY_BIAS
+        support = normal if faceDirections is None else Normalize(faceDirections[start:stop])
+        origin = points[start:stop] + support * bias
         reference = np.zeros_like(normal)
         reference[:, 2] = 1
         reference[np.abs(normal[:, 2]) > .9] = [0, 1, 0]
@@ -45,18 +47,25 @@ def TraceOcclusion(scene, points, normals, geometryGroups, group):
         directions = (xAxis[:, None] * (radial * np.cos(angle))[:, :, None]
                       + yAxis[:, None] * (radial * np.sin(angle))[:, :, None]
                       + normal[:, None] * axial[None, :, None])
-        starts = np.repeat(origin, RAY_COUNT, axis=0)
+        starts = np.repeat(origin, sampleCount, axis=0)
         hit = scene.run(starts, directions.reshape(-1, 3),
-                        dists=np.full(len(starts), RAY_DISTANCE, dtype=np.float32), output=1)
+                        dists=np.full(len(starts), distanceLimit, dtype=np.float32), output=1)
         groupHit = geometryGroups[hit['geomID']]
         distance = hit['tfar']
-        close = np.maximum(0, 1 - distance / (.46 * RAY_DISTANCE))
-        falloff = .61 * close + .39 * np.maximum(0, 1 - distance / RAY_DISTANCE)
+        close = np.maximum(0, 1 - distance / (.46 * distanceLimit))
+        falloff = .61 * close + .39 * np.maximum(0, 1 - distance / distanceLimit)
         # Keep contact shading through the resting joints. Attenuate its reach
         # between moving assemblies so their cast shadow does not follow a map.
         crossMotion = (groupHit != group) & ((groupHit != 0) | (group != 0))
         attenuation = np.where(crossMotion, .78 * close, 1)
-        exposure = (falloff * attenuation * (hit['geomID'] >= 0)).reshape(-1, RAY_COUNT).mean(axis=1)
+        blocked = (falloff * attenuation * (hit['geomID'] >= 0)).reshape(-1, sampleCount)
+        if faceDirections is None:
+            exposure = blocked.mean(axis=1)
+        else:
+            # The interpolated normal steers the hemisphere. The face normal
+            # rejects directions that would start underneath the shading face.
+            above = np.einsum('ijk,ik->ij', directions, support) > 0
+            exposure = (above * blocked).sum(axis=1) / np.maximum(1, above.sum(axis=1))
         result[start:stop] = np.clip(1 - 2.50 * exposure, .08, 1)
     return result
 
@@ -77,16 +86,15 @@ def WoodCavity(normalMap, orm, dents):
     return 1 - timber * np.minimum(.70, dents + .40 * pore * finish)
 
 
-def BakeContactOcclusion(repo, doc, views):
+def OcclusionScene(repo, doc, views):
     from embreex.mesh_construction import TriangleMesh
     from embreex.rtcore_scene import EmbreeScene
 
     roles = RoleMap(repo)
     motionIds = {role:index for index,role in enumerate(sorted(MOVING_ROLES), start=1)}
     scene = EmbreeScene()
-    charts = defaultdict(list)
     geometryGroups = []
-    geometry = []
+    subjects = []
     for node in doc['nodes']:
         primitive, = doc['meshes'][node['mesh']]['primitives']
         attrs = primitive['attributes']
@@ -98,15 +106,23 @@ def BakeContactOcclusion(repo, doc, views):
         sourcePart = extra['SourceRanges'][0]['part'] if 'SourceRanges' in extra else extra['SourceObject']
         role = roles.get(sourcePart)
         group = motionIds.get(role, 0)
-        geometry.append(TriangleMesh(scene, vertices @ rotation.T + location, indices))
+        geometry = TriangleMesh(scene, vertices @ rotation.T + location, indices)
         geometryGroups.append(group)
+        # Hold the mesh beside its subject for the lifetime of the scene.
+        subjects.append((node, primitive, sourcePart, rotation, location, group, role == 'Wood', geometry))
+    return scene, np.array(geometryGroups + [0], dtype=np.uint8), subjects
 
+
+def BakeContactOcclusion(repo, doc, views):
+    scene, geometryGroups, subjects = OcclusionScene(repo, doc, views)
+    charts = defaultdict(list)
+    for _, primitive, sourcePart, rotation, location, group, wood, _ in subjects:
         material = doc['materials'][primitive['material']]
         orm = material['pbrMetallicRoughness']['metallicRoughnessTexture']
         assert orm.get('texCoord', 0) == 0 and not orm.get('extensions')
         image = doc['textures'][orm['index']]['source']
         material['occlusionTexture'] = {**orm, 'strength': 1}
-        charts[image].append((sourcePart, primitive, rotation, location, group, role == 'Wood'))
+        charts[image].append((sourcePart, primitive, rotation, location, group, wood))
 
     # The GLB also keeps a separate anisotropy chart in a corner of one ORM
     # image. It is addressed through a texture transform and retains its RGB.
@@ -119,7 +135,6 @@ def BakeContactOcclusion(repo, doc, views):
             if image in charts:
                 reserved[image].append(slot['extensions']['KHR_texture_transform'])
 
-    geometryGroups = np.array(geometryGroups + [0], dtype=np.uint8)
     cavityImages = []
     for imageIndex, parts in charts.items():
         image = doc['images'][imageIndex]
@@ -194,6 +209,11 @@ if __name__ == '__main__':
     assert digest == manifest['runtimeSha256'] == lod['sourceSha256']
     inputVersion = doc['asset']['extras']['version']
     manifest['ambientOcclusion'] = BakeContactOcclusion(repo, doc, views)
+    if 'rearContact' in manifest:
+        from Script_Type38RearFinish import BakeRearFinish
+        normalImages = manifest['rearContact'].get('normalImages', [])
+        manifest['rearContact'] = BakeRearFinish(repo, doc, views, polishMetal=False)
+        manifest['rearContact']['normalImages'] = normalImages
     if 'edgeHighlights' in manifest:
         doc['asset']['extras']['version'] = inputVersion
     SaveType38Assets(args.output, doc, views, manifest, lod, author=manifest['renderMeshes'] == manifest['parts'])

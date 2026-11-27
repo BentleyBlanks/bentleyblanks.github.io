@@ -1,14 +1,22 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v27
+## 当前交付版 v28
 
-游戏使用 `511-edge-glints-27`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-rear-contact-28`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 后部倒角与高密度离线 AO · 2026-11-27
+
+后视照片用来核对尾盘的窄外缘和凸点，侧斜照片用来核对覆壳唇边、钢环和侧板贴木处的明暗过渡。俯视与馆藏照片辅助校准外露钢面的磨光范围。 [后视照片](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [侧斜照片](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG) · [钢面俯视](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action_inscriptions.JPG) · [澳大利亚战争纪念馆](https://www.awm.gov.au/collection/C142149)
+
+用离线射线烘焙重算后部接缝的 AO。该区域每个样点用 144 条射线，局部 UV 烘焙网格最长边为 1536。通过面法线剔除穿过起始表面的射线，活动件之间按近接触衰减。尾盘点纹之间的微遮蔽依据其材质法线计算。覆壳唇边、侧钢板、钢环与尾盘的倒角沿现有曲面调顺粗糙度和微法线，高光线在同机位斜光下核对。 [后部烘焙脚本](../../_blender/Script_Type38RearFinish.py)
+
+局部重烘可用 `Script_Type38RearFinish.py --input <v27 资产目录> --output <输出目录>`。
 
 ## 钢件倒角和木面漆边高光 · 2026-11-27
 
