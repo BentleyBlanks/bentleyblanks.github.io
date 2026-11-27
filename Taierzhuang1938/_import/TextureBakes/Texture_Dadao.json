@@ -16,44 +16,44 @@
       "file": "Texture_DadaoBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 277724,
-      "sha256": "eb347d7b4e20ada1daf119cc52d45664bbecdd55c32acc3bdce6cc328b73f13e"
+      "bytes": 273848,
+      "sha256": "45c5e6ae1fcae17fc501f61382d0fdb47d16eb2fc473d46b9921429b8d765d30"
     },
     {
       "channel": "Normal",
       "file": "Texture_DadaoNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 147682,
-      "sha256": "6e1154a7b6ffdacc6f6a701302bf4b526306d4b582a8190777cfd7cfc6fd9ed6"
+      "bytes": 147932,
+      "sha256": "34b3bd8ab540e0a6fb2950fe8ba07cfdba865947c458366933bb9a82ea921a1c"
     },
     {
       "channel": "Orm",
       "file": "Texture_DadaoOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 180598,
-      "sha256": "1108857ad3998eb3109e48de75b10cd6fe9439f8340ecd1e5bcbfef6a79b3184"
+      "bytes": 176572,
+      "sha256": "2782f77c91eb6fca8a69c5c7a1b4eeb3163b3d6260185fd5cf45914393b6a581"
     }
   ],
-  "totalBytes": 606004,
+  "totalBytes": 598352,
   "metrics": {
     "meanSrgb": [
-      0.5432,
-      0.5078,
-      0.473
+      0.5439,
+      0.5071,
+      0.4746
     ],
-    "luma": 0.508,
-    "lumaStd": 0.1063,
-    "sat": 0.1292,
+    "luma": 0.5085,
+    "lumaStd": 0.106,
+    "sat": 0.1275,
     "clipLow": 0.0,
     "clipHigh": 0.0001,
-    "lowFreq": 0.0903,
-    "seam": 0.0077,
-    "interior": 0.0053,
-    "seamRatio": 1.466,
+    "lowFreq": 0.0905,
+    "seam": 0.0076,
+    "interior": 0.0062,
+    "seamRatio": 1.223,
     "border": 0.0,
-    "swing": 0.2184,
+    "swing": 0.2191,
     "texelsPerMeter": null
   },
   "gateProblems": []

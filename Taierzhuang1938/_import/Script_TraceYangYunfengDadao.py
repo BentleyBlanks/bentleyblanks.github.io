@@ -120,6 +120,36 @@ def PlateSamples(mask, tolerance, spacing, minHole=6):
     return {"loops": rim, "surface": points}
 
 
+def CleanBladeOutline(points):
+    outline = np.asarray(points, dtype=np.float64)
+    closed = np.vstack((outline, outline[0]))
+    distance = np.r_[0, np.cumsum(np.linalg.norm(np.diff(closed, axis=0), axis=1))]
+    count = math.ceil(distance[-1] / .8)
+    step = distance[-1] / count
+    positions = np.arange(count) * step
+    samples = np.stack([np.interp(positions, distance, component) for component in closed.T], axis=1)
+
+    radius = math.ceil(11 / step)
+    border = np.pad(samples, ((radius, radius), (0, 0)), mode="wrap")
+    smooth = cv2.GaussianBlur(border, (1, 2 * radius + 1), 0, sigmaY=3.1 / step)[radius:-radius]
+    # Broad changes in direction define the silhouette. Use longer chords to
+    # recognize them so isolated bumps from the scanned edge do not get pinned.
+    window = round(15 / step)
+    before = samples - np.roll(samples, window, axis=0)
+    after = np.roll(samples, -window, axis=0) - samples
+    length = np.linalg.norm(before, axis=1) * np.linalg.norm(after, axis=1)
+    turn = 1 - np.sum(before * after, axis=1) / np.maximum(1e-5, length)
+    preserve = np.clip((turn - .21) / .45, 0, 1)
+    keep = preserve * preserve * (3 - 2 * preserve)
+    result = samples + (smooth - samples) * (1 - keep[:, None])
+    for axis in (0, 1):
+        for extreme in (np.argmin, np.argmax):
+            anchor = outline[extreme(outline[:, axis])]
+            nearest = np.argmin(np.linalg.norm(samples - anchor, axis=1))
+            result[nearest] = anchor
+    return cv2.approxPolyDP(result.astype(np.float32), .48, True).reshape(-1, 2).tolist()
+
+
 def GripRows(mask, frame, atlas):
     sine, cosine = frame["sin"], frame["cos"]
     u = np.arange(atlas["left"], atlas["right"] + 1, dtype=np.float32)
@@ -145,12 +175,14 @@ def Fit(source):
     # Keep a small overlap at the fittings without growing the outer silhouette.
     kernel = np.ones((5, 5), np.uint8)
     joined = {name: silhouette & (cv2.dilate(np.uint8(part), kernel) > 0) for name, part in masks.items()}
+    blade = PlateSamples(joined["Blade"], .82, (20, 16))
+    blade["loops"][0] = CleanBladeOutline(blade["loops"][0])
     return {
         "reference": {"sha256": hashlib.sha256(source.read_bytes()).hexdigest(), "width": 1700, "height": 872},
         "frame": frame,
         "atlas": atlas,
         "parts": {
-            "Blade": PlateSamples(joined["Blade"], .82, (20, 16)),
+            "Blade": blade,
             "Guard": PlateSamples(joined["Guard"], .65, (7, 8)),
             "Pommel": PlateSamples(joined["Pommel"], .63, (7, 8)),
         },

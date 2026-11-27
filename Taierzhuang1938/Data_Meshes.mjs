@@ -162,10 +162,10 @@ export const MESHES = {
   },
   Dadao: {
     file: "Model_Dadao.tzm.json", category: "weapon",
-    version: "yangyunfeng-dadao-wide15-20261127",
-    triangles: 9724, meshBlocks: 1, nodes: 5, joints: 0,
+    version: "yangyunfeng-dadao-finish-20261127",
+    triangles: 8472, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
-    span: [0.02892, 0.14864, 0.90040], lengthM: 0.900, bladeM: 0.599,
+    span: [0.02892, 0.14836, 0.90040], lengthM: 0.900, bladeM: 0.599,
     draws: { high: 1, medium: 1, low: 1 },
     note: "按确认的杨云峰大刀加宽参考图重建刀头孔、卷护手、布柄和红线尾环。"
       + "资料与游戏复原见 _import/Reference/SichuanDadao/。",

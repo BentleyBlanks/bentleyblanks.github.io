@@ -216,6 +216,21 @@ def BaseTile(color, details):
     return np.clip(adjusted, 0, 1)
 
 
+def ApplyPatinaColor(color, tags):
+    # Retain the photographed brightness and texture while shifting green cloth
+    # to worn brown and olive-colored steel stains to muted gray-brown.
+    lab = cv2.cvtColor(color.astype(np.float32), cv2.COLOR_RGB2LAB)
+    a, b = lab[..., 1], lab[..., 2]
+    chroma = Smoothstep(3, 9.5, np.hypot(a, b))
+    green = 1 - Smoothstep(-2.2, 1.0, a)
+    olive = Smoothstep(4, 14, b) * (1 - Smoothstep(.04, .30, a / np.maximum(1, np.abs(b))))
+    amount = chroma * np.maximum(green, olive)
+    target = np.where(tags[..., None] >= 3, (5.5, 12.0), (1.65, 3.9))
+    lab[..., 1:] += amount[..., None] * (target - lab[..., 1:])
+    corrected = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    return np.where(amount[..., None] > .001, corrected, color)
+
+
 def Valley(field, axis, distance):
     index = np.arange(field.shape[axis])
     left = np.take(field, np.maximum(index - distance, 0), axis=axis)
@@ -329,6 +344,7 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
         tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
         if strip:
             tile = MatchRimMetal(gaussian_filter(tile, (.69, .69, 0)), tags >= 3)
+        tile = ApplyPatinaColor(tile, tags)
         base[strip], = PadTiles((tile,), ((.49, .47, .44),), highCoverage, factor)
 
     data = {}

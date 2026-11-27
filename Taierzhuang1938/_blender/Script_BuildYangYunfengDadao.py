@@ -6,10 +6,11 @@ import math
 from pathlib import Path
 
 import bmesh
+import bpy
 from mathutils import Vector
 from mathutils.geometry import delaunay_2d_cdt
 
-from TzmCore import Node
+from TzmCore import AUTHORED_NORMAL_LAYER, Node
 
 
 FIT_FILE = Path(__file__).with_name("Data_YangYunfengDadaoFit.json")
@@ -101,6 +102,33 @@ def AcrossBlade(u, v, outline):
     return min(1, max(0, (v - min(cross)) / (max(cross) - min(cross))))
 
 
+def SmoothBladeWall(mesh, wall):
+    rim = set(wall)
+    for face in wall:
+        face.smooth = True
+    for edge in mesh.edges:
+        faces = tuple(edge.link_faces)
+        if any(face in rim for face in faces):
+            edge.smooth = (len(faces) == 2 and all(face in rim for face in faces)
+                           and faces[0].normal.dot(faces[1].normal) >= .74)
+    # Record Blender's split corner normals for the TZM exporter, including the
+    # transition between the broad faces and the side wall.
+    mesh.faces.index_update()
+    mesh.verts.index_update()
+    proxy = bpy.data.meshes.new("Dadao Rim Normals")
+    try:
+        mesh.to_mesh(proxy)
+        normals = proxy.corner_normals
+        authored = mesh.loops.layers.float_vector.new(AUTHORED_NORMAL_LAYER)
+        for face in mesh.faces:
+            loops = proxy.polygons[face.index].loop_indices
+            corners = {proxy.loops[i].vertex_index: normals[i].vector for i in loops}
+            for loop in face.loops:
+                loop[authored] = corners[loop.vert.index]
+    finally:
+        bpy.data.meshes.remove(proxy)
+
+
 def BuildPlate(fit, name):
     coordinates, shell, relief = TriangulatePlate(fit["parts"][name])
     mesh = bmesh.new()
@@ -117,13 +145,19 @@ def BuildPlate(fit, name):
     front = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], depths[i])) for i in used}
     back = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], -depths[i])) for i in used}
     boundaries = Counter(tuple(sorted((a, b))) for face in shell for a, b in zip(face, face[1:] + face[:1]))
+    wall = []
     for face in shell:
         mesh.faces.new([front[i] for i in reversed(face)]).smooth = True
         mesh.faces.new([back[i] for i in face]).smooth = True
         for a, b in zip(face, face[1:] + face[:1]):
             if boundaries[tuple(sorted((a, b)))] == 1:
-                mesh.faces.new((front[a], front[b], back[b], back[a])).smooth = name != "Blade"
-    return ApplyUv(mesh, fit)
+                edgeFace = mesh.faces.new((front[a], front[b], back[b], back[a]))
+                edgeFace.smooth = name != "Blade"
+                wall.append(edgeFace)
+    ApplyUv(mesh, fit)
+    if name == "Blade":
+        SmoothBladeWall(mesh, wall)
+    return mesh
 
 
 def BuildGrip(fit):
