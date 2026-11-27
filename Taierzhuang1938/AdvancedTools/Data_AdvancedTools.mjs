@@ -38,6 +38,9 @@ export const STANDALONE_TOOLS = Object.freeze([
   Object.freeze({ id: "testScenes", group: "level", slot: "tail", label: "测试场景",
     hint: "独立测试场景入口：进入 10 个功能测试场或跳进场景编辑器编辑",
     window: Object.freeze({ url: "./TestScenes.html", name: "TengxianTestScenes" }) }),
+  Object.freeze({ id: "squadSplinePreview", group: "level", slot: "tail", label: "小队 PCG 样条预览",
+    hint: "独立预览各行进 Profile、走廊宽窄自适应、跨队交叉避让与行进间左顾右盼（复用场景配置，不接入游戏）",
+    window: Object.freeze({ url: "./Tool_SquadSplinePreview.html", name: "TengxianSquadSplinePreview" }) }),
 ]);
 
 /** 控制中心页（相对游戏根目录 Taierzhuang1938/，Tool_Studio 的「返回控制中心」用）。 */

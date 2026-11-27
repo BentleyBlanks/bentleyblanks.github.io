@@ -90,8 +90,9 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("21 张卡片，含角色制作管线、测试场景、构件库预览、资产规范与模型制作工作台", info.cards.length === 21
+    Check("22 张卡片，含角色制作管线、测试场景、小队 PCG 样条预览、构件库预览、资产规范与模型制作工作台", info.cards.length === 22
       && info.cards.some((entry) => entry.id === "testScenes" && entry.href.includes("TestScenes.html"))
+      && info.cards.some((entry) => entry.id === "squadSplinePreview" && entry.href.includes("Tool_SquadSplinePreview.html"))
       && info.cards.some((entry) => entry.id === "assetStandards" && entry.href.includes("Tool_AssetStandards.html"))
       && info.cards.some((entry) => entry.id === "modelWorkbench" && entry.href.includes("Tool_ModelWorkbench.html"))
       && info.cards.some((entry) => entry.id === "characterWorkbench"

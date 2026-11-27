@@ -175,6 +175,7 @@ export const testDefs = {
   VehicleTracerTest: {file:"Script_VehicleTracerTest.mjs",timeoutMs:180000,desc:"Tank MG beam pixel floor/cap vs old tracer, hard-surface sparks and whitebox impact surfaces"},
   LitterGaitTest: {file:"Script_LitterGaitTest.mjs",desc:"Stretcher column walking character: per-team pace, density-limited stops, loose lanes, replay and untouched later stages"},
   SquadMarchTest: {file:"Script_SquadMarchTest.mjs",desc:"Shared squad cadence, roles, safe interruption, replay and population variants"},
+  SquadSplinePcgTest: {file:"Script_SquadSplinePcgTest.mjs",desc:"PCG squad spline corridor, 8 profiles, open-field formation morphing, cross-squad avoidance and procedural gaze"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
   SquadMarchNavigationTest: {file:"Script_SquadMarchNavigationTest.mjs",timeoutMs:300000,desc:"Displaced squad member rejoins through real navigation and terrain"},
   // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。现在跑 Front 那一段
@@ -1005,7 +1006,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   railBridgeModel: {label:'退役钢桁架铁路桥模型自检（不在第一关里）',tests:['RailBridgeTest']},
   beishaheBridge: {label:'北沙河独立史料复原桥资产（不改变剧情）',tests:['BeishaheBridgeTest']},
-  squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","LitterGaitTest","SquadMarchAiTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
+  squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadSplinePcgTest","LitterGaitTest","SquadMarchAiTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
   firstLevel: {label:'新版第一关完整任务',tests:['SandbagStandardTest','FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTerrainTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','FirstLevelFarBankTest','PontoonBridgeTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','MissionAreaGuardTest','MissionAreaGuardBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','LitterGaitTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMissionAftermathTest','FirstLevelMissionPeopleCadenceTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','CartCorpseBumpTest','FirstLevelFrontTest','FirstLevelCollectionCareTest','FirstLevelFrontPressureTest','FirstLevelFrontCounterattackTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelFrontCheckpoint04Test','FirstLevelFrontCheckpoint05Test','FirstLevelFrontCheckpoint05BombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
@@ -1257,7 +1258,7 @@ const changedDomainRules = [
   // 敌军喉咙窒息哽咽（docs/Data_NeckDeath.md）：规则 / 数值挂在 Soldier 的 TakeHit/Kill 上，门禁 NeckDeathTest(+Browser) 在 combat。
   { domain: "combat", pattern: /NeckDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
-  {domain:"squadMarch",pattern:/SquadMarch/},
+  {domain:"squadMarch",pattern:/SquadMarch|SquadSpline|ProceduralGaze/},
   // 担架队逐副的走路性格（Script_LitterGait，数在 Data_Tuning_SquadMarch.LITTER_GAIT）：只由第一关担架队列用。
   {domain:"squadMarch",pattern:/LitterGait/},
   {domain:"firstLevel",pattern:/LitterGait/},

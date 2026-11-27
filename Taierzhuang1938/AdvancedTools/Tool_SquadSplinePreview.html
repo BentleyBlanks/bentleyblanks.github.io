@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>小队样条预览 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" href="./Style_SquadSplinePreview.css?v=20261127PcgSplineV3">
+  <!-- 独立工具页：只引本地 vendor Three.js 与纯数学 PCG/场景模块，不加载游戏主程序与重渲染管线。 -->
+  <script type="importmap">
+    { "imports": { "three": "../vendor/three/build/three.module.js" } }
+  </script>
+  <script type="module" src="./Script_SquadSplinePreview.mjs?v=20261127PcgSplineV3"></script>
+</head>
+<body>
+  <header class="sp-top" aria-label="小队样条工具栏">
+    <div class="sp-topLeft">
+      <div class="sp-brand" title="小队行进 PCG 样条预览">
+        <svg class="sp-brandIcon" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <path d="M3 15.5C5.5 7 14.5 13 17 4.5" stroke-dasharray="2.4 2.2" opacity=".55"/>
+          <path d="M3 15.5C6.5 6.5 13.5 13.5 17 4.5"/>
+          <circle cx="3" cy="15.5" r="2" fill="currentColor"/>
+          <circle cx="10" cy="10" r="2.2" fill="#edca83" stroke="#0d0e0b" stroke-width="1.2"/>
+          <circle cx="17" cy="4.5" r="2" fill="currentColor"/>
+        </svg>
+        <h1>小队样条</h1>
+      </div>
+
+      <!-- 复用 SceneEditor 分类场景选择器 -->
+      <details id="scenePicker" class="sp-scenePicker">
+        <summary id="scenePickerSummary" class="sp-pickerSummary" aria-label="切换场景配置" title="复用场景编辑器配置数据">
+          <span id="sceneCatBadge" class="sp-catBadge" data-cat="encounter">遭遇</span>
+          <span id="scenePickerTitle" class="sp-pickerTitle">第一关 · Encounter Play</span>
+        </summary>
+        <div class="sp-sceneMenu" role="region" aria-label="选择场景">
+          <div class="sp-sceneMenuHead">
+            <div id="sceneCatTabs" class="sp-sceneCats" role="tablist" aria-label="场景分类"></div>
+            <input id="sceneFilter" class="sp-sceneFilter" type="search" placeholder="筛选场景…" autocomplete="off" aria-label="筛选场景">
+          </div>
+          <div id="sceneList" class="sp-sceneList"></div>
+        </div>
+      </details>
+
+      <span class="sp-sep" aria-hidden="true"></span>
+
+      <!-- 演示拓扑快切（以图标+短名直接传达场景形态） -->
+      <div id="scenarioBar" class="sp-scenarioBar" role="group" aria-label="演示场景"></div>
+    </div>
+
+    <!-- 中区：直接操纵工具（与 Encounter Designer 同源：W 选择 / Q 抓手 / E 声源） -->
+    <div class="sp-topCenter">
+      <div class="sp-toolCluster" role="group" aria-label="画布操作工具">
+        <button type="button" data-nav-tool="select" aria-pressed="true" aria-label="选择与编辑样条" title="选择 / 拖拽样条点（W）· 双击加点 · 右键删点">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M5.5 3 19.5 13.2l-6.8 1-3.6 7Z"/></svg>
+        </button>
+        <button type="button" data-nav-tool="hand" aria-pressed="false" aria-label="抓手平移" title="抓手工具（Q）· 单指 / 左键平移视图">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-5.5V4a1.5 1.5 0 0 1 3 0v7m0-5a1.5 1.5 0 0 1 3 0v6m0-3a1.5 1.5 0 0 1 3 0v6.5a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.7-2.3l-3.9-5a1.6 1.6 0 0 1 2.4-2.1L8 14"/></svg>
+        </button>
+        <button type="button" data-nav-tool="ping" aria-pressed="false" aria-label="放置声响刺激" title="声响刺激（E / Shift+点击）· 触发全队错峰转头">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="2.2" fill="currentColor"/><circle cx="12" cy="12" r="5.8" opacity=".82"/><circle cx="12" cy="12" r="9.4" stroke-dasharray="3.5 2.5" opacity=".55"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="sp-topRight">
+      <!-- 视口布局切换 -->
+      <div class="sp-toolCluster" role="group" aria-label="视口布局">
+        <button type="button" data-layout="split" aria-pressed="true" aria-label="2D+3D 双视口" title="2D + 3D 双视口">
+          <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="15" height="13" rx="1.8"/><path d="M10 3.5v13"/></svg>
+        </button>
+        <button type="button" data-layout="2d" aria-pressed="false" aria-label="仅 2D 视口" title="仅 2D 战术平面">
+          <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3.5" width="15" height="13" rx="1.8"/><path d="M6 12.5c2-4 6-1 8-5" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" data-layout="3d" aria-pressed="false" aria-label="仅 3D 视口" title="仅 3D 立体视口">
+          <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m10 3 6.5 3.6v6.8L10 17l-6.5-3.6V6.6Z"/><path d="M10 10v7M10 10l6.5-3.4M10 10 3.5 6.6"/></svg>
+        </button>
+      </div>
+
+      <!-- 一键原版机器人对照开关 -->
+      <button type="button" id="quickBaselineBtn" class="sp-iconBtn" aria-pressed="true" aria-label="原版折线对照" title="显示 / 隐藏原版直线机器人对照鬼影">
+        <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="6.5" cy="10" r="3" stroke-dasharray="2 1.8" opacity=".8"/>
+          <circle cx="13.5" cy="10" r="3.2" fill="currentColor" fill-opacity=".22"/>
+          <path d="M9.6 10h.8"/>
+        </svg>
+      </button>
+
+      <span class="sp-sep" aria-hidden="true"></span>
+
+      <button type="button" id="copyJsonBtn" class="sp-iconBtn" aria-label="复制 JSON" title="复制当前小队配置 JSON">
+        <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="7" y="7" width="9.5" height="10" rx="1.4"/><path d="M13 7V4.4A1.4 1.4 0 0 0 11.6 3H4.4A1.4 1.4 0 0 0 3 4.4v7.2A1.4 1.4 0 0 0 4.4 13H7"/></svg>
+      </button>
+      <button type="button" id="exportJsonBtn" class="sp-iconBtn" aria-label="导出 JSON" title="导出当前配置 JSON 文件">
+        <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.2v9.2m-3.6-3.4L10 12.6l3.6-3.6M3.5 14v1.6A1.4 1.4 0 0 0 4.9 17h10.2a1.4 1.4 0 0 0 1.4-1.4V14"/></svg>
+      </button>
+
+      <button type="button" id="toggleInspectorBtn" class="sp-iconBtn" aria-expanded="true" aria-label="收起参数面板" title="展开 / 收起右侧面板">
+        <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="1.8"/><path d="M12.5 3.5v13"/></svg>
+      </button>
+
+      <a class="sp-backLink" href="./ControlCenter.html" title="返回高级工具控制中心">控制中心 ↗</a>
+    </div>
+  </header>
+
+  <p id="errorBanner" class="sp-banner" role="alert" hidden></p>
+
+  <main class="sp-workspace" id="workspace" data-layout="split" data-inspector="open">
+    <section class="sp-viewports" aria-label="同步预览视口">
+      <!-- 2D 战术平面视口 -->
+      <div class="sp-pane sp-pane2d active" id="pane2d">
+        <div class="sp-paneBar">
+          <span class="sp-paneTag">2D</span>
+          <span id="pane2dMeta" class="sp-paneMeta"></span>
+          <div class="sp-paneBarRight">
+            <button type="button" id="clearStimuliBtn" class="sp-barBtn danger" hidden title="清空已放置声源">
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="5.2" stroke-dasharray="2.4 2"/><path d="m6 6 4 4m0-4-4 4"/></svg>
+              <span id="stimCount">0</span>
+            </button>
+            <details id="layersMenu" class="sp-popover">
+              <summary class="sp-barSummary" aria-label="2D 显示图层" title="切换 2D 叠加图层与图例">
+                <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 2.2 14 5.5 8 8.8 2 5.5Z"/><path d="m2 8.6 6 3.3 6-3.3M2 11.4 8 14.7l6-3.3"/></svg>
+                <span>图层</span>
+              </summary>
+              <div class="sp-popoverBody" role="group" aria-label="图层开关">
+                <label class="sp-layerItem"><input type="checkbox" data-layer="corridor" checked><i class="sw corridor"></i><span>走廊净宽</span></label>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="streamlines" checked><i class="sw stream"></i><span>个体流线</span></label>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="clusters" checked><i class="sw cluster"></i><span>社交簇</span></label>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="gaze" checked><i class="sw gaze"></i><span>视线扇面</span></label>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="pois" checked><i class="sw poi"></i><span>拐角 / 沟沿点</span></label>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="baseline" checked><i class="sw baseline"></i><span>原版对照</span></label>
+                <div class="sp-popoverSep"></div>
+                <label class="sp-layerItem"><input type="checkbox" data-layer="legend"><i class="sw legend"></i><span>图例浮标</span></label>
+              </div>
+            </details>
+            <button type="button" id="fit2dBtn" class="sp-barIconBtn" aria-label="适配 2D 视角" title="适配当前小队（F）">
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="sp-canvasWrap">
+          <canvas id="canvas2d" tabindex="0" aria-label="2D 战术平面视口"></canvas>
+          <div id="legend2d" class="sp-legend2d" hidden aria-hidden="true">
+            <span><i class="dot friend"></i>友军</span>
+            <span><i class="dot enemy"></i>日军</span>
+            <span><i class="dot civ"></i>老乡</span>
+            <span><i class="dot ghost"></i>原版</span>
+            <span class="sp-legSep"></span>
+            <span><i class="cone stim"></i>声源</span>
+            <span><i class="cone poi"></i>拐角</span>
+            <span><i class="cone soc"></i>社交</span>
+            <span><i class="cone scan"></i>扫视</span>
+          </div>
+          <div class="sp-zoomHud" role="group" aria-label="2D 缩放">
+            <button type="button" id="zoomOut2d" aria-label="缩小" title="缩小">−</button>
+            <output id="zoomPct2d" aria-label="当前缩放">100%</output>
+            <button type="button" id="zoomIn2d" aria-label="放大" title="放大">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D 立体姿态视口 -->
+      <div class="sp-pane sp-pane3d" id="pane3d">
+        <div class="sp-paneBar">
+          <span class="sp-paneTag">3D</span>
+          <div class="sp-camSeg" role="group" aria-label="3D 机位">
+            <button type="button" data-cam="overview" aria-pressed="true">全景</button>
+            <button type="button" data-cam="follow" aria-pressed="false">跟随</button>
+            <button type="button" data-cam="closeup" aria-pressed="false">近景</button>
+          </div>
+          <div class="sp-paneBarRight">
+            <button type="button" id="fit3dBtn" class="sp-barIconBtn" aria-label="复位 3D 视角" title="复位 3D 全景（F）">
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="sp-canvasWrap">
+          <canvas id="canvas3d" tabindex="0" aria-label="3D 立体姿态视口"></canvas>
+          <div id="compass3d" class="sp-compass" role="button" tabindex="0" aria-label="3D 视角罗盘：拖拽旋转，点击回正北" title="拖拽旋转视角 · 点击回正">
+            <svg viewBox="0 0 56 56" aria-hidden="true">
+              <circle cx="28" cy="28" r="24" fill="rgba(12,14,12,.72)" stroke="rgba(193,189,171,.28)" stroke-width="1"/>
+              <g id="compassRing" transform="rotate(0 28 28)">
+                <path d="M28 7 30.8 15.5h-5.6Z" fill="#edca83"/>
+                <path d="M28 49 30.2 42h-4.4Z" fill="rgba(193,189,171,.42)"/>
+                <circle cx="28" cy="28" r="2.2" fill="#edca83"/>
+                <text x="28" y="21.5" text-anchor="middle" fill="#ffe2a8" font-size="8" font-weight="700">N</text>
+                <text x="43" y="30.5" text-anchor="middle" fill="rgba(210,208,196,.55)" font-size="7">E</text>
+                <text x="13" y="30.5" text-anchor="middle" fill="rgba(210,208,196,.55)" font-size="7">W</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 右侧工作室参数面板 -->
+    <aside class="sp-inspector" id="inspector" aria-label="小队与预设控制面板">
+      <div id="inspectorResize" class="sp-inspectorResize" role="separator" aria-orientation="vertical" aria-label="调整右侧栏宽度" tabindex="0"></div>
+
+      <!-- 顶部固定：小队切换条 -->
+      <div class="sp-squadBar">
+        <div id="squadTabs" class="sp-squadTabs" role="tablist" aria-label="当前编排小队"></div>
+        <div class="sp-squadActs">
+          <button type="button" id="addSquadBtn" class="sp-miniIconBtn" aria-label="新增交叉小队" title="新增一支独立交叉测试小队">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 3.2v9.6M3.2 8h9.6"/></svg>
+          </button>
+          <button type="button" id="removeSquadBtn" class="sp-miniIconBtn danger" aria-label="删除当前小队" title="删除当前选中测试小队">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3.5 8h9"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 双页签（与 Encounter Designer 同款衬线底划线） -->
+      <div class="sp-tabs" role="tablist" aria-label="面板视图">
+        <button type="button" data-tab="presets" role="tab" aria-selected="true">预设</button>
+        <button type="button" data-tab="params" role="tab" aria-selected="false">参数<i id="overrideDot" class="sp-overrideDot" hidden></i></button>
+      </div>
+
+      <!-- Tab 1：预设 + 编队属性 + 视觉量化条 + 实时转头表盘 -->
+      <div id="tabPresets" class="sp-tabBody">
+        <div id="profileGrid" class="sp-profileGrid" role="radiogroup" aria-label="行进 Profile"></div>
+
+        <div class="sp-identityBlock">
+          <div class="sp-idRow">
+            <div class="sp-sideSeg" role="radiogroup" aria-label="阵营">
+              <button type="button" data-side="friend" aria-checked="true"><i class="dot friend"></i>友军</button>
+              <button type="button" data-side="enemy" aria-checked="false"><i class="dot enemy"></i>日军</button>
+              <button type="button" data-side="civilian" aria-checked="false"><i class="dot civ"></i>老乡</button>
+            </div>
+          </div>
+
+          <div class="sp-idRow sp-countRow">
+            <span class="sp-k">人数</span>
+            <input id="countRange" class="sp-range" type="range" min="2" max="24" step="1" value="12" aria-label="小队人数">
+            <strong id="countVal" class="sp-num">12</strong>
+          </div>
+
+          <div class="sp-idRow sp-seedRow">
+            <span class="sp-k">种子</span>
+            <input id="seedInput" type="text" value="L1_01c_retreat" maxlength="48" aria-label="确定性种子">
+            <button type="button" id="rollSeedBtn" class="sp-miniIconBtn" aria-label="随机种子" title="随机抽新种子">
+              <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><circle cx="6" cy="6" r=".85" fill="currentColor"/><circle cx="10" cy="10" r=".85" fill="currentColor"/><circle cx="10" cy="6" r=".85" fill="currentColor"/><circle cx="6" cy="10" r=".85" fill="currentColor"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 视觉量化条：用进度条+基线刻度对比自然度 -->
+        <div id="telemetryGrid" class="sp-metrics" aria-label="行进质量指标"></div>
+
+        <!-- 实时头/颈/胸视线分离表盘 -->
+        <div id="actorDialCard" class="sp-actorCard" aria-label="个体姿态与视线分离">
+          <svg id="actorDialSvg" class="sp-dialSvg" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r="28" fill="#0c0e0b" stroke="rgba(193,189,171,.22)" stroke-width="1"/>
+            <path d="M32 6v4M32 54v4M6 32h4M54 32h4" stroke="rgba(193,189,171,.28)" stroke-width="1"/>
+            <line x1="32" y1="32" x2="32" y2="10" stroke="rgba(220,220,205,.28)" stroke-width="1.2" stroke-dasharray="2 2"/>
+            <path id="dialGazeCone" d="" fill="rgba(154,224,154,.24)"/>
+            <line id="dialChestLine" x1="32" y1="32" x2="32" y2="15" stroke="#53a4be" stroke-width="2.6" stroke-linecap="round"/>
+            <line id="dialHeadLine" x1="32" y1="32" x2="32" y2="11" stroke="#f2c864" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="32" cy="32" r="3.4" fill="#edca83" stroke="#0d0e0b" stroke-width="1.2"/>
+          </svg>
+          <div class="sp-actorMeta">
+            <div class="sp-actorTop">
+              <strong id="actorName">—</strong>
+              <span id="actorPhase" class="sp-chip">—</span>
+              <span id="actorGaze" class="sp-chip gaze">—</span>
+              <button type="button" id="unpinActorBtn" class="sp-unpinBtn" hidden aria-label="取消固定个体" title="恢复自动追踪领队">×</button>
+            </div>
+            <div id="actorNums" class="sp-actorNums"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2：精细参数滑杆 -->
+      <div id="tabParams" class="sp-tabBody" hidden>
+        <div class="sp-paramsHead">
+          <span id="activeProfileBadge" class="sp-activeProfileTag">战壕戒备</span>
+          <button type="button" id="resetProfileBtn" class="sp-barBtn" disabled title="清除当前小队的手动调参，恢复预设值">
+            <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.2 8a4.8 4.8 0 1 0 1.4-3.4L2.8 6.4"/><path d="M2.8 3.2v3.2H6"/></svg>
+            <span>重置</span>
+          </button>
+        </div>
+        <div id="paramGroups" class="sp-paramGroups"></div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- 底部播放时间轴坞 -->
+  <footer class="sp-timeline" aria-label="时间轴与回放">
+    <div class="sp-transport">
+      <div class="sp-playCluster" role="group" aria-label="播放控制">
+        <button type="button" id="restartBtn" aria-label="回到起点" title="重播（0s）">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="3" y="3.2" width="1.8" height="9.6" rx=".4"/><path d="M12.5 3.4v9.2L5.6 8z"/></svg>
+        </button>
+        <button type="button" id="stepBackBtn" aria-label="后退 0.2 秒" title="后退 0.2s">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.8 4.2 5.8 8l4 3.8"/></svg>
+        </button>
+        <button type="button" id="playBtn" class="sp-playMain" aria-pressed="true" aria-label="播放或暂停" title="播放 / 暂停（Space）">
+          <svg id="playIcon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor" hidden><path d="M4.5 2.8v10.4L13 8z"/></svg>
+          <svg id="pauseIcon" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="3.8" y="3" width="2.8" height="10" rx=".5"/><rect x="9.4" y="3" width="2.8" height="10" rx=".5"/></svg>
+        </button>
+        <button type="button" id="stepFwdBtn" aria-label="前进 0.2 秒" title="前进 0.2s">
+          <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 4.2 10.2 8l-4 3.8"/></svg>
+        </button>
+      </div>
+
+      <button type="button" id="speedBtn" class="sp-speedPill" title="点击切换播放倍速">1.0×</button>
+      <button type="button" id="loopBtn" class="sp-iconBtn sm" aria-pressed="true" aria-label="循环播放" title="循环播放">
+        <svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.6 3.6 13.6 5.6l-2 2"/><path d="M2.8 8V6.8a1.2 1.2 0 0 1 1.2-1.2h9.6"/><path d="M4.4 12.4 2.4 10.4l2-2"/><path d="M13.2 8v1.2a1.2 1.2 0 0 1-1.2 1.2H2.4"/></svg>
+      </button>
+    </div>
+
+    <div class="sp-scrubber">
+      <input id="timeRange" class="sp-range sp-timeRange" type="range" min="0" max="36" step="0.05" value="0" aria-label="时间轴定位">
+      <div id="stimulusMarkers" class="sp-markers" aria-hidden="true"></div>
+    </div>
+
+    <output id="timeReadout" class="sp-timeNum">0.00 / 36.0s</output>
+  </footer>
+</body>
+</html>
