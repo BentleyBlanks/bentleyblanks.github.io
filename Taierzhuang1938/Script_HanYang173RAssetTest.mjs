@@ -384,17 +384,32 @@ for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachment
  assert(Math.abs(travel-report.exteriorFinish.ringPresentation[node.name].maxVertexTravelM)<1e-6);
 }
 assert.deepEqual(report.exteriorFinish.timberFrameRepairs,{MainWood_ContinuousLowerShoulder:52,UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront:9});
-const contactParts=doc.nodes.filter(node=>node.mesh!==undefined&&/^(MainWood_|UpperWood_|FrontWood_|FrontBand_|RearBand_Controlled|ReceiverOuterCollar|LowerPlateGuard_|LongOuterSteel_|ButtCap_)/.test(node.name)).map(node=>node.name).sort();
-assert.equal(contactParts.length,9);
-assert.deepEqual(report.exteriorFinish.contactVisibility.parts,contactParts);
+const ao=report.exteriorFinish.contactVisibility;
+const contactNodes=doc.nodes.filter(node=>node.mesh!==undefined&&node.name!==D.trigger);
+const fixedAoRoles=new Set(['body','frontSight','rearSight']);
+assert.equal(contactNodes.length,43);
+assert.deepEqual(ao.parts,contactNodes.map(node=>node.name).sort());
+assert.deepEqual(ao.unbaked,[D.trigger]);
+for(const [group,names] of Object.entries(ao.groups)){
+ assert.deepEqual([...names].sort(),contactNodes.filter(({extras})=>
+  (fixedAoRoles.has(extras.hanYangRole)?'fixed':extras.hanYangRole)===group).map(node=>node.name).sort());
+}
+assert.deepEqual(Object.keys(ao.groups).sort(),['boltBody','cockingPiece','fixed']);
+const contactJoints=new Set([
+ 'ButtCap_LimitedProfileBlend','FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown',
+ 'LowerPlateGuard_FlatSideNarrowReturn','ReceiverOuterCollar','RearOuterCover_RoundedSideReturn',
+ 'MainWood_ContinuousLowerShoulder','FrontWood_ContinuousOval','UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront',
+]);
 for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  const material=doc.materials[doc.meshes[node.mesh].primitives[0].material],slot=material.occlusionTexture;
- if(!contactParts.includes(node.name)){assert(!slot,`${node.name}: no fixed contact baked onto independent parts`);continue;}
- assert.equal(slot.index,material.pbrMetallicRoughness.metallicRoughnessTexture.index);assert.equal(slot.strength,.85);
+ if(node.name===D.trigger){assert(!slot,'the thin double-sided trigger stays on live shading');continue;}
+ assert.equal(slot.index,material.pbrMetallicRoughness.metallicRoughnessTexture.index);
+ assert.equal(slot.strength,.9);
+ if(!contactJoints.has(node.name))continue;
  const image=doc.images[doc.textures[slot.index].extensions.EXT_texture_webp.source];
  const {data,info}=await PartImage(image,node.name).raw().toBuffer({resolveWithObject:true});
  const red=(await sharp(data,{raw:{width:info.width,height:info.height,channels:info.channels}}).stats()).channels[0];
- assert(red.min<227&&red.max===255&&red.stdev>1,`${node.name}: contact and unobscured regions both present`);
+ assert(red.min<227&&red.max===255&&red.stdev>1,`${node.name}: the joint is shaded and exposed texels stay clear`);
 }
 const bandMesh=doc.meshes[doc.nodes.find(node=>node.name==='RearBand_ControlledCrown').mesh].primitives[0];
 const bandPbr=doc.materials[bandMesh.material].pbrMetallicRoughness;

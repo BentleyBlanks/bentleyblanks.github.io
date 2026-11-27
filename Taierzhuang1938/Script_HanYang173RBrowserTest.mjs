@@ -35,7 +35,7 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261127R34');assert.equal(evidence.identity.triangles,79513);
+ assert.equal(evidence.identity.version,'173R-20261127R35');assert.equal(evidence.identity.triangles,79513);
  assert.equal(evidence.identity.worldTriangles,79513);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  assert.equal(evidence.identity.drawMeshes,13);
  assert.equal(evidence.identity.worldDrawMeshes,13);
@@ -56,9 +56,11 @@ try{
  }
  for(const m of evidence.identity.materials){assert.equal(m.base,'srgb');assert(['','srgb-linear'].includes(m.normal));assert(['','srgb-linear'].includes(m.orm));assert(m.folded&&m.patches.some(p=>p.includes('orm')),m.part);}
  const contact=evidence.identity.materials.filter(material=>material.patches.includes('ormma'));
- assert.equal(contact.flatMap(m=>m.regions).length,9,'fixed-contact AO folds into the existing roughness sampler in game');
+ assert.equal(contact.flatMap(m=>m.regions).length,43,'contact AO folds into the existing roughness sampler in game');
  assert(contact.some(material=>material.regions.some(part=>part.startsWith('ButtCap_'))),'the fixed butt-cap joint receives the shared contact field');
  assert(contact.some(material=>material.regions.includes('RearBand_ControlledCrown'))&&timber.every(material=>contact.includes(material)));
+ assert(contact.some(material=>material.role==='boltBody')&&contact.some(material=>material.role==='cockingPiece'));
+ assert(contact.every(material=>material.role!=='trigger'),'the independently moving thin trigger uses live shading');
  evidence.lighting=[];
  for(const mode of ['Day','Shadow','Overcast','Night','Ads']){
   const row=await page.evaluate(async mode=>{
