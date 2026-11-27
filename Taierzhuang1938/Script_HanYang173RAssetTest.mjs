@@ -263,7 +263,9 @@ function MedianOil(samples){return samples.sort((left,right)=>left-right)[Math.f
 const baselineSurface=createHash('sha256');
 const closedFineReturns=new Set(['MiddleSideDisk','SideWoodButton','Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
 const rolledBands=new Set(['FrontBand_ContinuousEnvelopeContact','RearBand_ControlledCrown']);
-const changedMeshes=new Set(['RearOuterCover_RoundedSideReturn', 'MiddleSideDisk', 'SideWoodButton']);
+const changedMeshes=new Set([
+ 'RearOuterCover_RoundedSideReturn','MiddleSideDisk','SideWoodButton','UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront',
+]);
 const frontBandPrimitive=doc.meshes[doc.nodes.find(node=>node.name==='FrontBand_ContinuousEnvelopeContact').mesh].primitives[0];
 function Payload(viewId){
  const view=doc.bufferViews[viewId],offset=view.byteOffset||0;
@@ -339,7 +341,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  }
 
 }
-assert.equal(baselineSurface.digest('hex'),'f6e0a61ecb43a954cfffe55b1c7411246bbc53bc92f5ff8e51402facc72b2572','R32 geometry and tangent frames survive batching, including UVs on unatlased parts');
+assert.equal(baselineSurface.digest('hex'),'8b9e0827709abc26e215569917c02fea3203dfc9c5b4be650b8367ce3902f29b','the baseline mesh streams outside the documented fit revisions remain exact');
 assert.deepEqual(new Set(Object.keys(report.exteriorFinish.inspectionBevels)),bevelParts);
 for(const [name,{before,after,roundedFaces}] of Object.entries(report.exteriorFinish.inspectionBevels)){
  assert(after!==before&&report.parts.find(part=>part.part===name).gameTriangles===after,name+' exports the rounded edges');
@@ -592,7 +594,46 @@ for(const side of [-1,1]){
  const [front,crest,rear]=ribRadii(side);
  assert(crest>Math.max(front,rear)+.00027,'the rear-band ridge is present on both sides in the mesh');
 }
-for(const mesh of [frontSeam,rearSeam,lowerTimber,upperTimber,foreMesh])mesh.geometry.dispose();
+const fitted=report.exteriorFinish.fitCleanup;
+assert.deepEqual(Object.keys(fitted.parts).sort(),[D.stockReturn,...D.wood.filter(name=>name.startsWith('UpperWood_'))].sort());
+assert.equal(Object.keys(fitted.contactMaps).length,5,'contact AO covers both fitted joints');
+const finalTail=SeamSurface(D.stockReturn);
+const finalCollar=SeamSurface('ReceiverOuterCollar');
+const finalSeat=SeamSurface('Sight_ShallowRoundSeat');
+const fitRay=new THREE.Raycaster();
+let joinSamples=0;
+for(const side of [-1,1]){
+ for(const z of [-.134,-.130,-.126,-.123,-.121,-.12015]){
+  for(const height of [.032,.035,.037,.0385,.0415,.0438,.0465,.0487]){
+   fitRay.set(new THREE.Vector3(side,height,z),new THREE.Vector3(-side,0,0));
+   const tail=fitRay.intersectObject(finalTail,false)[0],collar=fitRay.intersectObject(finalCollar,false)[0];
+   if(!tail||!collar||side*tail.point.x<=0||side*collar.point.x<=0)continue;
+   joinSamples++;
+   assert(collar.distance<tail.distance+.000007,'the leading steel return sits beneath the receiver at the overlap');
+  }
+ }
+ for(const z of [-.0753,-.075,-.0744]){
+  fitRay.set(new THREE.Vector3(side*.01168,1,z),new THREE.Vector3(0,-1,0));
+  const tail=fitRay.intersectObject(finalTail,false)[0],wood=fitRay.intersectObject(lowerTimber,false)[0];
+  assert(tail&&wood&&wood.distance+.0006<tail.distance,'the rear side lip stays inside the wooden shoulder');
+ }
+}
+assert(joinSamples>=22,'the rays sample the fitted overlap where both near-side surfaces exist');
+const seatBounds=new THREE.Box3().setFromPoints(PartPositions('Sight_ShallowRoundSeat'));
+for(const z of [seatBounds.min.z-.00032,seatBounds.max.z+.00036]){
+ for(const x of [-.0012,0,.0012]){
+  fitRay.set(new THREE.Vector3(x,1,z),new THREE.Vector3(0,-1,0));
+  const wood=fitRay.intersectObject(upperTimber,false)[0];
+  assert(wood&&wood.point.y>seatBounds.max.y+.00015,'the wooden crown meets both rounded ends of the seat');
+ }
+}
+for(const section of [.17,.36,.64,.83])for(const x of [-.005,0,.005]){
+ const z=THREE.MathUtils.lerp(seatBounds.min.z,seatBounds.max.z,section);
+ fitRay.set(new THREE.Vector3(x,1,z),new THREE.Vector3(0,-1,0));
+ const steel=fitRay.intersectObject(finalSeat,false)[0],wood=fitRay.intersectObject(upperTimber,false)[0];
+ assert(steel&&wood&&steel.distance<wood.distance,'the fitted seat remains exposed above the wood');
+}
+for(const mesh of [frontSeam,rearSeam,lowerTimber,upperTimber,foreMesh,finalTail,finalCollar,finalSeat])mesh.geometry.dispose();
 foreMesh.material.dispose();
 const cap=PartPositions('RearSmallCover'),capBox=new THREE.Box3().setFromPoints(cap),capSize=capBox.getSize(new THREE.Vector3());
 assert(capSize.x>.015&&capSize.y>.015,'rear disc has a complete circular silhouette');

@@ -19,18 +19,21 @@ MODEL = 'Model_HanYang173R.glb'
 REPORT = 'Data_GameGeometry.json'
 
 
-def ReplaceOcclusion(contents, visibility):
-    pixels = np.asarray(Image.open(BytesIO(contents)).convert('RGB'))
-    height, width = pixels.shape[:2]
+def ContactRed(visibility, width, height):
     assert visibility.shape == (height // 2, width // 2) and visibility.dtype == np.uint8
     # Keep weak grazing occlusion from tinting broad faces. The denser shadows
     # in actual recesses keep their localized contrast.
     blocked = gaussian_filter(1. - visibility.astype(np.float32) / 255, .68, mode='nearest')
     blocked = (np.maximum(blocked - .10, 0) / .90) ** 1.22
     field = Image.fromarray(1. - blocked).resize((width, height), Image.Resampling.BILINEAR)
-    red = np.uint8(np.round(255 * np.asarray(field).clip(0, 1)))
+    return np.uint8(np.round(255 * np.asarray(field).clip(0, 1)))
+
+
+def ReplaceOcclusion(contents, visibility):
+    pixels = np.asarray(Image.open(BytesIO(contents)).convert('RGB'))
+    height, width = pixels.shape[:2]
     result = pixels.copy()
-    result[:, :, 0] = red
+    result[:, :, 0] = ContactRed(visibility, width, height)
     stream = BytesIO()
     Image.fromarray(result).save(stream, 'WEBP', lossless=True, method=4)
     baked = stream.getvalue()

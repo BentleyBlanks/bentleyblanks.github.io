@@ -1,6 +1,6 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "906a180db9860b03ddb3d1b67a141f726ebb51d5bfdbddacf954165e81d05491",
+  "gameSha256": "764dc7be2781ecf100601e13488b7d02d8ee353bf3615d02dd4513cbef37862b",
   "triangles": 79513,
   "repairedTangents": 45491,
   "parts": [
@@ -700,8 +700,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas2_ORM",
-      "sha256": "ada0bb80d28da7aabc4bf21342dff09415fd2f7bd0d1b5afc6a4a7ca53341da9",
-      "sourceSha256": "df26f621934fa985bcc92c08a356594bdf3f325dde57a450e58e2a0a3ff5bc35",
+      "sha256": "29473a8e9a7c1f36b5314eb628198c1c88c923e09422d0fb848927870beeb6e3",
+      "sourceSha256": "125f9813d945e7f15d2c142fd6566590cc4c179c934d9851f424bf1bfd53d86b",
       "mimeType": "image/webp",
       "islandCoverage": 0.275843,
       "rebake": true
@@ -748,8 +748,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas4_ORM",
-      "sha256": "9f16ed4f4abb2035af70479cd2aa2443bdc16370eb9b547482e00392fada14e9",
-      "sourceSha256": "0134957eb5eeb703e1a1ae88ad59e2145783c055c8ca15a6baea4b9ccd865f3c",
+      "sha256": "7e6535d2eab49375a40705bccca758012f61c5542d5d37ededa25b03bfb6c8a1",
+      "sourceSha256": "dcc5526a3f1a7100219a5a8126a92fe6d688d34b5999df79dfb20c5010961bed",
       "mimeType": "image/webp",
       "islandCoverage": 0.449166,
       "rebake": true
@@ -868,8 +868,8 @@
     },
     {
       "name": "HanYang173R_rearSight_Atlas9_ORM",
-      "sha256": "5fc6f5489e00a5706b59bc08274f883143644667d9860e1b316acca0b01ba47b",
-      "sourceSha256": "75d8401da4b059068fe3a374469b71357c340539bafcdd9c26fc414ed761c5ee",
+      "sha256": "23fd5216da0f38e8b54f0db817f24031e9aad87040d6cd5ec4ce55385cf56f16",
+      "sourceSha256": "258f74a93c7024a9790bb78bfb4d9bcf1788a64950d7072bf66defacdc666420",
       "mimeType": "image/webp",
       "islandCoverage": 0.404926,
       "rebake": true
@@ -925,8 +925,8 @@
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "ec7e2fbcd02fb26fe56772422e340f2c197ebeac0843d7840eb9f31e29473739",
-      "sourceSha256": "5f9077270dd55b2612b08f83a6ecd231e4fa39abed4b07922c6a37c5448e25d0",
+      "sha256": "234a278549b7fcb7c2194bc9162b58bb4e3b50e7f02cfe6b60e3cdfaaf689dd3",
+      "sourceSha256": "28a817cfdf5a0bab1886dd7b8e9178ed74ee68477c1f1259d9a10a943a4e6fbc",
       "islandCoverage": 0.175897,
       "rebake": true
     },
@@ -981,8 +981,8 @@
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "3ed95e263909d8cddf49dc427296b6566ba0a25e271178beb00d764eaf60f970",
-      "sourceSha256": "3f7db7b5a28016349863e612b38aa517abdd7a3490854ae51a3bedfc0eda5c86",
+      "sha256": "3a796cc037c7f117599a28dd98e744194345d698fa743ec5513e947b2c73f2a3",
+      "sourceSha256": "3d5d221c70923e86c9f825184d233e1cc13d20c7c6425feb20996bf47f35e81b",
       "islandCoverage": 0.32717,
       "rebake": true
     },
@@ -996,7 +996,7 @@
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R38: localized handling wear, longitudinal tail plate scuffs and broken steel edge polish.",
+  "rebake": "R39: seated rear cover lips and eased wood around the sight seat.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -1264,7 +1264,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261128R38",
+    "version": "173R-20261128R39",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -1471,7 +1471,7 @@
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261128R38",
+    "version": "173R-20261128R39",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -2247,6 +2247,26 @@
         }
       },
       "surfaceMaps": "Base colour and ORM on the original UV0, with the two existing wood oil masks."
+    },
+    "fitCleanup": {
+      "baseSha256": "906a180db9860b03ddb3d1b67a141f726ebb51d5bfdbddacf954165e81d05491",
+      "parts": {
+        "RearOuterCover_RoundedSideReturn": {
+          "vertices": 413,
+          "maximumTravelM": 0.0020269788801670074
+        },
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
+          "vertices": 2823,
+          "maximumTravelM": 0.0009386400342918932
+        }
+      },
+      "contactMaps": {
+        "HanYang173R_body_Atlas2_ORM": 83580,
+        "HanYang173R_body_Atlas4_ORM": 1118644,
+        "HanYang173R_rearSight_Atlas9_ORM": 57941,
+        "MainWood_ContinuousLowerShoulder_ORM": 5189,
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM": 164138
+      }
     }
   },
   "batching": {

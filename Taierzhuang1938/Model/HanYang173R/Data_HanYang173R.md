@@ -252,6 +252,12 @@ The grip and the supported faces of the stock and forewood have separate fields 
 
 Apply the finish to the R37 export with `python Taierzhuang1938/_import/Script_HanYangUsageWear.py <R37-directory> <exterior-source-directory> <staged-output>`. The finish bake writes the existing Base Color and ORM maps and adjusts the two wood oil films. The review archive records the original inspection views and the same game first-person lighting poses.
 
+### R39 fitted inspection joins
+
+The rear exterior cover sits beneath the receiver at its leading overlap. Its aft side lips tuck into the wood so the central exposed plate has a continuous outline. At the sight, the upper handguard's rounded opening follows the existing steel seat with a thin reveal. The inspection archive includes matched side and overhead views.
+
+Run `python Taierzhuang1938/_import/Script_HanYangFitCleanup.py <R38-directory> <fitted-stage>`. Open the fitted export with BlenderMCP and bake contact visibility with `_blender/Script_HanYangContactAtlases.py`. Then run `python Taierzhuang1938/_import/Script_HanYangFitContact.py <fitted-stage> <contact-bake-directory> <R35-GLB> <finished-stage>`. This composites the new contact bake at the repaired joins with the timber's material occlusion in the existing ORM red channel.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
