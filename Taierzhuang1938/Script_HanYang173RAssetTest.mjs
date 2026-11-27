@@ -387,6 +387,9 @@ for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachment
 }
 assert.deepEqual(report.exteriorFinish.timberFrameRepairs,{MainWood_ContinuousLowerShoulder:52,UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront:9});
 const ao=report.exteriorFinish.contactVisibility;
+const usage=report.exteriorFinish.usageWear;
+assert.equal(usage.tailPlate,D.stockReturn);
+assert.deepEqual([...usage.wood].sort(),[...D.wood].sort());
 assert.deepEqual(Object.keys(report.exteriorFinish.materialOcclusion.parts).sort(),[...D.wood].sort());
 const contactNodes=doc.nodes.filter(node=>node.mesh!==undefined&&node.name!==D.trigger);
 const fixedAoRoles=new Set(['body','frontSight','rearSight']);

@@ -246,6 +246,12 @@ The studio highlights follow the authored metal bevel faces and narrow convex tu
 
 Run `python Taierzhuang1938/_import/Script_HanYangWearAndEdges.py <R36-directory> <R35-GLB> <exterior-source-directory> <staged-output>` with the authored timber and bevel arrays in the exterior source directory. The command keeps the verified part and atlas layout and updates the packed PBR maps.
 
+### R38 handling wear and interrupted edge polish
+
+The grip and the supported faces of the stock and forewood have separate fields for rubbed oil, exposed wood finish and fine scuffs. The scuffs run along the wood grain, with broken ends and varied roughness. The stock return beneath the rear cap has longitudinal tracks following its curved steel surface. Weathered steel scan data breaks up the dark oxide and exposed steel. A shared field drives the colour and roughness of the worn metal bevels.
+
+Apply the finish to the R37 export with `python Taierzhuang1938/_import/Script_HanYangUsageWear.py <R37-directory> <exterior-source-directory> <staged-output>`. The finish bake writes the existing Base Color and ORM maps and adjusts the two wood oil films. The review archive records the original inspection views and the same game first-person lighting poses.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
@@ -268,7 +274,7 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Set `HANYANG_BAKE_GEOMETRY_DIR` for staged bevel and contact fields. Set `HANYANG_BAKE_OUTPUT_DIR` for the staged GLB, report and packed Blender review. Use that packed scene and matching GLB as the inputs for the R35 contact bake. Apply the timber micro-AO pass and the R37 finish using the staged R35 contact GLB, then create the final Blender review. A temporary `ReviewInput.glb` in the revision directory enables matched before/after renders. The review includes neutral studio and narrow grazing light. Promote the completed `Model_HanYang173R.glb` and `Data_GameGeometry.json` to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
+The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Set `HANYANG_BAKE_GEOMETRY_DIR` for staged bevel and contact fields. Set `HANYANG_BAKE_OUTPUT_DIR` for the staged GLB, report and packed Blender review. Use that packed scene and matching GLB as the inputs for the R35 contact bake. Apply the timber micro-AO pass and the R37 finish using the staged R35 contact GLB, then add the R38 handling wear and create the final Blender review. A temporary `ReviewInput.glb` in the revision directory enables matched before/after renders. The review includes neutral studio and narrow grazing light. Promote the completed `Model_HanYang173R.glb` and `Data_GameGeometry.json` to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
 
 ## Historical photo-reference material revision R2, 2026-11-13
 
