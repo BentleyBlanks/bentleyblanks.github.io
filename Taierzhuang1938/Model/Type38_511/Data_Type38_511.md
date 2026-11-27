@@ -1,14 +1,20 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v26
+## 当前交付版 v27
 
-游戏使用 `511-cavity-ao-26`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-edge-glints-27`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 钢件倒角和木面漆边高光 · 2026-11-27
+
+按相邻法线的转向和现有圆角挑出外露边缘。钢件磨亮处在 ORM 的 G/B 通道降低粗糙度并提高金属度。木件沿凸起的圆角减小清漆粗糙度并提高清漆覆盖，在压痕、孔隙和凹缝处衰减磨光。用同机位的主灯和两侧斜光核对高光。 [倒角材质烘焙脚本](../../_blender/Script_Type38EdgeHighlights.py)
+
+局部重烘可用 `Script_Type38EdgeHighlights.py --input <v26 资产目录> --output <输出目录>`。
 
 ## 加深接缝和木面凹部遮蔽 · 2026-11-27
 

@@ -944,7 +944,8 @@ def FinishSteelAtlas(doc, views, source, load, store):
 def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
     folder.mkdir(exist_ok=True,parents=True)
     digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
-    manifest.update(version=30 if author else 31,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
+    version = (32 if 'edgeHighlights' in manifest else 30) + int(not author)
+    manifest.update(version=version,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
                     images=len(doc['images']))
     manifest['imagePayloads'] = []
     for index,image in enumerate(doc['images']):
@@ -958,12 +959,14 @@ def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
 
 def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     from Script_Type38AmbientOcclusion import BakeContactOcclusion
+    from Script_Type38EdgeHighlights import BakeEdgeHighlights
 
     manifest['authorImages'] = len(doc['images'])
     if not author:
         doc,views,rules = PackType38(doc,views,repo)
         manifest['publishImageRules'] = rules
     manifest['ambientOcclusion'] = BakeContactOcclusion(repo, doc, views)
+    manifest['edgeHighlights'] = BakeEdgeHighlights(repo, doc, views)
     SaveType38Assets(folder, doc, views, manifest, lod, author)
 
 

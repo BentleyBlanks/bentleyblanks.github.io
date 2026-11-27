@@ -192,5 +192,8 @@ if __name__ == '__main__':
     manifest = json.loads((args.input / 'Data_Type38_511.json').read_text(encoding='utf8'))
     lod = json.loads((args.input / 'Data_Type38NpcLod.json').read_text(encoding='utf8'))
     assert digest == manifest['runtimeSha256'] == lod['sourceSha256']
+    inputVersion = doc['asset']['extras']['version']
     manifest['ambientOcclusion'] = BakeContactOcclusion(repo, doc, views)
+    if 'edgeHighlights' in manifest:
+        doc['asset']['extras']['version'] = inputVersion
     SaveType38Assets(args.output, doc, views, manifest, lod, author=manifest['renderMeshes'] == manifest['parts'])
