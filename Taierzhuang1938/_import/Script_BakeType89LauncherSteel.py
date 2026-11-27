@@ -15,7 +15,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
-    SaddleJointIdentity, SleeveJointIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
+    SaddleJointIdentity, SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity, SurfaceBalanceIdentity,
+    WideReflectionIdentity,
 )
 
 
@@ -1843,6 +1844,9 @@ def Bake(legacyOrm=None):
     barrelFinish = reference.get("barrelJointFinish")
     if barrelFinish is not None:
         ApplyBarrelJointFinish(maps, pixels, reference)
+    stemFinish = reference.get("stemJointFinish")
+    if stemFinish is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Stem", stemFinish, StemJointIdentity(reference))
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
@@ -1925,6 +1929,9 @@ def Bake(legacyOrm=None):
     if barrelFinish is not None:
         details["jointBarrelCoverage"] = barrelFinish["coverage"]
         details["jointBarrelDetail"] = barrelFinish["detail"]
+    if stemFinish is not None:
+        details["jointStemCoverage"] = stemFinish["coverage"]
+        details["jointStemDetail"] = stemFinish["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
