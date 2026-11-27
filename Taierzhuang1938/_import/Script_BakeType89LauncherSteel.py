@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from scipy.ndimage import gaussian_filter, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
-from Script_MeasureType89LauncherSteel import SurfaceBalanceIdentity
+from Script_MeasureType89LauncherSteel import SurfaceBalanceIdentity, WideReflectionIdentity
 
 
 HERE = Path(__file__).resolve().parent
@@ -1348,6 +1348,32 @@ def ApplyCloseupSurfaceBalance(tile, spec, u, v, seamVisibility):
     ApplyResponseFields(tile, calibration, channels, u, v, coverage)
 
 
+def ApplyBarrelWideReflection(tile, reference, u, v, seamVisibility):
+    balance = reference["barrelPatina"]["wideReflectionBalance"]
+    if any(balance.get(key) != value for key, value in WideReflectionIdentity(reference).items()):
+        raise ValueError("Wide barrel reflection balance does not match the photographed finish and seam AO")
+
+    def Coordinates(section):
+        angle = .5 + (u - section["uCenter"]) / (2 * section["uHalfSpan"])
+        lo, hi = section["vRange"]
+        return angle, (v - lo) / (hi - lo)
+
+    def Fade(value, limits):
+        lo, hi = limits
+        feather = balance["edgeFeather"]
+        return SmoothRamp((value - lo) / feather) * SmoothRamp((hi - value) / feather)
+
+    angle, axial = Coordinates(reference["footprint"])
+    closeAngle, closeAxial = Coordinates(reference["closeups"]["Barrel"]["footprint"])
+    close = Fade(closeAngle, balance["closeRange"]) * Fade(closeAxial, balance["closeRange"])
+    coverage = Fade(angle, balance["angularRange"]) * Fade(axial, balance["axialRange"])
+    coverage *= 1 - balance["closeProtection"] * close
+    coverage *= SmoothRamp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
+    fields = {name: np.interp(angle, balance["angularKnots"], values)
+              for name, values in zip(("gain", "tilt", "tiltV"), balance["coefficients"])}
+    ApplyMaterialFields(tile, fields, coverage)
+
+
 def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -1364,11 +1390,12 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     flank = reference["knurl"]["flankWear"]
     shoulder = reference["shoulder"]["Flank"]
     surfaceBalances = {name: closeups[name] for name in ("Barrel", "Saddle") if "surfaceBalance" in closeups[name]}
+    wideBarrelBalance = "wideReflectionBalance" in reference["barrelPatina"]
     if "albedoBalance" in flank and "surfaceCalibration" not in flank:
         raise ValueError("Knurl albedo balance requires the registered flank response")
     visibility = seamVisibility = None
     needsSeamVisibility = ("steelBalance" in tab or "albedoBalance" in flank
-                           or "reflectionBalance" in shoulder or bool(surfaceBalances))
+                           or "reflectionBalance" in shoulder or bool(surfaceBalances) or wideBarrelBalance)
     if needsSeamVisibility or "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
@@ -1443,13 +1470,16 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
                     ApplyCollarResponse(tile, collar, calibration)
-        if name in surfaceBalances:
+        if name in surfaceBalances or (name == "Barrel" and wideBarrelBalance):
             if name == "Barrel":
                 u, v = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
             else:
                 u, v = PlanarTexelCenters(width, height)
-            ApplyCloseupSurfaceBalance(tile, surfaceBalances[name], u, v,
-                                       seamVisibility[y:y + height, x:x + width])
+            regionVisibility = seamVisibility[y:y + height, x:x + width]
+            if name in surfaceBalances:
+                ApplyCloseupSurfaceBalance(tile, surfaceBalances[name], u, v, regionVisibility)
+            if name == "Barrel" and wideBarrelBalance:
+                ApplyBarrelWideReflection(tile, reference, u, v, regionVisibility)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]

@@ -7763,7 +7763,61 @@
       [2, 69, 84, 79, 94, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 96, 79, 89, 97, 100, 84, 91, 85, 38, 31, 19, 16, 5, 34, 77, 6, 12, 0, 20, 3, 0, 0, 69, 100, 100, 83, 94],
       [0, 60, 65, 65, 75, 87, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 81, 54, 61, 95, 84, 70, 100, 79, 33, 29, 17, 16, 10, 59, 43, 3, 10, 8, 14, 19, 7, 1, 64, 67, 96, 80, 94],
       [0, 31, 42, 39, 54, 46, 58, 76, 74, 76, 85, 64, 70, 68, 78, 70, 67, 23, 55, 64, 59, 61, 72, 33, 20, 20, 15, 14, 17, 21, 4, 0, 8, 7, 1, 18, 22, 4, 41, 39, 52, 58, 70]
-    ]
+    ],
+    "wideReflectionBalance": {
+      "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "sourceFinishSha256": "4ea7f640cd36090a013f5089796351a0058e6e547692c9360d23b106b8427826",
+      "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+      "seamAoSha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+      "angularKnots": [0.08954545454545455, 0.29477272727272724, 0.49999999999999994, 0.7052272727272727, 0.9104545454545454],
+      "coefficients": [
+        [0.16499999999999998, -0.123137469968101, -0.16499999999999998, -0.09020413789543548, 0.16499999999999998],
+        [0.08799999999999998, -0.028288694854773387, -0.08799999999999998, -0.061114706211320396, -0.08799999999999998],
+        [0.08799999999999998, 0.08799999999999998, 0.08799999999999998, 0.087942255128947, 0.0723787190488347]
+      ],
+      "edgeFeather": 0.13,
+      "angularRange": [-0.015, 1.015],
+      "axialRange": [0.04, 0.96],
+      "closeRange": [-0.09, 1.09],
+      "closeProtection": 0.91,
+      "visibilityFloor": 0.61,
+      "visibilityFade": 0.27,
+      "frameSha256": {
+        "V68WideBalanceBeforeMuseum": {
+          "beauty.png": "1f3308c685d10200884701e77fed5ba16c6dae89a63703dd7c4b04599453f28c",
+          "uv.png": "512c6d424e9c7702c8ad5c97c70f0a449785f62417b0d0efb847bd0d07500c0e",
+          "Published.json": "94a7441c0ca3bbf34bb4c94b0e3f7a9bffa63f26b6f48aff66a0193f0230a2c4",
+          "BasePlus.png": "e98e472015cb48db40d58c1e04c2a5ac1f8371867af0a70cd95c2c1cef18c92a",
+          "BaseMinus.png": "ce1815404fcac687469715640f8e847d9e8e05feb23048a385554fbc2280a358",
+          "AcrossPlus.png": "eefdfc3e95e643926d06d468aefa6f76763f9cab0146a7f6c1d24b90b7afca66",
+          "AcrossMinus.png": "671f6c0e95cc9f9ca84cb555bb5d00f00ed3291776e669bb9a03593e5ea5dfd7",
+          "AlongPlus.png": "642a1d242ea13fff26321c0fc9b72ef3ca62824886b19f092ae640f92c11acf5",
+          "AlongMinus.png": "132e64fb34f073667624b501c57d6d6d6575c240647b5bd04f185d0813f10c9d"
+        },
+        "V68WideBalanceBeforeRake": {
+          "beauty.png": "a8b650c04492acd50a31ebfa073e09da3236e7729c1ef0380d0ff1feceb58cb8",
+          "uv.png": "954104ca3f1579408111ffd8b563bfccdcadc6afc040fc279b69e4f50e176b3f",
+          "Published.json": "94a7441c0ca3bbf34bb4c94b0e3f7a9bffa63f26b6f48aff66a0193f0230a2c4",
+          "BasePlus.png": "3ef847b801a8e0c7975ee7a6b5047df8bbed6a9ad83f63e7aa3b690eb338f9b4",
+          "BaseMinus.png": "e8561c279ba94ff8795ca1715744443c79754c2ccf96f4ae55c2a02add03b92f",
+          "AcrossPlus.png": "98fb1699e3654d65eaa45e8ed2d8f6a5212e74ddf94460ba28b631ad6a5fa125",
+          "AcrossMinus.png": "252368611e45df6e2c316926d8449b3064f62f25f0c6614fb2f1bd9133388c2d",
+          "AlongPlus.png": "bc48e200f11bd2b9ca1bd29e28da27d398fa4a24b2bf1553ad14d22a4cf82b4b",
+          "AlongMinus.png": "d821e49dc1fa5f0260a39bf13878b2b544d3fb47ac6d28658c939e2e72095367"
+        },
+        "V68WideBalanceBeforeDefault": {
+          "beauty.png": "916ef8e73aaa037a5ace46289c1689d079d4a9cab8a45c4958098e765690bd83",
+          "uv.png": "512c6d424e9c7702c8ad5c97c70f0a449785f62417b0d0efb847bd0d07500c0e",
+          "Published.json": "94a7441c0ca3bbf34bb4c94b0e3f7a9bffa63f26b6f48aff66a0193f0230a2c4",
+          "BasePlus.png": "59df4d3db8af37247289c2ae2752e1fa47c83bf532da72b3338cedf6458d3199",
+          "BaseMinus.png": "b64f92936f5b8e153fd6bd2d4b868103999196d2c264f889fb81b7d78340ff78",
+          "AcrossPlus.png": "cc2fe8f1282e3fe6ecd928e0a8db62bfe20c33e6d4dfb8aed773dc3467817bd7",
+          "AcrossMinus.png": "c99fa379d3f18e5669ec238373b2aac40cfcbfe859455b948367c8d543fa650a",
+          "AlongPlus.png": "911f880e385e33320a6f5025f3622bec0baf050b6a673306d3aa1e78c167957f",
+          "AlongMinus.png": "b41c7a623961e1c575235ac91fe7efea0ff7c3968c2077b2e5fdf4b94d10c599"
+        }
+      }
+    }
   },
   "shoulder": {
     "Direct": {

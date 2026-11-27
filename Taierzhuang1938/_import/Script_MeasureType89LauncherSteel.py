@@ -92,6 +92,15 @@ def SurfaceBalanceIdentity(spec):
             "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
 
 
+def WideReflectionIdentity(reference):
+    patina = reference["barrelPatina"]
+    previous = {key: value for key, value in patina.items() if key != "wideReflectionBalance"}
+    basis = {"patina": previous, "footprint": reference["footprint"], "closeup": reference["closeups"]["Barrel"]}
+    encoded = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {"photoSha256": patina["source"]["sha256"], "sourceFinishSha256": sha256(encoded).hexdigest(),
+            "contactAoSha256": ContactAoSha256(), "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2572,6 +2581,7 @@ def Main():
     prior = record.get("closeups", {})
     priorFlank = record.get("knurl", {}).get("flankWear", {})
     priorShoulderBalance = record.get("shoulder", {}).get("Flank", {}).get("reflectionBalance")
+    priorWideBalance = record.get("barrelPatina", {}).get("wideReflectionBalance")
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
@@ -2635,6 +2645,9 @@ def Main():
         spec = record["closeups"][name]
         if previous and all(previous.get(field) == value for field, value in SurfaceBalanceIdentity(spec).items()):
             spec["surfaceBalance"] = previous
+    if priorWideBalance and all(priorWideBalance.get(field) == value
+                                for field, value in WideReflectionIdentity(record).items()):
+        record["barrelPatina"]["wideReflectionBalance"] = priorWideBalance
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)
