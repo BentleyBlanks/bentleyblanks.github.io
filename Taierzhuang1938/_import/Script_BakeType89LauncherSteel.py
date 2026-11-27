@@ -16,7 +16,7 @@ from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeig
 from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
     SaddleJointIdentity, SaddleReflectanceIdentity, SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity,
-    SurfaceBalanceIdentity, WideReflectionIdentity,
+    SurfaceBalanceIdentity, TabReflectanceIdentity, WideReflectionIdentity,
 )
 
 
@@ -1578,15 +1578,16 @@ def ApplyNeckJointFinish(maps, packed, reference):
     ApplyJointMaterialFields(maps, packed, "Neck", fields)
 
 
-def SampleCoveredPhotoFields(region, finish, identity):
+def SampleCoveredPhotoFields(region, finish, identity, *, includeWear=True):
     if any(finish.get(key) != value for key, value in identity.items()):
         raise ValueError(f"{region} response does not match the underlying material and AO")
-    coverage, detail = (finish[key] for key in ("coverage", "detail"))
-    if (detail["rearPhotoSha256"] != finish["sourceSha256"]
+    coverage = finish["coverage"]
+    detail = finish["detail"] if includeWear else None
+    if includeWear and (detail["rearPhotoSha256"] != finish["sourceSha256"]
             or detail.get("frontPhotoSha256", finish["frontPhotoSha256"]) != finish["frontPhotoSha256"]):
         raise ValueError(f"{region} wear does not match its registered photographs")
     sources = []
-    for record in (coverage, detail):
+    for record in ((coverage, detail) if includeWear else (coverage,)):
         file = REFERENCE.with_name(record["file"])
         if Sha256(file) != record["sha256"]:
             raise ValueError(f"{region} response data does not match {file.name}")
@@ -1597,6 +1598,8 @@ def SampleCoveredPhotoFields(region, finish, identity):
     u, v = PlanarTexelCenters(width, height)
     weight = PeriodicMaterialField(sources[0] / 65535., u, v)
     fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
+    if not includeWear:
+        return fields
     encoded = (sources[1] - 32768.) / detail["scale"]
     for name, layer in zip(detail["fields"], np.split(encoded, len(detail["fields"]), axis=1), strict=True):
         correction = PeriodicMaterialField(layer, u, v) * detail["strength"]
@@ -1604,8 +1607,8 @@ def SampleCoveredPhotoFields(region, finish, identity):
     return fields
 
 
-def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity):
-    fields = SampleCoveredPhotoFields(region, finish, identity)
+def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity, *, includeWear=True):
+    fields = SampleCoveredPhotoFields(region, finish, identity, includeWear=includeWear)
     ApplyJointMaterialFields(maps, packed, region, fields)
 
 
@@ -1850,6 +1853,12 @@ def Bake(legacyOrm=None):
     saddleReflectance = reference.get("saddleReflectanceFinish")
     if saddleReflectance is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "Saddle", saddleReflectance, SaddleReflectanceIdentity(reference))
+    tabFinishes = (("Tab", "tabReflectance", reference.get("tabReflectanceFinish")),
+                   ("TabBack", "tabBackReflectance", reference.get("tabBackReflectanceFinish")))
+    for region, _, finish in tabFinishes:
+        if finish is not None:
+            ApplyCoveredPhotoFinish(maps, pixels, region, finish, TabReflectanceIdentity(reference, region),
+                                    includeWear="detail" in finish)
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
@@ -1938,6 +1947,11 @@ def Bake(legacyOrm=None):
     if saddleReflectance is not None:
         details["saddleReflectanceCoverage"] = saddleReflectance["coverage"]
         details["saddleReflectanceDetail"] = saddleReflectance["detail"]
+    for _, label, finish in tabFinishes:
+        if finish is not None:
+            details[label + "Coverage"] = finish["coverage"]
+            if "detail" in finish:
+                details[label + "Detail"] = finish["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
