@@ -1,0 +1,255 @@
+{
+  "schema": "Type94WeatheringReleaseV113",
+  "revision": "WeatheringV113",
+  "sourceStage": "Data_ReleaseV112.json",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Exports\\Model_Type94TanketteMaterialAtlasV112.glb",
+  "sourceSha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Scene_Type94TanketteGameWeatheringV113.blend",
+  "sourceBlendSha256": "f171034de83150b1eedbc49d8abae55c84e03e29254917e0f8b4eeaa48e49310",
+  "output": {
+    "file": "Model/Type94Tankette/Model_Type94Tankette.glb",
+    "sha256": "58c7d28bc2f646b29f9bf265d7319736b19a133ae9f1a4c7b5f4fae50a536f4a",
+    "bytes": 39087572,
+    "materials": 2,
+    "meshOwners": 240,
+    "triangles": 79178,
+    "images": [
+      {
+        "name": "Texture_Type94PaintNormalV113",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 4278690,
+        "mimeType": "image/webp",
+        "pixelSha256": "3718dbd68b6ca294ee594c0bc5e45f57d90f235040768c3e0cb6558fd6a8bc2d"
+      },
+      {
+        "name": "Texture_Type94PaintOrmV113",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 9125276,
+        "mimeType": "image/webp",
+        "pixelSha256": "0cf207021d362c95a3c60f1477ce5ed92d044c5fd9605de7eafdb8e7973e3769"
+      },
+      {
+        "name": "Texture_Type94PaintBaseV113",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 6057984,
+        "mimeType": "image/webp",
+        "pixelSha256": "8136c814bda81bb0c9d5d933f249e94e65774fc0f4c97469cf884d73e040ad73"
+      },
+      {
+        "name": "Texture_Type94DetailsBaseV113",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 2678622,
+        "mimeType": "image/webp",
+        "pixelSha256": "ea00248add3c6dd884b1a4fe12f7a53ff91e980c5cce8914ea6f0b2d2b867e4f"
+      },
+      {
+        "name": "Texture_Type94DetailsNormalV113",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 6541192,
+        "mimeType": "image/webp",
+        "pixelSha256": "b29ca19e042fa57df978351ddfcf30d5549e3c544fe06e3822b26681fd251006"
+      },
+      {
+        "name": "Texture_Type94DetailsOrmV113",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 5013212,
+        "mimeType": "image/webp",
+        "pixelSha256": "fb28080803decb78e256fc02d9026ccda88f8f4aa4325ede31739ed702a5ee0e"
+      }
+    ]
+  },
+  "weathering": {
+    "references": {
+      "wet": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Inputs\\Texture_Type94ReferenceCohesiveClay.png",
+      "wetSha256": "0a88b42f50c66a927d31d479aacef6dd3a5f71ef123c508711193ab9b59dea38",
+      "dry": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Inputs\\Texture_Type94ReferenceDriedClay.png",
+      "drySha256": "d37258ae6d6d5e4714b1c967ead53f5ef98b86bd99e449a95302bf33b90152e8",
+      "pressed": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Inputs\\Texture_Type94ReferencePressedEarth.png",
+      "pressedSha256": "fa7e846f091665cdf5152b57d596148e537c9760d0f9145a13da8fc3893b5484"
+    },
+    "affectedBodyTexels": {
+      "Paint": {
+        "affectedSurfaceTexels": 4873222,
+        "strongCoatingTexels": 191644
+      },
+      "Details": {
+        "affectedSurfaceTexels": 2329673,
+        "strongCoatingTexels": 359284
+      }
+    },
+    "trackCounts": {
+      "Bare": 36,
+      "Crust": 28,
+      "DampB": 23,
+      "DampA": 23,
+      "Dust": 50
+    },
+    "trackTiles": {
+      "DampA": [
+        2096,
+        2104,
+        512
+      ],
+      "DampB": [
+        3120,
+        2104,
+        512
+      ],
+      "Crust": [
+        1024,
+        2480,
+        512
+      ],
+      "Dust": [
+        1536,
+        2480,
+        512
+      ]
+    },
+    "placement": "Artwork based on the shape and operation of this tank. Pressed earth in belt pockets and lower return zones, dry borders, shallow dust on the lower sides and upward-facing ledges."
+  },
+  "verification": {
+    "export": {
+      "beforeSha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+      "afterSha256": "58c7d28bc2f646b29f9bf265d7319736b19a133ae9f1a4c7b5f4fae50a536f4a",
+      "nodes": 296,
+      "meshOwners": 240,
+      "triangles": 79178,
+      "materials": 2,
+      "images": 6,
+      "allRigidTransformsAndGeometryValuesExact": true,
+      "emblemAndSolidPixelsExact": true,
+      "trackUvVariants": 5,
+      "ormAtActualLinkUvTriangleCenters": {
+        "Bare": {
+          "aoMedian": 0.9176,
+          "metallicMedian": 0.7608,
+          "roughnessMedian": 0.6039
+        },
+        "Crust": {
+          "aoMedian": 0.8667,
+          "metallicMedian": 0.5961,
+          "roughnessMedian": 0.6627
+        },
+        "DampB": {
+          "aoMedian": 0.8706,
+          "metallicMedian": 0.5922,
+          "roughnessMedian": 0.6471
+        },
+        "DampA": {
+          "aoMedian": 0.849,
+          "metallicMedian": 0.5863,
+          "roughnessMedian": 0.6392
+        },
+        "Dust": {
+          "aoMedian": 0.898,
+          "metallicMedian": 0.5922,
+          "roughnessMedian": 0.6608
+        }
+      },
+      "passed": true
+    },
+    "blender": {
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Scene_Type94TanketteGameWeatheringV113.blend",
+      "sourceBlendSha256": "f171034de83150b1eedbc49d8abae55c84e03e29254917e0f8b4eeaa48e49310",
+      "reopened": true,
+      "materials": 2,
+      "packedImages": 6,
+      "trackVariants": 5,
+      "reexport": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Acceptance\\Model_Type94WeatheringBlenderReexportV113.glb",
+      "reexportSha256": "55b5116534b1f173f1fc63d877442ada6152a70a9d739cda0b103535cb632620",
+      "triangles": 79178,
+      "meshOwners": 240
+    },
+    "browser": {
+      "checks": 973,
+      "sha256": "58c7d28bc2f646b29f9bf265d7319736b19a133ae9f1a4c7b5f4fae50a536f4a",
+      "passed": true
+    },
+    "visual": {
+      "materials": [
+        2,
+        2
+      ],
+      "differences": [
+        {
+          "view": "whole",
+          "meanChannelChange": 1.1268478494623655,
+          "channelsOver8": 0.04406182795698925
+        },
+        {
+          "view": "drive",
+          "meanChannelChange": 2.385668817204301,
+          "channelsOver8": 0.09021935483870967
+        },
+        {
+          "view": "rear",
+          "meanChannelChange": 2.094713440860215,
+          "channelsOver8": 0.07644408602150538
+        },
+        {
+          "view": "other",
+          "meanChannelChange": 2.1801096774193547,
+          "channelsOver8": 0.07620322580645161
+        }
+      ],
+      "gpu": false,
+      "passed": true
+    },
+    "localGpu": {
+      "sha256": "40467cb4a3ddaafcfdb607e844da989f0d25e120df8b5f7efeb30f756dc35ac1",
+      "bytes": 33334752,
+      "embeddedImages": 6,
+      "visual": {
+        "materials": [
+          2,
+          2
+        ],
+        "differences": [
+          {
+            "view": "whole",
+            "meanChannelChange": 1.333904301075269,
+            "channelsOver8": 0.046622043010752685
+          },
+          {
+            "view": "drive",
+            "meanChannelChange": 2.737804301075269,
+            "channelsOver8": 0.10258978494623656
+          },
+          {
+            "view": "rear",
+            "meanChannelChange": 2.4865397849462365,
+            "channelsOver8": 0.09020698924731183
+          },
+          {
+            "view": "other",
+            "meanChannelChange": 2.511554301075269,
+            "channelsOver8": 0.08232849462365592
+          }
+        ],
+        "gpu": true,
+        "passed": true
+      },
+      "passed": true
+    }
+  },
+  "evidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Acceptance"
+}

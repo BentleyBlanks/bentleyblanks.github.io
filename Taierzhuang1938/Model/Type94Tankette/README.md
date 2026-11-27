@@ -1,10 +1,16 @@
-# 九四式轻装甲车 · 馆藏照片复原 V111／游戏材质 V112
+# 九四式轻装甲车 · 馆藏照片复原 V111／游戏材质 V113
 
 以 2017 库宾卡同车橄榄漆照片为主，参看 2014 同车照片、馆方 1–7 号和一张 2022 年高角度车尾照。V107 重做前挡泥板、首板上缘、传动罩、主动轮和履带开窗。V111 用照片的共同特征复核轮轴标点和机位，再重塑两侧后挡泥板的下翻末端。游戏 GLB 整车实测 79,178 三角面，重新从高模投射切线空间法线、BaseColor 与包含 AO、粗糙度和金属度的 ORM。[资产合同](Data_Type94Tankette.json) · [交付记录](Data_ReleaseV111.json)
 
 米制、glTF +Y 向上、-Z 车头。现有 `Type94Tankette`、`Prop/type94Tankette` 和 `mechanisms.path` 接入复用同一个模型。炮塔、枪座、十个盖板或门、前后锁闩以及左右轮履沿用原有枢轴和演示行程。[机构模块](Script_Type94Mechanism.mjs)
 
 原图和旧工程保存在原来的 OneDrive 目录。本次输出位于 `Type94Tankette/PhotoReconstructionV111/`，含 `Scene_Type94TanketteHighV111.blend`、`Scene_Type94TanketteGameV111.blend`、`Textures/`、`Exports/` 和 `Acceptance/`。重校机位后，留出的右后履带轮廓在馆方 4 号和高角度补图里的中位投影余差分别约为 3 和 10 像素。馆方 5 号的失焦、挂车遮挡处断面和展厅灯场均记录推定依据。[参考和机位记录](Data_ReferenceViewsV111.json)
+
+## V113 游戏泥泞与尘灰
+
+主动轮、后回卷和挡泥板下缘使用按实际 UV 和车体坐标投射的压实泥、干壳边及薄尘。履带在同一 PBR 图集内有裸面、浮尘、干泥壳和两种湿泥。贴图沿各自链节运动，接地齿缘保留更多裸钢。凹处分别处理粗糙度、金属度、法线起伏和 AO。泥迹按这辆车的下部接触关系布置，属外观设定。[V113 交付记录](Data_ReleaseV113.json)
+
+新源位于 OneDrive 的 WeatheringV113 子目录。以 V112 游戏 GLB 和本次 Inputs 中的三张泥质样本运行 _import/Script_BakeType94WeatheringV113.py。用 _import/Script_VerifyType94WeatheringV113.py 核验导出文件。编辑源由 _blender/Script_BuildType94WeatherBlendV113.py 经 Script_BlenderMcp.mjs 的 --batch 重建，参数数组依次给 V112 游戏 .blend 路径和 V113 输出目录。
 
 ## V112 游戏材质图集
 

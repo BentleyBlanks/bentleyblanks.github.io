@@ -40,9 +40,9 @@
       "kind": "Secondary study, printed pp50-51 inspected; original JACAR scans unchecked; distinguishes surrounding fighting from city assault"
     }
   ],
-  "version": "20261127MaterialAtlasV112-e5ed0450",
-  "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
-  "bytes": 36500340,
+  "version": "20261127WeatheringV113-58c7d28b",
+  "sha256": "58c7d28bc2f646b29f9bf265d7319736b19a133ae9f1a4c7b5f4fae50a536f4a",
+  "bytes": 39087572,
   "acceptance": {
     "status": "Photographically calibrated rear folds and verified game asset",
     "strictReferenceMatched": true,
@@ -76,10 +76,10 @@
   "poseNodes": 296,
   "highSourceTriangles": 633816,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV111\\Scene_Type94TanketteHighV111.blend",
-  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Scene_Type94TanketteGameMaterialAtlasV112.blend",
+  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Scene_Type94TanketteGameWeatheringV113.blend",
   "sourceHighManifest": "Data_ReleaseV111.json",
-  "sourceGameManifest": "Data_ReleaseV112.json",
-  "deliveryManifest": "Data_ReleaseV112.json",
+  "sourceGameManifest": "Data_ReleaseV113.json",
+  "deliveryManifest": "Data_ReleaseV113.json",
   "mechanisms": {
     "driver": "Script_Type94Mechanism.mjs",
     "linksPerSide": 80,
@@ -1443,128 +1443,128 @@
   "pbr": {
     "embeddedImages": [
       {
-        "name": "Texture_Type94GamePaintNormalV111",
+        "name": "Texture_Type94PaintNormalV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 4649442,
+        "bytes": 4278690,
         "mimeType": "image/webp",
-        "pixelSha256": "edd56d39a18fb07be60e2c0131188d551cc2c941e8aa5fb1b1aa40a9be93d15b"
+        "pixelSha256": "3718dbd68b6ca294ee594c0bc5e45f57d90f235040768c3e0cb6558fd6a8bc2d"
       },
       {
-        "name": "Texture_Type94GamePaintOrmV111",
+        "name": "Texture_Type94PaintOrmV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 10222700,
+        "bytes": 9125276,
         "mimeType": "image/webp",
-        "pixelSha256": "83a220d330586e02f2635216c3415b972380682a1473bbf7d59fd07ef16fa066"
+        "pixelSha256": "0cf207021d362c95a3c60f1477ce5ed92d044c5fd9605de7eafdb8e7973e3769"
       },
       {
-        "name": "Texture_Type94GamePaintBaseV111",
+        "name": "Texture_Type94PaintBaseV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 6234056,
+        "bytes": 6057984,
         "mimeType": "image/webp",
-        "pixelSha256": "13624afe6c199d5b018030e613dd103b36dd7107e3164e815070c500ffcf9a87"
+        "pixelSha256": "8136c814bda81bb0c9d5d933f249e94e65774fc0f4c97469cf884d73e040ad73"
       },
       {
-        "name": "Texture_Type94DetailsBaseV112",
+        "name": "Texture_Type94DetailsBaseV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 1598298,
+        "bytes": 2678622,
         "mimeType": "image/webp",
-        "pixelSha256": "27b48a10bad10200efddf08a3aab7f7abc3be8241bbfec73a955af5fec235061"
+        "pixelSha256": "ea00248add3c6dd884b1a4fe12f7a53ff91e980c5cce8914ea6f0b2d2b867e4f"
       },
       {
-        "name": "Texture_Type94DetailsNormalV112",
+        "name": "Texture_Type94DetailsNormalV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 4921696,
+        "bytes": 6541192,
         "mimeType": "image/webp",
-        "pixelSha256": "36e62fd25f8f517df75788eaa2ea2809da38570499d8f84de2740aa14b3c7f0b"
+        "pixelSha256": "b29ca19e042fa57df978351ddfcf30d5549e3c544fe06e3822b26681fd251006"
       },
       {
-        "name": "Texture_Type94DetailsOrmV112",
+        "name": "Texture_Type94DetailsOrmV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 3491972,
+        "bytes": 5013212,
         "mimeType": "image/webp",
-        "pixelSha256": "d95cfd68b51fb3450ca79580e98f840a806ecdc34f2eed73f5dfc5122becab97"
+        "pixelSha256": "fb28080803decb78e256fc02d9026ccda88f8f4aa4325ede31739ed702a5ee0e"
       }
     ],
     "channels": "BaseColor sRGB; tangent normal linear; ORM R=AO G=Roughness B=Metallic linear",
-    "method": "V111 baked PBR; V112 same-resolution uncoated atlas and V111 clearcoat.",
+    "method": "V112 two-material PBR atlas with V113 localized cohesive mud, dried borders and fine dust across five track UV variants.",
     "images": [
       {
-        "name": "Texture_Type94GamePaintNormalV111",
+        "name": "Texture_Type94PaintNormalV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 4649442,
+        "bytes": 4278690,
         "mimeType": "image/webp",
-        "pixelSha256": "edd56d39a18fb07be60e2c0131188d551cc2c941e8aa5fb1b1aa40a9be93d15b"
+        "pixelSha256": "3718dbd68b6ca294ee594c0bc5e45f57d90f235040768c3e0cb6558fd6a8bc2d"
       },
       {
-        "name": "Texture_Type94GamePaintOrmV111",
+        "name": "Texture_Type94PaintOrmV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 10222700,
+        "bytes": 9125276,
         "mimeType": "image/webp",
-        "pixelSha256": "83a220d330586e02f2635216c3415b972380682a1473bbf7d59fd07ef16fa066"
+        "pixelSha256": "0cf207021d362c95a3c60f1477ce5ed92d044c5fd9605de7eafdb8e7973e3769"
       },
       {
-        "name": "Texture_Type94GamePaintBaseV111",
+        "name": "Texture_Type94PaintBaseV113",
         "size": [
           4096,
           4096
         ],
-        "bytes": 6234056,
+        "bytes": 6057984,
         "mimeType": "image/webp",
-        "pixelSha256": "13624afe6c199d5b018030e613dd103b36dd7107e3164e815070c500ffcf9a87"
+        "pixelSha256": "8136c814bda81bb0c9d5d933f249e94e65774fc0f4c97469cf884d73e040ad73"
       },
       {
-        "name": "Texture_Type94DetailsBaseV112",
+        "name": "Texture_Type94DetailsBaseV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 1598298,
+        "bytes": 2678622,
         "mimeType": "image/webp",
-        "pixelSha256": "27b48a10bad10200efddf08a3aab7f7abc3be8241bbfec73a955af5fec235061"
+        "pixelSha256": "ea00248add3c6dd884b1a4fe12f7a53ff91e980c5cce8914ea6f0b2d2b867e4f"
       },
       {
-        "name": "Texture_Type94DetailsNormalV112",
+        "name": "Texture_Type94DetailsNormalV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 4921696,
+        "bytes": 6541192,
         "mimeType": "image/webp",
-        "pixelSha256": "36e62fd25f8f517df75788eaa2ea2809da38570499d8f84de2740aa14b3c7f0b"
+        "pixelSha256": "b29ca19e042fa57df978351ddfcf30d5549e3c544fe06e3822b26681fd251006"
       },
       {
-        "name": "Texture_Type94DetailsOrmV112",
+        "name": "Texture_Type94DetailsOrmV113",
         "size": [
           4096,
           3072
         ],
-        "bytes": 3491972,
+        "bytes": 5013212,
         "mimeType": "image/webp",
-        "pixelSha256": "d95cfd68b51fb3450ca79580e98f840a806ecdc34f2eed73f5dfc5122becab97"
+        "pixelSha256": "fb28080803decb78e256fc02d9026ccda88f8f4aa4325ede31739ed702a5ee0e"
       }
     ]
   },
@@ -1574,7 +1574,7 @@
     "twoDirectionSampledSurfaceMaximumM": 0.0025087681133300066
   },
   "validation": {
-    "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+    "sha256": "58c7d28bc2f646b29f9bf265d7319736b19a133ae9f1a4c7b5f4fae50a536f4a",
     "exportChecks": 1172,
     "browserChecks": 973,
     "blenderMechanismChecks": 38,
@@ -1607,10 +1607,11 @@
       "verified": true,
       "method": "Canonical oriented position triangles per mesh owner, independent of texture and vertex-index ordering. Position quantization 1e-7 m."
     },
-    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Acceptance",
+    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\WeatheringV113\\Acceptance",
     "passed": true,
     "geometrySourceVerification": "Data_ReleaseV111.json",
-    "materialAtlasVerification": "Data_ReleaseV112.json"
+    "materialAtlasVerification": "Data_ReleaseV112.json",
+    "weatheringVerification": "Data_ReleaseV113.json"
   },
   "reconstructionScope": [
     "以 2017 库宾卡小诱导轮馆藏橄榄漆照片为主，2014 同车及馆方 1–7 号补充。",
@@ -1624,7 +1625,7 @@
   "activeCameraStudy": "Data_ReferenceViewsV111.json",
   "finalSourceVerification": {
     "high": "Data_ReleaseV111.json",
-    "game": "Data_ReleaseV112.json",
-    "delivery": "Data_ReleaseV112.json"
+    "game": "Data_ReleaseV113.json",
+    "delivery": "Data_ReleaseV113.json"
   }
 }
