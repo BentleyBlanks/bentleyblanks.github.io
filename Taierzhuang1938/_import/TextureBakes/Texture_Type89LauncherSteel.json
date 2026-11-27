@@ -19,50 +19,50 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 567344,
-      "sha256": "780289c625dca38c025160b47f439766af8ff32d29835c6d4b0be7ea32a73a35"
+      "bytes": 567150,
+      "sha256": "7208576fc3c0d5daee8ca663b745f735619a85d93c283b2c9139e135a2a7d94a"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 386386,
-      "sha256": "e0972a50f46af995bfa023847592f9526082ffa3e1cb5e6222ee8506cf6d40e1"
+      "bytes": 386080,
+      "sha256": "8cc4db3e538872a6025bdc5ff1f6e7f71a7993ff69ba15a9af2950e735fddc0c"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 84364,
-      "sha256": "04adb7a78b01b0404d6f56d262a6d8f10c07efe5ee5669a26da3f18a5e746676"
+      "bytes": 84322,
+      "sha256": "c179d823581460ed560520674b22feb33ef7c348b07ef6ea8d99759edd26c6d5"
     }
   ],
-  "totalBytes": 1038094,
+  "totalBytes": 1037552,
   "metrics": {
     "meanSrgb": [
-      0.4518,
-      0.4391,
-      0.407
+      0.4517,
+      0.439,
+      0.4069
     ],
-    "luma": 0.4326,
+    "luma": 0.4325,
     "lumaStd": 0.1178,
     "sat": 0.0992,
     "clipLow": 0.0,
     "clipHigh": 0.0001,
-    "lowFreq": 0.0972,
-    "seam": 0.1213,
+    "lowFreq": 0.0971,
+    "seam": 0.1211,
     "interior": 0.0266,
-    "seamRatio": 4.557,
+    "seamRatio": 4.563,
     "border": 0.715,
-    "swing": 0.1161,
+    "swing": 0.1168,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "110c360b467b48327f6a91a5177edb1823f1a632433467f23470688fc1e1d9a5",
+    "sha256": "240a5e2f6f1d71ae6c4ef5a5fb8d182a91b4e3763f7e7cfad9af3abef6083ce5",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -262,6 +262,10 @@
     "tabBackReflectanceDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherTabBackReflectanceWear.png",
       "sha256": "f51a2a77728a23043914a3a268a26c40b311d3235d067bcb6b43c85eeda8db95"
+    },
+    "shoulderReflectanceCoverage": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherShoulderReflectanceCoverage.png",
+      "sha256": "b2538a189b206059c7d19a4940414b3346facdeedacc1f5ebcf9fc558beeb3bf"
     }
   },
   "contactAo": {

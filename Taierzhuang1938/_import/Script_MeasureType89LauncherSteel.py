@@ -120,8 +120,8 @@ def SleeveReverseIdentity(reference):
             "horizonSha256": sha256(file).hexdigest(), "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
 
 
-def JointSteelIdentity(reference, region):
-    front = reference["closeups"][region]
+def JointSteelIdentity(reference, region, *, photoFit=None):
+    front = reference["closeups"][region] if photoFit is None else photoFit
     encoded = json.dumps(front, sort_keys=True, separators=(",", ":")).encode("utf-8")
     source = RECORD.parents[2] / "Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp"
     atlas = RECORD.parents[3] / "_blender/Data_Type89LauncherSteelAtlas.json"
@@ -152,6 +152,16 @@ def StemJointIdentity(reference):
 def TabReflectanceIdentity(reference, region):
     detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
     return JointSteelIdentity(reference, region) | {"contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest()}
+
+
+def ShoulderReflectanceIdentity(reference):
+    shoulder = reference["shoulder"]
+    direct = json.dumps(shoulder["Direct"], sort_keys=True, separators=(",", ":")).encode("utf-8")
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return JointSteelIdentity(reference, "Shoulder", photoFit=shoulder["Flank"]) | {
+        "directFitSha256": sha256(direct).hexdigest(),
+        "contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest(),
+    }
 
 
 def SleeveJointIdentity(reference):
@@ -2682,7 +2692,8 @@ def Main():
         ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity),
         ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity),
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
-        ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")))]
+        ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
+        ("shoulderReflectanceFinish", ShoulderReflectanceIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

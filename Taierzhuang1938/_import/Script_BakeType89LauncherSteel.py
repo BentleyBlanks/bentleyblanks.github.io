@@ -15,7 +15,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
-    SaddleJointIdentity, SaddleReflectanceIdentity, SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity,
+    SaddleJointIdentity, SaddleReflectanceIdentity, ShoulderReflectanceIdentity, SleeveJointIdentity,
+    SleeveReverseIdentity, StemJointIdentity,
     SurfaceBalanceIdentity, TabReflectanceIdentity, WideReflectionIdentity,
 )
 
@@ -1859,6 +1860,10 @@ def Bake(legacyOrm=None):
         if finish is not None:
             ApplyCoveredPhotoFinish(maps, pixels, region, finish, TabReflectanceIdentity(reference, region),
                                     includeWear="detail" in finish)
+    shoulderReflectance = reference.get("shoulderReflectanceFinish")
+    if shoulderReflectance is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Shoulder", shoulderReflectance, ShoulderReflectanceIdentity(reference),
+                                includeWear=False)
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
@@ -1952,6 +1957,8 @@ def Bake(legacyOrm=None):
             details[label + "Coverage"] = finish["coverage"]
             if "detail" in finish:
                 details[label + "Detail"] = finish["detail"]
+    if shoulderReflectance is not None:
+        details["shoulderReflectanceCoverage"] = shoulderReflectance["coverage"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
