@@ -541,7 +541,7 @@ function CreateServer(rootDir, context) {
     }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
     if (route.startsWith("/__model-workbench/")) { await handleModelWorkbench(request, response); return; }
-    if (route === "/__character-workbench/open") { await OpenCharacterWorkbench(request, response); return; }
+    if (route === "/__character-workbench/open") { await OpenCharacterWorkbench(request, response, rootDir); return; }
     if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
     if (route === "/__motion-workbench") {
       response.writeHead(302, { Location: "/__motion-workbench/", "Cache-Control": "no-store" });
@@ -841,7 +841,7 @@ async function CharacterWorkbenchReady() {
   throw new Error("端口 8743 已被其他服务占用。");
 }
 
-async function StartCharacterWorkbench() {
+async function StartCharacterWorkbench(rootDir) {
   if (await CharacterWorkbenchReady()) return;
   const workbenchDir = [process.env.OneDriveConsumer, process.env.OneDrive, path.join(os.homedir(), "OneDrive")]
     .filter(Boolean)
@@ -862,6 +862,7 @@ async function StartCharacterWorkbench() {
   ].join("\n");
   const child = spawn("python", ["-B", "-c", launch, String(DEFAULT_TEST_TTL_MS / 1000)], {
     cwd: workbenchDir, detached: true, windowsHide: true, stdio: "ignore",
+    env: { ...process.env, TRIPO_STUDIO_MCP_RUNNER: path.join(rootDir, "scripts", "Script_TripoStudioMcp.mjs") },
   });
   let spawnError;
   child.once("error", error => { spawnError = error; });
@@ -884,14 +885,14 @@ async function StartCharacterWorkbench() {
   }
 }
 
-async function OpenCharacterWorkbench(request, response) {
+async function OpenCharacterWorkbench(request, response, rootDir) {
   if (request.method !== "POST") { SendJson(response, 405, { error: "只收 POST" }); return; }
   if (!IsLocalPage(request) || request.headers.origin !== `http://${request.headers.host}`) {
     SendJson(response, 403, { error: "请从本机高级工具控制中心打开角色制作管线。" });
     return;
   }
   try {
-    characterWorkbenchStartup ??= StartCharacterWorkbench().finally(() => { characterWorkbenchStartup = undefined; });
+    characterWorkbenchStartup ??= StartCharacterWorkbench(rootDir).finally(() => { characterWorkbenchStartup = undefined; });
     await characterWorkbenchStartup;
     SendJson(response, 200, { url: CHARACTER_WORKBENCH_URL });
   } catch (error) {

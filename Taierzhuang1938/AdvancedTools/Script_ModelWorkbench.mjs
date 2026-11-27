@@ -323,6 +323,8 @@ function RenderStage() {
     }
     if (!task.active && task.retry !== "references" && task.state === "refsReady" && set === newest) {
       actions.append(Button("通过参考图并开始建模", () => StageAction("approveReferences", { referenceSet: set.id }), "primary"));
+      if (set.tripoReady) actions.append(Button("通过参考图并用 Tripo MCP 建模（消耗积分）",
+        () => StageAction("approveReferences", { referenceSet: set.id, buildProvider: "tripo" })));
     }
     if (task.referenceSets.length > 1) actions.append(HistorySelect(task.referenceSets, set.id, "参考图版本", value => { selectedSet = value; }));
     if (set) {

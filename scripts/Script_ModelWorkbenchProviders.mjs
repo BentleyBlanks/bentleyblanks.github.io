@@ -3,6 +3,22 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 
 export const VIEW_LABELS = { front: "正面", side: "左侧", back: "背面" };
+
+export function TripoViews(views) {
+  const directions = {
+    "正面": "front", front: "front",
+    "左侧": "left", "左侧面": "left", left: "left",
+    "右侧": "right", "右侧面": "right", right: "right",
+    "背面": "back", back: "back",
+  };
+  const selected = new Map();
+  for (const view of views) {
+    const label = view.label.trim().toLowerCase();
+    if (Object.hasOwn(directions, label)) selected.set(directions[label], view);
+  }
+  return selected.has("front") && selected.size > 1 ? Object.fromEntries(selected) : null;
+}
+
 export const PROVIDERS = {
   openai: "OpenAI API · GPT-Image-2.6",
   lovart: "Lovart",

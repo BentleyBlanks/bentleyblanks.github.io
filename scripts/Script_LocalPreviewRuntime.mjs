@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 // Startup modules outside the reloadable bridge still require a process restart.
 export function PreviewRuntimeRevision(root) {
   const hash = createHash("sha256");
-  for (const file of ["Script_LocalPreview.mjs", "Script_EncounterLibraryServer.mjs", "Script_EncounterImportWatch.mjs", "Script_EncounterCodexServer.mjs", "Script_EncounterCodexRunner.mjs", "Script_EncounterAgentProviders.mjs", "Script_EncounterCodexProgress.mjs", "Script_LocalPreviewRuntime.mjs", "Script_PreviewModules.mjs", "Script_ModelWorkbenchServer.mjs", "Script_ModelWorkbenchProviders.mjs", "Script_ModelWorkbenchImages.py"]) {
+  for (const file of ["Script_LocalPreview.mjs", "Script_EncounterLibraryServer.mjs", "Script_EncounterImportWatch.mjs", "Script_EncounterCodexServer.mjs", "Script_EncounterCodexRunner.mjs", "Script_EncounterAgentProviders.mjs", "Script_EncounterCodexProgress.mjs", "Script_LocalPreviewRuntime.mjs", "Script_PreviewModules.mjs", "Script_ModelWorkbenchServer.mjs", "Script_ModelWorkbenchProviders.mjs", "Script_ModelWorkbenchImages.py", "Script_TripoStudioMcp.mjs"]) {
     const filePath = path.join(root, "scripts", file);
     hash.update(file).update(fs.existsSync(filePath) ? fs.readFileSync(filePath) : "missing");
   }

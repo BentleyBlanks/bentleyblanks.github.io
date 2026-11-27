@@ -6,7 +6,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { CreateSteerableCodexChild } from "./Script_EncounterCodexRunner.mjs";
-import { AlternateProviderInstructions, GenerateOpenAiViews, PROVIDERS, ThreeViewPrompt, VIEW_LABELS } from "./Script_ModelWorkbenchProviders.mjs";
+import { AlternateProviderInstructions, GenerateOpenAiViews, PROVIDERS, ThreeViewPrompt, TripoViews, VIEW_LABELS } from "./Script_ModelWorkbenchProviders.mjs";
+import { GenerateTripoModel } from "./Script_TripoStudioMcp.mjs";
 
 const prefix = "/__model-workbench";
 const uuid = /^[a-f0-9-]{36}$/;
@@ -239,7 +240,7 @@ async function BlenderRun(root, args) {
 
 export function CreateModelWorkbenchHandler(root, {
   storage = DefaultStorage(), blenderRoot = DefaultBlenderRoot(),
-  runCodex = RunCodex, generateOpenAi = GenerateOpenAiViews, runBlender = BlenderRun,
+  runCodex = RunCodex, generateOpenAi = GenerateOpenAiViews, runBlender = BlenderRun, generateTripo = GenerateTripoModel,
 } = {}) {
   storage = path.resolve(storage);
   const running = new Map();
@@ -260,7 +261,7 @@ export function CreateModelWorkbenchHandler(root, {
   }
 
   function Visible(task) {
-    const result = { ...task };
+    const result = { ...task, referenceSets: task.referenceSets.map(set => ({ ...set, tripoReady: Boolean(TripoViews(set.views)) })) };
     if (task.active && !IsAlive(task.active.pid)) {
       result.failure = "本机服务已中断，可从上次工作继续。";
       result.state = task.active.previous;
@@ -506,20 +507,37 @@ export function CreateModelWorkbenchHandler(root, {
         const blend = path.join(sourceDir, "Model.blend");
         await RecoverBlender(task.abandonedBlender);
         delete task.abandonedBlender;
-        run.blender = { root, name: `ModelWorkbench_${run.id}` };
-        Save(task);
         let blender;
         let evidence;
         try {
+          const references = FileList(approved.views);
+          let tripo;
+          if (task.buildProvider === "tripo" && !previous) {
+            const selected = TripoViews(references);
+            Assert(selected, "Tripo 多视图建模需要已批准的正面和至少一个侧面或背面");
+            const cache = path.join(task.workspace || Folder(task.id), "_Scratch", "Tripo", approved.id);
+            const output = path.join(cache, "TripoBase.glb");
+            const provenance = await generateTripo({
+              views: Object.fromEntries(Object.entries(selected).map(([view, reference]) => [view, reference.path])),
+              output, key: `ModelWorkbench-${task.id}-${approved.id}`, cwd: root, signal, progress: Progress,
+            });
+            const file = path.join(sourceDir, "TripoBase.glb");
+            fs.copyFileSync(output, file);
+            tripo = { ...provenance, file };
+            SaveJson(path.join(sourceDir, "Data_TripoStudio.json"), provenance);
+            Message("system", `Tripo GLB 已保存。Studio 任务 ${provenance.taskId}，模型 ${provenance.modelId}。`);
+          }
+          run.blender = { root, name: `ModelWorkbench_${run.id}` };
+          Save(task);
           blender = await runBlender(root, ["start", ...(previous?.blend && fs.existsSync(previous.blend) ? [previous.blend] : []),
             "--new", "--task", run.blender.name]);
           Assert(blender.port, "BlenderMCP 没有返回任务端口");
           signal.throwIfAborted();
-          const references = FileList(approved.views);
           const critique = FileList(feedback?.attachments || []);
           const goal = "完成建模并导出可回导 GLB 与可编辑 Blender 源文件。与每张批准参考图对齐相机与构图，逐图检查轮廓、比例、结构、材质及可见细节。全部一致且证据完整才把 Goal 标为完成。";
           await Agent([
             Context(), goal,
+            tripo && `把 Tripo MCP 生成的基础几何 ${tripo.file} 导入 Blender，在该网格上继续建模和修正。重建脚本通过相对路径从本轮源工程目录读取 TripoBase.glb。把 Studio 模型 ID ${tripo.modelId} 列入来源说明。`,
             `使用 BlenderMCP：node "${path.join(root, "scripts", "Script_BlenderMcp.mjs")}" exec --port ${blender.port} --file "<当前目录的脚本>"。服务管理此端口与收尾。只能在当前任务目录与指定 .blend 路径写产物。`,
             `保存工程至 ${blend}，在当前目录生成 Model.glb、可重建的 Rebuild.py，以及每张参考图对应的模型独立渲染 PNG。导出后回导查看并反复修到一致。`,
             textureDir && `贴图源文件和正式烘焙图放在 ${textureDir}。Blender 贴图使用到 Textures 的相对路径。不得引用 _Scratch 内文件作为工程依赖。`,
@@ -559,7 +577,7 @@ export function CreateModelWorkbenchHandler(root, {
           if (archive) {
             for (const view of views) view.archive = ArchiveFile(task.workspace, `Review/${round}/${view.id}`, fs.readFileSync(Asset(task.id, view.id)));
           }
-          evidence = { id: run.id, approved: task.approved, blend, round, archive, views, model: SaveAsset(task, ".glb", glb),
+          evidence = { id: run.id, approved: task.approved, blend, round, archive, views, tripo: tripo || previous?.tripo, model: SaveAsset(task, ".glb", glb),
             rebuild: SaveAsset(task, ".py", rebuild), summary: Clean(evidence.summary, 3200), time: Date.now() };
         } finally {
           if (blender?.port) await runBlender(root, ["stop", "--port", String(blender.port)]);
@@ -676,7 +694,10 @@ export function CreateModelWorkbenchHandler(root, {
       Start(task, "references");
     } else if (action === "approveReferences") {
       Assert(task.state === "refsReady" && task.retry !== "references" && task.referenceSets.at(-1)?.id === body.referenceSet, "参考图版本已变化，请重新查看", 409);
+      Assert(body.buildProvider === undefined || body.buildProvider === "tripo", "未知建模途径");
+      if (body.buildProvider === "tripo") Assert(TripoViews(task.referenceSets.at(-1).views), "Tripo 多视图建模需要正面和至少一个侧面或背面");
       task.approved = body.referenceSet;
+      task.buildProvider = body.buildProvider || "blender";
       task.state = "refsApproved";
       Start(task, "build");
     } else if (action === "retry") {

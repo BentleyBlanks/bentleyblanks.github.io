@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as Delay } from "node:timers/promises";
 import { CreateModelWorkbenchHandler } from "./Script_ModelWorkbenchServer.mjs";
 import { GenerateOpenAiViews } from "./Script_ModelWorkbenchProviders.mjs";
+import { GenerateTripoModel } from "./Script_TripoStudioMcp.mjs";
 import { CreateSteerableCodexChild } from "./Script_EncounterCodexRunner.mjs";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 
@@ -38,6 +39,7 @@ const references = ["front", "side", "back"];
 const testTurns = [];
 const blenderCalls = [];
 let buildAttempts = 0, reviewAttempts = 0;
+const tripoCalls = [];
 
 async function TestGoal() {
   const server = new EventEmitter();
@@ -120,6 +122,13 @@ const handler = CreateModelWorkbenchHandler(root, {
     assert.ok(sources.length);
     return references.map((view, i) => ({ view, label: ["正面", "左侧", "背面"][i], path: ImagePath(i), source: "OpenAI 测试接头" }));
   },
+  generateTripo: async ({ views, output, key }) => {
+    assert.deepEqual(Object.keys(views), ["front", "left", "back"]);
+    tripoCalls.push(key);
+    await fs.mkdir(path.dirname(output), { recursive: true });
+    await fs.writeFile(output, FixtureGlb());
+    return { taskId: "fixture-studio-task", modelId: "fixture-studio-model" };
+  },
   runBlender: async (_root, args) => {
     blenderCalls.push(args);
     return { port: 9899, instances: [] };
@@ -143,6 +152,10 @@ const handler = CreateModelWorkbenchHandler(root, {
       assert.equal(session.model, "gpt-6.2-astra");
       assert.equal(session.effort, "xhigh");
       assert.match(goal, /全部一致/);
+      if (buildAttempts < 3) {
+        assert.match(prompt, /TripoBase\.glb/);
+        assert.deepEqual(await fs.readFile(path.join(building.sourceDir, "TripoBase.glb")), FixtureGlb());
+      }
       const ids = [...new Set([...prompt.matchAll(/"id":"([a-f0-9-]+\.png)"/g)].map(match => match[1]))].slice(0, 3);
       if (buildAttempts === 3) { assert.equal(images.length, 4); assert.match(prompt, /边缘坡度/); }
       await fs.writeFile(path.join(building.sourceDir, "Model.blend"), "fixture editable blend bytes");
@@ -190,6 +203,44 @@ const base = `http://127.0.0.1:${server.address().port}`;
 let browser, page;
 try {
   await TestGoal();
+  const cloudCalls = [];
+  const input = { views: { image: ImagePath(0) }, output: path.join(testRoot, "Tripo", "Base.glb"), key: "fixture-intent", cwd: root };
+  const tripoOptions = {
+    pollInterval: 0,
+    request: async (url, options) => {
+      if (url.pathname === "/upload") {
+        assert.equal(options.method, "PUT");
+        assert.equal(options.headers.get("content-type"), "image/png");
+        assert.deepEqual(options.body, await fs.readFile(ImagePath(0)));
+        return new Response(null, { status: 200 });
+      }
+      assert.equal(url.pathname, "/download");
+      return new Response(FixtureGlb());
+    },
+    connect: async () => ({
+      close() {},
+      async call(tool, args) {
+        cloudCalls.push(tool);
+        if (tool === "tripo_create_image_upload_grant") return { upload_grant: { required_headers: {}, object_key: "input-key", upload_url: "https://fixture.invalid/upload" } };
+        if (tool === "tripo_image_to_model") {
+          assert.equal(args.image_key, "input-key");
+          assert.equal(args.idempotency_key, "fixture-intent");
+          throw new Error("Simulated timeout after admission");
+        }
+        if (tool === "tripo_get_model_task_by_idempotency_key") {
+          assert.deepEqual(args, { creation_tool: "tripo_image_to_model", idempotency_key: "fixture-intent" });
+          return { found: true, task: { task_id: "saved-task", status: "running" } };
+        }
+        if (tool === "tripo_get_model_task") return { task: { task_id: "saved-task", status: "success", model_ids: ["saved-model"] } };
+        assert.equal(tool, "tripo_get_model_asset");
+        return { model: { model_url: "https://fixture.invalid/download" } };
+      },
+    }),
+  };
+  assert.deepEqual(await GenerateTripoModel(input, tripoOptions), { taskId: "saved-task", modelId: "saved-model" });
+  assert.deepEqual(await fs.readFile(input.output), FixtureGlb());
+  assert.deepEqual(await GenerateTripoModel(input, tripoOptions), { taskId: "saved-task", modelId: "saved-model" });
+  assert.deepEqual(cloudCalls, ["tripo_create_image_upload_grant", "tripo_image_to_model", "tripo_get_model_task_by_idempotency_key", "tripo_get_model_task", "tripo_get_model_asset"]);
   const oldKey = process.env.OPENAI_API_KEY;
   process.env.OPENAI_API_KEY = "fixture-key";
   const requestFolder = path.join(testRoot, "Provider");
@@ -209,7 +260,7 @@ try {
   process.env.OPENAI_API_KEY = oldKey || "fixture-key";
 
   browser = await LaunchBrowser({ extraArgs: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
-  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const pageErrors = [];
   page.on("pageerror", error => pageErrors.push(error.message));
   await page.goto(base + workbench);
@@ -236,7 +287,7 @@ try {
     body: JSON.stringify({ action: "approveReferences", revision: approved.revision, referenceSet: "old-version" }),
   });
   assert.equal(badApprove.status, 409);
-  await page.getByRole("button", { name: "通过参考图并开始建模" }).click();
+  await page.getByRole("button", { name: /通过参考图并用 Tripo MCP 建模/ }).click();
   await page.getByText("缺少逐视角对齐资料", { exact: true }).first().waitFor();
   assert.equal(reviewAttempts, 0);
   await page.getByRole("button", { name: "重试上次操作" }).click();
@@ -248,6 +299,8 @@ try {
   assert.equal(result.candidates[0].review.verdict, "revise");
   assert.equal(result.candidates[0].review.attachments.length, 1);
   assert.equal(result.candidates[1].review.verdict, "pass");
+  assert.equal(result.candidates[1].tripo.modelId, "fixture-studio-model");
+  assert.deepEqual(tripoCalls, [`ModelWorkbench-${id}-${approved.referenceSets[0].id}`, `ModelWorkbench-${id}-${approved.referenceSets[0].id}`]);
   assert.deepEqual(result.candidates.map(candidate => candidate.round), ["R002", "R003"]);
   const index = JSON.parse(await fs.readFile(path.join(result.workspace, "Data_Task.json"), "utf8"));
   assert.equal(index.approved, result.approved);
@@ -298,7 +351,7 @@ try {
   await page.getByRole("button", { name: "切换任务列表" }).click();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 430);
   assert.deepEqual(pageErrors, []);
-  console.log("PASS: 2K Max API payload and retry cache, both intake routes, approval and evidence gates, independent review and marked rerun, GLB, screenshots, chat, and narrow layout.");
+  console.log("PASS: 2K image requests, Tripo task recovery and GLB delivery, approval and evidence gates, Blender handoff, independent review and marked rerun, screenshots, chat, and narrow layout.");
 } catch (error) {
   if (page) {
     console.error("Workbench state:", {

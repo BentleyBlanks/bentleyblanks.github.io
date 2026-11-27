@@ -27,9 +27,9 @@ export function DesktopCodexCommand() {
   return desktopCommand;
 }
 
-export function SpawnAppServer(rootDir, configArgs = []) {
+export function SpawnAppServer(rootDir, configArgs = [], { preferInstalledCli = false } = {}) {
   const entry = path.join(process.env.APPDATA || "", "npm/node_modules/@openai/codex/bin/codex.js");
-  const desktop = DesktopCodexCommand();
+  const desktop = preferInstalledCli && fs.existsSync(entry) ? null : DesktopCodexCommand();
   let command = fs.existsSync(entry) ? process.execPath : process.platform === "win32" ? "codex.exe" : "codex";
   const args = ["app-server", "--listen", "stdio://", ...configArgs];
   let commandArgs = fs.existsSync(entry) ? [entry, ...args] : args;

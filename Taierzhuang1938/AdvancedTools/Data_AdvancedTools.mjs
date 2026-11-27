@@ -34,7 +34,7 @@ export const STANDALONE_TOOLS = Object.freeze([
     window: Object.freeze({ url: "./Tool_AssetStandards.html", name: "TengxianAssetStandards" }) }),
   Object.freeze({ id: "modelWorkbench", group: "assets", slot: "tail", label: "3D 模型制作工作台",
     hint: "管理参考图、Blender 建模、同视角比对与独立验收",
-    window: Object.freeze({ url: "./Tool_ModelWorkbench.html?v=20261124", name: "TengxianModelWorkbench" }) }),
+    window: Object.freeze({ url: "./Tool_ModelWorkbench.html?v=20261127Tripo", name: "TengxianModelWorkbench" }) }),
   Object.freeze({ id: "testScenes", group: "level", slot: "tail", label: "测试场景",
     hint: "独立测试场景入口：进入 10 个功能测试场或跳进场景编辑器编辑",
     window: Object.freeze({ url: "./TestScenes.html", name: "TengxianTestScenes" }) }),
