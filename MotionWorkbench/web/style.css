@@ -1182,6 +1182,46 @@ input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.14); }
 .mwTakeTile.viewing { border-color: var(--gold-hi); box-shadow: 0 0 0 1px rgba(250, 224, 164, 0.4); }
 .mwTakeTile.isFailed { border-color: var(--bad-border); }
 .mwTakeTile.isFailed.viewing { border-color: var(--bad); }
+.mwTakeTile.isScheduled {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(231, 196, 122, 0.14) 0%, var(--surface-2) 100%);
+  box-shadow: 0 0 0 1px rgba(231, 196, 122, 0.25);
+}
+.mwTakeTile.isScheduled:hover {
+  border-color: var(--gold-hi);
+  background: linear-gradient(180deg, rgba(231, 196, 122, 0.22) 0%, var(--surface-3) 100%);
+}
+.mwTakeTile.isScheduled .mwTakeThumb { background: rgba(231, 196, 122, 0.05); }
+.mwTakeTile.isScheduled .mwTakeMeta { background: rgba(231, 196, 122, 0.12); color: var(--gold-hi); }
+
+.mwQueuedBanner {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--gold-border);
+  background: linear-gradient(90deg, rgba(231, 196, 122, 0.16) 0%, rgba(231, 196, 122, 0.06) 100%);
+  color: var(--gold-hi);
+  font-size: 13px;
+  font-weight: 600;
+}
+.mwQueuedBannerLeft {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.mwQueuedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-hi);
+  box-shadow: 0 0 8px var(--gold);
+  flex: none;
+}
 .mwTakeMiniProg {
   position: absolute;
   left: 0;
@@ -1202,7 +1242,7 @@ input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.14); }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 12px;
+  padding: 32px 12px 10px;
   overflow: hidden;
   font-size: 12px;
   color: var(--muted);
@@ -1235,6 +1275,7 @@ input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.14); }
 }
 .mwTakeStateBadge.sel { color: #11120d; background: var(--gold); border-color: var(--gold-hi); }
 .mwTakeStateBadge.run { color: var(--gold-hi); border-color: var(--gold-border); }
+.mwTakeStateBadge.sch { color: #11120d; background: var(--gold); border-color: var(--gold-hi); }
 .mwTakeStateBadge.err { color: #f7b8b0; background: rgba(48, 22, 19, 0.92); border-color: var(--bad-border); }
 .mwTakeDelBtn {
   position: absolute;

@@ -226,6 +226,13 @@
         <!-- STAGE 03 · 视频生成（Seedance 抽卡验收） -->
         <section class="mwStage hidden" data-panel="3">
           <div class="mwCanvas mwStage3Canvas">
+            <div id="s3QueuedBanner" class="mwQueuedBanner hidden">
+              <div class="mwQueuedBannerLeft">
+                <span class="mwQueuedDot" aria-hidden="true"></span>
+                <span id="s3QueuedBannerText">已排入定时队列</span>
+              </div>
+              <button id="btnS3BannerOpenSch" class="mwBtn mwSm mwPrimary" type="button">查看队列</button>
+            </div>
             <div class="mwHeroPlayer">
               <div id="s3PlayerEmpty" class="mwPlaceholder">
                 <div class="mwPhTitle">待生成视频</div>
@@ -373,6 +380,13 @@
         <!-- STAGE 04 · 骨骼提取（统一进度卡 + 失败诊断卡 + 三视图同期验收） -->
         <section class="mwStage hidden" data-panel="4">
           <div class="mwCanvas mwStage4Canvas">
+            <div id="s4QueuedBanner" class="mwQueuedBanner hidden">
+              <div class="mwQueuedBannerLeft">
+                <span class="mwQueuedDot" aria-hidden="true"></span>
+                <span id="s4QueuedBannerText">已排入定时队列</span>
+              </div>
+              <button id="btnS4BannerOpenSch" class="mwBtn mwSm mwPrimary" type="button">查看队列</button>
+            </div>
             <div id="s4Empty" class="mwPlaceholder hidden">
               <div id="s4IdleBlock" class="mwEmptyStack">
                 <div class="mwPhTitle" id="s4EmptyTitle">等待提骨</div>

@@ -1080,10 +1080,27 @@ function renderTaskDetail() {
   const s2ReadyCount = (task.storyboard?.shots || []).filter((s) => s.status === "succeeded").length;
   $("#s3SourceSummary").textContent = `白盒：${task.whitebox?.status === "approved" ? "已确认" : "待确认"} · 分镜：${s2ReadyCount} 张就绪 · ${task.storyboard?.qualityPreset || "720p"} · ${task.durationSec || 10}s`;
 
+  const curH3Sch = (appState.schedule?.items || []).find(
+    (x) => x.taskId === task.id && x.kind === "stage3_h3" && (x.status === "pending" || x.status === "running")
+  );
+  const s3Banner = $("#s3QueuedBanner");
+  if (s3Banner) {
+    s3Banner.classList.toggle("hidden", !curH3Sch);
+    if (curH3Sch) {
+      const slot = curH3Sch.scheduledTime || getNearestUpcomingSlot(appState.schedule);
+      $("#s3QueuedBannerText").textContent =
+        curH3Sch.status === "running"
+          ? `定时队列执行中 · MiniMax-H3（${curH3Sch.resolution || "720p"} ${curH3Sch.duration || 6}s）`
+          : `已排入 ${slot} 定时队列 · MiniMax-H3（${curH3Sch.resolution || "720p"} ${curH3Sch.duration || 6}s），到点自动开跑`;
+    }
+  }
+
   const readyCount = takes.filter((t) => t.status === "succeeded").length;
   const runCount = takes.filter((t) => t.status === "running").length;
   const failCount = takes.filter((t) => t.status === "failed").length;
-  const titleParts = [`${readyCount} 条成片`];
+  const titleParts = [];
+  if (curH3Sch) titleParts.push(`1 条定时排队（${curH3Sch.scheduledTime || getNearestUpcomingSlot(appState.schedule)}）`);
+  titleParts.push(`${readyCount} 条成片`);
   if (runCount) titleParts.push(`${runCount} 条生成中`);
   if (failCount) titleParts.push(`${failCount} 条失败`);
   const takesTitleEl = $("#s3TakesTitle");
@@ -1093,7 +1110,25 @@ function renderTaskDetail() {
 
   const s3Box = $("#s3Takes");
   s3Box.innerHTML = "";
-  if (!takes.length) {
+  if (curH3Sch) {
+    const slot = curH3Sch.scheduledTime || getNearestUpcomingSlot(appState.schedule);
+    const schTile = document.createElement("div");
+    schTile.className = "mwTakeTile isScheduled";
+    schTile.title = "点击打开错峰定时队列查看或调整时间";
+    schTile.innerHTML = `
+      <div class="mwTakeThumb">
+        <span class="mwTakeStateBadge sch">⏱ 已排 ${escapeHtml(slot)}</span>
+        <span class="mwTakeThumbMsg mwGold">${curH3Sch.status === "running" ? "定时任务执行中…" : `等待 ${escapeHtml(slot)} 自动生成`}</span>
+      </div>
+      <div class="mwTakeMeta">
+        <span class="mwTakeMetaTitle">MiniMax-H3 · ${escapeHtml(curH3Sch.resolution || "720p")} ${escapeHtml(curH3Sch.duration || 6)}s</span>
+        <span class="mwMono mwGold">队列中</span>
+      </div>
+    `;
+    schTile.onclick = () => setScheduleDrawer(true);
+    s3Box.appendChild(schTile);
+  }
+  if (!takes.length && !curH3Sch) {
     s3Box.innerHTML = `<div class="mwTakeEmpty">当前动作尚无抽卡记录，点击右侧「生成 1 条视频」或导入本地 MP4</div>`;
   }
   for (const tk of takes) {
@@ -1178,6 +1213,21 @@ function renderTaskDetail() {
   $("#s3InspFoot")?.classList.toggle("hidden", !selectedTake?.url);
 
   // Stage 04 · 骨骼提取
+  const curMocapSch = (appState.schedule?.items || []).find(
+    (x) => x.taskId === task.id && x.kind === "stage4_mocap" && (x.status === "pending" || x.status === "running")
+  );
+  const s4Banner = $("#s4QueuedBanner");
+  if (s4Banner) {
+    s4Banner.classList.toggle("hidden", !curMocapSch);
+    if (curMocapSch) {
+      const slot = curMocapSch.scheduledTime || getNearestUpcomingSlot(appState.schedule);
+      const gpuLabel = curMocapSch.precisionPreset === "high_a100" ? "A100" : "L4";
+      $("#s4QueuedBannerText").textContent =
+        curMocapSch.status === "running"
+          ? `定时队列执行中 · Colab 提骨（${gpuLabel}）`
+          : `已排入 ${slot} 定时队列 · Colab 提骨（${gpuLabel}），到点自动开跑`;
+    }
+  }
   const pPreset = task.stage4?.precisionPreset || "standard_l4";
   $$("#s4PrecisionPresets .mwPresetBtn").forEach((b) => {
     b.classList.toggle("active", b.dataset.p === pPreset);
@@ -2595,6 +2645,8 @@ $("#btnS4OpenLogs").onclick = () => setSystemDrawer(true, "logs");
 $("#btnSchedule").onclick = () => setScheduleDrawer(!appState.schOpen);
 $("#btnCloseSch").onclick = () => setScheduleDrawer(false);
 $("#schScrim").onclick = () => setScheduleDrawer(false);
+if ($("#btnS3BannerOpenSch")) $("#btnS3BannerOpenSch").onclick = () => setScheduleDrawer(true);
+if ($("#btnS4BannerOpenSch")) $("#btnS4BannerOpenSch").onclick = () => setScheduleDrawer(true);
 
 async function saveScheduleConfig(patch) {
   try {
