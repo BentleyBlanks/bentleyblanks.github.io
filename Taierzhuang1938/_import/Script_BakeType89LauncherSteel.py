@@ -717,12 +717,27 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
     if name == "Knurl":
         knurl = reference["knurl"]
         flank = knurl["flankWear"]
+        grooveFinish = flank.get("grooveFinish", {})
+        if grooveFinish:
+            identity = {"photoSha256": flank["source"]["sha256"],
+                        "photoPattern": flank.get("patternRegistration", {}).get("photo"),
+                        "responseSha256": flank.get("surfaceCalibration", {}).get("sha256"),
+                        "contactAoSha256": Sha256(CONTACT_AO)}
+            if any(grooveFinish.get(key) != value for key, value in identity.items()):
+                raise ValueError("Grip groove finish must match the registered photo and current material response")
         angular = knurl["angularCycles"] * xx
         axial = knurl["axialCycles"] * vv
         angular, axial = RegisterKnurlFlankPattern(knurl, angular, axial, xx, vv)
         phaseA, phaseB = angular + axial, angular - axial
         left, right = np.mod(phaseA, 1), np.mod(phaseB, 1)
-        diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
+        flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
+        distanceA, distanceB = 2 * np.minimum(left, 1 - left), 2 * np.minimum(right, 1 - right)
+        if grooveFinish:
+            # The two groove families have different relief in the side photo.
+            liftA, liftB = grooveFinish["reliefLift"]
+            distanceA += liftA * flankCoverage * (1 - distanceA)
+            distanceB += liftB * flankCoverage * (1 - distanceB)
+        diamonds = np.minimum(distanceA, distanceB)
         # The front photo shows worn narrow crests and a shallower slope to the grooves.
         angularDistance = np.abs((xx + .5) % 1 - .5)
         front = 1 - np.clip((angularDistance - .121) / .065, 0, 1)
@@ -737,7 +752,6 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         rows = np.rint(padding + (1 - centerV) * (height - 2 * padding)).astype(np.int32)
         cellWear = chip[rows, columns]
         photoTone, photoWarmth, coverage = PhotographicGrain(knurl["wear"], (xx + .5) % 1 - .5, vv)
-        flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
         photoTone = photoTone * coverage + 1.32 * flankTone * flankCoverage
         photoWarmth = photoWarmth * coverage + flankWarmth * flankCoverage
         coverage = np.maximum(coverage, flankCoverage)
@@ -754,7 +768,8 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         uKnots, shadowChroma = np.asarray(flank["shadowChroma"], dtype=np.float32).T
         flankOxide = flankCoverage * np.clip(np.interp(xx, uKnots, shadowChroma) / .24, 0, 1)
         tonalDelta += 6.4 * chip + 15.5 * (shoulders - .45) - 7.6 * grooves + 112 * photoTone
-        tonalDelta -= 12.5 * flankOxide * grooves + 22 * flankCoverage * flankGroove
+        oxideTone, grooveTone = grooveFinish.get("recessTone", (12.5, 22))
+        tonalDelta -= oxideTone * flankOxide * grooves + grooveTone * flankCoverage * flankGroove
         polishedLip = np.exp(-((diamonds - .29) / .13)**2) * np.clip(.56 + .36 * cellWear + .98 * photoTone, .07, 1)
         tonalDelta += .9 * front + 1.74 * front * polishedLip
         heightField += (1.56 + .40 * flankCoverage) * shoulders * wornHeight * (1 - .14 * front)
@@ -869,7 +884,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         # The groove bottoms retain oxide. Small worn patches catch sharper
         # reflections within the satin finish on the diamond shoulders.
         dark = (.83 - .20 * front) * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
-        dark = np.minimum(.96, dark + .21 * flankCoverage * flankGroove)
+        dark = np.minimum(.96, dark + grooveFinish.get("recessMix", .21) * flankCoverage * flankGroove)
         recessColor = SrgbToLinear(np.array([40, 36, 30], dtype=np.float32) / 255)
         linear += (recessColor - linear) * dark[..., None]
         rough += (.73 - rough) * dark
@@ -879,7 +894,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         exposed = np.clip(.77 * chippedCrests + .26 * wornLip + .116 * front * polishedLip, 0, 1)
         crestColor = SrgbToLinear(np.array([159, 152, 140], dtype=np.float32) / 255)
         linear += (crestColor - linear) * exposed[..., None]
-        rough += (.322 - rough) * exposed
+        rough += (.322 + grooveFinish.get("crestRoughnessLift", 0) * flankCoverage - rough) * exposed
         metal += (.94 - metal) * exposed
     if name == "Shoulder":
         # The front arc retains a dark satin film. Its flank has oxidized
@@ -1064,9 +1079,23 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         base += .035 * shoeCoverage[..., None] * LUMA_NEUTRAL_WARMTH
     if name == "Stem":
         base += .051 * stemCoverage[..., None] * LUMA_NEUTRAL_WARMTH
+    if name == "Knurl" and grooveFinish:
+        # Match the steel and oxide colors at equal luminance. The exposed
+        # crests need less correction than the worn faces and groove bottoms.
+        chromaCoverage = flankCoverage * (1 - .42 * exposed)
+        active = chromaCoverage > 0
+        redBase, redGroove = grooveFinish["redAdjustment"]
+        blueBase, blueFace = grooveFinish["blueAdjustment"]
+        red = redBase + redGroove * grooves[active]
+        blue = blueBase + blueFace * (1 - exposed[active])
+        green = -(LUMA[0] * red + LUMA[2] * blue)
+        tint = np.stack([green + red, green, green + blue], axis=-1)
+        colors = SrgbToLinear(np.clip(base[active], 0, 1))
+        colors += ((colors @ LUMA) * chromaCoverage[active])[..., None] * tint
+        base[active] = LinearToSrgb(np.clip(colors, 0, 1))
     ao = 1 - .019 * pits - (.087 if name in ("Recess", "Channel") else .016) * oxidation
     if name == "Knurl":
-        ao *= 1 - .31 * grooves
+        ao *= 1 - (.31 - grooveFinish.get("microAoReduction", 0) * flankCoverage) * grooves
     if name == "Wheel":
         ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
@@ -1111,10 +1140,11 @@ def BakeKnurl(quadrants, width, height, index, reference):
     maps = list(BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference))
     knurl = reference["knurl"]
     flank = knurl["flankWear"]
-    if "patternRegistration" in flank:
+    if "patternRegistration" in flank or "grooveFinish" in flank:
         # The periodic normal filter has a small response outside the shifted
         # pattern. Fade that halo back to the established surrounding chart.
-        originalFlank = {key: value for key, value in flank.items() if key != "patternRegistration"}
+        originalFlank = {key: value for key, value in flank.items()
+                         if key not in ("patternRegistration", "grooveFinish")}
         originalReference = reference | {"knurl": knurl | {"flankWear": originalFlank}}
         originalNormal = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, originalReference)[1]
         u = (np.arange(sourceWidth) - pad) / (sourceWidth - 2 * pad)

@@ -40,6 +40,15 @@ def KnurlFlankResponseIdentity(flank):
     return {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
             "uBySampleRow": source["uBySampleRow"], "footprint": flank["footprint"],
             "detailSha256": flank["detail"]["sha256"], "contactAoSha256": ContactAoSha256()}
+
+
+def KnurlGrooveFinishIdentity(flank):
+    return {"photoSha256": flank["source"]["sha256"],
+            "photoPattern": flank.get("patternRegistration", {}).get("photo"),
+            "responseSha256": flank.get("surfaceCalibration", {}).get("sha256"),
+            "contactAoSha256": ContactAoSha256()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2557,6 +2566,9 @@ def Main():
             and pattern.get("uBySampleRow") == flank["source"]["uBySampleRow"]
             and pattern.get("cyclesPerChart") == [knurl["angularCycles"], knurl["axialCycles"]]):
         flank["patternRegistration"] = pattern
+    grooveFinish = priorFlank.get("grooveFinish")
+    if grooveFinish and all(grooveFinish.get(key) == value for key, value in KnurlGrooveFinishIdentity(flank).items()):
+        flank["grooveFinish"] = grooveFinish
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

@@ -9,7 +9,7 @@ from scipy.ndimage import gaussian_filter, map_coordinates
 from scipy.optimize import minimize
 
 from Script_MeasureType89LauncherSteel import (
-    RECORD, REGISTERED_LUMA, ContactAoSha256, FitSignedResponse, KnurlFlankResponseIdentity, Photo,
+    RECORD, REGISTERED_LUMA, ContactAoSha256, FitSignedResponse, KnurlFlankResponseIdentity, KnurlGrooveFinishIdentity, Photo,
     ReadRegisteredLuma, ReadRegisteredRgb, RegisteredTabFace, ResponseEquations, SaveReferenceRecord,
     TabWarmIdentity, WriteResponseFields,
 )
@@ -206,6 +206,9 @@ def Main():
         flank["patternRegistration"] = RegisterFlankPattern(reference["knurl"], luma[1], args.knurl_pattern_evidence)
     elif (flank.get("patternRegistration", {}).get("responseSha256") != flank["surfaceCalibration"]["sha256"]):
         flank.pop("patternRegistration", None)
+    grooveFinish = flank.get("grooveFinish")
+    if grooveFinish and any(grooveFinish.get(key) != value for key, value in KnurlGrooveFinishIdentity(flank).items()):
+        flank.pop("grooveFinish")
     SaveReferenceRecord(reference)
     print("Measured tab warm shading and the grip flank material response")
 

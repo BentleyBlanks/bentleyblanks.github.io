@@ -6698,6 +6698,42 @@
           "HeldOut.png": "c9dfd99382a91eee161d2d39a46d1893073317638a44a93a1de0e702401af182"
         },
         "sampleCount": 3737
+      },
+      "grooveFinish": {
+        "photoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "photoPattern": {
+          "cyclesScale": [0.9711, 0.9726],
+          "phaseByDiagonal": [-0.1946, 0.4391],
+          "powerByDiagonal": [0.001808, 0.009606]
+        },
+        "responseSha256": "332afc4ec5936f9231dfc70d3810e8a013ed94a6f07edfa826f861be45ef350b",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "reliefLift": [0.17, 0.07],
+        "recessTone": [7.5, 11.0],
+        "recessMix": 0.12,
+        "microAoReduction": 0.13,
+        "crestRoughnessLift": 0.036,
+        "redAdjustment": [0.048, 0.034],
+        "blueAdjustment": [0.028, 0.007],
+        "frameSha256": {
+          "V60GripLocal": {
+            "Mixed.png": "5e4d0189feedf2460170581c86407e391a3b5ad1b53ae88030c101bab9414681",
+            "Second.png": "3f7beeeba6e709f7d8fffdafcb94367c69ca1b008fb0d0b7e7069cdb83225b75",
+            "Anchored.png": "0c57c4a28110533a445a1761f1f59791b28918db34870d9fead298947e61f492",
+            "HeldOut.png": "a5b7dab0a5519bc6a5d932cc004b95816a83d37ff826375113456afdc6e85036",
+            "Independent.png": "997adea91d021ef133f7ebb719f37721d734093cef21029bfbc8bb5f75377d45",
+            "Default.png": "4e4dd4fd4f04be8fdd428e0593879a93204a91bbe2c33cbed52a80e2c267bbc0"
+          },
+          "V61KnurlCalibratedTrial": {
+            "Mixed.png": "fd5cbd97993b1bf53b5786b4879a05955338bcd6ed4cbbf53d7c32cb1772c7b0",
+            "Second.png": "eaafbbe70cba0b8d193d0056293b0500becebc6a3edda635525f53ca26a59e92",
+            "Anchored.png": "4dbc24bf3fc49996e6c52f696d5cd1c90c4e9d356d4046ac00eff96e1efda551",
+            "HeldOut.png": "00e863b661f2df1247879e6d4987036fcdab27206655dce88c746350a66f816a",
+            "Independent.png": "e0cc2f5813aca34c3f6ed55cca32f56d85eb4a5d0df60444f559c51097d746fe",
+            "Default.png": "5af8fcac03857e132ed94d880995b04c87d0e413c1208c2abc9e0e5ba5254caf"
+          }
+        },
+        "fixtureSha256": "f0717adeaca9ee6006a1403cce8e8f3752eac6bc62d128eb68a88f0c5bedb156"
       }
     }
   },
