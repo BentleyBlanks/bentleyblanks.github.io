@@ -11194,15 +11194,17 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherSleeveJointWear.png",
-      "sha256": "b27c2ef5a9fb80d985967304919d6b5dbc765f2c5ae54c6402069990329f243d",
-      "scale": 39000,
+      "sha256": "e7fe0de4f879aa4dae4beb8002eb95b9a8b947cfd0d4175142b80d5658f2b2e9",
+      "scale": 36033,
       "strength": 1.0,
       "fields": [
         "gain",
         "tintRed",
         "tintBlue",
         "roughness",
-        "metalness"
+        "metalness",
+        "tilt",
+        "tiltV"
       ],
       "registeredTexels": 3668,
       "rearReference": "V76SleeveAligned",
@@ -11228,6 +11230,39 @@
         "BroadGainPlus": "495dd9339f9006a0452650ed7338f13980a61b46b18b6675106d0b980708d166",
         "BroadGainMinus": "6c5acb15836c8ee3124b2cf24156abd22193d0cbbf4aefa368965fb08bdb68df",
         "HeldOut": "2b7831a29c4c8b40a866647afa065ba762c05a693c9929db258db93181bb4f93"
+      }
+    },
+    "currentRearLighting": {
+      "previousDetailSha256": "b27c2ef5a9fb80d985967304919d6b5dbc765f2c5ae54c6402069990329f243d",
+      "photoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "rearRigSha256": "0bc867bac19421a9eacffe0c84e4a1e6efdf3023b13d8d034436c982a16bcf87",
+      "coarseResponseSha256": "f3c6e0f1181cefe81f6b2f57497d295c64a7a42797799975320be2289d8e370d",
+      "heldOutAxialRanges": [
+        [
+          0.24,
+          0.31
+        ],
+        [
+          0.66,
+          0.74
+        ]
+      ],
+      "detailStrength": 0.84,
+      "frames": {
+        "UV": "d8f51f06259178a78ef23e3212bf8557f95a8e6e6e3b64c5fd03934f402264ab",
+        "UVContact": "f4a7849eb6e7bdc57c3ab3486973d8331fb2d015196d159b6b6fa3c25105615f",
+        "MaterialChannels": "b204cc7af55993f82cd9d71f9dbdfb7d4c10d705682eeb7c1118cb2c8ba97df6",
+        "Matched": "a23d1b45893a06cf0434fa027781f2b34d51c2772519e23a99ced33dfcb859ae",
+        "HeldOut": "ef735ad0b8b49392d846df91ef3bb2aeac621165ffe5c738e4af9a0a74c006a0",
+        "Broad": "1a1c62130603ce90ef852c46d0454fd993b12531f330f3115e1ca8d74f2945d8",
+        "MatchedGainPlus": "2f035f9bc0d09d65e8a361d21d30f7722f53364879d12a2466b76ee069d6f47b",
+        "MatchedGainMinus": "504b069eec7ce6287a73fc3144a6f896c4ee86a2c6731fd723675fa805c9d8a9",
+        "BroadGainPlus": "f87dbbfedebb39c62fd84158b12a1dbbc77c15227cc2b337580b066cadcaeaa3",
+        "BroadGainMinus": "c94383b65802f42006177cc07ff2af17b0bb26d3aae9c4cfab0f2015da8dfc1e",
+        "MatchedRoughPlus": "da7ef84c595483314530d382dd7842010d5479a773fba175b35ba2f0eb44780c",
+        "MatchedRoughMinus": "b05346cccf4cd4b1e5e0465ca20b08cc7dc7e30b25f5690600f860c1afeba8a5",
+        "BroadRoughPlus": "ebd4e32eec4ecc572454d2031e1d453890dd9b30bde2108acda99673582a9984",
+        "BroadRoughMinus": "e05f4de373ff2ee7c4ab6557df2432999b1b199900131f35a404225eba4755c6"
       }
     }
   },
