@@ -41,7 +41,7 @@ void main() {
 def Accessor(doc, blocks, index):
     accessor = doc['accessors'][index]
     view = doc['bufferViews'][accessor['bufferView']]
-    width = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3}[accessor['type']]
+    width = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}[accessor['type']]
     dtype = np.dtype({5126: '<f4', 5123: '<u2', 5125: '<u4'}[accessor['componentType']])
     return np.ndarray((accessor['count'], width), dtype=dtype, buffer=blocks[accessor['bufferView']],
                       offset=accessor.get('byteOffset', 0),

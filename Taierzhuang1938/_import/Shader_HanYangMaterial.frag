@@ -18,6 +18,9 @@ layout(location=0) out vec4 base;
 layout(location=1) out vec4 orm;
 layout(location=2) out vec4 mapped;
 layout(location=3) out vec4 finishMask;
+#ifdef WOOD_FINISH_REBAKE
+layout(location=4) out float woodOcclusion;
+#endif
 #endif
 const vec3 along=vec3(1,0,0),across=vec3(0,1,0),up=vec3(0,0,1);
 float luma(vec3 color){return dot(color,vec3(.2126,.7152,.0722));}
@@ -42,45 +45,58 @@ float flecks(vec2 coord){
 float strokeDistance(vec2 p,vec2 start,vec2 end){
  vec2 line=end-start;return length(p-start-line*clamp(dot(p-start,line)/dot(line,line),0.,1.));
 }
-// Compressed fibres make a shallow, irregular bed with a broken ridge on
-// one side. The same profile drives both the finish and the opposite slopes.
-vec2 WoodDentProfile(vec2 q,float key){
- float shape=length(q*vec2(1.+.18*q.y,1.))+.19*(softNoise(q*2.8+key)-.5);
- float bed=1.-smoothstep(.13,1.,shape+.10*q.x);
- float fibre=softNoise(q*vec2(3.2,11.7)+key);
- float rim=(1.-smoothstep(.045,.20,abs(shape-.89)))
-           *smoothstep(-.22,.58,q.y-.21*q.x)*(.16+.84*smoothstep(.32,.73,fibre));
- return vec2(bed,rim);
+// A glancing impact leaves an asymmetric cut. A blunt impact compresses
+// a flatter patch, with crushed fibres and an incomplete ridge on one side.
+vec2 WoodDentProfile(vec2 q,float key,float grainSplit){
+ float thread=softNoise(q*vec2(5.2,16.8)+key);
+ float segmentation=softNoise(vec2(q.x*5.7,key*.813));
+ float bend=.26*(1.-min(1.,q.x*q.x))*(2.*hash21(vec2(key,9.8))-1.);
+ float side=q.y-bend-.085*sin(6.1*q.x+key);
+ float ragged=.16*(thread-.5)+.12*(segmentation-.5);
+ float taper=1.-smoothstep(.43,1.09,abs(q.x+.12*side));
+ float width=(.30+.43*taper)*(.80+.38*segmentation);
+ float cutWall=abs(side)/(width*(side>=0.?.84:1.21))+ragged;
+ float cut=taper*(1.-smoothstep(.10,.97,cutWall));
+ cut*=.62+.38*smoothstep(-.60,.52,q.x-.22*side);
+ float bevel=max(.91*abs(q.x+.32*side),max(1.03*abs(side-.26*q.x),abs(.78*q.x-.60*side)));
+ float impact=(1.-smoothstep(.40,1.06,bevel+ragged))*(.56+.44*smoothstep(-.45,.58,side+.24*q.x));
+ float splitRidge=taper*(1.-smoothstep(.04,.26,abs(cutWall-.85)));
+ float impactRidge=1.-smoothstep(.045,.19,abs(bevel+ragged-.91));
+ float splinter=smoothstep(.12,.58,side-.14*q.x)*smoothstep(.33,.73,.71*thread+.29*segmentation);
+ return vec2(mix(impact,cut,grainSplit),mix(impactRidge,splitRidge,grainSplit)*splinter);
 }
 vec4 WoodDent(vec2 offset,vec2 extent,float angle,float depth,float key){
  vec2 dir=vec2(cos(angle),sin(angle));
  vec2 crossGrain=vec2(-dir.y,dir.x);
  mat2 frame=transpose(mat2(dir,crossGrain));
  vec2 q=(frame*offset)/extent;
- if(dot(q,q)>1.72)return vec4(0.);
- vec2 profile=WoodDentProfile(q,key);
+ if(abs(q.x)>1.36||abs(q.y)>1.37)return vec4(0.);
+ float grainSplit=step(.35,hash21(vec2(key,22.51)));
+ vec2 profile=WoodDentProfile(q,key,grainSplit);
  const float stepAt=.000135;
  vec2 dx=(frame*vec2(stepAt,0.))/extent;
  vec2 dy=(frame*vec2(0.,stepAt))/extent;
- const vec2 height=vec2(1.,-.17);
+ const vec2 height=vec2(1.,-.14);
  vec2 slope=vec2(
-  dot(height,WoodDentProfile(q+dx,key)-WoodDentProfile(q-dx,key)),
-  dot(height,WoodDentProfile(q+dy,key)-WoodDentProfile(q-dy,key))
+  dot(height,WoodDentProfile(q+dx,key,grainSplit)-WoodDentProfile(q-dx,key,grainSplit)),
+  dot(height,WoodDentProfile(q+dy,key,grainSplit)-WoodDentProfile(q-dy,key,grainSplit))
  )*(depth/(2.*stepAt));
- return vec4(profile,slope);
+ return vec4(profile.x*clamp(depth/.00040,.18,1.),profile.y,slope);
 }
 vec4 ScatteredWoodDents(vec2 face,vec2 spacing,float phase,float wear,float size){
  vec2 field=face/spacing+vec2(phase,.57*phase);
  vec2 cell=floor(field);
  float grouping=softNoise(face*vec2(38.,70.)+phase);
- float chance=hash21(cell+3.58)+.44*wear+.28*grouping;
- float active=smoothstep(.64,.96,chance);
+ float chance=hash21(cell+3.58)+.34*wear+.24*grouping;
+ float active=smoothstep(.74,1.04,chance);
  if(active<=0.)return vec4(0.);
  vec2 centre=.36+.28*vec2(hash21(cell+11.4),hash21(cell+31.7));
  vec2 offset=(fract(field)-centre)*spacing;
- float angle=mix(-1.50,1.50,hash21(cell+5.87));
- vec2 extent=size*vec2(mix(.0015,.0054,hash21(cell+11.9)),mix(.00078,.00255,hash21(cell+9.18)));
- float depth=size*mix(.00011,.00043,hash21(cell+23.19));
+ float orientation=hash21(cell+5.87);
+ float angle=hash21(cell+6.14)>.70?mix(.86,1.45,orientation)*sign(orientation-.49):mix(-.48,.55,orientation);
+ angle+=3.14159265*step(.53,hash21(cell+7.31));
+ vec2 extent=size*vec2(mix(.00215,.0059,hash21(cell+11.9)),mix(.00052,.00162,hash21(cell+9.18)));
+ float depth=size*mix(.000075,.000265,hash21(cell+23.19));
  return active*WoodDent(offset,extent,angle,depth,phase+61.*hash21(cell+34.6));
 }
 vec4 StockWitnessDents(vec2 face,bool reverseSide){
@@ -475,7 +491,7 @@ void main(){
   float sidePhase=17.31+17.5*float(p.y<0.)+seed;
   vec2 side=p.xz+vec2(0.,.18*p.y);
   vec4 impression=ScatteredWoodDents(side,vec2(.030,.021),sidePhase,wornZone,handguard?.83:1.);
-  impression+=.71*ScatteredWoodDents(side,vec2(.014,.010),sidePhase+31.5,wornZone,.46);
+  impression+=.60*ScatteredWoodDents(side,vec2(.014,.010),sidePhase+31.5,wornZone,.46);
 #ifdef STOCK_CREST_WEAR
   if(p.x<.120)impression+=StockWitnessDents(side,p.y<0.);
 #endif
@@ -488,12 +504,17 @@ void main(){
   vec2 damage=min(impression.xy+crown.xy,vec2(1.));
   // Use the same compressed beds as the normal bake so AO sits below the
   // torn ridges and leaves the ridges free to catch light.
-  cavityBlock=max(cavityBlock,.73*smoothstep(.10,.91,damage.x));
-  visible*=1.-.25*damage.x+.175*damage.y;
-  rough=mix(rough,.755,.76*damage.x);
-  rough=mix(rough,.455,.35*damage.y);
+  cavityBlock=max(cavityBlock,.59*smoothstep(.18,.89,damage.x));
+  visible*=1.-.19*damage.x+.18*damage.y;
+  rough=mix(rough,.745,.73*damage.x);
+  rough=mix(rough,.442,.46*damage.y);
   gradient+=dentSlope-normal*dot(dentSlope,normal);
   finishMask.r*=1.-.80*damage.x;
+  float burnishedLip=smoothstep(.14,.84,edgeWear)*(1.-.84*damage.x)*(1.-.64*cavityBlock)*(1.-.65*cutEnd);
+  rough=mix(rough,max(.29,.64*rough),.86*burnishedLip);
+  float raisedFilm=.73*burnishedLip;
+  if(foreEnd)raisedFilm*=smoothstep(.10,.34,finishMask.r);
+  finishMask.r=max(finishMask.r,raisedFilm);
  }else{
   vec3 weights=pow(abs(normal),vec3(4.));
   weights/=max(dot(weights,vec3(1.)),.0001);
@@ -628,5 +649,8 @@ void main(){
  mapped=vec4(normalize(vec3(dot(gradient,tangent),dot(gradient,bitangent),1.))*.5+.5,1.);
 #ifdef WOOD_OCCLUSION_BAKE
  woodVisibility=vec2(1.-cavityBlock,1.);
+#endif
+#ifdef WOOD_FINISH_REBAKE
+ woodOcclusion=1.-cavityBlock;
 #endif
 }
