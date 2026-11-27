@@ -73,6 +73,7 @@
 - 驻钣接头的刻印以第 6 张馆藏近照中的周围钢面为局部灰度基准。实测默认灯和近似馆藏布光下的底色响应，回烘字口亮边和凹处阴影，并对应用后的效果再校正一次。本地默认灯下的刻印亮暗相关性由约 0.13 提高至 0.77，近似馆藏布光、中性灯和独立斜视下的刻印平均对比误差也降低。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 支柱擦亮的钢面按第 4 张馆藏照配准。用默认灯、近似馆藏补光和柔光测量底色、粗糙度及两个切线方向的法线响应，在首轮回烘后再校正。本地默认灯下平均亮度误差由约 24.5 降至 9.2 个灰阶，亮斑区域由 28.2 降至 13.4。近似馆藏补光下由 13.9 降至 10.0，两侧独立斜视的误差也降低。补光下仍有局部中间调偏亮。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 拨片正面沿第 4、5 张馆藏照的共同磨痕校准细纹，再按默认灯、两张照片的对照布光及低亮暖光测量宽反光并回烘。默认灯下本地亮度平均误差从 32.2 降至 15.3 个灰阶，拟合第 4 张照片的机位和近似亮度后从 19.6 降至 10.3。两张照片的细纹对比误差均下降。低亮暖光下，拨片的整体亮度误差仍较大。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 滚花握部按第 3 张馆藏照收窄菱面的高光，调整磨亮棱边、粗糙度和暗槽底色。沿环向续接斜纹，用默认灯和两组侧灯测量反光后回烘。默认灯下，配准区的平均亮度误差由约 38.7 降至 27.5 个灰阶，宽反光误差由 28.1 降至 13.0。按第 7 张馆藏照校准的箍圈由约 38.1 降至 24.2 个灰阶。另用不同机位和侧灯复核。 [采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -95,4 +96,5 @@
 - 带 `--neck-mark-evidence <MetalFinishV54/Evidence>` 的照片采样命令使用 `V54NeckMarkStudyDefault`、`V54NeckMarkStudyMuseum` 及同机位的 `V54NeckMarkResolveDefault`、`V54NeckMarkResolveMuseum` 重算刻印的底色对比。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 带 `--stem-response-evidence <MetalFinishV55/Evidence>` 的照片采样命令读取 `V55StemFreshDefault`、`V55StemFreshFill`、`V55StemSoftBRDF` 及三组 `V55StemResolve` 回烘响应帧，重算支柱的底色、法线和粗糙度。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 带 `--tab-response-evidence <MetalFinishV56/Evidence>` 的照片采样命令读取 `V56TabStudy` 的底色试验帧，及 `V56TabSurface`、`V56TabResolve` 的两轮材质响应。两张照片须沿既有曲面配准，细纹与宽反光分别编码。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV56/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 带 `--grip-response-evidence <MetalFinishV57/Evidence/V57GripStudyControlled>` 的照片采样命令重算滚花握部和箍圈的底色、切线法线与粗糙度。滚花在另一侧补光下也测响应，减少单侧灯对结果的影响。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV57/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

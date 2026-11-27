@@ -75,6 +75,25 @@ def SeamBlend(field, pixels=24):
     return field
 
 
+def WrapKnurlPadding(pixels):
+    padding = ATLAS["padding"]
+    pixels[:, :padding] = pixels[:, -2 * padding:-padding]
+    pixels[:, -padding:] = pixels[:, padding:2 * padding]
+
+
+def BlendKnurlSeam(field):
+    # Match the value at the wrap without mirroring the diagonal grooves.
+    padding = ATLAS["padding"]
+    end = field.shape[1] - padding
+    span = 15
+    delta = .5 * (field[:, end] - field[:, padding])
+    weight = np.linspace(1, 0, span, dtype=np.float32)
+    weight = (weight**2 * (3 - 2 * weight))[None, :, None]
+    field[:, padding:padding + span] += delta[:, None] * weight
+    field[:, end - span + 1:end + 1] -= delta[:, None] * weight[:, ::-1]
+    WrapKnurlPadding(field)
+
+
 def ReferenceField(data, xx, vv, values):
     stencil = np.asarray(data[values], dtype=np.float32)
     footprint = data["footprint"]
@@ -227,6 +246,29 @@ def ApplyTabResponses(tile, tab):
                 or calibration["outlineUV"] != tab["outlineUV"] or calibration["footprint"] != tab["footprint"]):
             raise ValueError("Tab response data do not match the paired source photographs and projection")
         ApplyResponseFields(tile, calibration, channels, uu, span)
+
+
+def ApplyKnurlResponse(tile, knurl, calibration):
+    source = knurl["source"]
+    if (calibration["photoSha256"] != source["sha256"] or calibration["sampleBounds"] != source["sampleBounds"]
+            or calibration["footprint"] != knurl["wear"]["footprint"]):
+        raise ValueError("Knurl response does not match the source photo and projection")
+    height, width = tile[0].shape[:2]
+    uu, vv = PlanarTexelCenters(width, height)
+    first, last = ATLAS["knurlSourceV"]
+    angular = (np.clip(uu, 0, 1) + .5) % 1 - .5
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "roughness"), angular, first + (last - first) * vv)
+    for pixels in tile:
+        WrapKnurlPadding(pixels)
+
+
+def ApplyCollarResponse(tile, collar, calibration):
+    source = collar["source"]
+    if (calibration["photoSha256"] != source["sha256"] or calibration["footprint"] != collar["footprint"]
+            or any(calibration[key] != source[key] for key in ("rasterX", "sampleRails", "lastY"))):
+        raise ValueError("Collar response does not match the source photo and projection")
+    height, width = tile[0].shape[:2]
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "roughness"), *PlanarTexelCenters(width, height))
 
 
 def PhotographicGrain(closeup, xx, vv):
@@ -616,7 +658,11 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         phaseA, phaseB = angular + axial, angular - axial
         left, right = np.mod(phaseA, 1), np.mod(phaseB, 1)
         diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
-        shoulders = np.clip((diamonds - .05) / .55, 0, 1)
+        # The front photo shows worn narrow crests and a shallower slope to the grooves.
+        angularDistance = np.abs((xx + .5) % 1 - .5)
+        front = 1 - np.clip((angularDistance - .121) / .065, 0, 1)
+        front = front**2 * (3 - 2 * front)
+        shoulders = np.clip((diamonds - .05) / (.55 + .115 * front), 0, 1)
         grooves = np.clip(1 - diamonds / .34, 0, 1) ** .83
         chip = UnitVariation(luminance, .42, 2.15)
         centerA, centerB = np.floor(phaseA) + .5, np.floor(phaseB) + .5
@@ -637,7 +683,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         flankGroove = np.clip(1 - cutDistance / .44, 0, 1) ** .79
         grooves += flankCoverage * np.maximum(flankGroove - grooves, 0)
         wornHeight = np.clip(.91 + .16 * cellWear, .55, 1.11) * (1 - .10 * coverage)
-        exposedArea = np.clip((diamonds - .26) / .56, 0, 1)
+        exposedArea = np.clip((diamonds - .26 - .075 * front) / .56, 0, 1)
         polish = np.clip(.39 + .19 * chip + .29 * cellWear + .75 * photoTone
                          - .95 * np.maximum(photoWarmth, 0), .02, 1)
         chippedCrests = exposedArea * polish * (1 + .28 * flankCoverage)
@@ -645,11 +691,14 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         flankOxide = flankCoverage * np.clip(np.interp(xx, uKnots, shadowChroma) / .24, 0, 1)
         tonalDelta += 6.4 * chip + 15.5 * (shoulders - .45) - 7.6 * grooves + 112 * photoTone
         tonalDelta -= 12.5 * flankOxide * grooves + 22 * flankCoverage * flankGroove
-        heightField += (1.56 + .40 * flankCoverage) * shoulders * wornHeight + .12 * chip * shoulders + .28 * photoTone
+        polishedLip = np.exp(-((diamonds - .29) / .13)**2) * np.clip(.56 + .36 * cellWear + .98 * photoTone, .07, 1)
+        tonalDelta += .9 * front + 1.74 * front * polishedLip
+        heightField += (1.56 + .40 * flankCoverage) * shoulders * wornHeight * (1 - .14 * front)
+        heightField += (.12 + .029 * front) * chip * shoulders + .28 * photoTone
         heightField -= .49 * flankCoverage * flankGroove
         oxidation += .127 * grooves + .10 * photoWarmth
         warmth += .32 * photoWarmth + .27 * flankOxide * grooves
-        roughnessDelta += .071 * grooves + .092 * shoulders - .14 * photoTone + .067 * flankOxide * grooves
+        roughnessDelta += .071 * grooves + (.092 + .082 * front) * shoulders - .14 * photoTone + .067 * flankOxide * grooves
     if name == "Channel":
         shadowRibs = np.maximum(0, np.cos(2 * np.pi * (44 * vv + xx * .18))) ** 7
         tonalDelta += 18 * shadowRibs
@@ -755,7 +804,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
     if name == "Knurl":
         # The groove bottoms retain oxide. Small worn patches catch sharper
         # reflections within the satin finish on the diamond shoulders.
-        dark = .83 * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
+        dark = (.83 - .20 * front) * grooves * np.clip(.94 + .105 * cellWear, .68, 1)
         dark = np.minimum(.96, dark + .21 * flankCoverage * flankGroove)
         recessColor = SrgbToLinear(np.array([40, 36, 30], dtype=np.float32) / 255)
         linear += (recessColor - linear) * dark[..., None]
@@ -763,7 +812,7 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         metal += (.30 - metal) * dark
         lip = np.clip(1 - np.abs(cutDistance - .47) / .22, 0, 1)
         wornLip = flankCoverage * lip * (1 - grooves) * np.clip(.65 + .32 * cellWear, .25, 1)
-        exposed = np.clip(.77 * chippedCrests + .26 * wornLip, 0, 1)
+        exposed = np.clip(.77 * chippedCrests + .26 * wornLip + .116 * front * polishedLip, 0, 1)
         crestColor = SrgbToLinear(np.array([159, 152, 140], dtype=np.float32) / 255)
         linear += (crestColor - linear) * exposed[..., None]
         rough += (.322 - rough) * exposed
@@ -958,8 +1007,11 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         ao *= 1 - .54 * trough - .11 * rust
     heightField = np.clip(heightField * (.54 + .46 * oxidation), -1.5, 1.5)
     surface = np.stack([rough, metal, ao], axis=-1)
-    if name in ("Barrel", "Collar", "CollarRing", "Shoulder", "Knurl", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
-        seamWidth = 6 if name in ("Knurl", "RearEye", "Wheel") else 24
+    if name == "Knurl":
+        for field in (base, heightField[..., None], surface):
+            BlendKnurlSeam(field)
+    elif name in ("Barrel", "Collar", "CollarRing", "Shoulder", "Sleeve", "Neck", "SaddleRim", "RearEye", "Wheel"):
+        seamWidth = 6 if name in ("RearEye", "Wheel") else 24
         base = SeamBlend(base, pixels=seamWidth)
         heightField = SeamBlend(heightField[..., None], pixels=seamWidth)[..., 0]
         surface = SeamBlend(surface, pixels=seamWidth)
@@ -994,8 +1046,8 @@ def BakeKnurl(quadrants, width, height, index, reference):
     sourceWidth, sourceHeight = 2 * (width - pad), 2 * (height - pad)
     maps = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference)
     first, last = ATLAS["knurlSourceV"]
-    across = np.clip((np.arange(width) - pad) / (width - 2 * pad - 1), 0, 1)
-    columns = pad + across * (sourceWidth - 2 * pad - 1)
+    across = np.clip((np.arange(width) + .5 - pad) / (width - 2 * pad), 0, 1)
+    columns = pad + across * (sourceWidth - 2 * pad)
     fraction = np.clip((np.arange(height) - pad) / (height - 2 * pad), 0, 1)
     rows = pad + (1 - last + (last - first) * fraction) * (sourceHeight - 2 * pad)
     lower, left = rows.astype(np.int32), columns.astype(np.int32)
@@ -1004,8 +1056,7 @@ def BakeKnurl(quadrants, width, height, index, reference):
     for pixels in maps:
         vertical = (1 - blendV) * pixels[lower] + blendV * pixels[lower + 1]
         tile = (1 - blendU) * vertical[:, left] + blendU * vertical[:, left + 1]
-        # Extend the matched texels through padding before WebP encoding.
-        SeamBlend(tile, pixels=3)
+        WrapKnurlPadding(tile)
         output.append(np.rint(tile).astype(np.uint8))
     return output
 
@@ -1094,6 +1145,9 @@ def BuildAtlas(reference):
             tile = ResizeChart(BakeRegion(name, quadrants, sourceSize, index, reference), width, height)
         elif name == "Knurl":
             tile = BakeKnurl(quadrants, width, height, index, reference)
+            knurl = reference["knurl"]
+            if (calibration := knurl.get("responseCalibration")) is not None:
+                ApplyKnurlResponse(tile, knurl, calibration)
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
         elif name == "Barrel":
@@ -1129,6 +1183,10 @@ def BuildAtlas(reference):
                 tab = reference["closeups"]["Tab"]
                 if "grainCalibration" in tab or "surfaceCalibration" in tab:
                     ApplyTabResponses(tile, tab)
+            elif name == "CollarRing":
+                collar = reference["closeups"]["CollarRing"]
+                if (calibration := collar.get("responseCalibration")) is not None:
+                    ApplyCollarResponse(tile, collar, calibration)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1173,6 +1231,10 @@ def Bake():
         details["saddleResponse"] = calibration
     if (calibration := reference["closeups"]["Stem"].get("responseCalibration")) is not None:
         details["stemResponse"] = calibration
+    if (calibration := reference["knurl"].get("responseCalibration")) is not None:
+        details["knurlResponse"] = calibration
+    if (calibration := reference["closeups"]["CollarRing"].get("responseCalibration")) is not None:
+        details["collarResponse"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("chromaCalibration")) is not None:
         details["neckChroma"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:

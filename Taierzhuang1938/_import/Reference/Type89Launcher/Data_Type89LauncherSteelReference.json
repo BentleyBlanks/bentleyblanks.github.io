@@ -4039,6 +4039,49 @@
         "sha256": "7f8740b710a0fc3adbcf339bc2598a48d926d19a0cde9c3cf868fdcf5773ea16",
         "toneScale": 300,
         "warmthScale": 520
+      },
+      "responseCalibration": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "rasterX": [509, 540],
+        "sampleRails": [
+          [56, 411],
+          [130, 430],
+          [224, 443],
+          [350, 454],
+          [509, 457],
+          [670, 452],
+          [810, 441],
+          [960, 418]
+        ],
+        "lastY": 580,
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.18, 0.61]
+        },
+        "file": "Texture_Type89LauncherCollarRingResponse.png",
+        "sha256": "31107492175ec947801213959559f0e9976a72bf6bfcb3bc1404dde3f797cc9f",
+        "scale": 68000,
+        "frameSha256": {
+          "V57GripStudyControlled": {
+            "Collar_UvHi.png": "82d8becd786af1ef0cdfaacb175478db01a6568fb5cfca4763463550204fdee1",
+            "Collar_UvLo.png": "15a00cb12c78f80a46fef2a67be511e4354cb53a0c2c35d6f91424148008bca5",
+            "Collar_Default.png": "efdb147b5a4925700b7e1120d3028e7fb8feae1089f82836da34234125a3f6c2",
+            "Collar_Matched.png": "46f2094c272f8535512fd4f51f878e2d4b7da27f68ca9be8a130990de8bfadaa",
+            "Collar_DefaultBasePlus.png": "8134ca91bb9837e73df723027360a9bc334d5e25d7f22cf88fb8b1a0da7d6fe4",
+            "Collar_MatchedBasePlus.png": "6584dd851d6c46d404ac1b8c2b7ed1fd01f144de9911facc872d27b66e99ea2c",
+            "Collar_DefaultBaseMinus.png": "39181e5c70785666e9373cd67556d2c2cc878024f3d5c4a5713e5b8e8ed1b1dc",
+            "Collar_MatchedBaseMinus.png": "2842fc23d4d5c08cfe312cc292542cf67d7103917f1f183ecd286106c88c6f51",
+            "Collar_DefaultTiltPlus.png": "effc94ab5c4d91fa9af1319bf0267439c426a6b1ef61c1bb88866ed9ab409ecc",
+            "Collar_MatchedTiltPlus.png": "7db0a218035e8cb7b245dfb6f39482eebdd995275fb5daa0e2e6e7cd224b6a4a",
+            "Collar_DefaultTiltMinus.png": "4010954b68da23f03c54503f809c6c5d3761fe73426b9bebbf86f6b27bc82c06",
+            "Collar_MatchedTiltMinus.png": "fb189e6d5a2f25c7995bc1d863e1d4ca680f91657ac5b38c3be6cfbfe9db1144",
+            "Collar_DefaultRoughPlus.png": "9781f81dfe7b02f32d5bb3b26d70eb572bb0f04605aedc847a6dce742f454503",
+            "Collar_MatchedRoughPlus.png": "0f85ae761f2400af8ca16fd55bcf09746708cf4f630be89fa60c152a98758def",
+            "Collar_DefaultRoughMinus.png": "b6930504165c5bc538baf662e5ad37fc1543723d775614a3f080376b955ed9a3",
+            "Collar_MatchedRoughMinus.png": "bb2d6bf657c0265e98458009ad330f40e9a3a8e4f981b4bf44a113923f567b38"
+          }
+        }
       }
     },
     "Stem": {
@@ -6325,6 +6368,45 @@
         [0.03555, -0.05571],
         [0.03784, 0.06]
       ]
+    },
+    "responseCalibration": {
+      "photoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb",
+      "sampleBounds": [665, 338, 883, 513],
+      "footprint": {
+        "uCenter": 0.02227,
+        "uHalfSpan": 0.09188,
+        "vRange": [0.44433, 0.69863]
+      },
+      "file": "Texture_Type89LauncherKnurlResponse.png",
+      "sha256": "25515f0a48b77e3c136ef7884354a121d5b2335e7d188fbd389d5df724aa9db6",
+      "scale": 68000,
+      "frameSha256": {
+        "V57GripStudyControlled": {
+          "Direct_UvHi.png": "13f7b51d2771153d5d310a05565b575b6c135db5b01a098ab0d8833cf76fff1e",
+          "Direct_UvLo.png": "7851d2d208c4e32ad7ea6394e04c7b1d3385e3a27f80659e1390d31d939de2ba",
+          "Direct_Default.png": "68ab0bb85dc88e2ad94ec4679bd28df01a8296c1bc8c1cbd2d69f005f4681136",
+          "Direct_Matched.png": "17d46dd6499233190fab219fd4bbc3fbf94966fade6e453733970b758a6d486f",
+          "Direct_Gallery4.png": "ec3d91a7281357f09b7f44f4a5db40c942a83e8899ce0fc1f4c02a1722aff118",
+          "Direct_DefaultBasePlus.png": "8e341732ac3e714e6267b5dc1f9eb84f8644e8511864453ae15d7c9e9f4d3f47",
+          "Direct_MatchedBasePlus.png": "94be20dd821641de96b362243c71a0de1af1c07cbe8768e1973e180dd3f28f74",
+          "Direct_Gallery4BasePlus.png": "5897397fbb2ece4acf5226b04db776da32f64e32f66079da227198a0734a10c7",
+          "Direct_DefaultBaseMinus.png": "c504f044d158c868da3bc20ff93f5e1e0c3591bc496e73772f8a0502f2d9760d",
+          "Direct_MatchedBaseMinus.png": "0d99d66ef587c317ccd79633bca7fea7c7e9f3609a54d775deb58f302c56693a",
+          "Direct_Gallery4BaseMinus.png": "84e3044da9be4ca4f5da0eba733c266da122952da2def3e9fc7e461fefa77e24",
+          "Direct_DefaultTiltPlus.png": "0415bb565a6d139cd170bb23000322fca623e8f683cb4a39fbb865898951e276",
+          "Direct_MatchedTiltPlus.png": "04884352ee2089ccedb54a0a18cd121e47dfe1b103fe5c3ffbbb6ad718160b9b",
+          "Direct_Gallery4TiltPlus.png": "30cc6662b6b5c04509869daf08529c8627105a7d7e4603471061396dd14c81d6",
+          "Direct_DefaultTiltMinus.png": "6a9a4279efaa525995175abea73e78d4b3d8380ddd11545cc77da6b3cb2d4f35",
+          "Direct_MatchedTiltMinus.png": "13be02695fb16c6c416bb02eec43bc6097ba505e4d3dba23c9a30823898f87d4",
+          "Direct_Gallery4TiltMinus.png": "d3d27b2ae807cef0375fb5e3df7e841ab08dc235a5889c6c79bc86eb7c3b676c",
+          "Direct_DefaultRoughPlus.png": "6fb2148a4bbb9353a96c60ef6d5074eabb3e84f1633182e24a27038fa6edfbcd",
+          "Direct_MatchedRoughPlus.png": "42d9d4e08980a76a42836819e4e8b59f2e9f26f7cda1fd30934e2fd9ff7b5f5c",
+          "Direct_Gallery4RoughPlus.png": "6f8c4cdf64ce35b863a1a82338ba769dbefeac907cfc30e154422ee50711fb36",
+          "Direct_DefaultRoughMinus.png": "76f71fe7fc429b9133c6cd69abb8c3415effff431c11c02f1b156f6f33df97d3",
+          "Direct_MatchedRoughMinus.png": "fb1152b0eae3494889e2731f21233839cd48f5b1ef7dcec5e8acf395ca794135",
+          "Direct_Gallery4RoughMinus.png": "4fb738729c188467e8619aa0e518531fd974f4d6123bc461d8131d289414aa14"
+        }
+      }
     },
     "flankWear": {
       "source": {

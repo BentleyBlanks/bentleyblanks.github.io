@@ -22,6 +22,7 @@ BARREL_FACETS = RECORD.with_name("Texture_Type89LauncherBarrelFacets.png")
 BARREL_BAND = RECORD.with_name("Texture_Type89LauncherBarrelBand.png")
 BARREL_GRAIN = RECORD.with_name("Texture_Type89LauncherBarrelGrain.png")
 COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
+COLLAR_RESPONSE = RECORD.with_name("Texture_Type89LauncherCollarRingResponse.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 SADDLE_RESPONSE = RECORD.with_name("Texture_Type89LauncherSaddleResponse.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
@@ -34,6 +35,7 @@ TAB_RESPONSE = RECORD.with_name("Texture_Type89LauncherTabResponse.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
+KNURL_RESPONSE = RECORD.with_name("Texture_Type89LauncherKnurlResponse.png")
 TAB_FRONT_PAIR_PROJECTION = [
     [0.27025285843021063, -0.006591860418187142, 1028.448752789885],
     [-0.011732769701317706, 0.28119255144826527, 475.2094623617538],
@@ -1041,7 +1043,90 @@ def BarrelFinish(folder, previous, *, evidence=None, responseEvidence=None, fini
     return result
 
 
-def CollarFinish(folder):
+def CollarPhotoCoordinates(footprint, source, u, v):
+    center, radius = source["rasterX"]
+    xs = center + radius * np.sin(2 * np.pi * footprint["uHalfSpan"] * (2 * u - 1))
+    xStations, firstRows = np.asarray(source["sampleRails"]).T
+    first = np.interp(xs, xStations, firstRows)
+    return xs, first + (source["lastY"] - first) * v
+
+
+def FitGripResponse(part, image, coordinates, evidence):
+    grip = part == "Direct"
+    hashes = {}
+    hi, lo = (ReadRegisteredRgb(evidence, f"{part}_Uv{bits}.png", hashes) for bits in ("Hi", "Lo"))
+    visible = (hi[..., 2] == 255) & (lo[..., 2] == 255)
+    rows, columns = np.nonzero(visible)
+    if len(rows) < 400:
+        raise ValueError(f"No registered photo area in the {part} material response")
+    crop = np.s_[rows.min() - 2:rows.max() + 3, columns.min() - 2:columns.max() + 3]
+    u, v = np.moveaxis((256 * hi[crop][..., :2] + lo[crop][..., :2]) / 65535, -1, 0)
+    visible = visible[crop]
+    x, y = coordinates(u, v)
+    # Keep the historical color response separate from the narrow normal-map detail.
+    rgb = np.stack([map_coordinates(channel, (y, x), order=1)
+                    for channel in np.moveaxis(image.astype(float), -1, 0)], axis=-1)
+    photo = rgb @ REGISTERED_LUMA
+    lights = ("Default", "Matched", "Gallery4") if grip else ("Default", "Matched")
+    weights = np.array([.50, .29, .21] if grip else [.58, .42])
+    shape = (51, 48) if grip else (69, 31)
+    sigma = (2.35, 2.65) if grip else (2.2, 2.4)
+    radius = 5.5 if grip else 2.8
+    axes = (("Base", .24, (1.65, 1.80), .021), ("Tilt", .16, (1.04, 1.04), .024),
+            ("Rough", .12, (1.1, 1.1), .025))
+    support = gaussian_filter(visible.astype(float), radius)
+    selected = visible & (support > .77) & (photo > 27) & (photo < 248)
+    if selected.sum() < (5000 if grip else 550):
+        raise ValueError(f"Insufficient registered samples for the {part} material response")
+
+    def SmoothImage(field):
+        return (gaussian_filter(field * visible, radius) / np.maximum(support, .01))[selected]
+
+    def Read(name):
+        return SmoothImage(ReadRegisteredLuma(evidence, f"{part}_{name}.png", hashes)[crop])
+
+    initial = np.log(np.column_stack([Read(light) for light in lights]) + 19)
+    target = np.log(SmoothImage(photo) + 19)[:, None]
+    residual = np.clip(target - initial, -.53, .47)
+    if grip:
+        # Keep the response stable when the strip light crosses to the other side.
+        residual[:, 2] *= .22
+    basis = [np.log(np.column_stack([Read(light + axis + side) for light in lights]) + 19) - initial
+             for axis, *_ in axes for side in ("Plus", "Minus")]
+    bins = np.rint(u[selected] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(v[selected] * (shape[1] - 1)).astype(int)
+
+    def Smooth(values):
+        histogram = np.bincount(bins, weights=values, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(histogram, sigma)
+
+    count = Smooth(np.ones(selected.sum()))
+
+    def Average(values):
+        return Smooth(values @ weights) / np.maximum(count, .4)
+
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    fit = FitSignedResponse(pull, response, axes, 10)
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    fade = np.clip(count / 1.1, 0, 1)
+    fade *= np.clip(np.minimum(uu, 1 - uu) / (.15 if grip else .13), 0, 1)
+    fade *= np.clip(np.minimum(vv, 1 - vv) / .16, 0, 1)
+    fade = fade**2 * (3 - 2 * fade)
+    fields = [gaussian_filter((fit[..., 2*i] - fit[..., 2*i+1]) * step, (.85, 1.05)) * fade
+              for i, (_, step, _, _) in enumerate(axes)]
+    return fields, {evidence.name: hashes}
+
+
+def RestoreGripResponse(record, prior, identity, evidence, path, part, image, coordinates):
+    if evidence is not None:
+        fields, hashes = FitGripResponse(part, image, coordinates, evidence)
+        record["responseCalibration"] = WriteResponseFields(path, identity, fields, hashes, scale=68000)
+    elif (calibration := prior.get("responseCalibration")) is not None:
+        if all(calibration.get(key) == value for key, value in identity.items()):
+            record["responseCalibration"] = calibration
+
+
+def CollarFinish(folder, prior=None, evidence=None):
     image, source = Photo(folder, 7)
     # Image rows remain below the curved dark seam and inside the visible ring.
     # The short axial footprint is the portion visible in this close-up.
@@ -1061,10 +1146,12 @@ def CollarFinish(folder):
     result.update(PatinaMap(samples))
 
     us, vs = np.meshgrid(np.linspace(0, 1, 352), np.linspace(0, 1, 160))
-    xs = rasterX[0] + rasterX[1] * np.sin(2 * np.pi * footprint["uHalfSpan"] * (2 * us - 1))
-    first = np.interp(xs, xStations, firstRows)
-    ys = first + (lastY - first) * vs
+    xs, ys = CollarPhotoCoordinates(footprint, source, us, vs)
     result["detail"] = WriteDetailPlate(image, xs, ys, COLLAR_DETAIL)
+    identity = {"photoSha256": source["sha256"], "rasterX": rasterX,
+                "sampleRails": rails, "lastY": lastY, "footprint": footprint}
+    RestoreGripResponse(result, prior or {}, identity, evidence, COLLAR_RESPONSE, "Collar", image,
+                        lambda u, v: CollarPhotoCoordinates(footprint, source, u, v))
     return result
 
 
@@ -2224,7 +2311,7 @@ def KnurlWear(image, bounds):
             "removedFrequencies": [[round(x, 5), round(y, 5)] for x, y in frequencies]}
 
 
-def KnurlFrequency(folder):
+def KnurlFrequency(folder, prior=None, evidence=None):
     image, source = Photo(folder, 3)
     x0, y0, x1, y1 = bounds = [665, 338, 883, 513]
     patch = image[y0:y1, x0:x1] @ LUMA
@@ -2238,10 +2325,20 @@ def KnurlFrequency(folder):
     angular = float(np.mean([abs(fy[j, 0]) for j, i in peaks]))
     # The counts are frequencies in the display asset's UVs.
     source["sampleBounds"] = bounds
-    return {"source": source, "axialCyclesPerPixel": round(axial, 5),
-            "angularCyclesPerPixel": round(angular, 5),
-            "axialCycles": round(axial * 345 / .406), "angularCycles": round(angular * np.pi * 316),
-            "wear": KnurlWear(image, bounds)}
+    result = {"source": source, "axialCyclesPerPixel": round(axial, 5),
+              "angularCyclesPerPixel": round(angular, 5),
+              "axialCycles": round(axial * 345 / .406), "angularCycles": round(angular * np.pi * 316),
+              "wear": KnurlWear(image, bounds)}
+    footprint = result["wear"]["footprint"]
+    angle = 2 * np.pi * footprint["uHalfSpan"]
+
+    def PhotoCoordinates(u, v):
+        arc = np.sin((2 * u - 1) * angle) / np.sin(angle)
+        return x0 + (x1 - x0 - 1.01) * v, y0 + (y1 - y0 - 1.01) * (.5 + .5 * arc)
+
+    identity = {"photoSha256": source["sha256"], "sampleBounds": bounds, "footprint": footprint}
+    RestoreGripResponse(result, prior or {}, identity, evidence, KNURL_RESPONSE, "Direct", image, PhotoCoordinates)
+    return result
 
 
 def KnurlFlankWear(folder):
@@ -2389,6 +2486,7 @@ def Main():
     options.add_argument("--neck-mark-evidence", type=Path, help="V54 Evidence directory with the neck mark response captures")
     options.add_argument("--stem-response-evidence", type=Path, help="V55 Evidence directory with stem material response captures")
     options.add_argument("--tab-response-evidence", type=Path, help="V56 Evidence directory with paired-photo tab response captures")
+    options.add_argument("--grip-response-evidence", type=Path, help="V57 captures of the grip and collar under measured lighting")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -2403,7 +2501,8 @@ def Main():
     sleeve = SleeveFinish(args.photos, prior.get("Sleeve", {}), evidence=args.sleeve_evidence,
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
-    record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
+    collar = CollarFinish(args.photos, prior.get("CollarRing"), evidence=args.grip_response_evidence)
+    record["closeups"] = {"Barrel": barrel, "CollarRing": collar,
                           "Stem": StemFinish(args.photos, prior.get("Stem"), responseEvidence=args.stem_response_evidence),
                           "Sleeve": sleeve,
                           "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
@@ -2413,7 +2512,7 @@ def Main():
                           "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)
-    record["knurl"] = KnurlFrequency(args.photos)
+    record["knurl"] = KnurlFrequency(args.photos, record.get("knurl"), evidence=args.grip_response_evidence)
     record["knurl"]["flankWear"] = KnurlFlankWear(args.photos)
     record["shoulder"] = ShoulderFinish(args.photos)
     encoded = json.dumps(record, ensure_ascii=False, indent=2)
