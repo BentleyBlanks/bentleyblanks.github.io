@@ -163,6 +163,18 @@ def CollarReflectanceIdentity(reference):
     }
 
 
+def BarrelJointIdentity(reference):
+    identity = JointSteelIdentity(reference, "Barrel")
+    previous = json.dumps(reference.get("reverseReflectionBalance"), sort_keys=True, separators=(",", ":"))
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return identity | ReverseReflectionIdentity(reference) | {
+        "closePhotoSha256": identity["frontPhotoSha256"],
+        "frontPhotoSha256": reference["barrelPatina"]["source"]["sha256"],
+        "rearFitSha256": sha256(previous.encode("utf-8")).hexdigest(),
+        "contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest(),
+    }
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2648,7 +2660,7 @@ def Main():
         ("reverseReflectionBalance", ReverseReflectionIdentity), ("sleeveReverseFinish", SleeveReverseIdentity),
         ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity),
         ("neckJointFinish", NeckJointIdentity), ("sleeveJointFinish", SleeveJointIdentity),
-        ("collarReflectanceFinish", CollarReflectanceIdentity))]
+        ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

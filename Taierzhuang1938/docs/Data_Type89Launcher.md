@@ -94,6 +94,7 @@
 - 驻钣接头以第 6 张近照和第 8 张背面照配准到同一钢材图集。联合校准底色、切线法线、粗糙度和金属度，并提取背面氧化斑与点蚀细纹。校准灯下近照钢面的平均亮度误差由 12.2 降至 7.8 灰阶，背面由 17.4 降至 6.2 灰阶。另以独立补光、宽柔光、默认灯和斜视复测。 [接头采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 尾套以第 1 张照片和第 8 张照片共同校准钢色、反光及环槽侧面的磨蚀。用轮廓与环槽亮暗位置复核背面配准，分别拟合底色、切线法线、粗糙度和金属度。按正面照片实际可见的 UV 范围衰减共见区的修正，并以多组布光、斜视和接缝 AO 复测。 [尾套采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 箍圈以第 7 张近照和第 8 张背面照复校亮带形状与磨蚀细纹。用底色、切线法线、粗糙度、金属度和色差的实渲响应联合拟合，并用默认灯和斜侧光约束正面共见区。 [箍圈采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 筒身以第 1 张整体照和第 8 张背面照联合校准反光、钢色和磨蚀细纹。从多组实渲响应分配底色、法线、粗糙度和金属度，并在第 7 张近照的刻印区衰减修正。 [筒身采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -103,6 +104,7 @@
 - 驻钣接头的双照参数保存在 `neckJointFinish`。钢材烘焙在合成接缝遮蔽后应用接头的粗糙度与金属度变化，背面 16 位细纹图按配准的 UV 窗口叠入原 2K 底色。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 尾套的双照参数保存在 `sleeveJointFinish`。两张 16 位源图分别记录正反双照的 UV 覆盖权重和背面磨蚀细纹。粗糙度与金属度在接缝遮蔽合成后写入 ORM，三张运行时贴图合计低于 1 MiB。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 箍圈亮带复校保存在 `collarReflectanceFinish`。16 位源图记录实拍覆盖和细纹响应。粗糙度和金属度在接缝遮蔽合成之后更新，三张 WebP 源贴图合计低于 1 MiB。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 筒身正背双照复校保存在 `barrelJointFinish`。整体钢面和相邻窄条共用一套最终光泽，窄条从筒身重采样，粗糙度和金属度的差量合并到已有 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 重新推导筒身亮度修正时，为采样命令加 `--barrel-evidence <MetalFinishV38/Evidence>`。三组控制帧的 SHA-256 与原照投影记录在 `registeredCalibration` 中。只重算照片采样时，匹配同一照片和投影的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 重新推导外套筒底色时加 `--sleeve-evidence <MetalFinishV39/Evidence>`。记录包含两组配准帧哈希、原照哈希和表面采样范围。只重算照片采样时，原照、采样线和采样范围一致的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)

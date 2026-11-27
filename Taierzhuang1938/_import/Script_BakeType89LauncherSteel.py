@@ -14,7 +14,7 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
+    BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
     SaddleJointIdentity, SleeveJointIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
 )
 
@@ -1577,7 +1577,7 @@ def ApplyNeckJointFinish(maps, packed, reference):
     ApplyJointMaterialFields(maps, packed, "Neck", fields)
 
 
-def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity):
+def SampleCoveredPhotoFields(region, finish, identity):
     if any(finish.get(key) != value for key, value in identity.items()):
         raise ValueError(f"{region} response does not match the underlying material and AO")
     coverage, detail = (finish[key] for key in ("coverage", "detail"))
@@ -1598,12 +1598,36 @@ def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity):
     fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
     encoded = (sources[1] - 32768.) / detail["scale"]
     for name, layer in zip(detail["fields"], np.split(encoded, len(detail["fields"]), axis=1), strict=True):
-        fields[name] += PeriodicMaterialField(layer, u, v) * detail["strength"]
+        correction = PeriodicMaterialField(layer, u, v) * detail["strength"]
+        fields[name] = fields[name] + correction if name in fields else correction
+    return fields
+
+
+def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity):
+    fields = SampleCoveredPhotoFields(region, finish, identity)
     ApplyJointMaterialFields(maps, packed, region, fields)
 
 
 def ApplySleeveJointFinish(maps, packed, reference):
     ApplyCoveredPhotoFinish(maps, packed, "Sleeve", reference["sleeveJointFinish"], SleeveJointIdentity(reference))
+
+
+def ApplyBarrelJointFinish(maps, packed, reference):
+    fields = SampleCoveredPhotoFields("Barrel", reference["barrelJointFinish"], BarrelJointIdentity(reference))
+    size = packed.shape[1], packed.shape[0]
+
+    def SurfaceChannels():
+        return np.asarray(Image.fromarray(maps[2]).resize(size, Image.Resampling.BOX), dtype=np.int16)[..., 1:]
+
+    before = SurfaceChannels()
+    x, y, width, height = ATLAS["regions"]["Barrel"]
+    tile = np.s_[y:y + height, x:x + width]
+    ApplyMaterialFields([image[tile] for image in maps], fields, None)
+    # Rebuild the narrow stripe from the finished barrel and fold both surface deltas into GB.
+    sx, sy, sw, sh = ATLAS["regions"]["Stripe"]
+    for image, stripe in zip(maps, SampleBarrelStripe(maps, (sw, sh)), strict=True):
+        image[sy:sy + sh, sx:sx + sw] = stripe
+    packed[..., 1:] = np.clip(packed[..., 1:].astype(np.int16) + SurfaceChannels() - before, 0, 255).astype(np.uint8)
 
 
 def ApplyCollarPackedRoughness(packed, original, balance):
@@ -1816,9 +1840,14 @@ def Bake(legacyOrm=None):
     collarReflectance = reference.get("collarReflectanceFinish")
     if collarReflectance is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "CollarRing", collarReflectance, CollarReflectanceIdentity(reference))
+    barrelFinish = reference.get("barrelJointFinish")
+    if barrelFinish is not None:
+        ApplyBarrelJointFinish(maps, pixels, reference)
+    baseQuality = (collarReflectance or {}).get("baseQuality", 84)
+    baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
-        quality = collarReflectance.get("baseQuality", 84) if collarReflectance and channel == "Base" else 84
+        quality = baseQuality if channel == "Base" else 84
         Image.fromarray(image).save(output, method=6, quality=quality)
     # Keep the shallow contact gradients within the project's 1 MiB set budget.
     Image.fromarray(pixels).save(HERE.parent / "Texture" / f"Texture_{STEM}Orm.webp", method=6, quality=86)
@@ -1893,6 +1922,9 @@ def Bake(legacyOrm=None):
     if collarReflectance is not None:
         details["collarReflectanceCoverage"] = collarReflectance["coverage"]
         details["collarReflectanceDetail"] = collarReflectance["detail"]
+    if barrelFinish is not None:
+        details["jointBarrelCoverage"] = barrelFinish["coverage"]
+        details["jointBarrelDetail"] = barrelFinish["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
