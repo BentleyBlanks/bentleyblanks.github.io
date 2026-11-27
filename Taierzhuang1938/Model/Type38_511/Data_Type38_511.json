@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 39,
+  "version": 41,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "f06f1e7f1a6abe391825b084116f621e07cdbaae54ad8dd993410371e8de1005",
+  "runtimeSha256": "0d324fa1bf40e08fd1cf7a9fb0fbb444372b9077f33f40de5169b8d4576ff62c",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 79894,
@@ -70,8 +70,8 @@
     {
       "index": 6,
       "name": "Texture_Type38_BodyBatch03_metallicRoughnessTexture",
-      "bytes": 1534402,
-      "sha256": "bb82a8b50fcdbce324c27a41486b2409da1c870874bd1d5c5a15763c30178851"
+      "bytes": 1533326,
+      "sha256": "676dc88a5207d62a6085785b73941192995b9b6ae128180a57e78b879b73ebee"
     },
     {
       "index": 7,
@@ -250,8 +250,8 @@
     {
       "index": 36,
       "name": "Texture_Type38_CoverBatch14_metallicRoughnessTexture",
-      "bytes": 1341536,
-      "sha256": "721f741530bc1a7fabfdf721d394d1386f9e24a86bc7827d46faf428b8200721"
+      "bytes": 1344843,
+      "sha256": "4177c9b815c44e48a3298b9235c32e51f8c0bbed9494276df94408138490a7f8"
     },
     {
       "index": 37,
@@ -298,8 +298,8 @@
     {
       "index": 44,
       "name": "Texture_Type38Sample35Orm",
-      "bytes": 251977,
-      "sha256": "241839b8b94ee6468ecf6c7eab0207204f0e9bb9bd0c7f83e379c0ec79f9678e"
+      "bytes": 244664,
+      "sha256": "23cae6ded05ce06931eae3174ede345d8b14ab7d6a978dc6a5323bfb0e36b603"
     },
     {
       "index": 45,
@@ -316,8 +316,8 @@
     {
       "index": 47,
       "name": "Texture_Type38Sample36Orm",
-      "bytes": 698305,
-      "sha256": "75cbc3b27e9fde7538e04bf2cdecb686c69892e890ab1e3ec8b9e299d3be740b"
+      "bytes": 693293,
+      "sha256": "722e10bc83b0b6044125a0b8373c09b97c2333dd3c287650d40d8d72b8133b50"
     },
     {
       "index": 48,
@@ -346,8 +346,8 @@
     {
       "index": 52,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 230323,
-      "sha256": "78b1f6e6515de692d9436762e222087788d1e813d6887ad693b18180c96fa121"
+      "bytes": 223562,
+      "sha256": "1f60149eeb6a5ea5f5bc145d2c01e78ed26cc09c07d7d6c76356b98307b5f060"
     },
     {
       "index": 53,
@@ -376,8 +376,8 @@
     {
       "index": 57,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 2471263,
-      "sha256": "2b33699d8a16b6e47d0645e8184bf1191d638c34e32f1bf0cdda7ffc67a57d8b"
+      "bytes": 2470785,
+      "sha256": "65a5531635eca9f0315060777e234f28aebf4541dffb80d7caa45330eacb900f"
     },
     {
       "index": 58,
@@ -1072,6 +1072,20 @@
       6,
       36,
       44,
+      52,
+      57
+    ]
+  },
+  "compactTail": {
+    "stackRatio": 0.5778946041619551,
+    "sidewallRatio": 0.5706636738051499,
+    "faceWidthRatio": 1.0349848321373483,
+    "diskClearanceSamples": 82247,
+    "contactImages": [
+      6,
+      36,
+      44,
+      47,
       52,
       57
     ]
