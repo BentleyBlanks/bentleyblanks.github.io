@@ -14,10 +14,10 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
-    SaddleJointIdentity, SaddleReflectanceIdentity, ShoulderReflectanceIdentity, SleeveJointIdentity,
-    SleeveReverseIdentity, StemJointIdentity,
-    SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WideReflectionIdentity,
+    BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripRearIdentity, NeckJointIdentity,
+    ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, ShoulderReflectanceIdentity,
+    SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity, SurfaceBalanceIdentity, TabReflectanceIdentity,
+    WheelOxideIdentity, WideReflectionIdentity,
 )
 
 
@@ -1880,6 +1880,9 @@ def Bake(legacyOrm=None):
                                 includeWear=False)
     if (wheelOxide := reference.get("wheelOxideFinish")) is not None:
         ApplyWheelOxideFinish(maps, pixels, reference, wheelOxide)
+    gripRear = reference.get("gripRearFinish")
+    if gripRear is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Knurl", gripRear, GripRearIdentity(reference))
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
@@ -1975,6 +1978,9 @@ def Bake(legacyOrm=None):
                 details[label + "Detail"] = finish["detail"]
     if shoulderReflectance is not None:
         details["shoulderReflectanceCoverage"] = shoulderReflectance["coverage"]
+    if gripRear is not None:
+        details["gripRearCoverage"] = gripRear["coverage"]
+        details["gripRearDetail"] = gripRear["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

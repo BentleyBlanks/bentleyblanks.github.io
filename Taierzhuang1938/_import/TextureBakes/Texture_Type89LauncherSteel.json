@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 568768,
-      "sha256": "b18005bde1135d10255289c78c97ecfbccbd41ad686ca7c2f5f7c27f51eef192"
+      "bytes": 569966,
+      "sha256": "2585614ae22fec31c42abb864851c723cf0d204f71b942844c8d33f6df9c0bb5"
     },
     {
       "channel": "Normal",
@@ -35,34 +35,34 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 84930,
-      "sha256": "9ef934d779e7b85920c5844277c78488c41cc1e7ec776d29a5aeef8e64f1ac4d"
+      "bytes": 84926,
+      "sha256": "c0f61e7b275390341316c7070930cd0f28bb0d5bf4273ad976660c8109ad8cbc"
     }
   ],
-  "totalBytes": 1040044,
+  "totalBytes": 1041238,
   "metrics": {
     "meanSrgb": [
-      0.4531,
-      0.4395,
-      0.4071
+      0.4537,
+      0.4402,
+      0.4078
     ],
-    "luma": 0.4333,
-    "lumaStd": 0.1184,
-    "sat": 0.1014,
+    "luma": 0.4339,
+    "lumaStd": 0.1186,
+    "sat": 0.1012,
     "clipLow": 0.0,
     "clipHigh": 0.0001,
-    "lowFreq": 0.0983,
-    "seam": 0.1267,
+    "lowFreq": 0.0977,
+    "seam": 0.1269,
     "interior": 0.0269,
-    "seamRatio": 4.714,
-    "border": 0.718,
-    "swing": 0.1163,
+    "seamRatio": 4.715,
+    "border": 0.717,
+    "swing": 0.1177,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "75e5d3255ed51528a4cdccf6f50af1341f26b97ae10583c1a9217c43400f0cb6",
+    "sha256": "50c641e7765ce52f03ecc0ae84356a10f3a09446f6872896b1ccf3e67d5152a0",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -266,6 +266,14 @@
     "shoulderReflectanceCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherShoulderReflectanceCoverage.png",
       "sha256": "b2538a189b206059c7d19a4940414b3346facdeedacc1f5ebcf9fc558beeb3bf"
+    },
+    "gripRearCoverage": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherGripRearCoverage.png",
+      "sha256": "88cd982a63eb60da3fcb636f50d8e5eedfcee280ed35e1f75c482148ecb9ef52"
+    },
+    "gripRearDetail": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherGripRearWear.png",
+      "sha256": "d6c7d452265cc00e8fe9eecbe839accf378eaef37428f007acf686b190dde5bc"
     }
   },
   "contactAo": {
