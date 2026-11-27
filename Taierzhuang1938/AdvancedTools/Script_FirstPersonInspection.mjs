@@ -31,10 +31,36 @@ const FIRE_PUNCH_FOV_DEG = 1.9;
 const PLAYER_BOLT_VOLUME = 0.42;
 
 const WEAPON_LIGHT_BY_SKY = Object.freeze({
+  testSceneDay: Object.freeze({ fill: 0.62, spec: 0.30, color: "#ffffff", ambient: 1.0, sun: 1.0 }),
   firstLevelBattleDay: Object.freeze({ fill: 0.55, spec: 0.25, color: "#ffffff", ambient: 1.0, sun: 1.0 }),
   dusk: Object.freeze({ fill: 0.50, spec: 0.22, color: "#ffe2c4", ambient: 0.5, sun: 0.6 }),
   firstLevelNight: Object.freeze({ fill: 0.30, spec: 0.14, color: "#b4c4e8", ambient: 1.0, sun: 1.0 }),
 });
+
+const DEFAULT_SKY_BY_SCENE = Object.freeze({
+  range: "firstLevelBattleDay",
+  agentBlank: "testSceneDay",
+});
+
+function NormalizeSceneKind(value) {
+  if (!value) return null;
+  const key = String(value).trim().toLowerCase();
+  if (key === "agentblank" || key === "blank" || key === "agent" || key === "empty") return "agentBlank";
+  if (key === "range" || key === "firingrange") return "range";
+  return null;
+}
+
+function NormalizeSkyName(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (WEAPON_LIGHT_BY_SKY[raw]) return raw;
+  const key = raw.toLowerCase();
+  if (key === "sunny" || key === "clear" || key === "testsceneday") return "testSceneDay";
+  if (key === "day" || key === "firstlevelbattleday") return "firstLevelBattleDay";
+  if (key === "dusk") return "dusk";
+  if (key === "night" || key === "firstlevelnight") return "firstLevelNight";
+  return null;
+}
 
 const IMPACT_CUE = Object.freeze({
   brick: "impactBrick", dirt: "impactDirt", wood: "impactWood", metal: "impactMetal",
@@ -139,7 +165,10 @@ class FirstPersonInspectionApp {
     // 核心状态
     this.mode = "range"; // "range" | "bolt" | "inertia"
     this.profile = "after"; // "before" | "after"
+    this.sceneKind = "range"; // "range" | "agentBlank"
     this.skyName = "firstLevelBattleDay";
+    this.skyManual = false;
+    this.hudVisible = true;
     this.view = "player"; // "player" | "inspect"
     this.orbitPreset = "rightRear";
     this.weaponId = "HanYang";
@@ -226,7 +255,6 @@ class FirstPersonInspectionApp {
     this.CollectDom();
     this.ApplyToolsVolume();
     this.WireViewmodelCallbacks();
-    this.ApplySky("firstLevelBattleDay");
     this.BuildWeaponList();
     this.BuildCompareChips();
     this.BuildDebugOverlay();
@@ -234,6 +262,12 @@ class FirstPersonInspectionApp {
 
     // URL 参数初始化
     const params = new URLSearchParams(location.search);
+    const paramScene = NormalizeSceneKind(params.get("scene")) || "range";
+    const paramSky = NormalizeSkyName(params.get("sky"));
+    this.skyManual = !!paramSky;
+    this.SetScene(paramScene, { preserveSky: !!paramSky });
+    if (paramSky) this.ApplySky(paramSky, { manual: true });
+
     const paramWeapon = params.get("weapon");
     if (paramWeapon && WEAPON_IDS.includes(paramWeapon)) this.weaponId = paramWeapon;
     this.SetWeapon(this.weaponId);
@@ -244,6 +278,12 @@ class FirstPersonInspectionApp {
     const paramMode = params.get("mode");
     if (paramMode === "bolt" || paramMode === "inertia") this.SetMode(paramMode);
     else this.SetMode("range");
+
+    const paramView = params.get("view");
+    if (paramView === "inspect" || paramView === "player") this.SetView(paramView);
+    const paramOrbit = params.get("orbit");
+    if (paramOrbit && paramOrbit in ORBIT_PRESETS) this.SetOrbitPreset(paramOrbit, paramView === "inspect");
+    if (params.get("hud") === "0") this.SetHudVisible(false);
   }
 
   CollectDom() {
@@ -364,15 +404,46 @@ class FirstPersonInspectionApp {
     }
   }
 
-  ApplySky(name) {
-    if (!WEAPON_LIGHT_BY_SKY[name]) return false;
-    this.skyName = name;
-    this.base.ApplySkyPreset(name);
-    this.base.firstPersonSelfShadow?.SetWeaponLight?.(WEAPON_LIGHT_BY_SKY[name]);
+  ApplySky(name, { manual = false } = {}) {
+    const resolved = NormalizeSkyName(name);
+    if (!resolved || !WEAPON_LIGHT_BY_SKY[resolved]) return false;
+    this.skyName = resolved;
+    if (manual) this.skyManual = true;
+    this.base.ApplySkyPreset(resolved);
+    this.base.firstPersonSelfShadow?.SetWeaponLight?.(WEAPON_LIGHT_BY_SKY[resolved]);
+    this.base.firstPersonReflection?.Invalidate?.();
     for (const btn of document.querySelectorAll("[data-sky]")) {
-      btn.setAttribute("aria-pressed", String(btn.dataset.sky === name));
+      btn.setAttribute("aria-pressed", String(btn.dataset.sky === resolved));
     }
     return true;
+  }
+
+  SetScene(kind, { preserveSky = false } = {}) {
+    const resolved = NormalizeSceneKind(kind);
+    if (!resolved) return false;
+    this.sceneKind = resolved;
+    const isBlank = resolved === "agentBlank";
+    if (this.range?.root) this.range.root.visible = !isBlank;
+    if (this.base.vfx?.ambientDust) this.base.vfx.ambientDust.visible = !isBlank;
+    if (this.dom?.clearHolesBtn) this.dom.clearHolesBtn.hidden = isBlank;
+    for (const btn of document.querySelectorAll("[data-scene]")) {
+      btn.setAttribute("aria-pressed", String(btn.dataset.scene === resolved));
+    }
+    if (!preserveSky) {
+      if (isBlank) {
+        this.ApplySky(DEFAULT_SKY_BY_SCENE.agentBlank);
+      } else if (!this.skyManual) {
+        this.ApplySky(DEFAULT_SKY_BY_SCENE.range);
+      }
+    }
+    this.base.firstPersonReflection?.Invalidate?.();
+    return true;
+  }
+
+  SetHudVisible(visible) {
+    this.hudVisible = !!visible;
+    this.dom?.stage?.classList.toggle("hud-hidden", !this.hudVisible);
+    return this.hudVisible;
   }
 
   BuildWeaponList() {
@@ -467,9 +538,13 @@ class FirstPersonInspectionApp {
     for (const btn of document.querySelectorAll("[data-mode]")) {
       btn.addEventListener("click", () => this.SetMode(btn.dataset.mode));
     }
+    // 场景切换
+    for (const btn of document.querySelectorAll("[data-scene]")) {
+      btn.addEventListener("click", () => this.SetScene(btn.dataset.scene));
+    }
     // 光照切换
     for (const btn of document.querySelectorAll("[data-sky]")) {
-      btn.addEventListener("click", () => this.ApplySky(btn.dataset.sky));
+      btn.addEventListener("click", () => this.ApplySky(btn.dataset.sky, { manual: true }));
     }
     // 静音开关
     this.dom.muteToggle.addEventListener("click", () => {
@@ -921,6 +996,22 @@ class FirstPersonInspectionApp {
     }
   }
 
+  SetOrbit({ yaw, pitch, dist, target } = {}) {
+    if (this.view !== "inspect") this.SetView("inspect");
+    if (Number.isFinite(yaw)) this.orbit.yaw = yaw;
+    if (Number.isFinite(pitch)) this.orbit.pitch = Clamp(pitch, -0.55, 1.35);
+    if (Number.isFinite(dist)) this.orbit.dist = Clamp(dist, 0.35, 3.2);
+    if (Array.isArray(target) && target.length === 3) {
+      this.orbit.target.set(target[0], target[1], target[2]);
+    }
+    return {
+      yaw: this.orbit.yaw,
+      pitch: this.orbit.pitch,
+      dist: this.orbit.dist,
+      target: [this.orbit.target.x, this.orbit.target.y, this.orbit.target.z],
+    };
+  }
+
   SetStance(stance) {
     if (stance !== "stand" && stance !== "crouch" && stance !== "sprint") return;
     this.stancePreset = stance;
@@ -1127,7 +1218,7 @@ class FirstPersonInspectionApp {
       audio?.Play?.("shellDrop", { volume: 0.52, pan: 0.35, delay: w.kind === "boltRifle" ? 0.62 : 0.38 });
     }
 
-    const hit = this.range.RaycastShot(this.camera.position, _aimDir);
+    const hit = this.sceneKind === "agentBlank" ? null : this.range.RaycastShot(this.camera.position, _aimDir);
     if (hit) {
       this.base.vfx?.Impact?.(hit.point, hit.normal, hit.surface, { weaponKind: w.kind, hardSparks: hit.surface === "metal" });
       audio?.Play?.(IMPACT_CUE[hit.surface] || "impactBrick", { position: hit.point.clone(), volume: 0.5 });
@@ -1968,7 +2059,9 @@ class FirstPersonInspectionApp {
     return {
       mode: this.mode,
       profile: this.profile,
+      scene: this.sceneKind,
       sky: this.skyName,
+      hudVisible: this.hudVisible,
       view: this.view,
       weaponId: this.weaponId,
       weaponName: w?.name || this.weaponId,
@@ -2004,12 +2097,14 @@ async function Main() {
   };
   const canvas = document.getElementById("view");
   const params = new URLSearchParams(location.search);
+  const bootScene = NormalizeSceneKind(params.get("scene")) || "range";
+  const bootSky = NormalizeSkyName(params.get("sky")) || DEFAULT_SKY_BY_SCENE[bootScene] || "firstLevelBattleDay";
   try {
     const base = await CreateStudioBase({
       canvas,
       onStep: SetStep,
       fitCanvas: true,
-      initialSky: "firstLevelBattleDay",
+      initialSky: bootSky,
     });
     const app = new FirstPersonInspectionApp(base);
     // 先跑 2 帧预热相机、靶场与反射探针
@@ -2037,9 +2132,13 @@ async function Main() {
       base,
       SetMode: (m) => app.SetMode(m),
       SetProfile: (p, reset) => app.SetProfile(p, reset),
+      SetScene: (s, opts) => app.SetScene(s, opts),
       SetWeapon: (id) => app.SetWeapon(id),
       SetView: (v) => app.SetView(v),
-      SetSky: (s) => app.ApplySky(s),
+      SetOrbitPreset: (id, switchView) => app.SetOrbitPreset(id, switchView),
+      SetOrbit: (opts) => app.SetOrbit(opts),
+      SetSky: (s, opts) => app.ApplySky(s, opts),
+      SetHudVisible: (on) => app.SetHudVisible(on),
       SetStance: (s) => app.SetStance(s),
       SetAds: (on) => { app.adsLocked = !!on; app.SyncStanceButtons(); },
       Trigger: (act) => app.TriggerAction(act),

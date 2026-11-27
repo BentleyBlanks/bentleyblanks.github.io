@@ -781,6 +781,25 @@ try {
     await page.evaluate(() => window.FirstPersonInspection.StepFrames(6));
     const reloadSnap = await page.evaluate(() => window.FirstPersonInspection.Snapshot());
     Check("空仓换弹与实机同源（空仓开膛触发 reload）", reloadSnap.action?.kind === "reload" && reloadSnap.ammo === 0, JSON.stringify(reloadSnap));
+    // 校验 Agent 专用空白场景与默认晴天光照
+    await page.locator('[data-scene="agentBlank"]').click();
+    await page.evaluate(() => window.FirstPersonInspection.StepFrames(4));
+    const blankCheck = await page.evaluate(() => ({
+      snap: window.FirstPersonInspection.Snapshot(),
+      rangeVisible: window.FirstPersonInspection.app.range.root.visible,
+    }));
+    Check("切入 Agent 空白场景自动隐藏靶场并默认切到晴天光照",
+      blankCheck.snap.scene === "agentBlank" && blankCheck.snap.sky === "testSceneDay" && blankCheck.rangeVisible === false,
+      JSON.stringify(blankCheck));
+    await page.locator('[data-scene="range"]').click();
+    await page.evaluate(() => window.FirstPersonInspection.StepFrames(2));
+    const backRange = await page.evaluate(() => ({
+      snap: window.FirstPersonInspection.Snapshot(),
+      rangeVisible: window.FirstPersonInspection.app.range.root.visible,
+    }));
+    Check("切回靶场恢复靶场几何与默认昼光",
+      backRange.snap.scene === "range" && backRange.snap.sky === "firstLevelBattleDay" && backRange.rangeVisible === true,
+      JSON.stringify(backRange));
     Check("第一人称独立窗口没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
     await page.close();
   }

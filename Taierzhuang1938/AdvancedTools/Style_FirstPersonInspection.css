@@ -143,6 +143,13 @@ a { color: inherit; text-decoration: none; }
 }
 .stage.inspect-mode #view { cursor: grab; }
 .stage.inspect-mode #view:active { cursor: grabbing; }
+.stage.hud-hidden .hud-top-left,
+.stage.hud-hidden .hud-bottom-left,
+.stage.hud-hidden .bolt-card,
+.stage.hud-hidden .ab-float,
+.stage.hud-hidden .stage-hint,
+.stage.hud-hidden .reticle,
+.stage.hud-hidden .reload-prompt { display: none !important; }
 
 /* 中心准心与命中回馈 */
 .reticle {

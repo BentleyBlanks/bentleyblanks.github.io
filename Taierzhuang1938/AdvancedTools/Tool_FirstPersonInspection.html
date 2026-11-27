@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261123ReloadPrompt">
+  <link rel="stylesheet" href="./AdvancedTools/Style_FirstPersonInspection.css?v=20261127AgentBlankScene">
   <script>
     (function () {
       var map = '{"imports":{"three":"./vendor/three/build/three.module.js"}}';
@@ -40,7 +40,12 @@
     </nav>
 
     <div class="header-right">
-      <div class="seg-group lighting-group" role="group" aria-label="靶场光照">
+      <div class="seg-group scene-group" role="group" aria-label="检查场景">
+        <button type="button" data-scene="range" aria-pressed="true">靶场</button>
+        <button type="button" data-scene="agentBlank" aria-pressed="false" title="Agent 专用空白场景：隐藏靶场建筑与靶标，默认晴天光照以便看清枪支与第一人称手部细节">空白 · Agent</button>
+      </div>
+      <div class="seg-group lighting-group" role="group" aria-label="光照环境">
+        <button type="button" data-sky="testSceneDay" aria-pressed="false">晴天</button>
         <button type="button" data-sky="firstLevelBattleDay" aria-pressed="true">昼光</button>
         <button type="button" data-sky="dusk" aria-pressed="false">黄昏</button>
         <button type="button" data-sky="firstLevelNight" aria-pressed="false">夜晚</button>
