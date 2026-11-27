@@ -32,6 +32,9 @@ return {
   // 屏幕空间反射：布尔总闸 + 强度倍率。出厂跟画质档走（medium 及以上开），
   // 关掉不重编译材质（强度归零，材质那一行等价于「radiance 原样」）。
   ssr: !!preset.ssr, ssrStrength: 1,
+  // 水面画质档（low / medium / high / ultra）。出厂跟画质档走，运行时可热切；
+  // 编辑器模式由 Script_Water.SetWaterMode("editor") 强制锁最低档（low），试玩/正式游玩才按此档渲染。
+  waterQuality: preset.water || "high",
   // 屏幕空间近场间接光（SSIL）的倍率。**只是强度，不是总闸** —— 位掩码那一趟
   // 与 GTAO 共用同一次地平线搜索，开不开是构造期的事（画质档的 ssil 那一位），
   // 滑到 0 只是不出效果、不省时间。low / medium 档没有它，面板那一行会自己藏起来。

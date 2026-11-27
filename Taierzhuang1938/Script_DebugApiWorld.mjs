@@ -221,5 +221,7 @@ export function WorldDebugApi(ctx) {
       Deaths: () => ({ ...ctx.ai.deaths }),
       OpenDirections: (x, z, count = 72, probeM = 20) =>
         ctx.CountOpenDirections(x, z, ctx.battlefield.GroundHeight(x, z), probeM, count),
+      /** 3A 物理水面取证与热切口（档位、编辑/试玩门禁、折射拷贝与交互波纹；保留 Debug.Water 给玩家涉水探针）。 */
+      WaterSurface: ctx.Water,
   };
 }

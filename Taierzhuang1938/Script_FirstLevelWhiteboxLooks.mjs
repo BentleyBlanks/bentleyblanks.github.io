@@ -353,21 +353,21 @@ export function BuildWhiteboxWater(blocks, scene, { preset = "muddyRiver", name 
     if (prev && block.x - block.w / 2 <= prev.x + prev.w / 2 + 0.01) run.push(block);
     else runs.push([block]);
   }
-  const positions = [], uvs = [], normals = [], indices = [];
-  const across = 6;       // 横向分段：Gerstner 顶点位移要有顶点可动
+  const positions = [], uvs = [], normals = [], edges = [], indices = [];
+  const across = 8;       // 横向分段：Gerstner 顶点位移与岸边收敛要有足够顶点
   for (const run of runs) {
-    const edges = [];
+    const edgesList = [];
     for (let i = 0; i <= run.length; i += 1) {
       const a = run[Math.max(0, i - 1)], b = run[Math.min(run.length - 1, i)];
       const x = i === 0 ? b.x - b.w / 2 : i === run.length ? a.x + a.w / 2 : (a.x + a.w / 2 + b.x - b.w / 2) / 2;
       const y = ((a.y + a.h / 2) + (b.y + b.h / 2)) / 2 - 0.04;
       const half = (a.d + b.d) / 4;
-      edges.push({ x, y, z: (a.z + b.z) / 2, half });
+      edgesList.push({ x, y, z: (a.z + b.z) / 2, half });
     }
     // 每段再细分到 ~2 m 一格
     const rows = [];
-    for (let i = 0; i < edges.length - 1; i += 1) {
-      const e0 = edges[i], e1 = edges[i + 1], steps = Math.max(1, Math.round((e1.x - e0.x) / 2));
+    for (let i = 0; i < edgesList.length - 1; i += 1) {
+      const e0 = edgesList[i], e1 = edgesList[i + 1], steps = Math.max(1, Math.round((e1.x - e0.x) / 2));
       for (let s = i === 0 ? 0 : 1; s <= steps; s += 1) {
         const t = s / steps;
         rows.push({ x: e0.x + (e1.x - e0.x) * t, y: e0.y + (e1.y - e0.y) * t,
@@ -377,8 +377,13 @@ export function BuildWhiteboxWater(blocks, scene, { preset = "muddyRiver", name 
     const base = positions.length / 3;
     for (const row of rows) {
       for (let j = 0; j <= across; j += 1) {
-        const z = row.z - row.half + (2 * row.half * j) / across;
-        positions.push(row.x, row.y, z); normals.push(0, 1, 0); uvs.push(row.x, z);
+        const t = j / across;
+        const z = row.z - row.half + 2 * row.half * t;
+        const distBank = Math.min(t, 1 - t) * (2 * row.half);
+        positions.push(row.x, row.y, z);
+        normals.push(0, 1, 0);
+        uvs.push(row.x, z);
+        edges.push(Math.min(1.0, distBank / 1.4));
       }
     }
     for (let r = 0; r < rows.length - 1; r += 1) {
@@ -392,6 +397,7 @@ export function BuildWhiteboxWater(blocks, scene, { preset = "muddyRiver", name 
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("aWaterEdge", new THREE.Float32BufferAttribute(edges, 1));
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
   return CreateWaterSurface({ geometry, scene, preset, name });
@@ -399,30 +405,45 @@ export function BuildWhiteboxWater(blocks, scene, { preset = "muddyRiver", name 
 
 /** Bake authored cross-sections into one connected, horizontal shallow-water surface. */
 export function BuildRibbonWater(block, scene) {
-  const positions=[], normals=[], uvs=[], indices=[];
-  const across=4, surfaceY=block.y+block.h/2;
-  for(const [x,north,south] of block.waterRibbon) {
-    for(let column=0;column<=across;column++) {
-      const z=north+(south-north)*column/across;
-      positions.push(x,surfaceY,z);
-      normals.push(0,1,0);
-      uvs.push(x,z);
+  const isPond = /^Pond_/.test(block.id || "");
+  const positions=[], normals=[], uvs=[], edges=[], indices=[];
+  const across = isPond ? 8 : 12, surfaceY = block.y + block.h / 2;
+  const count = block.waterRibbon.length;
+  for (let row = 0; row < count; row += 1) {
+    const [x, north, south] = block.waterRibbon[row];
+    const span = Math.abs(south - north);
+    const endFactor = isPond ? Math.min(1.0, Math.min(row, count - 1 - row) / 1.5) : 1.0;
+    for (let column = 0; column <= across; column += 1) {
+      const t = column / across;
+      const z = north + (south - north) * t;
+      const distBank = Math.min(t, 1 - t) * span;
+      positions.push(x, surfaceY, z);
+      normals.push(0, 1, 0);
+      uvs.push(x, z);
+      edges.push(Math.min(1.0, distBank / 1.4) * endFactor);
     }
   }
-  for(let row=1;row<block.waterRibbon.length;row++) {
-    for(let column=0;column<across;column++) {
-      const a=(row-1)*(across+1)+column, b=a+across+1;
-      indices.push(a,a+1,b,b,a+1,b+1);
+  for (let row = 1; row < count; row += 1) {
+    for (let column = 0; column < across; column += 1) {
+      const a = (row - 1) * (across + 1) + column, b = a + across + 1;
+      indices.push(a, a + 1, b, b, a + 1, b + 1);
     }
   }
-  const geometry=new THREE.BufferGeometry();
-  geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
-  geometry.setAttribute("normal",new THREE.Float32BufferAttribute(normals,3));
-  geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("aWaterEdge", new THREE.Float32BufferAttribute(edges, 1));
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
-  const flow = /^Pond_/.test(block.id || "") ? [-0.04, 0.02] : [-1, 0.2];
-  return CreateWaterSurface({geometry,scene,preset:"muddyRiver",flow,name:block.id});
+  const flow = isPond ? [-0.04, 0.02] : [-0.85, 0.16];
+  return CreateWaterSurface({
+    geometry,
+    scene,
+    preset: isPond ? "pond" : "muddyRiver",
+    flow,
+    name: block.id,
+  });
 }
 
 /**

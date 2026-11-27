@@ -617,6 +617,8 @@ export const testDefs = {
   WhiteboxMaterialTest: { file: "Script_WhiteboxMaterialTest.mjs", desc: "白盒材质：灰表面 + 米格线补丁、语义色保留、水材质，数据文件纯数据" },
   SsrTest: { file: "Script_SsrTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图" },
+  WaterTest: { file: "Script_WaterTest.mjs", timeoutMs: 10 * 60 * 1000,
+    desc: "3A 物理水面：四档画质与 16 采样器预算 / 单层折射拷贝与焦散 / 交互波纹与 WaterDepth / 编辑器默认最低档与试玩自动开启正式画质门禁" },
   AtmosphereTest: { file: "Script_AtmosphereTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "物理大气：四张 LUT / 十档预设的辐照度与色相标定 / 70 m 能见度不许降 / 大气透视近远端" },
   VolumetricsTest: { file: "Script_VolumetricsTest.mjs", timeoutMs: 25 * 60 * 1000,
@@ -792,7 +794,7 @@ export const browserTests = new Set([
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
   "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "MeleeLabVariantsBrowserTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest", "CommandRoomBrowserTest", "CommandRoomPublicationTest", "CommandRoomPreviewTest", "MenuPresentationTest", "AboutBrowserTest",
-  "PerformanceTest", "PhysicsTest", "PostTest", "FilmGrainTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "VehicleTracksBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
+  "PerformanceTest", "PhysicsTest", "PostTest", "FilmGrainTest", "TerrainBlendTest", "TerrainTrailsTest", "TerrainTrailsBrowserTest", "VehicleTracksBrowserTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "WaterTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
   "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "TrenchEditorTest", "VisibilityTest", "VoiceTest",
@@ -1092,7 +1094,7 @@ export const domains = {
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
     // 第一关开机预热编对没有，看 WhiteboxShaderWarmTest（约一分半，high 档）。
-    tests: ["FirstPersonLightingBrowserTest", "MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "FilmGrainTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "DeferredMaterialDisposeTest", "ShadowSkipTest","BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
+    tests: ["FirstPersonLightingBrowserTest", "MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "FilmGrainTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "DeferredMaterialDisposeTest", "ShadowSkipTest","BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "WaterTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {

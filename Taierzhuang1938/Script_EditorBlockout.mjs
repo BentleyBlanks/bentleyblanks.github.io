@@ -43,6 +43,7 @@ import {
 import { BuildBlockoutSnapshot, FormatBlockoutSnapshot, ParsePoseParam } from "./Script_EditorBlockoutSnapshot.mjs";
 import { BlockoutPuppets } from "./Script_EditorBlockoutPuppets.mjs";
 import { BlockoutTrees } from "./Script_EditorBlockoutTrees.mjs";
+import { CreateWaterSurface, BuildWaterBlockGeometry, SetWaterMode } from "./Script_Water.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { BlockoutBackdrop } from "./Script_EditorBlockoutBackdrop.mjs";
 import { BlockoutMarkers } from "./Script_EditorBlockoutMarkers.mjs";
@@ -691,8 +692,11 @@ export class EditorBlockout {
     const field = this.game.battlefield;
     if (!field || !layout) return;
     // 正式场景（试玩，§17）：地面（分层地表）、道具、树、植被是 FirstLevelWhiteboxField 按现行第一关的口径建好的，这里不碰；
-    // 体块（房子、墙、工事）不是正式资产，照白盒画灰面 + 米格线（用户 2026-11-01），水照白盒编辑器铺浑水面
+    // 体块（房子、墙、工事）不是正式资产，照白盒画灰面 + 米格线（用户 2026-11-01），
+    // 水面：编辑/预演一律保持编辑器最低水面档（BuildCreekWater + SetWaterMode("editor")），
+    // 仅切入正式试玩（formal / play）时才开启 3A 正式水面画质。
     const formal = layout.style === "formal";
+    SetWaterMode(formal || this.play?.active ? "play" : "editor");
     const tint = layout.heightTint || { lo: -4, hi: 6 };
     const waterBlocks = BlockoutWaterBlocks(layout);
     const creek = layout.id !== "BlockoutFirstLevel" && waterBlocks.length > 0;
@@ -765,9 +769,16 @@ export class EditorBlockout {
       DressAsWhitebox(material, semantic === "water" ? { kind: "water" } : { keepColor: keepColor.has(semantic) });
     }
     if (!field.waterMesh && waterBlocks.length) {
-      const mesh = BuildCreekWater(waterBlocks, (x, z) => this.groundAt(x, z), this.host.scene, creek
-        ? { name: "BlockoutWater" }
-        : { name: "BlockoutWater", material: MakeWhiteboxWaterMaterial({ name: "BlockoutWhiteboxWater" }) });
+      const mesh = formal
+        ? CreateWaterSurface({
+            geometry: BuildWaterBlockGeometry(waterBlocks, (x, z) => this.groundAt(x, z)),
+            scene: this.host.scene,
+            preset: "muddyRiver",
+            name: "BlockoutWater",
+          })
+        : BuildCreekWater(waterBlocks, (x, z) => this.groundAt(x, z), this.host.scene, creek
+          ? { name: "BlockoutWater" }
+          : { name: "BlockoutWater", material: MakeWhiteboxWaterMaterial({ name: "BlockoutWhiteboxWater" }) });
       if (mesh) { field.waterMesh = mesh; field.meshes.push(mesh); }
     }
   }
@@ -821,6 +832,7 @@ export class EditorBlockout {
       this.rebuilding = true;
       // 换关回到白盒（编辑）；正式 / 白盒互换（UseSceneVariant）与外部改了场景文件（ReloadScene）保留
       if (!keepVariant && BLOCKOUT_PHASES[index]?.blockout) BLOCKOUT_PHASES[index].blockout.variant = "edit";
+      if (!keepVariant) SetWaterMode("editor");
       try {
         await this.game.JumpToLevel(index);
         this.levelIndex = index;
@@ -859,6 +871,7 @@ export class EditorBlockout {
    * 这一关没有正式场景（旧版第一关、第二关草稿）什么也不做。→ 成没成
    */
   async UseSceneVariant(variant) {
+    SetWaterMode(variant === "play" ? "play" : "editor");
     if (!this.NeedsSceneVariant(variant)) return true;
     if (this.switching) await this.switching.catch(() => {});
     if (!this.NeedsSceneVariant(variant)) return true;

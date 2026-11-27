@@ -28,6 +28,7 @@ import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
 import { BLOOM, FILM_GRAIN, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
+import { GetWaterState } from "./Script_Water.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
@@ -352,6 +353,15 @@ export class GraphicsSettings {
       { value: 0, label: "默认" }, { value: 512, label: "512" },
       { value: 1024, label: "1k" }, { value: 2048, label: "2k" }, { value: 4096, label: "4k" },
     ], gfx.shadowSize, (v) => { gfx.shadowSize = Number(v); this.Apply(); });
+    Choice(common, "水面画质", [
+      { value: "low", label: "低" },
+      { value: "medium", label: "中" },
+      { value: "high", label: "高" },
+      { value: "ultra", label: "极致" },
+    ], gfx.waterQuality || preset.water || "high", (v) => {
+      gfx.waterQuality = String(v);
+      this.Apply();
+    }, "控制试玩与正式游玩时的物理水面画质（单层折射、色散、水下焦散、CSM 水面投影、Hi-Z 倒影与交互波纹）。编辑器模式默认锁定最低档，仅试玩开启正式画质。");
     Range(common, {
       label: "视野角度", min: 40, max: 90, step: 1, value: gfx.fov,
       format: (v) => `${v.toFixed(0)}°`,
@@ -621,6 +631,7 @@ export class GraphicsSettings {
     // 在 low 档按「恢复出厂」应该回到关，而不是给它开一个建不出靶的开关。
     gfx.ssr = this.host.post ? !!this.host.post.preset.ssr : true;
     gfx.ssrStrength = 1;
+    gfx.waterQuality = this.host.post?.preset.water || "high";
     // 簇状局部光的出厂值跟画质档走（low 那一档的表里就是 false），
     // 与 TAA 同一条规矩：别在 low 上「恢复出厂」反而把它打开。
     gfx.clusteredLights = this.host.post ? this.host.post.preset.clusteredLights !== false : true;
@@ -700,6 +711,10 @@ export class GraphicsSettings {
           ? `开（${this.host.post.preset.ssrScale === 1 ? "全" : "半"}分辨率 · ${this.host.post.preset.ssrSteps} 步）`
           : "关")
         : "本档不可用");
+      const water = GetWaterState();
+      f.Set("水面", water.mode === "editor" && !water.forcedQuality
+        ? `${water.effectiveQuality}（编辑器锁定最低档 · 试玩为 ${water.requestedQuality}）`
+        : `${water.effectiveQuality}（${water.tierLabel}${water.hasOpaqueCopy ? " · 折射" : ""}${water.hasShadows ? " · 投影" : ""}${water.hasSsr ? " · SSR" : ""}）`);
       // 读的是管线**实际在跑**的那条路（uFogSource），不是设置里那一位：
       // 网格没有、这一档天光 density = 0、开机前几帧都会照实说「解析式高度雾」。
       const volumetrics = this.host.post.volumetricsPass;

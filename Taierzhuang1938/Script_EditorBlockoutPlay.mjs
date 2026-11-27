@@ -31,6 +31,7 @@ import {
 import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
+import { SetWaterMode } from "./Script_Water.mjs";
 
 export const PLAY_KEY = "KeyK";
 const DEG = Math.PI / 180;
@@ -212,6 +213,8 @@ export class BlockoutPlay {
     editor.markers.SetPois([]);
     editor.markers.SetStations([], -1);
     document.body.classList.add("blockoutPlay");
+    // 试玩开启正式水面画质（即使该关卡没有独立 playUrl 正式场景，也立即解除编辑器最低水面档）
+    SetWaterMode("play");
     this.hud.hidden = false;
     this.EnterStep(0);
     return true;
@@ -402,7 +405,11 @@ export class BlockoutPlay {
     this.hud.hidden = true;
     this.ShowKeyHint(null);
     editor.markers.SetNext(null);
-    if (!summary) { this.Restore(run.step?.index ?? editor.index); return; }
+    if (!summary) {
+      if (editor.sceneVariant !== "play") SetWaterMode("editor");
+      this.Restore(run.step?.index ?? editor.index);
+      return;
+    }
     this.summary = {
       result, indices: run.indices, failedCursor: result === "done" ? -1 : run.cursor, failedIndex: run.step?.index ?? -1,
       totalT: run.totalT, kills: run.kills, damage: run.damage, log: run.log, settings: run.settings,
@@ -428,6 +435,8 @@ export class BlockoutPlay {
     if (!restore) return;
     const index = summary.failedIndex >= 0 ? summary.failedIndex : summary.indices[summary.indices.length - 1];
     if (this.editor.NeedsSceneVariant?.("edit")) await this.editor.UseSceneVariant("edit");
+    // 退回编辑态：立刻切回编辑器默认最低水面画质档
+    SetWaterMode("editor");
     this.Restore(index);
   }
 

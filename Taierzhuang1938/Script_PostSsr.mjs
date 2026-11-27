@@ -71,15 +71,14 @@ export const SSR_DEBUG_VIEWS = new Set(["ssr", "ssrConfidence", "ssrHitDistance"
 /**
  * 追踪端的 uniform 声明块。**名字一律 `uSsr` 前缀**，这样整块塞进任何材质的
  * uniform 表里都不会撞名（水面材质就是这么接的）。
+ * `hizSlots` 允许调用方按采样器预算裁少 Hi-Z 槽位（例如水面用 4 级省出 2 个片段采样器给 CSM/折射）。
  */
-export const SSR_UNIFORM_GLSL = /* glsl */`
-uniform sampler2D uSsrHiz0;
-uniform sampler2D uSsrHiz1;
-uniform sampler2D uSsrHiz2;
-uniform sampler2D uSsrHiz3;
-uniform sampler2D uSsrHiz4;
-uniform sampler2D uSsrHiz5;
-uniform vec2 uSsrHizSize[${HIZ_SLOTS}];
+export function SsrUniformGlsl(hizSlots = HIZ_SLOTS) {
+  const slots = Math.max(1, Math.min(HIZ_SLOTS, hizSlots | 0));
+  let hizDecls = "";
+  for (let i = 0; i < slots; i += 1) hizDecls += `uniform sampler2D uSsrHiz${i};\n`;
+  return /* glsl */`
+${hizDecls}uniform vec2 uSsrHizSize[${HIZ_SLOTS}];
 uniform float uSsrHizMaxLevel;
 uniform sampler2D uSsrDepth;        // 预通道 RT0：xyz = 视空间法线，w = 线性视深
 uniform sampler2D uSsrVelocity;     // 预通道 RT1：屏幕空间速度（uv）
@@ -100,6 +99,9 @@ uniform float uSsrConeScale;
 uniform float uSsrFrame;
 uniform float uSsrForegroundDepth;
 `;
+}
+
+export const SSR_UNIFORM_GLSL = SsrUniformGlsl(HIZ_SLOTS);
 
 /**
  * 几何与 Hi-Z 的公共函数。
@@ -110,7 +112,23 @@ uniform float uSsrForegroundDepth;
  * 反投影要先把这一份平移减掉、投影要再加回去 —— 少了它，射线的屏幕位置与
  * 深度图差半个像素，细几何（电线、栏杆）上的反射会一帧一跳。
  */
-export const SSR_GEOMETRY_GLSL = /* glsl */`
+export function SsrGeometryGlsl(hizSlots = HIZ_SLOTS) {
+  const slots = Math.max(1, Math.min(HIZ_SLOTS, hizSlots | 0));
+  let hizMinBody = "";
+  let hizSizeBody = "";
+  for (let i = 0; i < slots; i += 1) {
+    if (i === 0) {
+      hizMinBody += `  if (level <= 0) return texture2D(uSsrHiz0, uv).r;\n`;
+      hizSizeBody += `  if (level <= 0) return uSsrHizSize[0];\n`;
+    } else if (i < slots - 1) {
+      hizMinBody += `  if (level == ${i}) return texture2D(uSsrHiz${i}, uv).r;\n`;
+      hizSizeBody += `  if (level == ${i}) return uSsrHizSize[${i}];\n`;
+    } else {
+      hizMinBody += `  return texture2D(uSsrHiz${i}, uv).r;\n`;
+      hizSizeBody += `  return uSsrHizSize[${i}];\n`;
+    }
+  }
+  return /* glsl */`
 float SsrSceneDepth(vec2 uv) {
   float d = texture2D(uSsrDepth, uv).a;
   return d <= 0.0 ? uSsrFar : d;   // 天空当最远：max-reduce 与 min-reduce 都靠这条统一
@@ -121,22 +139,10 @@ vec3 SsrSceneNormal(vec2 uv) { return normalize(texture2D(uSsrDepth, uv).xyz); }
 // 变量下标取 sampler 在 GLSL ES 3.00 里是非法的（只允许常量表达式），
 // 所以摊成 if 梯。级数不足时上层把多余的槽绑成最后一级，读到的仍然有效。
 float SsrHizMin(vec2 uv, int level) {
-  if (level <= 0) return texture2D(uSsrHiz0, uv).r;
-  if (level == 1) return texture2D(uSsrHiz1, uv).r;
-  if (level == 2) return texture2D(uSsrHiz2, uv).r;
-  if (level == 3) return texture2D(uSsrHiz3, uv).r;
-  if (level == 4) return texture2D(uSsrHiz4, uv).r;
-  return texture2D(uSsrHiz5, uv).r;
-}
+${hizMinBody}}
 
 vec2 SsrHizSize(int level) {
-  if (level <= 0) return uSsrHizSize[0];
-  if (level == 1) return uSsrHizSize[1];
-  if (level == 2) return uSsrHizSize[2];
-  if (level == 3) return uSsrHizSize[3];
-  if (level == 4) return uSsrHizSize[4];
-  return uSsrHizSize[5];
-}
+${hizSizeBody}}
 
 vec3 SsrUvToView(vec2 uv, float viewDepth) {
   vec2 ndc = (uv - uSsrJitterUv) * 2.0 - 1.0;
@@ -185,6 +191,9 @@ float SsrScreenExit(vec2 uv0, vec2 duv) {
   return clamp(min(min(sx, sy), 1.0), 0.0, 1.0);
 }
 `;
+}
+
+export const SSR_GEOMETRY_GLSL = SsrGeometryGlsl(HIZ_SLOTS);
 
 /**
  * Hi-Z 追踪本体。步数与细化步数是**编译期常量**（GLSL 循环上限），所以按档位
@@ -202,7 +211,8 @@ float SsrScreenExit(vec2 uv0, vec2 duv) {
  *   上一帧的颜色。水面上表现为近处一粒一粒的暗点（2026-10-01 浮桥边上量到）。
  *   场景 SSR 不开：它的命中靶有时域与解算兜着，改判据要另做全场回归。
  */
-export function SsrTraceGlsl({ steps = 48, refine = 4, name = "SsrTrace", rejectFront = false } = {}) {
+export function SsrTraceGlsl({ steps = 48, refine = 4, name = "SsrTrace", rejectFront = false, hizSlots = HIZ_SLOTS } = {}) {
+  const maxSlot = Math.max(0, Math.min(HIZ_SLOTS, hizSlots | 0) - 1);
   return /* glsl */`
 vec4 ${name}(vec3 originView, vec3 dirView, float jitter) {
   // --- 射线段：起点 → 最远处，并且不许越过近平面 -------------------------
@@ -231,7 +241,7 @@ vec4 ${name}(vec3 originView, vec3 dirView, float jitter) {
   if (s >= sExit) return vec4(0.0);
 
   int level = 1;
-  int maxLevel = int(uSsrHizMaxLevel);
+  int maxLevel = min(int(uSsrHizMaxLevel), ${maxSlot});
   float sFront = s;          // 最后一次确认「在表面前面」的位置（细化的左端）
   bool hit = false;
   for (int i = 0; i < ${steps}; i++) {
@@ -390,9 +400,9 @@ vec3 SsrFetchRadiance(vec2 hitUv, float lod) {
  *
  * 生成一份带独立步数的函数（水面比场景反射短，32 步足够跨过一条护城河）。
  */
-export function SsrSurfaceGlsl({ steps = 32, refine = 3, name = "SsrSurfaceReflection", rejectFront = false } = {}) {
+export function SsrSurfaceGlsl({ steps = 32, refine = 3, name = "SsrSurfaceReflection", rejectFront = false, hizSlots = HIZ_SLOTS } = {}) {
   return /* glsl */`
-${SsrTraceGlsl({ steps, refine, name: `${name}Trace`, rejectFront })}
+${SsrTraceGlsl({ steps, refine, name: `${name}Trace`, rejectFront, hizSlots })}
 // viewPos / viewNormal 都是**视空间**（水面自己 viewMatrix 转一次）。
 // roughness 只用来选采色的 mip，方向仍按镜面 —— 水面粗糙度是 0.02 量级，
 // 再套一次随机 GGX 只会白白引入噪声。
@@ -414,7 +424,8 @@ vec4 ${name}(vec3 viewPos, vec3 viewNormal, float roughness, float noise) {
 
 /** 水面这类「自己追踪」的材质要 include 的整块 GLSL。 */
 export function SsrSurfaceBlockGlsl(options = {}) {
-  return `${SSR_UNIFORM_GLSL}\n${SSR_GEOMETRY_GLSL}\n${SSR_FETCH_GLSL}\n${SsrSurfaceGlsl(options)}`;
+  const slots = options.hizSlots ?? HIZ_SLOTS;
+  return `${SsrUniformGlsl(slots)}\n${SsrGeometryGlsl(slots)}\n${SSR_FETCH_GLSL}\n${SsrSurfaceGlsl(options)}`;
 }
 
 // ===========================================================================
@@ -797,10 +808,17 @@ export function MakeSsrTraceUniforms() {
   return uniforms;
 }
 
-/** 把追踪端 uniform 整包塞进别人的 uniform 表（水面用）。 */
-export function BindSsrTraceUniforms(target, trace) {
+/** 把追踪端 uniform 整包塞进别人的 uniform 表（水面用）。支持按 hizSlots 裁掉多余的 Hi-Z 槽。 */
+export function BindSsrTraceUniforms(target, trace, hizSlots = HIZ_SLOTS) {
   if (!target || !trace) return target;
-  for (const key of Object.keys(trace)) target[key] = trace[key];
+  const slots = Math.max(1, Math.min(HIZ_SLOTS, hizSlots | 0));
+  for (const key of Object.keys(trace)) {
+    if (key.startsWith("uSsrHiz") && /^uSsrHiz(\d+)$/.test(key)) {
+      const idx = Number(key.slice(7));
+      if (idx >= slots) continue;
+    }
+    target[key] = trace[key];
+  }
   return target;
 }
 

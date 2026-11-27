@@ -33,6 +33,8 @@ import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import {
   THROW, GRENADE_BODY, MELEE, BLAST, SHELL, INDIRECT, THREAT,
 } from "./Data_Tuning_Combat.mjs";
+import { AddWaterRipple } from "./Script_Water.mjs";
+import { WATER_RIPPLES } from "./Data_Tuning_Water.mjs";
 
 // 世界重力。Script_Player 的 JUMP.gravityMps2 与 Script_ShellVisual 各自还存着
 // 同一个 19.6；三处合成一张世界表是待办（见本轮报告的集成请求）。
@@ -797,6 +799,25 @@ export class CombatSystem {
     BLAST_TARGETS.Blast(position, radius, damage, kind);
     this.host.battlefield.deformation?.ApplyBlast(position, explosiveId, { incoming: options?.incoming ?? null });
     this.host.battlefield.breakableTrees?.Blast(position, radius, damage);
+    const waterDepthFn = this.host.battlefield?.WaterDepth;
+    if (waterDepthFn) {
+      const probeY = position.y - 2.0;
+      const hitWater = waterDepthFn.call(this.host.battlefield, position.x, position.z, probeY) > 0.02;
+      const blastReach = Math.max(4, radius * 0.9);
+      if (hitWater
+        || waterDepthFn.call(this.host.battlefield, position.x + blastReach, position.z, probeY) > 0.02
+        || waterDepthFn.call(this.host.battlefield, position.x - blastReach, position.z, probeY) > 0.02
+        || waterDepthFn.call(this.host.battlefield, position.x, position.z + blastReach, probeY) > 0.02
+        || waterDepthFn.call(this.host.battlefield, position.x, position.z - blastReach, probeY) > 0.02) {
+        AddWaterRipple(position.x, position.z, {
+          strength: WATER_RIPPLES.blastStrength * (hitWater ? 1.0 : 0.65),
+          radius: Math.max(WATER_RIPPLES.blastRadiusM, radius * 1.8),
+          speed: WATER_RIPPLES.blastSpeed,
+          freq: WATER_RIPPLES.blastFreq,
+          foam: hitWater ? WATER_RIPPLES.blastFoam : WATER_RIPPLES.blastFoam * 0.45,
+        });
+      }
+    }
     const bf = this.host.battlefield;
     const ai = this.host.ai;
     const from = position.clone();

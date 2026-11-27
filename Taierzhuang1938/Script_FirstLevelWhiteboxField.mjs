@@ -181,6 +181,8 @@ export class FirstLevelWhiteboxField {
     this.looks = null;
     this.railTrackKit = null;
     this.waterMesh = null;
+    this.waterRibbons = [];
+    this.waterBodies = [];
     this.trainOffsetM = 0; this.trainMeshes = []; this.trainColliders = [];
     this.gates = new Map();
     this.scenarioMeshes = [];
@@ -457,6 +459,13 @@ export class FirstLevelWhiteboxField {
       if(block.waterRibbon) {
         const mesh = BuildRibbonWater(block, this.scene);
         if (!this.waterMesh || block.id === "SandRiverSurface") this.waterMesh = mesh;
+        this.waterRibbons.push({
+          id: block.id,
+          surfaceY: block.y + (block.h || 0) / 2,
+          strips: block.waterRibbon,
+          minX: block.waterRibbon[0]?.[0] ?? 0,
+          maxX: block.waterRibbon[block.waterRibbon.length - 1]?.[0] ?? 0,
+        });
         this.meshes.push(mesh);
         continue;
       }
@@ -468,7 +477,14 @@ export class FirstLevelWhiteboxField {
       // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
       const look = this.looks && targetSink === sink ? this.looks.LookOf(block) : null;
       if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner)) {
-        if (this.looks && targetSink === sink && block.semantic === "water") waterBlocks.push(block);
+        if (this.looks && targetSink === sink && block.semantic === "water") {
+          waterBlocks.push(block);
+          this.waterBodies.push({
+            x: block.x, z: block.z, w: block.w, d: block.d,
+            c: Math.cos(block.ry || 0), s: Math.sin(block.ry || 0),
+            surfaceY: block.y + (block.h || 0) / 2 - 0.04,
+          });
+        }
         else if (look) {
           if (!lookBuckets.has(look)) lookBuckets.set(look, []);
           lookBuckets.get(look).push(this.looks.BoxGeometry(block, look, terrainAt));
@@ -1041,7 +1057,47 @@ export class FirstLevelWhiteboxField {
     return height;
   }
 
-  WaterDepth(_x, _z, _y) { return 0; }
+  WaterDepth(x, z, y) {
+    let best = 0;
+    for (const r of this.waterRibbons) {
+      const strips = r.strips;
+      const n = strips.length;
+      if (n < 2) continue;
+      const loX = Math.min(r.minX, r.maxX);
+      const hiX = Math.max(r.minX, r.maxX);
+      if (x < loX || x > hiX) continue;
+      // 站到桥面或高台上不算涉水（与 TengxianField / EditorSplines 口径一致）
+      if (Number.isFinite(y) && y > r.surfaceY + 0.12) continue;
+      const asc = strips[n - 1][0] >= strips[0][0];
+      let lo = 0, hi = n - 1;
+      while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (asc ? strips[mid][0] <= x : strips[mid][0] >= x) lo = mid;
+        else hi = mid;
+      }
+      const a = strips[lo], b = strips[hi];
+      const dx = b[0] - a[0];
+      const t = Math.abs(dx) > 1e-6 ? Clamp((x - a[0]) / dx, 0, 1) : 0;
+      const z0 = a[1] + (b[1] - a[1]) * t;
+      const z1 = a[2] + (b[2] - a[2]) * t;
+      const zMin = Math.min(z0, z1), zMax = Math.max(z0, z1);
+      if (z < zMin || z > zMax) continue;
+      const floorY = Number.isFinite(y) ? Math.max(y, this.TerrainHeight(x, z)) : this.TerrainHeight(x, z);
+      const depth = r.surfaceY - floorY;
+      if (depth > best) best = depth;
+    }
+    for (const b of this.waterBodies) {
+      if (Number.isFinite(y) && y > b.surfaceY + 0.12) continue;
+      const dx = x - b.x, dz = z - b.z;
+      const lx = dx * b.c - dz * b.s;
+      const lz = dx * b.s + dz * b.c;
+      if (Math.abs(lx) > b.w * 0.5 || Math.abs(lz) > b.d * 0.5) continue;
+      const floorY = Number.isFinite(y) ? Math.max(y, this.TerrainHeight(x, z)) : this.TerrainHeight(x, z);
+      const depth = b.surfaceY - floorY;
+      if (depth > best) best = depth;
+    }
+    return best;
+  }
 
   NearbyColliders(x, z, radius = 3) {
     const size = this.gridSize;
@@ -1263,6 +1319,7 @@ export class FirstLevelWhiteboxField {
     }
     this.meshes.length = 0;
     this.looks?.Dispose(); this.looks = null; this.waterMesh = null;
+    this.waterRibbons = []; this.waterBodies = [];
     this.railTrackKit = null;
     this.trenchSurface?.Dispose(); this.trenchSurface = null;
     this.terrainContact?.Dispose(); this.terrainContact = null;

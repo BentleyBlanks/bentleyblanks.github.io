@@ -43,7 +43,12 @@ import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
 import { SSIL } from "./Data_Tuning_Gtao.mjs";
-import { SetWaterSkyUniforms, SetWaterSsr, UpdateWaterSurfaces } from "./Script_Water.mjs";
+import {
+  SetWaterSkyUniforms, SetWaterSsr, SetWaterSsrState, SetWaterLightRig, SetWaterAtmosphere,
+  SetWaterFog, SetWaterQuality, SetWaterMode, SetWaterQualityOverride,
+  AddWaterRipple, GetWaterState, UpdateWaterSurfaces,
+} from "./Script_Water.mjs";
+import { WATER_RIPPLES } from "./Data_Tuning_Water.mjs";
 import { TengxianField } from "./Script_TengxianField.mjs";
 import { InitPhysics, PhysicsWorld } from "./Script_Physics.mjs";
 import { JieheField, JIEHE_LEVEL_ID, JIEHE_CAMERA_FAR } from "./Script_JieheField.mjs";
@@ -700,16 +705,27 @@ InstallPrepassStaticBatch(renderer, prepassStaticBatch);
 if (post.prepassPass) post.prepassPass.staticBatch = prepassStaticBatch;
 // 水面不能走 SSR 靶（它 skipNormalDepth，那一像素在预通道里是河床）——
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
-// 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
+// 必须排在任何水面材质建出来之前（同时按编辑器/试玩口径锁定默认水面档位：
+// 所有编辑器默认最低档 "low"，仅试玩/正式游玩切回正式 3A 档位）。
+const WATER_QUALITY_PARAM = params.get("waterQuality");
+const IS_EDITOR_LOW_WATER = BLOCKOUT || TOOLS_HOME || !!(EDITOR_PARAM && EDITOR_PARAM !== "none");
+SetWaterMode(IS_EDITOR_LOW_WATER ? "editor" : "play");
+SetWaterQuality(graphics.waterQuality || post.preset.water || QUALITY);
+if (WATER_QUALITY_PARAM) SetWaterQualityOverride(WATER_QUALITY_PARAM);
 SetWaterSsr(ssrUniforms ? post.ssrPass.trace : null);
+SetWaterSsrState(graphics.ssr !== false, graphics.ssrStrength ?? 1);
 const sky = new SkyDome(renderer, { quality: QUALITY });
 scene.add(sky.mesh);
-// 水面借天空 uniform：反射的天顶/地平线/太阳色随时段预设一起换（Script_Water）
+// 水面借天空 uniform + 物理大气天空视图 LUT：反射随时段预设与 Hillaire 大气同步换（Script_Water）
 SetWaterSkyUniforms(sky.uniforms);
+SetWaterAtmosphere(sky.atmosphere);
 // 级联阴影（Script_Csm）：renderer 交给 LightRig 是为了让它把阴影口径切成
 // BasicShadowMap（PCSS 的 blocker search 必须读到裸深度；采样器类型必须与
 // Script_Csm.SHADOW_MAP_TYPE 一致，不一致是未定义行为）。
 const lights = new LightRig(scene, { quality: QUALITY, shadowExtent: 66, renderer });
+// 级联太阳阴影接入水面：桥身、桥墩、岸堤与柳树真实投在水面、高光日路与水下焦散上
+SetWaterLightRig(lights);
+let waterWadeClock = 0, waterWadeLastX = 1e9, waterWadeLastZ = 1e9;
 // 白盒关卡编辑器走正片光照，背光面近乎死黑：补光抬上来（只管编辑器，正片不吃）。
 if (BLOCKOUT) lights.SetFillBoost(BLOCKOUT_EDITOR_FILL);
 // 组件式环境系统（docs/Data_Environment.md）：场景有 Scenes/<Id>/Environment_<Id>.json 时由它出天光
@@ -1003,6 +1019,19 @@ const ctx = {
   get SURFACE_BY_TAG() { return SURFACE_BY_TAG; },
   get TOOLS_HOME() { return TOOLS_HOME; },
   get trailFocus() { return trailFocus; },
+  get Water() {
+    return {
+      State: () => GetWaterState(),
+      SetQuality: (tier) => {
+        if (typeof tier === "string") graphics.waterQuality = tier;
+        SetWaterQuality(graphics.waterQuality);
+        return GetWaterState();
+      },
+      SetMode: (mode) => { SetWaterMode(mode); return GetWaterState(); },
+      SetOverride: (tier) => { SetWaterQualityOverride(tier); return GetWaterState(); },
+      AddRipple: (x, z, opts) => AddWaterRipple(x, z, opts),
+    };
+  },
   get WeaponName() { return WeaponName; },
   get wheel() { return wheel; },
   // 主文件里的函数
@@ -8813,7 +8842,25 @@ function RenderSceneContent(dt) {
   // 「五十米外那根烟柱」，给这一桶上最远切片的雾会让烟柱吃到整整一列的雾量。
   vfx.SetFog(preset.fog, preset.sunColor);
   vfx.SetSun(sky.sunDirection);
-  // 水面与粒子层同一批账：时间推进 + 深度源每帧重接（SetSize 会换纹理引用）
+  // 水面与粒子层同一批账：雾参数同步 + 涉水交互波纹 + 时间推进与深度源每帧重接
+  SetWaterFog(preset.fog, preset.sunColor);
+  if (player && player.waterDepth > 0.03 && !state.paused && dt > 0) {
+    waterWadeClock += dt;
+    const dx = player.position.x - waterWadeLastX;
+    const dz = player.position.z - waterWadeLastZ;
+    if (waterWadeClock >= WATER_RIPPLES.wadeMinIntervalS && (dx * dx + dz * dz) >= WATER_RIPPLES.wadeStepDistanceM * WATER_RIPPLES.wadeStepDistanceM) {
+      waterWadeClock = 0;
+      waterWadeLastX = player.position.x;
+      waterWadeLastZ = player.position.z;
+      AddWaterRipple(player.position.x, player.position.z, {
+        strength: WATER_RIPPLES.wadeStrength,
+        radius: WATER_RIPPLES.wadeRadiusM,
+        speed: WATER_RIPPLES.wadeSpeed,
+        freq: WATER_RIPPLES.wadeFreq,
+        foam: WATER_RIPPLES.wadeFoam,
+      });
+    }
+  }
   UpdateWaterSurfaces(dt, post.NormalDepthTexture, post.width, post.height, camera);
   // 音频听者也在这儿接 —— 和上面三行同一类账：接口写好了，没人调。
   //
@@ -9303,6 +9350,9 @@ function ApplyGraphics() {
   const autoContact = !autoQuality.enabled || autoQuality.contactShadows;
   post.SetSsrEnabled(graphics.ssr !== false && autoSsr);
   post.SetSsrStrength(graphics.ssrStrength ?? 1);
+  // 水面画质与 SSR 状态热同步（编辑器模式仍由 Script_Water 强制锁在 low，切入试玩后即按此档生效）
+  SetWaterQuality(graphics.waterQuality || post.preset.water || QUALITY);
+  SetWaterSsrState(graphics.ssr !== false && autoSsr, graphics.ssrStrength ?? 1);
   // SSIL：档位给不给是构造期的（`preset.ssil`），倍率滑到 0 时把整趟也停掉 ——
   // 材质端那一次取样会自动顶上一张 1×1 全黑，不用重编译任何材质。
   post.SetSsilEnabled(!!post.preset.ssil && graphics.ssil > 0);
@@ -9427,6 +9477,7 @@ function ApplyGraphics() {
     sky.SetHazeScale(graphics.atmosphereHaze),
   ].some(Boolean);
   if (atmosphereChanged) sky.BakeEnvironment(scene);
+  SetWaterAtmosphere(sky.atmosphere);
 
   const shadowSize = graphics.shadowSize || lights.defaultShadowSize;
   if (lights.sun.shadow.mapSize.x !== shadowSize) {
