@@ -1,0 +1,353 @@
+{
+  "schema": "Type89SedimentProfileV1",
+  "revision": "SurfaceV21",
+  "baseline": "SurfaceV20",
+  "baselineRuntimeSha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
+  "reference": "Type89BattleWornV6",
+  "palette": {
+    "damp": [
+      39,
+      32,
+      25
+    ],
+    "dry": [
+      79,
+      66,
+      53
+    ],
+    "powder": [
+      120,
+      106,
+      88
+    ]
+  },
+  "track": {
+    "packedRoughness": [
+      0.85,
+      0.95
+    ],
+    "powderOpacity": 0.31,
+    "reliefGain": 0.82,
+    "trackClodScale": [
+      1.24,
+      1.08
+    ],
+    "hullClodScale": 1.19,
+    "maximumShoeX": 0.158,
+    "maximumShoeAbsY": 0.059,
+    "zones": {
+      "Left": [
+        [
+          0,
+          4,
+          [
+            3,
+            3,
+            2,
+            3,
+            2
+          ]
+        ],
+        [
+          5,
+          9,
+          [
+            1,
+            2,
+            0,
+            2,
+            1
+          ]
+        ],
+        [
+          10,
+          27,
+          [
+            2,
+            1,
+            2,
+            2,
+            0,
+            1,
+            1
+          ]
+        ],
+        [
+          28,
+          34,
+          [
+            2,
+            2,
+            1,
+            3,
+            3,
+            2,
+            3
+          ]
+        ],
+        [
+          35,
+          42,
+          [
+            3,
+            3,
+            2,
+            3,
+            2,
+            3,
+            3,
+            1
+          ]
+        ],
+        [
+          43,
+          51,
+          [
+            3,
+            2,
+            3,
+            1,
+            2,
+            3,
+            2,
+            1,
+            2
+          ]
+        ],
+        [
+          52,
+          72,
+          [
+            2,
+            1,
+            2,
+            0,
+            1,
+            2,
+            1,
+            1
+          ]
+        ],
+        [
+          73,
+          80,
+          [
+            1,
+            2,
+            2,
+            3,
+            2,
+            3,
+            2,
+            3
+          ]
+        ]
+      ],
+      "Right": [
+        [
+          0,
+          5,
+          [
+            2,
+            3,
+            3,
+            2,
+            1,
+            2
+          ]
+        ],
+        [
+          6,
+          29,
+          [
+            1,
+            2,
+            2,
+            1,
+            0,
+            1,
+            2,
+            1
+          ]
+        ],
+        [
+          30,
+          37,
+          [
+            3,
+            2,
+            2,
+            3,
+            3,
+            2,
+            3,
+            3
+          ]
+        ],
+        [
+          38,
+          45,
+          [
+            2,
+            3,
+            3,
+            1,
+            3,
+            3,
+            2,
+            3
+          ]
+        ],
+        [
+          46,
+          51,
+          [
+            2,
+            2,
+            3,
+            1,
+            2,
+            1
+          ]
+        ],
+        [
+          52,
+          71,
+          [
+            1,
+            2,
+            1,
+            2,
+            0,
+            1,
+            2
+          ]
+        ],
+        [
+          72,
+          80,
+          [
+            2,
+            1,
+            2,
+            3,
+            3,
+            2,
+            2,
+            3,
+            2
+          ]
+        ]
+      ]
+    },
+    "clodCarriers": {
+      "Mesh_Type89MudClodLeft05": "Mesh_TrackLinkLeft034",
+      "Mesh_Type89MudClodRight10": "Mesh_TrackLinkRight035"
+    },
+    "extraCaps": [
+      {
+        "name": "Mesh_Type89TreadEarthLeftA",
+        "carrier": "Mesh_TrackLinkLeft032",
+        "origin": [
+          -0.046,
+          -0.003,
+          0.018
+        ],
+        "radii": [
+          0.097,
+          0.042,
+          0.02
+        ],
+        "seed": 71
+      },
+      {
+        "name": "Mesh_Type89TreadEarthRightA",
+        "carrier": "Mesh_TrackLinkRight033",
+        "origin": [
+          0.052,
+          0.009,
+          0.018
+        ],
+        "radii": [
+          0.088,
+          0.042,
+          0.02
+        ],
+        "seed": 194
+      },
+      {
+        "name": "Mesh_Type89TreadEarthLeftB",
+        "carrier": "Mesh_TrackLinkLeft037",
+        "origin": [
+          0.036,
+          -0.008,
+          0.019
+        ],
+        "radii": [
+          0.096,
+          0.039,
+          0.019
+        ],
+        "seed": 258
+      },
+      {
+        "name": "Mesh_Type89TreadEarthLeftC",
+        "carrier": "Mesh_TrackLinkLeft003",
+        "origin": [
+          -0.049,
+          0.011,
+          0.019
+        ],
+        "radii": [
+          0.091,
+          0.041,
+          0.019
+        ],
+        "seed": 358
+      },
+      {
+        "name": "Mesh_Type89TreadEarthRightB",
+        "carrier": "Mesh_TrackLinkRight079",
+        "origin": [
+          0.048,
+          -0.014,
+          0.018
+        ],
+        "radii": [
+          0.099,
+          0.039,
+          0.02
+        ],
+        "seed": 403
+      }
+    ]
+  },
+  "body": {
+    "coatSide": 0.82,
+    "coatWheel": 0.66,
+    "coatBow": 0.76,
+    "powderOpacity": 0.23,
+    "reliefM": 0.0026,
+    "starterNames": {
+      "hull": [
+        "Mesh_Hull",
+        "Mesh_BowPlate",
+        "Mesh_EngineHatch"
+      ],
+      "lower": [
+        "Mesh_VerticalSkirt",
+        "Mesh_Suspension",
+        "Mesh_Bogie",
+        "Mesh_LeadingSkirt",
+        "Mesh_Skirt"
+      ],
+      "wheel": [
+        "Mesh_FrontIdler",
+        "Mesh_RearSprocket",
+        "Mesh_RoadWheel",
+        "Mesh_ReturnRoller",
+        "Mesh_LeadingWheel"
+      ]
+    }
+  }
+}

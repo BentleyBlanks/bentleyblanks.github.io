@@ -1,0 +1,437 @@
+{
+  "schema": "Type89SedimentReviewV1",
+  "baselineRuntimeSha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
+  "revision": "SurfaceV21",
+  "reference": "Type89BattleWornV6",
+  "recipeSha256": "d231a14c5c49dd10a099eb1b2e144cd6e28ac4cd29ae106f7bdc5c012e297c9d",
+  "maps": {
+    "Texture_Type89GameTrackBase.png": {
+      "sha256": "909de7753492eb0b70f451c95a6bb91015d5d457e331470f533f7639068ae1bf",
+      "changedTexels": 892911,
+      "metallicSha256": null,
+      "aoSha256": null
+    },
+    "Texture_Type89GameTrackNormal.png": {
+      "sha256": "e81c181fb199ceefcd77165961725cbc423d775b7080f62cfa0e46588cadf936",
+      "changedTexels": 831246,
+      "metallicSha256": null,
+      "aoSha256": null
+    },
+    "Texture_Type89GameTrackOrm.png": {
+      "sha256": "5ff8e850b97d2105425e10b6f13c1927990b8122fd33e6c6b105d565ac8e5a50",
+      "changedTexels": 915947,
+      "metallicSha256": "54527d78b37d5b25f34e8216f563cfe4277a224bd5fc5075d73cdda519209161",
+      "aoSha256": "b38b1fa5c5a7d9901847a0fda871d261fb79c4ab29c4ad972689043f993c7d58"
+    },
+    "Texture_Type89GameBodyBase.png": {
+      "sha256": "498f6e78cfeb4908ee92a4641bc3536067c4baf57b6e086b6c9148c9579c4f69",
+      "changedTexels": 2060223,
+      "metallicSha256": null,
+      "aoSha256": null
+    },
+    "Texture_Type89GameBodyNormal.png": {
+      "sha256": "74850e6a3d54aec081b8bfa192eb2c4abc69f43f14d7848f404a80b48bfe24d0",
+      "changedTexels": 1312910,
+      "metallicSha256": null,
+      "aoSha256": null
+    },
+    "Texture_Type89GameBodyOrm.png": {
+      "sha256": "8aaf85e2c39e7f2d4c12ab25b571628dbde585e47f9e1f2f149c0e27414e9f88",
+      "changedTexels": 2070246,
+      "metallicSha256": "465fecef56d569cb2896787bd0da7fad2a7efb2b9f47caca5341420ea3829a20",
+      "aoSha256": "7f0fcd3751167e7332df992df64010caf62466199c037cc88a2f581d3db06da2"
+    }
+  },
+  "statistics": {
+    "treadsHeavilyPacked": {
+      "2": 167406,
+      "1": 94927,
+      "0": 49107,
+      "3": 205539
+    },
+    "treadPowderTexels": 214866,
+    "treadCakeTexels": 516959,
+    "bodyDeposits": {
+      "Mesh_Hull": 8004,
+      "Mesh_SuspensionLeft": 17293,
+      "Mesh_BogieLeft01": 1156,
+      "Mesh_RoadWheelLeft01": 13574,
+      "Mesh_RoadWheelLeft02": 15502,
+      "Mesh_BogieLeft02": 5362,
+      "Mesh_RoadWheelLeft03": 25504,
+      "Mesh_RoadWheelLeft04": 21188,
+      "Mesh_BogieLeft03": 3080,
+      "Mesh_RoadWheelLeft05": 9208,
+      "Mesh_RoadWheelLeft06": 25899,
+      "Mesh_BogieLeft04": 8043,
+      "Mesh_RoadWheelLeft07": 30109,
+      "Mesh_RoadWheelLeft08": 12969,
+      "Mesh_BogieSpringUnitLeft01": 5088,
+      "Mesh_BogieSpringUnitLeft02": 12004,
+      "Mesh_FrontIdlerLeft": 66385,
+      "Mesh_LeadingWheelLeft": 29759,
+      "Mesh_RearSprocketLeft": 9692,
+      "Mesh_ReturnRollerLeft01": 1708,
+      "Mesh_ReturnRollerLeft02": 2950,
+      "Mesh_ReturnRollerLeft03": 118,
+      "Mesh_ReturnRollerLeft04": 947,
+      "Mesh_SuspensionCoverLeft01": 207,
+      "Mesh_SuspensionCoverLeft02": 122,
+      "Mesh_SuspensionCoverLeft03": 1075,
+      "Mesh_VerticalSkirtLeftFront": 30757,
+      "Mesh_VerticalSkirtLeftRear": 29214,
+      "Mesh_SuspensionRight": 12559,
+      "Mesh_BogieRight01": 4441,
+      "Mesh_RoadWheelRight01": 12976,
+      "Mesh_RoadWheelRight02": 13257,
+      "Mesh_BogieRight02": 7390,
+      "Mesh_RoadWheelRight03": 12859,
+      "Mesh_RoadWheelRight04": 24062,
+      "Mesh_BogieRight03": 4459,
+      "Mesh_RoadWheelRight05": 5706,
+      "Mesh_RoadWheelRight06": 18798,
+      "Mesh_BogieRight04": 5138,
+      "Mesh_RoadWheelRight07": 21940,
+      "Mesh_RoadWheelRight08": 3244,
+      "Mesh_BogieSpringUnitRight01": 6204,
+      "Mesh_BogieSpringUnitRight02": 7106,
+      "Mesh_FrontIdlerRight": 74370,
+      "Mesh_LeadingWheelRight": 12522,
+      "Mesh_RearSprocketRight": 50050,
+      "Mesh_ReturnRollerRight01": 564,
+      "Mesh_ReturnRollerRight02": 2243,
+      "Mesh_ReturnRollerRight03": 90,
+      "Mesh_ReturnRollerRight04": 5621,
+      "Mesh_SuspensionCoverRight01": 339,
+      "Mesh_SuspensionCoverRight02": 93,
+      "Mesh_SuspensionCoverRight03": 457,
+      "Mesh_VerticalSkirtRightFront": 30633,
+      "Mesh_VerticalSkirtRightRear": 25960
+    },
+    "bodyPowderTexels": 697193
+  },
+  "shoeVariants": {
+    "Mesh_TrackLinkLeft000": 3,
+    "Mesh_TrackLinkLeft001": 3,
+    "Mesh_TrackLinkLeft002": 2,
+    "Mesh_TrackLinkLeft003": 3,
+    "Mesh_TrackLinkLeft004": 2,
+    "Mesh_TrackLinkLeft005": 1,
+    "Mesh_TrackLinkLeft006": 2,
+    "Mesh_TrackLinkLeft007": 0,
+    "Mesh_TrackLinkLeft008": 2,
+    "Mesh_TrackLinkLeft009": 1,
+    "Mesh_TrackLinkLeft010": 2,
+    "Mesh_TrackLinkLeft011": 1,
+    "Mesh_TrackLinkLeft012": 2,
+    "Mesh_TrackLinkLeft013": 2,
+    "Mesh_TrackLinkLeft014": 0,
+    "Mesh_TrackLinkLeft015": 1,
+    "Mesh_TrackLinkLeft016": 1,
+    "Mesh_TrackLinkLeft017": 2,
+    "Mesh_TrackLinkLeft018": 1,
+    "Mesh_TrackLinkLeft019": 2,
+    "Mesh_TrackLinkLeft020": 2,
+    "Mesh_TrackLinkLeft021": 0,
+    "Mesh_TrackLinkLeft022": 1,
+    "Mesh_TrackLinkLeft023": 1,
+    "Mesh_TrackLinkLeft024": 2,
+    "Mesh_TrackLinkLeft025": 1,
+    "Mesh_TrackLinkLeft026": 2,
+    "Mesh_TrackLinkLeft027": 2,
+    "Mesh_TrackLinkLeft028": 2,
+    "Mesh_TrackLinkLeft029": 2,
+    "Mesh_TrackLinkLeft030": 1,
+    "Mesh_TrackLinkLeft031": 3,
+    "Mesh_TrackLinkLeft032": 3,
+    "Mesh_TrackLinkLeft033": 2,
+    "Mesh_TrackLinkLeft034": 3,
+    "Mesh_TrackLinkLeft035": 3,
+    "Mesh_TrackLinkLeft036": 3,
+    "Mesh_TrackLinkLeft037": 2,
+    "Mesh_TrackLinkLeft038": 3,
+    "Mesh_TrackLinkLeft039": 2,
+    "Mesh_TrackLinkLeft040": 3,
+    "Mesh_TrackLinkLeft041": 3,
+    "Mesh_TrackLinkLeft042": 1,
+    "Mesh_TrackLinkLeft043": 3,
+    "Mesh_TrackLinkLeft044": 2,
+    "Mesh_TrackLinkLeft045": 3,
+    "Mesh_TrackLinkLeft046": 1,
+    "Mesh_TrackLinkLeft047": 2,
+    "Mesh_TrackLinkLeft048": 3,
+    "Mesh_TrackLinkLeft049": 2,
+    "Mesh_TrackLinkLeft050": 1,
+    "Mesh_TrackLinkLeft051": 2,
+    "Mesh_TrackLinkLeft052": 2,
+    "Mesh_TrackLinkLeft053": 1,
+    "Mesh_TrackLinkLeft054": 2,
+    "Mesh_TrackLinkLeft055": 0,
+    "Mesh_TrackLinkLeft056": 1,
+    "Mesh_TrackLinkLeft057": 2,
+    "Mesh_TrackLinkLeft058": 1,
+    "Mesh_TrackLinkLeft059": 1,
+    "Mesh_TrackLinkLeft060": 2,
+    "Mesh_TrackLinkLeft061": 1,
+    "Mesh_TrackLinkLeft062": 2,
+    "Mesh_TrackLinkLeft063": 0,
+    "Mesh_TrackLinkLeft064": 1,
+    "Mesh_TrackLinkLeft065": 2,
+    "Mesh_TrackLinkLeft066": 1,
+    "Mesh_TrackLinkLeft067": 1,
+    "Mesh_TrackLinkLeft068": 2,
+    "Mesh_TrackLinkLeft069": 1,
+    "Mesh_TrackLinkLeft070": 2,
+    "Mesh_TrackLinkLeft071": 0,
+    "Mesh_TrackLinkLeft072": 1,
+    "Mesh_TrackLinkLeft073": 1,
+    "Mesh_TrackLinkLeft074": 2,
+    "Mesh_TrackLinkLeft075": 2,
+    "Mesh_TrackLinkLeft076": 3,
+    "Mesh_TrackLinkLeft077": 2,
+    "Mesh_TrackLinkLeft078": 3,
+    "Mesh_TrackLinkLeft079": 2,
+    "Mesh_TrackLinkLeft080": 3,
+    "Mesh_TrackLinkRight000": 2,
+    "Mesh_TrackLinkRight001": 3,
+    "Mesh_TrackLinkRight002": 3,
+    "Mesh_TrackLinkRight003": 2,
+    "Mesh_TrackLinkRight004": 1,
+    "Mesh_TrackLinkRight005": 2,
+    "Mesh_TrackLinkRight006": 1,
+    "Mesh_TrackLinkRight007": 2,
+    "Mesh_TrackLinkRight008": 2,
+    "Mesh_TrackLinkRight009": 1,
+    "Mesh_TrackLinkRight010": 0,
+    "Mesh_TrackLinkRight011": 1,
+    "Mesh_TrackLinkRight012": 2,
+    "Mesh_TrackLinkRight013": 1,
+    "Mesh_TrackLinkRight014": 1,
+    "Mesh_TrackLinkRight015": 2,
+    "Mesh_TrackLinkRight016": 2,
+    "Mesh_TrackLinkRight017": 1,
+    "Mesh_TrackLinkRight018": 0,
+    "Mesh_TrackLinkRight019": 1,
+    "Mesh_TrackLinkRight020": 2,
+    "Mesh_TrackLinkRight021": 1,
+    "Mesh_TrackLinkRight022": 1,
+    "Mesh_TrackLinkRight023": 2,
+    "Mesh_TrackLinkRight024": 2,
+    "Mesh_TrackLinkRight025": 1,
+    "Mesh_TrackLinkRight026": 0,
+    "Mesh_TrackLinkRight027": 1,
+    "Mesh_TrackLinkRight028": 2,
+    "Mesh_TrackLinkRight029": 1,
+    "Mesh_TrackLinkRight030": 3,
+    "Mesh_TrackLinkRight031": 2,
+    "Mesh_TrackLinkRight032": 2,
+    "Mesh_TrackLinkRight033": 3,
+    "Mesh_TrackLinkRight034": 3,
+    "Mesh_TrackLinkRight035": 2,
+    "Mesh_TrackLinkRight036": 3,
+    "Mesh_TrackLinkRight037": 3,
+    "Mesh_TrackLinkRight038": 2,
+    "Mesh_TrackLinkRight039": 3,
+    "Mesh_TrackLinkRight040": 3,
+    "Mesh_TrackLinkRight041": 1,
+    "Mesh_TrackLinkRight042": 3,
+    "Mesh_TrackLinkRight043": 3,
+    "Mesh_TrackLinkRight044": 2,
+    "Mesh_TrackLinkRight045": 3,
+    "Mesh_TrackLinkRight046": 2,
+    "Mesh_TrackLinkRight047": 2,
+    "Mesh_TrackLinkRight048": 3,
+    "Mesh_TrackLinkRight049": 1,
+    "Mesh_TrackLinkRight050": 2,
+    "Mesh_TrackLinkRight051": 1,
+    "Mesh_TrackLinkRight052": 1,
+    "Mesh_TrackLinkRight053": 2,
+    "Mesh_TrackLinkRight054": 1,
+    "Mesh_TrackLinkRight055": 2,
+    "Mesh_TrackLinkRight056": 0,
+    "Mesh_TrackLinkRight057": 1,
+    "Mesh_TrackLinkRight058": 2,
+    "Mesh_TrackLinkRight059": 1,
+    "Mesh_TrackLinkRight060": 2,
+    "Mesh_TrackLinkRight061": 1,
+    "Mesh_TrackLinkRight062": 2,
+    "Mesh_TrackLinkRight063": 0,
+    "Mesh_TrackLinkRight064": 1,
+    "Mesh_TrackLinkRight065": 2,
+    "Mesh_TrackLinkRight066": 1,
+    "Mesh_TrackLinkRight067": 2,
+    "Mesh_TrackLinkRight068": 1,
+    "Mesh_TrackLinkRight069": 2,
+    "Mesh_TrackLinkRight070": 0,
+    "Mesh_TrackLinkRight071": 1,
+    "Mesh_TrackLinkRight072": 2,
+    "Mesh_TrackLinkRight073": 1,
+    "Mesh_TrackLinkRight074": 2,
+    "Mesh_TrackLinkRight075": 3,
+    "Mesh_TrackLinkRight076": 3,
+    "Mesh_TrackLinkRight077": 2,
+    "Mesh_TrackLinkRight078": 2,
+    "Mesh_TrackLinkRight079": 3,
+    "Mesh_TrackLinkRight080": 2
+  },
+  "sourceMaterials": {
+    "High": [
+      "Material_Type89HighBody",
+      "Material_Type89HighGlass",
+      "Material_Type89HighGuard",
+      "Material_Type89HighMechanical",
+      "Material_Type89HighRunningGear"
+    ],
+    "Game": [
+      "Material_Type89GameBody",
+      "Material_Type89GameGlass",
+      "Material_Type89GameGuard",
+      "Material_Type89GameTrack"
+    ]
+  },
+  "sourceWidenedClods": {
+    "High": 16,
+    "Game": 12
+  },
+  "clodScales": {
+    "Mesh_Type89MudClodLeft01": [
+      1.0611368417739868,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89MudClodLeft02": [
+      1.2400000095367432,
+      1.073319673538208,
+      1.0
+    ],
+    "Mesh_Type89MudClodLeft03": [
+      1.2400000095367432,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89MudClodLeft04": [
+      1.2400000095367432,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89MudClodLeft05": [
+      1.1655466556549072,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89MudClodLeft06": [
+      1.2400000095367432,
+      1.031669020652771,
+      1.0
+    ],
+    "Mesh_Type89MudClodRight07": [
+      1.231478214263916,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89MudClodRight08": [
+      1.2400000095367432,
+      1.0800000429153442,
+      1.0
+    ],
+    "Mesh_Type89MudClodRight09": [
+      1.1820067167282104,
+      1.0614738464355469,
+      1.0
+    ],
+    "Mesh_Type89MudClodRight10": [
+      1.2400000095367432,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89HullEarth01": [
+      1.190000057220459,
+      1.0,
+      1.0
+    ],
+    "Mesh_Type89HullEarth02": [
+      1.190000057220459,
+      1.0,
+      1.0
+    ]
+  },
+  "clodCarriers": {
+    "Mesh_Type89MudClodLeft05": {
+      "before": "Mesh_TrackLinkLeft048",
+      "after": "Mesh_TrackLinkLeft034"
+    },
+    "Mesh_Type89MudClodRight10": {
+      "before": "Mesh_TrackLinkRight048",
+      "after": "Mesh_TrackLinkRight035"
+    }
+  },
+  "additionalCaps": [
+    "Mesh_Type89TreadEarthLeftA",
+    "Mesh_Type89TreadEarthRightA",
+    "Mesh_Type89TreadEarthLeftB",
+    "Mesh_Type89TreadEarthLeftC",
+    "Mesh_Type89TreadEarthRightB"
+  ],
+  "runtime": {
+    "nodes": 535,
+    "meshInstances": 274,
+    "renderedTriangles": 79997,
+    "sha256": "3cea8620fcfffcafb88c74496e9c09890710bf48ffe9ee4da0f7a6f81d294c81",
+    "bytes": 40800028,
+    "runtimeMaterials": 4,
+    "highSourceSha256": "87627ba2ba767cb40f46adbba92964b5df64cf35b205ffe3c35780e71525791d",
+    "gameSourceSha256": "5c3f3dbfc2f2a3ad377ab29d560b4ec5283c7e83c6009188f1b54c2bd96eafd3"
+  },
+  "verification": {
+    "weaponInspectionPairs": 5,
+    "motionMaxMudContactM": 0.0005510753943758218,
+    "motionSamples": 324,
+    "localEvidence": "Review/Comparisons, Review/WeaponInspection, Review/Blender",
+    "renderDifferences": {
+      "game": {
+        "Whole": {
+          "mae": 0.5833684751449456,
+          "pixelsOver3": 32264,
+          "peak": 117
+        },
+        "Gear": {
+          "mae": 1.957674856437058,
+          "pixelsOver3": 110463,
+          "peak": 164
+        },
+        "Front": {
+          "mae": 1.388477172800929,
+          "pixelsOver3": 55711,
+          "peak": 170
+        },
+        "Left": {
+          "mae": 0.664116292896054,
+          "pixelsOver3": 46898,
+          "peak": 81
+        },
+        "Rear": {
+          "mae": 1.8440584990183337,
+          "pixelsOver3": 95550,
+          "peak": 172
+        }
+      },
+      "high": {
+        "Track": {
+          "mae": 2.771604938271605,
+          "pixelsOver3": 204836,
+          "peak": 191
+        },
+        "Left": {
+          "mae": 0.5427042722547109,
+          "pixelsOver3": 50338,
+          "peak": 192
+        },
+        "Front": {
+          "mae": 1.7027132066276802,
+          "pixelsOver3": 83829,
+          "peak": 194
+        }
+      }
+    }
+  }
+}

@@ -30,7 +30,8 @@ const cannon=[];
 const nodesByName=new Map(g.nodes.map(node=>[node.name,node]));
 const optionalAsset=OPTIONAL_VEHICLE_ASSETS.find(asset=>asset.id==='Type89MediumTank');
 const highDerived=contract.budgetPolicy==='HighDerivedGameHardCeiling';
-const mergedMaterials=contract.materialRevision==='SurfaceV20';
+const mergedMaterials=['SurfaceV20','SurfaceV21'].includes(contract.materialRevision);
+const sedimentRevision=contract.materialRevision==='SurfaceV21';
 const RoleOf=primitive=>primitive.extras?.Type89SurfaceRole
   ??g.materials[primitive.material].extras?.Type89Role
   ??g.materials[primitive.material].name.replace('Material_Type89Game','');
@@ -561,7 +562,7 @@ if(paintFinish){
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
   }
 }
-if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.materialRevision)) {
+if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20', 'SurfaceV21'].includes(contract.materialRevision)) {
   const profileFile = path.join(here,'Model/Type89MediumTank/Data_MetalFinishProfile.json');
   const profileBytes = Buffer.from(fs.readFileSync(profileFile,'utf8').replace(/\r\n/g,'\n'));
   const profile = JSON.parse(profileBytes);
@@ -610,7 +611,7 @@ if (contract.materialRevision === 'SurfaceV16') {
   Check(lands.length>=8&&webs.length>=8&&land[0]+.16<web[0]&&land[1]>web[1]+.21,
     'Baked tread lands are smoother and more conductive than their cast webs',JSON.stringify({land,web}));
 }
-if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.materialRevision)) {
+if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20', 'SurfaceV21'].includes(contract.materialRevision)) {
   const recipeFile=path.join(here,'Model/Type89MediumTank/Data_BattleWearProfile.json');
   const recipeBytes=Buffer.from(fs.readFileSync(recipeFile,'utf8').replace(/\r\n/g,'\n'));
   const recipe=JSON.parse(recipeBytes);
@@ -626,7 +627,7 @@ if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.m
   const hullDeposits=deposits.filter(node=>origins.get(node)==='Mesh_Hull');
   const mudTriangles=deposits.reduce((total,node)=>total+g.meshes[node.mesh].primitives
     .reduce((sum,part)=>sum+g.accessors[part.indices].count/3,0),0);
-  Check(deposits.length===12 && trackDeposits.length===10 && hullDeposits.length===2
+  Check(deposits.length===(sedimentRevision?17:12) && trackDeposits.length===(sedimentRevision?15:10) && hullDeposits.length===2
     && mudTriangles===finish?.addedMudTriangles && triangles-mudTriangles===79821,
   'Three-dimensional deposits are included in the full-vehicle budget and remain on their carriers',
   JSON.stringify({track:trackDeposits.length,hull:hullDeposits.length,mudTriangles}));
@@ -646,7 +647,7 @@ if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.m
     && trackImage.info.width===2048 && trackImage.info.height===2048,
   'All articulated shoes share unchanged shape and tangents and use four distinct tread atlas tiles');
 }
-if (['SurfaceV18','SurfaceV19','SurfaceV20'].includes(contract.materialRevision)) {
+if (['SurfaceV18','SurfaceV19','SurfaceV20','SurfaceV21'].includes(contract.materialRevision)) {
   const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_AmbientOcclusionReview.json'),'utf8'));
   const recorded=g.asset.extras?.Type89AmbientOcclusion;
   Check(recorded?.revision===audit.revision && recorded?.baselineRuntimeSha256===audit.baselineRuntimeSha256
@@ -664,8 +665,10 @@ if (['SurfaceV18','SurfaceV19','SurfaceV20'].includes(contract.materialRevision)
     'Actual full-strength ORM visibility matches the saved contact bake: '+group);
   }
 }
-if (['SurfaceV19','SurfaceV20'].includes(contract.materialRevision)) {
+if (['SurfaceV19','SurfaceV20','SurfaceV21'].includes(contract.materialRevision)) {
   const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalReview.json'),'utf8'));
+  const surface=sedimentRevision
+    ?JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_SedimentReview.json'),'utf8')):audit;
   const finish=g.asset.extras?.Type89ExposedMetal;
   const recipe=Buffer.from(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalProfile.json'),'utf8').replace(/\r\n/g,'\n'));
   Check(finish?.revision===audit.revision && finish?.aoChannelExact===true
@@ -676,14 +679,51 @@ if (['SurfaceV19','SurfaceV20'].includes(contract.materialRevision)) {
     const atlas=await ImageFor(material.pbrMetallicRoughness.metallicRoughnessTexture);
     const metal=Buffer.alloc(atlas.info.width*atlas.info.height);
     for (let i=0;i<metal.length;i++) metal[i]=atlas.data[i*4+2];
-    Check(createHash('sha256').update(metal).digest('hex')===audit.maps['Texture_Type89Game'+group+'Orm.png'].metallicSha256,
-      'Actual metallic-channel bytes match the calibrated exposure: '+group);
+    Check(createHash('sha256').update(metal).digest('hex')===surface.maps['Texture_Type89Game'+group+'Orm.png'].metallicSha256,
+      'Actual metallic-channel bytes match the reviewed surface: '+group);
     if (role==='Armor') {
       const samples=UvSamples(role);
       const area=samples.reduce((sum,sample)=>sum+sample.area,0);
       const dielectric=samples.filter(sample=>Sample(atlas,sample.uv,2)<.07).reduce((sum,sample)=>sum+sample.area,0);
       Check(dielectric/area>.95,'Intact painted armour remains dielectric beside the exposed steel',
         'fraction='+Number(dielectric/area).toFixed(3));
+    }
+  }
+}
+if(sedimentRevision){
+  const profileBytes=Buffer.from(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_SedimentProfile.json'),'utf8').replace(/\r\n/g,'\n'));
+  const profile=JSON.parse(profileBytes);
+  const review=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_SedimentReview.json'),'utf8'));
+  const data=g.asset.extras?.Type89Sediment;
+  Check(data?.revision===contract.materialRevision&&data?.reference==='Type89BattleWornV6'
+    &&data?.recipeSha256===createHash('sha256').update(profileBytes).digest('hex')
+    &&data?.baselineRuntimeSha256===profile.baselineRuntimeSha256
+    &&data?.aoRedExact&&data?.widenedOriginalClods===12&&data?.additionalMudCaps===profile.track.extraCaps.length,
+  'SurfaceV21 uses the reviewed sediment controls and the original articulated mud carriers');
+  const mudParents=new Map();
+  for(const node of g.nodes)for(const child of node.children??[])mudParents.set(g.nodes[child].name,node.name);
+  const designated=[...Object.entries(profile.track.clodCarriers),
+    ...profile.track.extraCaps.map(({name,carrier})=>[name,carrier])];
+  Check(designated.every(([name,carrier])=>mudParents.get(name)===carrier&&nodesByName.get(name)?.extras.battleWearMud),
+    'The relocated and new three-dimensional mud clumps ride their intended links');
+  const variants={};
+  for(const [side,ranges] of Object.entries(profile.track.zones))for(const [from,to,sequence] of ranges){
+    for(let i=from;i<=to;i++) variants['Mesh_TrackLink'+side+String(i).padStart(3,'0')]=sequence[(i-from)%sequence.length];
+  }
+  Check(Object.keys(variants).length===162&&Object.entries(variants).every(([name,variant])=>{
+    const node=nodesByName.get(name);
+    const part=g.meshes[node.mesh].primitives[0];
+    const uv=ReadAccessor(glb,part.attributes.TEXCOORD_0).data;
+    return Math.floor(uv[0]*2)+2*Math.floor(uv[1]*2)===variant;
+  }), 'Both treads use the inspected non-mirrored sequence of the four soil coverages');
+  for(const [group,role] of [['Body','Armor'],['Track','Track']]){
+    const material=MaterialFor(role);
+    for(const [label,texture] of [['Base',material.pbrMetallicRoughness.baseColorTexture],['Normal',material.normalTexture]]){
+      const image=await ImageFor(texture);
+      const rgb=Buffer.alloc(image.info.width*image.info.height*3);
+      for(let i=0;i<rgb.length/3;i++) image.data.copy(rgb,i*3,i*4,i*4+3);
+      Check(createHash('sha256').update(rgb).digest('hex')===review.maps['Texture_Type89Game'+group+label+'.png'].sha256,
+      'Mud and powder colour and relief are present in the rendered atlas: '+group+' '+label);
     }
   }
 }

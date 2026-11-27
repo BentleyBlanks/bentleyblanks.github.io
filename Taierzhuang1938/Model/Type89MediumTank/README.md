@@ -1,6 +1,6 @@
 # 八九式中战车乙型（馆藏外形复原）
 
-**GeometryV55 / SurfaceV20** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,422 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
+**GeometryV55 / SurfaceV21** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,842 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
 
 炮盾外框、炮塔下缘、车首板、侧裙和后翼子板按多视角复核，后甲板补做弧形把手并校正百叶边沿。低模保留主要履带开孔、中央减料槽、轮盘轮廓、罩板边缘和可见关节。小销眼和细铸纹由高模投射。实体排气罩的孔阵在游戏中由双面遮罩表现。游戏版共四个材质，车体、履带、排气护网和玻璃。原贴图加一张 32×8 的漆膜参数图，共十张图像。车体图集 4K，护网 1K，履带在 2K 图集内保留四套 1K 鞋面。底色、OpenGL 切线法线和 ORM 分通道烘焙。ORM 红通道包含高模投射、积泥边缘和按装配几何重烘的接触遮蔽。
 
@@ -16,14 +16,16 @@ V19 按漆层、积泥与真实露钢区分金属度。完整涂层和泥层接�
 
 V20 把六类不透明部件共用到一个车体材质。装甲漆和铸面在副 UV 上读取各自的漆膜权重、粗糙度和镜面反射参数，原暗面使用图集空位内的色块。高模实际材质由十个减到五个，细漆膜、铸面和积泥继续通过节点组编辑。参见[材质合并验收](Data_MaterialMergeReview.json)。
 
+V21 按 V6 的压实半干泥重做前后履带绕圈、履板槽和轮组。团泥由深棕内层、干结碎边和局部的薄尘形成。两块泥转到前下绕圈，整理原有泥块拓扑并在前后绕圈增加五块实体泥。车首下缘、裙板边和翼子板落尘处增加局部材质起伏。参见[泥尘对照](Data_SedimentReview.json)。
+
 ## 源工程与重建
 
-新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV20。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存同机位完整材质、AO、Metallic 及浏览器验证。V19 的露钢复核保存在 GeometryV55SurfaceV19。V18 的接缝 AO 与开盖复查保存在 GeometryV55SurfaceV18。V17 战损三视图保存在 GeometryV55SurfaceV17。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
+新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV21。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存泥尘近景、新旧同机位和 V6 外观对照。V20 的材质合并复核保存在 GeometryV55SurfaceV20。V19 的露钢复核保存在 GeometryV55SurfaceV19。V18 的接缝 AO 与开盖复查保存在 GeometryV55SurfaceV18。V17 战损三视图保存在 GeometryV55SurfaceV17。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
 
-从仓库根重建。脚本读取冻结的 V19、生成材质参数图，通过 BlenderMCP 合并两份源工程的材质槽，并重建游戏 GLB。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=maps、--stage=bind、--stage=runtime 单独执行。
+从仓库根重建。脚本在冻结的 V20 上重烘泥和尘的底色、粗糙度与法线，通过 BlenderMCP 写入两份可编辑源。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=maps、--stage=bind、--stage=runtime 单独执行。
 
 ```powershell
-node Taierzhuang1938/_blender/Script_RebuildType89MaterialMerge.mjs
+node Taierzhuang1938/_blender/Script_RebuildType89Sediment.mjs
 ```
 
 ## 运行与验收

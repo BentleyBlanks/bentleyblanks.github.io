@@ -220,7 +220,7 @@
       "id": "Type89MediumTank",
       "name": "八九式中战车乙型（馆藏外形复原）",
       "pack": "Type89MediumTank/Model_Type89MediumTank.glb",
-      "sourceTriangles": 1487422,
+      "sourceTriangles": 1487842,
       "selectedGameSourceTriangles": 80109,
       "selectedGameVisibleSourceTriangles": 80109,
       "actualTriangles": 79997,
@@ -230,7 +230,7 @@
       "targetTriangles": 80000,
       "policy": "target",
       "sourceTexture": "土浦 2007 原照和 2025 同车原片用于外形与材质基底，V6 正、左、俯三视图用于战损外观",
-      "runtimeTexture": "SurfaceV20，车体 4K、履带 2K 四分区、排气罩 1K、漆膜参数图 32×8。游戏版四个材质，按原图集保留折射、开孔遮罩、露钢和装配接触遮蔽。",
+      "runtimeTexture": "SurfaceV21，车体 4K、履带 2K 四分区、排气罩 1K、漆膜参数图 32×8。四个材质，重烘压实泥、干结边缘和局部薄尘的 PBR 与法线。",
       "note": "可选资产按需加载。整车实际默认实例硬上限 80,000。米制 Y-up、-Z 车头；左右各 81 节履带、15 个轮组，沿用炮塔、主炮、机枪和舱盖的独立运动轴。隐藏结构与微观表面属于美术复原。",
       "exporterOmittedTriangles": 58
     },
