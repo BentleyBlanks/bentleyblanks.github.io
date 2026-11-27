@@ -31,6 +31,12 @@ for(const material of doc.materials){
 assert.equal(contract.ambientOcclusion.materials,doc.materials.length);
 assert.equal(contract.ambientOcclusion.channel,'R');
 assert.deepEqual(contract.ambientOcclusion.images,[...aoImages].sort((a,b)=>a-b));
+const woodAoImages=D.wood.map(part=>{
+ const node=doc.nodes.find(item=>item.extras.SourceObject===part);
+ const material=doc.materials[doc.meshes[node.mesh].primitives[0].material];
+ return doc.textures[material.occlusionTexture.index].source;
+});
+assert.deepEqual(contract.ambientOcclusion.woodCavityImages,woodAoImages.sort((a,b)=>a-b));
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
  node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);

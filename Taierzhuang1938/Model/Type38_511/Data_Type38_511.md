@@ -1,14 +1,18 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v25
+## 当前交付版 v26
 
-游戏使用 `511-contact-ao-25`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-cavity-ao-26`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 加深接缝和木面凹部遮蔽 · 2026-11-27
+
+加深箍口、机匣和木钢交界的接触遮蔽。前托和握持区沿已有压痕补环境遮蔽，局部木孔使用木材法线的凹谷烘焙。AO 按木料范围写入两件木面的 ORM R，并与几何遮蔽一起采样。
 
 ## 接缝环境遮蔽 · 2026-11-27
 
