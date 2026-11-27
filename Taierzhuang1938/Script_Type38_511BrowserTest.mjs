@@ -106,16 +106,23 @@ try{
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
     steelRoughness.sort((first,second)=>first-second);
-    const colorPatch=(u,v)=>{
-     const red=[],green=[];
+    const patchMedian=(image,channel,u,v)=>{
+     const values=[];
      for(let row=-2;row<=2;row++)for(let col=-2;col<=2;col++){
       const offset=4*((Math.round(v*canvas.height)+row)*canvas.width+Math.round(u*canvas.width)+col);
-      red.push(base[offset]);green.push(base[offset+1]);
+      values.push(image[offset+channel]);
      }
-     return [red.sort((one,two)=>one-two)[12],green.sort((one,two)=>one-two)[12]];
+     return values.sort((one,two)=>one-two)[12];
     };
-    const sideValues=mesh.userData.type38Part.includes('WoodGroove')?
+    const lowerStock=mesh.userData.type38Part.includes('WoodGroove');
+    const colorPatch=(u,v)=>[0,1].map(channel=>patchMedian(base,channel,u,v));
+    const sideValues=lowerStock?
      [[.1005,.539,.1307,.5377],[.0938,.5167,.1239,.5154],[.0872,.4944,.1171,.4931]].map(([insideU,insideV,belowU,belowV])=>[colorPatch(insideU,insideV),colorPatch(belowU,belowV)]):[];
+    const dentAo=lowerStock?[[.06723,.30790],[.05709,.28643],[.05531,.26699]]
+      .map(([u,v])=>patchMedian(coverage,0,u,v)):[];
+    // Sample the exposed crown directly because its chart includes the shaded underside.
+    const crownAo=lowerStock?[]:[[.15918,.87402],[.15723,.67871],[.15723,.48145],[.15723,.28223]]
+      .map(([u,v])=>patchMedian(coverage,0,u,v));
     const lacquerReflection=[],filmRoughness=[],seatFinish=[];
     if(sideValues.length){
      for(const [u,v] of [[.922,.8454],[.679,.362]]){
@@ -141,16 +148,18 @@ try{
       filmRoughness.push(rough.sort((one,two)=>one-two)[12]);
      }
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,occluded,open,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,seatFinish,
+    samples.push({part:mesh.userData.type38Part,visible,varnished,occluded,open,dentAo,crownAo,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,seatFinish,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
   });
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
-  for(const sample of evidence.woodCoat)assert(sample.occluded>20&&sample.open>sample.visible*.45,
-    `wood needs contact AO at its joints and open AO across its exposed faces: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
+  assert(lower.occluded>20&&lower.open>lower.visible*.45,'the stock needs contact AO and open exposed faces');
+  assert(upper.occluded>20&&upper.crownAo.length===4&&upper.crownAo.every(value=>value>245),
+    'the upper wood needs contact AO under the sides and a bright exposed crown');
+  assert(lower.dentAo.length===3&&lower.dentAo.every(value=>value<170),'exposed wood dents must carry their own cavity AO');
   const [shelteredSeat,exposedWrist]=lower.seatFinish;
   assert(shelteredSeat.strength<exposedWrist.strength*.52&&shelteredSeat.roughness>exposedWrist.roughness+7,
    'the cut wood at the rear seam must show a more satin finish than the exposed wrist');

@@ -944,7 +944,7 @@ def FinishSteelAtlas(doc, views, source, load, store):
 def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
     folder.mkdir(exist_ok=True,parents=True)
     digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
-    manifest.update(version=28 if author else 29,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
+    manifest.update(version=30 if author else 31,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
                     images=len(doc['images']))
     manifest['imagePayloads'] = []
     for index,image in enumerate(doc['images']):
