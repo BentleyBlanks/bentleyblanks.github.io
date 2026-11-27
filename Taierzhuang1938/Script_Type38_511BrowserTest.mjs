@@ -33,7 +33,8 @@ try{
    privateGeometry:world.meshes.every(mesh=>meshes.every(fps=>fps.geometry!==mesh.geometry)),
    compressedTextures:meshes.reduce((sum,mesh)=>sum+Object.values(mesh.material).filter(value=>value?.isCompressedTexture).length,0),
    materials:meshes.map(mesh=>({part:mesh.userData.type38Part,sources:mesh.userData.type38Parts.length,base:mesh.material.map?.colorSpace,normal:mesh.material.normalMap?.colorSpace,
-    orm:mesh.material.roughnessMap?.colorSpace,clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
+    orm:mesh.material.roughnessMap?.colorSpace,ao:!!mesh.material.userData.ormUniforms?.ao&&!mesh.material.aoMap,
+    clearcoat:!!mesh.material.clearcoatMap,colour:mesh.material.color.toArray()})),glError:g.renderer.getContext().getError()};
   world.meshes.forEach(mesh=>mesh.geometry.dispose());return row;
  });
  assert.equal(evidence.identity.version,specification.version);
@@ -57,6 +58,7 @@ try{
  assert(sourceCount(m=>m.base==='srgb')>=40);
  assert(sourceCount(m=>m.normal==='')>=20);
  assert(sourceCount(m=>m.clearcoat)>=4);
+ assert.equal(sourceCount(m=>m.ao&&m.orm===''),specification.parts,'all parts must read linear AO from the existing ORM sampler');
  if(!external){
   await page.evaluate(()=>{
    // Measure the original UV landmarks inside the actual game's atlas tiles.
@@ -91,12 +93,15 @@ try{
     const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;ctx.drawImage(orm,0,0);
     const coverage=ctx.getImageData(0,0,canvas.width,canvas.height).data;
     ctx.drawImage(mat.map.image,0,0);const base=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-    let visible=0,varnished=0,redSum=0,greenSum=0,blueSum=0;
+    let visible=0,varnished=0,redSum=0,greenSum=0,blueSum=0,occluded=0,open=0;
     const steelRoughness=[];
     for(let offset=0;offset<pixels.length;offset+=4*17){
-     if(coverage[offset]>=230&&coverage[offset+2]>190)steelRoughness.push(coverage[offset+1]);
-     if(coverage[offset]<230||coverage[offset+2]>50)continue;
+     if(coverage[offset+1]===0)continue;
+     if(coverage[offset+2]>190)steelRoughness.push(coverage[offset+1]);
+     if(coverage[offset+2]>50)continue;
      visible++;
+     if(coverage[offset]<200)occluded++;
+     if(coverage[offset]>245)open++;
      redSum+=base[offset];greenSum+=base[offset+1];blueSum+=base[offset+2];
      if(mat.clearcoat*pixels[offset]/255>.18&&pixels[offset+1]>32&&pixels[offset+1]<135)varnished++;
     }
@@ -136,13 +141,15 @@ try{
       filmRoughness.push(rough.sort((one,two)=>one-two)[12]);
      }
     }
-    samples.push({part:mesh.userData.type38Part,visible,varnished,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,seatFinish,
+    samples.push({part:mesh.userData.type38Part,visible,varnished,occluded,open,meanRed:redSum/visible,meanGreen:greenSum/visible,meanBlue:blueSum/visible,sideValues,lacquerReflection,filmRoughness,seatFinish,
      steelCount:steelRoughness.length,steelRoughnessMedian:steelRoughness[Math.floor(steelRoughness.length*.5)]});
    });
    return samples;
   });
   assert.equal(evidence.woodCoat.length,2);
   for(const sample of evidence.woodCoat)assert(sample.visible>500&&sample.varnished/sample.visible>.90,`missing visible wood varnish: ${sample.part}`);
+  for(const sample of evidence.woodCoat)assert(sample.occluded>20&&sample.open>sample.visible*.45,
+    `wood needs contact AO at its joints and open AO across its exposed faces: ${sample.part}`);
   const lower=evidence.woodCoat.find(sample=>sample.part.includes('WoodGroove')),upper=evidence.woodCoat.find(sample=>sample.part==='Wood_UpperFittedCrown05');
   const [shelteredSeat,exposedWrist]=lower.seatFinish;
   assert(shelteredSeat.strength<exposedWrist.strength*.52&&shelteredSeat.roughness>exposedWrist.roughness+7,

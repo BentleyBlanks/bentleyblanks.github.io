@@ -22,6 +22,15 @@ assert.equal(WEAPON_MESH_BY_ID.Type38,'Type38_511');
 assert.equal(doc.meshes.length,D.renderMeshes);assert.equal(doc.meshes.length,contract.renderMeshes);
 assert.equal(doc.images.length,contract.images);assert.equal(doc.images.length,contract.imagePayloads.length);
 assert(D.renderMeshes<D.parts,'the game GLB must contain fewer rendering meshes than source parts');
+const aoImages=new Set();
+for(const material of doc.materials){
+ const orm=material.pbrMetallicRoughness.metallicRoughnessTexture;
+ assert.deepEqual(material.occlusionTexture,{...orm,strength:1},'AO must share the ORM texture and UVs');
+ aoImages.add(doc.textures[orm.index].source);
+}
+assert.equal(contract.ambientOcclusion.materials,doc.materials.length);
+assert.equal(contract.ambientOcclusion.channel,'R');
+assert.deepEqual(contract.ambientOcclusion.images,[...aoImages].sort((a,b)=>a-b));
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
  node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);

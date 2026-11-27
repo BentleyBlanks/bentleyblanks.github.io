@@ -1,14 +1,20 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v24
+## 当前交付版 v25
 
-游戏使用 `511-sight-fit-24`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-contact-ao-25`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 接缝环境遮蔽 · 2026-11-27
+
+沿已装配网格的可见表面烘焙短程遮蔽，覆盖前后箍、木托接缝、照门座、机匣、护圈和托底板边缘。相对运动的部件只保留贴近接触的遮蔽，避免在游戏动画中出现宽阴影。检查台的 AO 通道和游戏的外观材质共用 ORM 的 R 通道，G/B 保留粗糙度和金属度。 [遮蔽烘焙脚本](../../_blender/Script_Type38AmbientOcclusion.py)
+
+完整重建另需 Python 包 `embreex==4.4.0.post1`。本地已有配套的 GLB、资产清单和 NPC LOD 清单时，可用 `Script_Type38AmbientOcclusion.py --input <源目录> --output <输出目录>` 单独重烘 AO。
 
 ## 前段钢面、木托使用痕迹和接缝 · 2026-11-27
 

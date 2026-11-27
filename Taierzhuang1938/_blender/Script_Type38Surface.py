@@ -114,7 +114,7 @@ def Attribute(doc, views, index, width):
     return np.frombuffer(views[field['bufferView']], dtype={5123: '<u2', 5125: '<u4', 5126: '<f4'}[field['componentType']]).reshape(-1, width)
 
 
-def SurfaceAtlas(doc, views, primitive, size):
+def SurfaceAtlas(doc, views, primitive, size, padding=18):
     attrs = primitive['attributes']
     points = Attribute(doc, views, attrs['POSITION'], 3)
     uv = Attribute(doc, views, attrs['TEXCOORD_0'], 2) * size - .5
@@ -152,8 +152,10 @@ def SurfaceAtlas(doc, views, primitive, size):
         field[top + row, left + col] = values[0] + weightB[hit, None] * (values[1]-values[0]) + weightC[hit, None] * (values[2]-values[0])
         valid[top + row, left + col] = True
     assert valid.any()
+    if not padding:
+        return field, valid, valid
     distance, near = distance_transform_edt(~valid, return_indices=True)
-    pad = (~valid) & (distance <= 18)
+    pad = (~valid) & (distance <= padding)
     field[pad] = field[near[0, pad], near[1, pad]]
     return field, valid | pad, valid
 
@@ -939,17 +941,11 @@ def FinishSteelAtlas(doc, views, source, load, store):
     return {name:np.percentile(rough[mask],[10,50,90]).round(1).tolist() for name,mask in coverage.items()}
 
 
-def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
+def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
     folder.mkdir(exist_ok=True,parents=True)
-    authorImages = len(doc['images'])
-    rules = None
-    if not author:
-        doc,views,rules = PackType38(doc,views,repo)
     digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
-    manifest.update(version=26 if author else 27,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
-                    images=len(doc['images']),authorImages=authorImages)
-    if rules is not None:
-        manifest['publishImageRules'] = rules
+    manifest.update(version=28 if author else 29,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
+                    images=len(doc['images']))
     manifest['imagePayloads'] = []
     for index,image in enumerate(doc['images']):
         chunk = views[image['bufferView']]
@@ -958,6 +954,17 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     for name,record in [('Data_Type38_511.json',manifest),('Data_Type38NpcLod.json',lod)]:
         (folder/name).write_text(json.dumps(record,ensure_ascii=False,indent=2)+'\n',encoding='utf8')
     print('Finished:',digest,flush=True)
+
+
+def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
+    from Script_Type38AmbientOcclusion import BakeContactOcclusion
+
+    manifest['authorImages'] = len(doc['images'])
+    if not author:
+        doc,views,rules = PackType38(doc,views,repo)
+        manifest['publishImageRules'] = rules
+    manifest['ambientOcclusion'] = BakeContactOcclusion(repo, doc, views)
+    SaveType38Assets(folder, doc, views, manifest, lod, author)
 
 
 def Build(cache, output=None, author=False):
