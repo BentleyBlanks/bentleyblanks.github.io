@@ -859,6 +859,12 @@ input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.14); }
   font-weight: 600;
   color: var(--text-hi);
 }
+.mwViewHead > span:first-child {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mwViewBody {
   flex: 1;
   min-height: 0;

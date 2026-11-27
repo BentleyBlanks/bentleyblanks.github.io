@@ -583,11 +583,17 @@ function renderStageRail(task) {
 function setVideoSrcIfChanged(el, url) {
   if (!el) return;
   const target = url || "";
-  if (el.dataset.loadedUrl !== target) {
-    if (target) el.src = target;
-    else el.removeAttribute("src");
+  const broken = Boolean(target && (el.error || (el.readyState === 0 && el.networkState === 3)));
+  if (el.dataset.loadedUrl !== target || broken) {
+    if (target) {
+      el.src = target;
+      el.load();
+    } else {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+    }
     el.dataset.loadedUrl = target;
-    if (!target) el.load();
   }
 }
 
@@ -875,7 +881,7 @@ function renderTaskDetail() {
   $("#s3MainCap").classList.toggle("hidden", !showS3Video);
 
   if (showS3Video) {
-    setVideoSrcIfChanged($("#s3MainVideo"), viewedTake.url);
+    setVideoSrcIfChanged($("#s3MainVideo"), appState.activeStage === 3 ? viewedTake.url : "");
     $("#s3MainCap").textContent = `${viewedTake.label} · ${fmtSize(viewedTake.sizeBytes)}`;
   } else {
     setVideoSrcIfChanged($("#s3MainVideo"), "");
@@ -1094,7 +1100,9 @@ function renderTaskDetail() {
       : `<span class="mwTakeStateBadge">成片</span>`;
 
     const thumbInner = tk.url
-      ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>`
+      ? appState.activeStage === 3
+        ? `<video src="${tk.url}" muted playsinline preload="metadata"></video>`
+        : `<span class="mwTakeThumbMsg">${escapeHtml(tk.label)}</span>`
       : isRun
       ? `<span class="mwSpinner mwSpinnerSm" aria-hidden="true"></span><span class="mwTakeThumbMsg">${escapeHtml(tk.progressText || "云端生成中…")}</span><div class="mwTakeMiniProg"><i style="width:${tkPct}%"></i></div>`
       : `<span class="mwTakeThumbMsg">${escapeHtml(summarizeTakeError(tk).title)}</span>`;
@@ -1167,11 +1175,12 @@ function renderTaskDetail() {
     };
   });
 
-  // Visual Input Video Source Card
+  // Visual Input Video Source Card (only bind video stream when Stage 04 is active to avoid HTTP/1.1 6-socket starvation)
+  const isStage4Active = appState.activeStage === 4;
   const hasInputVid = Boolean(selectedTake?.url);
   $("#s4InputThumb").classList.toggle("hidden", !hasInputVid);
   $("#s4InputEmpty").classList.toggle("hidden", hasInputVid);
-  setVideoSrcIfChanged($("#s4InputThumb"), hasInputVid ? selectedTake.url : "");
+  setVideoSrcIfChanged($("#s4InputThumb"), hasInputVid && isStage4Active ? selectedTake.url : "");
   $("#s4SelectedVideo").textContent = selectedTake
     ? selectedTake.label
     : isMixamo
@@ -1364,9 +1373,9 @@ function renderTaskDetail() {
         : "请先在「03 视频生成」定稿视频";
     }
   } else {
-    setVideoSrcIfChanged($("#vidOrig"), selectedTake?.url || "");
-    setVideoSrcIfChanged($("#vidOverlay"), files["render/overlay.mp4"]?.url || "");
-    setVideoSrcIfChanged($("#vidWorld"), files["render/world.mp4"]?.url || "");
+    setVideoSrcIfChanged($("#vidOrig"), isStage4Active ? (selectedTake?.url || "") : "");
+    setVideoSrcIfChanged($("#vidOverlay"), isStage4Active ? (files["render/overlay.mp4"]?.url || "") : "");
+    setVideoSrcIfChanged($("#vidWorld"), isStage4Active ? (files["render/world.mp4"]?.url || "") : "");
 
     const sum = run.summary;
     $("#s4MetricSummary").textContent = sum
@@ -1475,7 +1484,7 @@ function renderStage5Retarget(task, selectedTake) {
   const hasVid = Boolean(selectedTake?.url);
   $("#vidRetargetOrig").classList.toggle("hidden", !hasVid);
   $("#s5NoVideoNote").classList.toggle("hidden", hasVid);
-  setVideoSrcIfChanged($("#vidRetargetOrig"), hasVid ? selectedTake.url : "");
+  setVideoSrcIfChanged($("#vidRetargetOrig"), hasVid && appState.activeStage === 5 ? selectedTake.url : "");
 
   $("#s5CharViewportTitle").textContent = `${cInfo.name} · 3D 预览`;
   $("#s5RetSummary").textContent = qa
@@ -1959,7 +1968,7 @@ $("#btnApproveCredit").onclick = async () => {
 /* --- Stage 1 / 2 / 3 / 4 / 5 / 6 动作绑定 --- */
 function gotoStage(n) {
   appState.activeStage = Number(n);
-  renderStageRail(currentTask());
+  renderTaskDetail();
 }
 
 $$(".mwFilterBtn").forEach((btn) => {
