@@ -250,13 +250,15 @@ function ForeFinishAt(section,height){
  const hit=new THREE.Raycaster(origin,new THREE.Vector3(-1,0,0)).intersectObject(foreMesh,false)[0];
  assert(hit&&hit.point.x>0,'marks fall on the visible timber flank');
  function Texel(info,channel){return (Math.floor(hit.uv.y*info.height)*info.width+Math.floor(hit.uv.x*info.width))*info.channels+channel;}
- return [foreMask[Texel(foreInfo,0)],foreOrm.data[Texel(foreOrm.info,1)]];
+ return [foreMask[Texel(foreInfo,0)],foreOrm.data[Texel(foreOrm.info,1)],foreOrm.data[Texel(foreOrm.info,0)]];
 }
 const wearLandmarks=[[.2812,.5033],[.3265,.4615],[.3689,.6864],[.3736,.5303],[.5314,.7145],[.5619,.7034],[.5235,.3122],[.5301,.3578],[.5723,.1989],[.1909,.4042]];
 const impressed=wearLandmarks.map(([section,height])=>ForeFinishAt(section,height));
 const surrounding=wearLandmarks.map(([section,height])=>ForeFinishAt(section+.014,height+.095));
 assert(impressed.every(([film])=>film<20),'both branches of the fork and the other registered impressions interrupt the oil film on the actual UV islands');
 assert(MedianOil(impressed.map(v=>v[1]))>MedianOil(surrounding.map(v=>v[1]))+17,'abraded fibre beds remain rougher than the surrounding satin finish');
+assert(MedianOil(impressed.map(v=>v[2]))+24<MedianOil(surrounding.map(v=>v[2])),
+ 'timber micro-AO darkens the registered scratch beds on the same UVs as the normal and wear maps');
 function MedianOil(samples){return samples.sort((left,right)=>left-right)[Math.floor(samples.length/2)];}
 const baselineSurface=createHash('sha256');
 const closedFineReturns=new Set(['MiddleSideDisk','SideWoodButton','Sight_ShallowRoundSeat', 'Sight_LowContinuousLeaf_NoUnknownNumbers', 'RearTab', 'RearTopExternalLever', 'RearSmallCover', 'RearCockingExterior']);
@@ -385,6 +387,7 @@ for(const node of doc.nodes.filter(item=>item.name?.endsWith('ExternalAttachment
 }
 assert.deepEqual(report.exteriorFinish.timberFrameRepairs,{MainWood_ContinuousLowerShoulder:52,UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront:9});
 const ao=report.exteriorFinish.contactVisibility;
+assert.deepEqual(Object.keys(report.exteriorFinish.materialOcclusion.parts).sort(),[...D.wood].sort());
 const contactNodes=doc.nodes.filter(node=>node.mesh!==undefined&&node.name!==D.trigger);
 const fixedAoRoles=new Set(['body','frontSight','rearSight']);
 assert.equal(contactNodes.length,43);
@@ -404,7 +407,7 @@ for(const node of doc.nodes.filter(node=>node.mesh!==undefined)){
  const material=doc.materials[doc.meshes[node.mesh].primitives[0].material],slot=material.occlusionTexture;
  if(node.name===D.trigger){assert(!slot,'the thin double-sided trigger stays on live shading');continue;}
  assert.equal(slot.index,material.pbrMetallicRoughness.metallicRoughnessTexture.index);
- assert.equal(slot.strength,.9);
+ assert.equal(slot.strength,1);
  if(!contactJoints.has(node.name))continue;
  const image=doc.images[doc.textures[slot.index].extensions.EXT_texture_webp.source];
  const {data,info}=await PartImage(image,node.name).raw().toBuffer({resolveWithObject:true});

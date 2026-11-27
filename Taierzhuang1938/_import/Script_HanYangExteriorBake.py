@@ -11,6 +11,7 @@ from Script_HanYangTimberFrames import RepairTimberFrames, SmoothStockCrest
 from Script_HanYangBandProfiles import FormInspectionBand, SeatFrontBandTimber, SeatRearBandTimber, ShapeBandProfile, ShapeStockEnd
 from Script_HanYangBatchRuntime import BatchRuntime
 from Script_HanYangRingFinish import CloseFittingShell, PoseRingNode, SmoothRingFrames, VertexDistance
+from Script_HanYangScanLibrary import OpenScan, ScanRecesses
 import numpy as np
 from PIL import Image
 from scipy import ndimage
@@ -87,14 +88,6 @@ library=Path(os.environ.get('HANYANG_SCAN_DIR', str(revision/'SurfaceScans')))
 scanSources=json.loads(Path(__file__).with_name('Data_HanYangScanSources.json').read_text())
 
 
-def ScanRecesses(displacement, scale):
-    # Separate the pores and pits from the shape of the scan's original panel.
-    height = np.asarray(displacement, dtype=np.float32) / 65535
-    height = ndimage.gaussian_filter(height, .86, mode='wrap')
-    depth = ndimage.gaussian_filter(height, 12., mode='wrap') - height
-    return Image.fromarray(np.uint8(np.round(255 * np.clip(depth / scale, 0, 1))))
-
-
 def FlattenSteelNormal(image):
     # The donor scan is corrugated. Its shallow corrosion can be transferred
     # to a smooth surface once the long-wavelength sheet curvature is removed.
@@ -108,16 +101,10 @@ def FlattenSteelNormal(image):
 
 maps={}
 for kind,asset in [('Wood','black_walnut_veneer_02'),('Steel','metal_plate_02'),('OldWood','fine_grained_wood'),('OldSteel','rusty_metal_04')]:
-    channels={}
-    for source in [item for item in scanSources if item['asset']==asset]:
-        content=(library/source['file']).read_bytes()
-        assert hashlib.sha256(content).hexdigest()==source['sha256'],source['file']
-        img=Image.open(io.BytesIO(content))
-        channels[source['role']]=img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    channels={source['role']: OpenScan(library, source) for source in scanSources if source['asset']==asset}
     size=channels['Diffuse'].size
     assert all(image.size==size for image in channels.values())
-    recessScale = {'Wood': .0095, 'OldSteel': .034}.get(kind)
-    recesses = ScanRecesses(channels['Displacement'], recessScale) if recessScale else Image.new('L', size)
+    recesses = ScanRecesses(channels['Displacement'], asset) if 'Displacement' in channels else Image.new('L', size)
     surface = Image.merge('RGB', (channels['Rough'].convert('L'), channels.get('Metal', Image.new('L', size)).convert('L'), recesses))
     normals = channels['nor_gl'].convert('RGB')
     if kind == 'OldSteel':

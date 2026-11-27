@@ -10,10 +10,15 @@ uniform vec2 heightRange,acrossRange;
 uniform bool fineEdgeFinish;
 uniform sampler2D pigmentMap,surfaceMap,detailMap;
 uniform sampler2D wearColor,wearSurface,wearNormal;
+#ifdef WOOD_OCCLUSION_BAKE
+layout(location=0) out vec2 woodVisibility;
+vec4 base,orm,mapped,finishMask;
+#else
 layout(location=0) out vec4 base;
 layout(location=1) out vec4 orm;
 layout(location=2) out vec4 mapped;
 layout(location=3) out vec4 finishMask;
+#endif
 const vec3 along=vec3(1,0,0),across=vec3(0,1,0),up=vec3(0,0,1);
 float luma(vec3 color){return dot(color,vec3(.2126,.7152,.0722));}
 vec3 artSpace(vec3 v){return vec3(-v.z,v.x,v.y);}
@@ -322,6 +327,7 @@ float SteelNoise(vec3 point,vec3 weights){
 }
 void main(){
  finishMask=vec4(0.,0.,0.,1.);
+ float cavityBlock=0.;
  vec3 p=artSpace(point),normal=normalize(artSpace(faceNormal));
  vec3 tangent=normalize(artSpace(basis.xyz)-normal*dot(normal,artSpace(basis.xyz)));
  vec3 bitangent=-normalize(cross(normal,tangent))*sign(basis.w);
@@ -377,6 +383,9 @@ void main(){
   float contact=clamp(.66*patch(p,vec3(.018,0.,.003),vec3(.129,.064,.048))
                      +.53*patch(p,vec3(.421,0.,.013),vec3(.29,.051,.049))
                      +.24*patch(p,vec3(-.150,0.,-.053),vec3(.116,.054,.037)),0.,1.);
+  // Select the recessed fibres in the 16-bit donor height. The rubbed
+  // regions keep more of their ambient light at the same depth.
+  cavityBlock=.32*smoothstep(.21,.89,scanPores)*(1.-.29*contact)*(1.-.23*cutEnd);
   float oilVariation=softNoise(vec2(p.x*37.4+7.*p.y,radial*166.));
   float polish=smoothstep(.23,.77,.55*contact+.23*shade+.13*oilVariation+.09*woodExposure);
   float scanContrast=clamp(.73*(luma(oldPigment)-.220)+.48*(luma(color)-.454),-.18,.16);
@@ -415,6 +424,8 @@ void main(){
     float reach=face*(1.-smoothstep(-.11,.012,p.x))*(1.-.85*crest);
     WearSample wear=stockPatina(detail,phase);
     vec3 cuts=wear.marks;
+    float chippedBed=max(.54*smoothstep(.21,.99,cuts.x),.31*smoothstep(.36,.97,cuts.z));
+    cavityBlock=max(cavityBlock,reach*chippedBed);
     visible=mix(visible,visible*vec3(1.49,1.46,1.43),reach*(.55*cuts.x+.34*cuts.y+.30*cuts.z));
     rough=mix(rough,.71,reach*(.63*cuts.x+.27*cuts.z));
     vec2 stepAt=vec2(.00015,0.);
@@ -426,6 +437,7 @@ void main(){
    if(p.x<-.025 && normal.z>.06){
     vec2 facePos=(p.xy+vec2(.2455,0.))/vec2(.3192,.025);
     vec2 scar=crestFibreWear(facePos)*smoothstep(.06,.65,normal.z);
+    cavityBlock=max(cavityBlock,.64*smoothstep(.115,.92,scar.x));
     vec2 stepAt=vec2(.00018)/vec2(.3192,.025);
     const vec2 relief=vec2(1.,-.64);
     vec3 slope=along*dot(relief,crestFibreWear(facePos+vec2(stepAt.x,0.))-crestFibreWear(facePos-vec2(stepAt.x,0.)))
@@ -444,6 +456,7 @@ void main(){
    float reverseSide=float(p.y<0.);
    float flank=smoothstep(.28,.86,abs(normal.y));
    vec2 cuts=foreEndImpressions(face,reverseSide)*flank;
+   cavityBlock=max(cavityBlock,.59*smoothstep(.10,.91,cuts.x));
    vec2 stepAt=.00019/dimensions;
    const vec2 relief=vec2(1.,-.65);
    vec3 slope=along*dot(relief,foreEndImpressions(face+vec2(stepAt.x,0.),reverseSide)-foreEndImpressions(face-vec2(stepAt.x,0.),reverseSide))
@@ -473,6 +486,9 @@ void main(){
   crown*=smoothstep(.48,.94,abs(normal.z))*(1.-.86*cutEnd);
   vec3 dentSlope=along*(impression.z+crown.z)+(up+.18*across)*impression.w+across*crown.w;
   vec2 damage=min(impression.xy+crown.xy,vec2(1.));
+  // Use the same compressed beds as the normal bake so AO sits below the
+  // torn ridges and leaves the ridges free to catch light.
+  cavityBlock=max(cavityBlock,.73*smoothstep(.10,.91,damage.x));
   visible*=1.-.25*damage.x+.175*damage.y;
   rough=mix(rough,.755,.76*damage.x);
   rough=mix(rough,.455,.35*damage.y);
@@ -610,4 +626,7 @@ void main(){
  base=vec4(visible,1.);
  orm=vec4(visibility,rough,metal,1.);
  mapped=vec4(normalize(vec3(dot(gradient,tangent),dot(gradient,bitangent),1.))*.5+.5,1.);
+#ifdef WOOD_OCCLUSION_BAKE
+ woodVisibility=vec2(1.-cavityBlock,1.);
+#endif
 }

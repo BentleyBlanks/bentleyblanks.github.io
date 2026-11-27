@@ -232,6 +232,12 @@ The compositor writes the visibility into the existing ORM atlases' red channel.
 
 Open the packed source scene through BlenderMCP. Set `HANYANG_AO_INPUT` to the matching GLB and `HANYANG_AO_OUTPUT` to the staging directory in Blender's Python environment, then run `_blender/Script_HanYangContactAtlases.py`. Run `python Taierzhuang1938/_import/Script_HanYangPackContactAtlases.py <input-directory> <bake-directory> <staged-output>` with NumPy, SciPy, Pillow and OpenCV, then verify the packed GLB in the inspection bench.
 
+### R36 timber micro-occlusion and stronger contact
+
+The timber shader rasterizes the recessed fibres from the walnut scan and the existing chips, cuts and compressed dents onto each wood piece's UV0. Their micro-visibility goes into the ORM red channel alongside the contact bake. The contact curve steepens the visibility loss inside the joints and eases back across the exposed panels. The packed AO uses the full authored strength in the game and the inspection bench.
+
+Run `python Taierzhuang1938/_import/Script_HanYangMaterialOcclusion.py <R35-directory> <SurfaceScans-directory> <staged-output>` on the output of the R35 contact pass. The stage uses the same OpenGL context and walnut displacement as the exterior bake. The game inspection archive contains matched AO and grazing-light captures of the wood and matched AO captures of the assembly joints.
+
 ### Rebuild and inspect
 
 The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
@@ -254,7 +260,7 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Set `HANYANG_BAKE_GEOMETRY_DIR` for staged bevel and contact fields. Set `HANYANG_BAKE_OUTPUT_DIR` for the staged GLB, report and packed Blender review. Use that packed scene and matching GLB as the inputs for the R35 contact bake, then run the Blender review on the completed AO asset. A temporary `ReviewInput.glb` in the revision directory enables matched before/after renders. The review includes neutral studio and narrow grazing light. Promote the completed `Model_HanYang173R.glb` and `Data_GameGeometry.json` to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
+The baker needs NumPy, Pillow, SciPy and ModernGL with an OpenGL 3.3 context. Set `HANYANG_BAKE_GEOMETRY_DIR` for staged bevel and contact fields. Set `HANYANG_BAKE_OUTPUT_DIR` for the staged GLB, report and packed Blender review. Use that packed scene and matching GLB as the inputs for the R35 contact bake, then run the R36 timber and contact pass before the final Blender review. A temporary `ReviewInput.glb` in the revision directory enables matched before/after renders. The review includes neutral studio and narrow grazing light. Promote the completed `Model_HanYang173R.glb` and `Data_GameGeometry.json` to this asset folder and run `node Taierzhuang1938/Script_HanYang173RAssetTest.mjs`. All review images and third-party photographs stay outside publication.
 
 ## Historical photo-reference material revision R2, 2026-11-13
 

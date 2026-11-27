@@ -1,6 +1,6 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "da0660b1c40ce737e67d6c827fa19d01538a4195b31fc02be88f1918e2a6a8d4",
+  "gameSha256": "95c316ef3fc4e203a0fe8529288b64f1285f55dc5812577ac3fa04797c6b8f99",
   "triangles": 79513,
   "repairedTangents": 45491,
   "parts": [
@@ -676,8 +676,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas1_ORM",
-      "sha256": "76cf5aab04901381697ee236b567b8e22bb0eea6d85c62a16c9ab0e2ebc494e0",
-      "sourceSha256": "b1de5524241254b6a235ed32f6a99d31ffdb093db0ccd771a82d56c16876643b",
+      "sha256": "70f97c7ba8abb491948e076ffd14b868a932794991b06d28ebd1ef0b1ce5de05",
+      "sourceSha256": "8a9045422254bcdbf80f90389067a2865a7c9b389bd26b3c25c646efa481fa92",
       "mimeType": "image/webp",
       "islandCoverage": 0.407206,
       "rebake": true
@@ -700,8 +700,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas2_ORM",
-      "sha256": "8b53f48103209485a510ff3dd3bea77d7b09e373449abd7b73e71ad3650009ef",
-      "sourceSha256": "2561859180287aae94a335d170476f569eff2c03caae6fc744adc5f8aa6ba480",
+      "sha256": "fa87d3a7b5cf4aaff8226316d0159ed06a13c02c517ab06fd10232f03330c627",
+      "sourceSha256": "3facf58288a0045a98424fd37f2b7fc0999f43b1375b320daec524f7921ae4b9",
       "mimeType": "image/webp",
       "islandCoverage": 0.275843,
       "rebake": true
@@ -724,8 +724,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas3_ORM",
-      "sha256": "38f1facad272a5a628de7abb8d494e14b1614d80b54c75e50aa3f4ff74b6dcbd",
-      "sourceSha256": "da5f2171d03d2bdfad6cd6e4571601b96b241e14ce211551e1217b6188b83f0b",
+      "sha256": "7631c42be5fb3e43c88df09b3328238dea62adc1fdac2340f8afa05f8ec31d76",
+      "sourceSha256": "3fef13d0571bdc3ff7d121b4fa6af76d323509f3c2e9412289c28a7bb1ffcff4",
       "mimeType": "image/webp",
       "islandCoverage": 0.688503,
       "rebake": true
@@ -748,8 +748,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas4_ORM",
-      "sha256": "a65911841b68a529215a69f68b7f87fef2c043698923a0ddeb76d1e274f77736",
-      "sourceSha256": "12caa4b5558aff64406e62b7d87bddf27c8e0ca788ea8a75b4312ae621c06284",
+      "sha256": "e481a34591347bb41f49703eb66a5f83a33e07b9274f5f4797197eeeb2e172a8",
+      "sourceSha256": "1052e895e3781a618f6d0ba64f73314215da529dd2d01c1c6f82e855962b223d",
       "mimeType": "image/webp",
       "islandCoverage": 0.449166,
       "rebake": true
@@ -772,8 +772,8 @@
     },
     {
       "name": "HanYang173R_body_Atlas5_ORM",
-      "sha256": "6d75509247af135986ab838ee2914d29ac208e731b0e6c6633b1341f6d8be333",
-      "sourceSha256": "fa7b6324744e8811ebdcd9d198ca81998db7955df45e41974c8b3405531fe034",
+      "sha256": "ee24030b778d30490ef3e48204a681815e23c819262fb9f1d2717c42bd78fee6",
+      "sourceSha256": "08625a14c36a676975e28525d26a30b6927b5e99bc6e78e9a2fcaa576357dcf1",
       "mimeType": "image/webp",
       "islandCoverage": 0.294369,
       "rebake": true
@@ -796,8 +796,8 @@
     },
     {
       "name": "HanYang173R_boltBody_Atlas6_ORM",
-      "sha256": "fe664e0dd411451280c6beb7ac8aa23445dcc7731ab984f0f5c5dba4a984483a",
-      "sourceSha256": "f879f8641cfbb620d3592b05f25cac5ba496bc61e7f1cd6cf3ae3be51b7b1df0",
+      "sha256": "0fa260433cb4466f806e8e6ec10624b592f40b03f01f63e65eaaf80edbf7c7fe",
+      "sourceSha256": "e4052e0b5b14e8bcfc34ab76910696a4b2bf6955fb766db62d8967b3a65669fe",
       "mimeType": "image/webp",
       "islandCoverage": 0.634682,
       "rebake": true
@@ -820,8 +820,8 @@
     },
     {
       "name": "HanYang173R_frontSight_Atlas7_ORM",
-      "sha256": "7c43e838841a83dd1d99a3d8cccc8a3e0a5effc09a279295706e1dfae8c50f1f",
-      "sourceSha256": "34d94cfb1eeface2a19517aa721b9fa7bfcc82b7b4b6d8001836d4c6a37292d1",
+      "sha256": "ec498aa1e6136c90f56ce65e4dbe0341107b9ae870aa00dda7cfee03dc9d5307",
+      "sourceSha256": "0783ced85f5cd7e0f0f2654853dc205bdd4da5f5d2b305c111d9e63a41348f81",
       "mimeType": "image/webp",
       "islandCoverage": 0.422207,
       "rebake": true
@@ -844,8 +844,8 @@
     },
     {
       "name": "HanYang173R_cockingPiece_Atlas8_ORM",
-      "sha256": "b3e4779428bccff0875ab14b899f94c9a70ff2cedf46b71aad7eb17b9e97c0a9",
-      "sourceSha256": "d39524e0ca6d4c4e584c5fd76796463b9cd9f82ca00db337969d827e99c94d63",
+      "sha256": "2df0d1e2f7442306eaa52b78e445d0bcdb3521a78d1750a2aedfd1ee631cb59e",
+      "sourceSha256": "64bd3aa7929428aee7adba5c3798e078d75ecd6f07753caa46994ed65d985e58",
       "mimeType": "image/webp",
       "islandCoverage": 0.540672,
       "rebake": true
@@ -868,8 +868,8 @@
     },
     {
       "name": "HanYang173R_rearSight_Atlas9_ORM",
-      "sha256": "60b9d886b4742d3ac8a0a795275ae69bdd409b1783c09823daca7e20acbb4892",
-      "sourceSha256": "8fe4ff6b73a604e1bd8d8d612add294608fdb76cb87cb978a46568b47c1dd242",
+      "sha256": "a44d6369f1db4d423b048ff4e60087a7bad5177a86d22e8d9005b33207db84d4",
+      "sourceSha256": "4feda55cf3ba178c6dc2497c88b6fc83669347ab0878fffdbf0f5c69b6101a0f",
       "mimeType": "image/webp",
       "islandCoverage": 0.404926,
       "rebake": true
@@ -893,8 +893,8 @@
     {
       "name": "FrontWood_ContinuousOval_ORM",
       "mimeType": "image/webp",
-      "sha256": "0f7cda9f99883501a9c4ef4f091541a890c473c678226645964417205936d96c",
-      "sourceSha256": "63e37665413b572770819b99471542e5572bed6a31f83840050ef57081d88492",
+      "sha256": "fc362baec17ff147041c4b2222b874bcd7e321247aabac40ef3d5adfd2372427",
+      "sourceSha256": "0a64c40163804b215bb1739e3263973906e2b576048f39919b136becd0960e9c",
       "islandCoverage": 0.261859,
       "rebake": true
     },
@@ -925,8 +925,8 @@
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "924fcdd0c6a32eed3e51a788dfe6208049dc589506c459a089c6742d197a0d79",
-      "sourceSha256": "78a1ed613bf657cbd2b67c945579a1f569c2b7aa213f4e276308fa025e4c8420",
+      "sha256": "941921508e41781a572101395ddf68321e33a26dae577894860b972fd8bb16af",
+      "sourceSha256": "0c9f94a76adc8d5cd7f2dca60b5a4ff07465b28d08f95be301811b78279d649c",
       "islandCoverage": 0.175897,
       "rebake": true
     },
@@ -981,8 +981,8 @@
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "79d4382e2f1cf49010ea9826435344e9fd4ba385dd2decbc33c9390cc22a50cc",
-      "sourceSha256": "fa9ad50bc62e58cd621700052147cc7c000df6e28a168101af1e756b4931deb3",
+      "sha256": "576e4958baa3458ead3294daf6113b72f05a26fdc371c18a9a75fc6b012ae821",
+      "sourceSha256": "832b9ad4bb7ed46cd6a5feb40ce57836b0312b98cfa185259a1d70e86cfe6c19",
       "islandCoverage": 0.32717,
       "rebake": true
     },
@@ -996,7 +996,7 @@
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R35: baked contact AO on the existing ORM atlases.",
+  "rebake": "R36: stronger contact AO and recessed timber fibres, cuts and dents.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -1264,7 +1264,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261127R35",
+    "version": "173R-20261127R36",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -1471,7 +1471,7 @@
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261127R35",
+    "version": "173R-20261127R36",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -1930,7 +1930,7 @@
         "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront"
       ],
       "channel": "linear ORM red",
-      "strength": 0.9,
+      "strength": 1.0,
       "sourceAssetSha256": "dd802443254c1414b8e81187cf84d8404754c0c3f51dd2836943197e0f10e713",
       "sampling": "Two cosine-weighted Cycles AO fields on the final UVs.",
       "radiiM": [
@@ -1995,7 +1995,35 @@
       },
       "unbaked": [
         "Trigger_FlatCurvedExternalStrip"
+      ],
+      "contrastPower": 1.72,
+      "contrastRamp": [
+        0.025,
+        0.145
       ]
+    },
+    "materialOcclusion": {
+      "baseSha256": "da0660b1c40ce737e67d6c827fa19d01538a4195b31fc02be88f1918e2a6a8d4",
+      "channel": "linear ORM red",
+      "source": "Object-space donor recesses, cuts and compressed dents from the timber PBR shader.",
+      "composition": "strengthened geometry visibility multiplied by timber micro-visibility",
+      "parts": {
+        "FrontWood_ContinuousOval": {
+          "minimum": 69,
+          "openFraction": 0.777865,
+          "recessedFraction": 0.131257
+        },
+        "MainWood_ContinuousLowerShoulder": {
+          "minimum": 69,
+          "openFraction": 0.77988,
+          "recessedFraction": 0.131309
+        },
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
+          "minimum": 69,
+          "openFraction": 0.79881,
+          "recessedFraction": 0.112377
+        }
+      }
     }
   },
   "batching": {
