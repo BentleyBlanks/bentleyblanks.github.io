@@ -20,6 +20,7 @@ import { SceneInfo } from "../Data_SceneAssets.mjs";
 import { GLOBAL_SH_PROBE_COEFFICIENTS } from "../Data_GlobalShProbe.mjs";
 import { BLOCKOUT_EDITOR_FILL } from "../Data_Tuning_WhiteboxMaterial.mjs";
 import { ENV_RUNTIME } from "../Data_Tuning_Environment.mjs";
+import { ApplyEditorLiteCameraProfile, CAMERA_PROFILES } from "../Script_CameraProfile.mjs";
 
 const SKY_DISPLAY_VERT = /* glsl */`
 varying vec3 vWorldDirection;
@@ -47,9 +48,8 @@ const SKY_SIG_FIELDS = [
   "stars", "atmosphere", "fog", "lightIntensity", "envIntensity",
 ];
 
-// Three.js ACESFilmicToneMapping 在 RRTAndODTFit 之前会执行 color *= toneMappingExposure / 0.6；
-// 游戏 CompositePass 的 AcesFitted 不除以 0.6，乘 0.6 后两者逐系数等价。
-const THREE_ACES_EXPOSURE_SCALE = 0.6;
+// 场景编辑器编辑视口固化使用 CAMERA_PROFILES.editorLite（仅 Three.js 默认 ACESFilmicToneMapping + 固化曝光），
+// 不随昼夜或环境区域覆写 toneMappingExposure。
 // 相机单帧跳变超过此距离（如 Frame / Home / 定位分界线）时立刻贴合目标区域环境，不等长过渡。
 const SNAP_JUMP_M = 40;
 // 场景编辑器编辑视口没有级联阴影与 SSR，且保留完整视距：雾起止放宽并跟当前大气色同步。
@@ -124,9 +124,7 @@ export class SceneEditorEnvironment {
     this.scene = scene;
     this.fallbackSky = fallbackSky;
 
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.78 * THREE_ACES_EXPOSURE_SCALE;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    ApplyEditorLiteCameraProfile(this.renderer);
 
     this.sky = new SkyDome(renderer, { radius: 4000, quality: "medium", environment: true, atmosphere: true });
     this.skyDisplayMaterial = new THREE.ShaderMaterial({
@@ -292,9 +290,8 @@ export class SceneEditorEnvironment {
     this.ambient.color.setHex(lightPreset.ambientColor ?? 0x607085);
     this.ambient.intensity = ambientBase * BLOCKOUT_EDITOR_FILL.ambient;
 
-    // 曝光与 ACES 色调映射
-    const exposure = Number.isFinite(preset.exposure) ? preset.exposure : 0.78;
-    this.renderer.toneMappingExposure = exposure * THREE_ACES_EXPOSURE_SCALE;
+    // 固化使用 CAMERA_PROFILES.editorLite，不再随昼夜/区域覆盖曝光与色调映射
+    ApplyEditorLiteCameraProfile(this.renderer);
 
     // 远雾与背景色随当前大气地平线/雾色联动（线性空间直接写入）
     const fogSky = preset.fog?.sky || preset.horizon || [0.6, 0.6, 0.59];
@@ -349,7 +346,8 @@ export class SceneEditorEnvironment {
       volume: this.activeVolume,
       preset: this.activePresetId,
       hour: this.env.active ? this.env.clock.hour : 12,
-      exposure: Number.isFinite(preset?.exposure) ? preset.exposure : null,
+      exposure: CAMERA_PROFILES.editorLite.exposure,
+      cameraProfile: CAMERA_PROFILES.editorLite.id,
       envIntensity: this.scene.environmentIntensity,
       sunClarity: this.specParams.sunClarity,
       specIblScale: this.specParams.specIblScale,

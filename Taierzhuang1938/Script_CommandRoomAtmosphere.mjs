@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import {ParticleEffects} from "./Script_ParticleEffects.mjs";
 import {CreateParticleEnvironment} from "./Script_ParticleEnvironment.mjs";
+import {MarkNoPrepass} from "./Script_Post.mjs";
 
 // A bounded world-space light volume. Camera depth clips the integral; a static
 // light-space depth map includes the actual window mullions, furniture and paper.
@@ -113,8 +114,6 @@ void main(){
   }
   vec3 room=mix(FocusColor(screenUv),texture2D(panelColor,screenUv).rgb,panelMix);
   gl_FragColor=vec4(room+fog/max(total,1e-5),1.);
-  #include <tonemapping_fragment>
-  #include <colorspace_fragment>
 }`;
 const PANEL_BLUR = `varying vec2 screenUv;uniform sampler2D sourceColor;uniform vec2 axis;
 void main(){
@@ -156,7 +155,7 @@ export class CommandRoomAtmosphere {
         beamLength:{value:data.length},tint:{value:new THREE.Color(data.color)},density:{value:data.density},
         clock:{value:0},edgeSoftness:{value:data.edgeSoftness},scatterGain:{value:data.scatterGain},
         anisotropy:{value:data.anisotropy},variation:{value:data.variation},noiseScale:{value:data.noiseScale}}});
-    this.compositeMaterial=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,
+    this.compositeMaterial=new THREE.ShaderMaterial({depthTest:false,depthWrite:false,toneMapped:false,
       vertexShader:VERTEX,fragmentShader:COMPOSITE,
       uniforms:{sceneColor:{value:this.colorTarget.texture},sceneDepth:{value:this.colorTarget.depthTexture},
         panelColor:{value:this.blurTargets[1].texture},panelMix:{value:0},
@@ -166,7 +165,7 @@ export class CommandRoomAtmosphere {
     this.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.volumeMaterial);
     this.quad.frustumCulled=false;this.quadScene.add(this.quad);
   }
-  SetPanelFocus(value){this.panelFocus=THREE.MathUtils.clamp(value,0,1);this.compositeMaterial.uniforms.panelMix.value=this.panelFocus;}
+  SetPanelFocus(value){this.panelFocus=THREE.MathUtils.clamp(value,0,1);this.compositeMaterial.uniforms.panelMix.value=this.panelFocus>.001?this.panelFocus:0;}
   BuildDust(data) {
     this.particleEnvironment=CreateParticleEnvironment();const shared=this.particleEnvironment.shared;
     Object.assign(shared,{uParticleLightDepth:this.lightUniforms.lightDepth,uParticleLightMatrix:this.lightUniforms.lightMatrix,
@@ -179,10 +178,11 @@ export class CommandRoomAtmosphere {
       emission:{rateOverTime:data.count/120},shape:{box:[this.data.size[0]*.94,this.data.size[1]*.94,this.data.length],direction:direction.toArray()},noise:{strength:data.drift},
     }}).id;
     this.dust=this.particles.renderer.pools.windowMote.mesh;this.dust.name='CommandRoomWindowDust';
+    this.dust.userData.skipNormalDepth=true;MarkNoPrepass(this.dust.material);
     this.dust.material.blendDst=THREE.OneFactor;this.lastDustTime=0;return this.dust;
   }
 
-  Render(camera,time) {
+  Render(camera,time,target=null) {
     const r=this.renderer;r.getDrawingBufferSize(this.size);
     const width=Math.max(1,this.size.x),height=Math.max(1,this.size.y);
     if(this.colorTarget.width!==width||this.colorTarget.height!==height){
@@ -225,7 +225,7 @@ export class CommandRoomAtmosphere {
       r.setRenderTarget(this.blurTargets[1]);r.render(this.quadScene,this.quadCamera);
     }
     this.quad.material=this.volumeMaterial;r.setRenderTarget(this.volumeTarget);r.render(this.quadScene,this.quadCamera);
-    this.quad.material=this.compositeMaterial;r.setRenderTarget(null);r.render(this.quadScene,this.quadCamera);
+    this.quad.material=this.compositeMaterial;r.setRenderTarget(target);r.render(this.quadScene,this.quadCamera);
   }
   Dispose(){
     this.particles?.Dispose();this.particleEnvironment?.Dispose();

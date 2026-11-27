@@ -1043,8 +1043,11 @@ export class CompositePass {
       U.uLocalTonemap.value.set(0, 0, 0, 0);
     }
     const isNight = options.skyPreset === "night" || options.skyPreset === "firstLevelNight";
+    const purkinjeValue = Number.isFinite(options.purkinje)
+      ? options.purkinje
+      : (isNight ? LOCAL_TONEMAP.nightPurkinje : LOCAL_TONEMAP.purkinje);
     U.uPurkinje.value = (this.pipeline.localTonemapEnabled && ctx.preset.localTonemap !== false)
-      ? (isNight ? LOCAL_TONEMAP.nightPurkinje : LOCAL_TONEMAP.purkinje) : 0;
+      ? purkinjeValue : 0;
 
     U.uTonemap.value = this.pipeline.tonemapMode === "agx" ? 1 : 0;
     U.uFilmLook.value = FilmLookIndex(this.pipeline.filmLookMode);
@@ -1121,7 +1124,7 @@ export class CompositePass {
     } else {
       U.uLutAmount.value = 0;
     }
-    ctx.blitter.Blit(this.material, this.target);
+    ctx.blitter.Blit(this.material, this.target, ctx.options?.outputViewport || null);
   }
 
   Dispose() {

@@ -1,8 +1,10 @@
 import * as THREE from "three";
-import { PostPipeline } from "./Script_Post.mjs";
+import { CreateEditorLiteBlit } from "./Script_CameraProfile.mjs";
 
 // Observer renders the same world, without stepping animation, physics or sound.
-// Both cameras share GPU resources; each pipeline owns its temporal history.
+// Multi-viewport observer uses CAMERA_PROFILES.editorLite via CreateEditorLiteBlit (renders linear HDR
+// reusing main viewport's prewarmed NoToneMapping shaders, then single-pass Three.js ACESFilmic blit)
+// so dual-viewport inspection avoids both duplicating PostPipeline and recompiling scene shaders.
 // Presentation canvases capture each completed view before the next camera draws.
 export class EncounterPlayView {
   constructor(host) {
@@ -80,7 +82,7 @@ export class EncounterPlayView {
     this.host.ctx.frameDebugger?.SetViewport("视口 2 · 观察视角");
     if(!this.renderer) {
       this.renderer=this.host.renderer;
-      this.post=new PostPipeline(this.renderer,{width:640,height:720,quality:this.host.ctx.graphicsProfileApi?.State?.()?.id||"high"});
+      this.editorLiteBlit=CreateEditorLiteBlit();
     }
     const width=Math.max(1,this.canvas.clientWidth),height=Math.max(1,this.canvas.clientHeight);
     const source=this.renderer.domElement;
@@ -90,24 +92,20 @@ export class EncounterPlayView {
     }
     if(this.primary.width!==source.width||this.primary.height!==source.height){this.primary.width=source.width;this.primary.height=source.height;}
     this.primary.getContext("2d").drawImage(source,0,0);
-    const main=this.host.post;
-    if(this.post.width!==main.width||this.post.height!==main.height||this.post.outputWidth!==main.outputWidth||this.post.outputHeight!==main.outputHeight)
-      this.post.SetSize(main.width,main.height,main.outputWidth,main.outputHeight);
     const restore=this.host.ctx.SuspendScreenSpaceForProbe();
     const saved=this.host.viewmodel.root.visible,body=this.host.viewmodel.body?.root;
     const bodyVisible=body?.visible;
     this.host.viewmodel.root.visible=false;if(body)body.visible=false;
     before?.();
     try {
-      this.post.Render(this.host.scene,this.camera,{...options,dt,damage:0,fade:0,eyeClosure:0,concussion:null,
-        nearDofStrength:0,dofStrength:0,motionBlur:0});
+      this.editorLiteBlit.Render(this.renderer,this.host.scene,this.camera,source.width,source.height);
       this.canvas.getContext("2d").drawImage(source,0,0,width,height);
     } finally {
       after?.();this.host.viewmodel.root.visible=saved;if(body)body.visible=bodyVisible;restore();
     }
   }
   Dispose(){
-    this.count=1;this.host.ai.view.SetObserverCameras([]);this.post?.Dispose?.();
+    this.count=1;this.host.ai.view.SetObserverCameras([]);this.editorLiteBlit?.Dispose?.();this.editorLiteBlit=null;
     this.host.canvas.removeEventListener("pointerdown",this.onMainFocus);
     this.pane.remove();this.primary.remove();document.body.classList.remove("encounterDual");
   }

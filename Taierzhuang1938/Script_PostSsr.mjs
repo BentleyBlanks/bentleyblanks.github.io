@@ -933,9 +933,10 @@ export class SsrPass {
     }
   }
 
-  Enabled() {
+  Enabled(ctx) {
     // 强度被面板拧到 0 时就别跑了（那是玩家在省性能）；但调试视图选中时
-    // 仍要跑，否则面板上是一张几十帧前的陈旧图。
+    // 仍要跑，否则面板上是一张几十帧前的陈旧图。正交相机不跑透视 Hi-Z 追踪。
+    if (ctx?.camera?.isOrthographicCamera) return false;
     return this.live && (this.surface.strength.value > 0
       || SSR_DEBUG_VIEWS.has(this.pipeline.debugView));
   }

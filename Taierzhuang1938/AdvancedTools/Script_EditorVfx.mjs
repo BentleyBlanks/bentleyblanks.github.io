@@ -523,25 +523,11 @@ export class VfxEditor {
       Row('昼夜', this.environmentSelect.root);
     }
 
-    // 曝光 EV 归位到测试场景光照区（不再挤在窗口顶栏），点击读数一键归零
+    // 相机后处理按 CAMERA_PROFILES.standard 固化（曝光 0.78，昼夜切换仅改天穹/光照/雾）
     if (stageApi) {
-      const expRange = El('input');
-      expRange.type = 'range'; expRange.min = '-4'; expRange.max = '4'; expRange.step = '0.25'; expRange.value = String(stageApi.exposureEv || 0);
-      expRange.dataset.vfxExposure = 'true';
-      expRange.setAttribute('aria-label', '曝光补偿 EV');
-      const expVal = El('span', 'vfxPropVal resettable', '±0.0');
-      expVal.title = '点击归零 EV';
-      const SyncExp = () => {
-        const ev = Number(expRange.value);
-        stageApi.SetExposureEv(ev);
-        expVal.textContent = `${ev > 0 ? '+' : ev < 0 ? '' : '±'}${ev.toFixed(1)}`;
-        expRange.style.setProperty('--fill', `${((ev + 4) / 8) * 100}%`);
-      };
-      expRange.addEventListener('input', SyncExp);
-      expVal.addEventListener('click', () => { expRange.value = '0'; SyncExp(); });
-      SyncExp();
-      const { ctrl } = Row('曝光 EV');
-      ctrl.append(expRange, expVal);
+      const profileVal = El('span', 'vfxPropVal', '标准固化 · 0.78');
+      profileVal.title = '统一相机后处理档案 CAMERA_PROFILES.standard（固化参数，禁止工具覆写曝光）';
+      Row('相机档案', profileVal);
     }
 
     // 照明弹镜头（仅选照明弹 / 信号弹时显示）

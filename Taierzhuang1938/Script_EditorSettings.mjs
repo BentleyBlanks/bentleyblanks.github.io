@@ -27,12 +27,14 @@ import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
 import { SaveGraphicsProfile } from "./Script_GraphicsProfile.mjs";
 import { FIRST_PERSON_LIGHTING } from "./Data_Tuning_FirstPersonLighting.mjs";
-import { BLOOM, FILM_GRAIN, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
+import { CAMERA_PROFILES, IsFrozenCameraSettingKey, StripFrozenCameraSettings } from "./Script_CameraProfile.mjs";
 import { GetWaterState } from "./Script_Water.mjs";
 
 
 // 可热调参数的范围、标签和默认值共用；旧存档缺项时沿用默认值。
+// 2026-11-28 CameraProfile 收口：TAA / 锐化 / 颗粒大小等后处理参数全部冻结在 CAMERA_PROFILES.standard，不再暴露。
 export function GraphicsDetailControls(post) {
+  void post;
   return {
     // 级联阴影（Script_Csm）。这三根给的都是**第 0 级的基准**，往外逐级按纹素
     // 尺度自动缩放 —— 远级纹素粗四倍，痤疮台阶也粗四倍，同一个绝对偏移必然是
@@ -60,11 +62,6 @@ export function GraphicsDetailControls(post) {
     atmosphere: [
       { key: "atmosphereHaze", label: "烟霾倍率", min: 0.2, max: 4, step: 0.05, value: 1, prefix: "×" },
     ],
-    taa: [
-      { key: "taaCurrentWeight", label: "当前帧权重", min: 0.01, max: 1, step: 0.01, value: 0.04 },
-      { key: "taaJitterScale", label: "抖动幅度", min: 0, max: 1.5, step: 0.05, value: 1, prefix: "×" },
-      { key: "sharpen", label: "锐化强度", min: 0, max: 1, step: 0.02, value: post?.preset.sharpen ?? 0.22 },
-    ],
     // 材质着色升级（2026-09）：这一组全是**运行时倍率**，拖了立刻生效不重编译。
     // 开关（编不编）是上面那几个 Toggle，翻一次要整场重编译几百毫秒。
     material: [
@@ -73,10 +70,6 @@ export function GraphicsDetailControls(post) {
       { key: "microShadowStrength", label: "微阴影", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
       { key: "horizonStrength", label: "地平线遮蔽", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
       { key: "skinStrength", label: "皮肤散射", min: 0, max: 2, step: 0.05, value: 1, prefix: "×" },
-    ],
-    // 全屏胶片颗粒的粗细（强度是「后处理强度」里的「颗粒」倍率）。范围与出厂值在 Data_Tuning_Camera.FILM_GRAIN。
-    grain: [
-      { key: "grainSize", label: "颗粒大小", ...FILM_GRAIN.sizeRange, prefix: "×", digits: 2 },
     ],
   };
 }
@@ -116,11 +109,11 @@ function WriteJson(key, value) {
  * 一批着色器（2026-09-27 实测两帧 3 s + 9 s）。
  */
 export function LoadSavedGraphics(graphics) {
-  const gfx = ReadJson(KEY_GFX);
+  const gfx = StripFrozenCameraSettings(ReadJson(KEY_GFX));
   if (!gfx || !graphics) return null;
   let changed = 0;
   for (const key of Object.keys(graphics)) {
-    if (key === "profile") continue;
+    if (key === "profile" || IsFrozenCameraSettingKey(key)) continue;
     if (typeof gfx[key] === typeof graphics[key] && gfx[key] != null && graphics[key] !== gfx[key]) {
       graphics[key] = gfx[key];
       changed += 1;
@@ -180,7 +173,7 @@ function GfxSwitch(parent, label, value, onChange) {
 export class GraphicsSettings {
   static id = "graphics";
   static label = "画质";
-  static hint = "分辨率、阴影、全局光照、后处理强度、视场";
+  static hint = "分辨率、阴影、全局光照、大气与材质、视场";
 
   constructor(host) {
     this.host = host;
@@ -217,7 +210,7 @@ export class GraphicsSettings {
   }
 
   Save() {
-    WriteJson(KEY_GFX, { ...this.gfx });
+    WriteJson(KEY_GFX, StripFrozenCameraSettings(this.gfx));
   }
 
   Apply() {
@@ -299,11 +292,6 @@ export class GraphicsSettings {
         }, descs[control.key] || "");
       }
     };
-    const Multiplier = (parent, label, key, desc = "", save = false) => Range(parent, {
-      label, min: 0, max: 2, step: 0.05, value: gfx[key],
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx[key] = v; if (save) this.Save(); else this.Apply(); },
-    }, desc);
     const Group = (id, title) => {
       const details = El("details", "gfxGroup");
       details.dataset.group = id;
@@ -366,11 +354,6 @@ export class GraphicsSettings {
       label: "视野角度", min: 40, max: 90, step: 1, value: gfx.fov,
       format: (v) => `${v.toFixed(0)}°`,
       onInput: (v) => { gfx.fov = v; this.Save(); },
-    });
-    Range(common, {
-      label: "曝光补偿", min: -3, max: 3, step: 0.1, value: gfx.exposureCompensation ?? 0,
-      format: (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)} EV`,
-      onInput: (v) => { gfx.exposureCompensation = v; this.Apply(); },
     });
     // **不是画质项**：断肢既不省时间也不改画风，它决定的是玩家愿不愿意看到这个
     // （口径见 docs/Data_Dismemberment.md §1 最后一行）。存的是 gfx.gore 那一位，
@@ -471,8 +454,6 @@ export class GraphicsSettings {
     }, "带阴影的体积雾：光柱会被建筑切断，火与照明弹会照亮周围的空气。"
       + "关掉退回合成 pass 里的解析式高度雾（low 档出厂就是那一条）。"
       + "透过率与解析雾逐像素相同，开关它不改变七十米外的能见度。");
-    Switch(atmo.box, "屏幕空间体积光（体积雾关时才生效）", gfx.godEnabled === true,
-      (on) => { gfx.godEnabled = on; this.Save(); });
     atmo.Done();
 
     // --- 材质细节 ------------------------------------------------------------
@@ -500,84 +481,6 @@ export class GraphicsSettings {
       (on) => { gfx.skinSss = on; this.Apply(); });
     Details(mat.box, "material");
     mat.Done();
-
-    // --- 抗锯齿 --------------------------------------------------------------
-    const aa = Group("aa", "抗锯齿");
-    Switch(aa.box, "TAA（时域抗锯齿）", gfx.taa !== false, (on) => {
-      gfx.taa = on;
-      this.Apply();
-    });
-    Details(aa.box, "taa");
-    aa.Done();
-
-    // --- 后处理强度 ----------------------------------------------------------
-    const post = Group("post", "后处理强度（倍率）");
-    Multiplier(post.box, "环境光遮蔽", "ssao", "", true);
-    // SSIL 只在给了它的档位上才有意义（构造期开关，见 Data_Tuning_Graphics.ssil）。
-    // 档位没给就不画这一行 —— 一根拖了没反应的滑杆比没有滑杆更糟。
-    if (preset.ssil) {
-      Multiplier(post.box, "屏幕空间间接光", "ssil",
-        "SSIL 与 GTAO 共用同一趟地平线搜索；拖到 0 会把那一趟一起停掉。", true);
-    }
-    Multiplier(post.box, "泛光", "bloom", "", true);
-    Multiplier(post.box, "体积光", "god", "", true);
-    Multiplier(post.box, "运动模糊", "motionBlur", "", true);
-    Multiplier(post.box, "颗粒", "grain",
-      "对标 COD 的 35mm 单色银盐颗粒：逐帧离散换片无慢闪，克制细腻，暗影柔润、灰墙与亮空保持干净。拖到 0 可关闭。", true);
-    Details(post.box, "grain", {
-      grainSize: "×1 为 35mm 柔和银盐微晶，调大可模拟更粗的 16mm 胶片质感，不会同时加重强度。"
-        + (preset.filmGrain ? "当前档位启用双角无平铺光学软乳剂采样。" : "低画质使用单层银盐亮度颗粒。"),
-    });
-    Multiplier(post.box, "暗角", "vignette", "", true);
-    post.Done();
-
-    // --- 相机与调色 ----------------------------------------------------------
-    // 与上面那一栏分开：那一栏是「后处理开多重」，这一栏是「这是一台什么相机」。
-    const camera = Group("camera", "相机与调色");
-    Switch(camera.box, "自动曝光", gfx.autoExposure !== false, (on) => {
-      gfx.autoExposure = on;
-      this.Apply();
-    });
-    Switch(camera.box, "局部色调映射", gfx.localTonemap !== false, (on) => {
-      gfx.localTonemap = on;
-      this.Apply();
-    }, "在战壕暗处看亮外景时自动保住高光与暗部层次，夜间开启暗视觉冷偏移。");
-    Switch(camera.box, "3D LUT 分级", gfx.lut !== false, (on) => { gfx.lut = on; this.Apply(); });
-    Choice(camera.box, "胶片调色风格", [
-      { value: "standard", label: "标准" },
-      { value: "cod14", label: "COD14 战地" },
-      { value: "bleach", label: "漂白旁路" },
-      { value: "kodak2383", label: "Kodak 2383" },
-    ], gfx.filmLook || FILM_LOOK.default, (v) => { gfx.filmLook = String(v); this.Apply(); });
-    Switch(camera.box, "镜头光学与扰动", gfx.filmOptics !== false, (on) => {
-      gfx.filmOptics = on;
-      this.Apply();
-    }, "5 谱段光谱色散、35mm 红橙光渗、爆炸冲击波折射、火源热浪与近爆镜面扬尘。");
-    Switch(camera.box, "泛光 Karis 平均", gfx.bloomKaris === true, (on) => {
-      gfx.bloomKaris = on;
-      this.Apply();
-    });
-    Choice(camera.box, "色调映射", [
-      { value: "aces", label: "ACES" },
-      { value: "agx", label: "AgX" },
-    ], gfx.tonemap || "aces", (v) => { gfx.tonemap = String(v); this.Apply(); });
-    const flareNote = this.host.post && !this.host.post.preset.lensFlare ? "镜头光晕需 high 及以上档位。" : "";
-    Range(camera.box, {
-      label: "镜头光晕", min: 0, max: 2, step: 0.05, value: gfx.lensFlare ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.lensFlare = v; this.Apply(); },
-    }, flareNote);
-    Range(camera.box, {
-      label: "镜头脏污", min: 0, max: 2, step: 0.05, value: gfx.lensDirt ?? 1,
-      format: (v) => `×${v.toFixed(2)}`,
-      onInput: (v) => { gfx.lensDirt = v; this.Apply(); },
-    });
-    Range(camera.box, {
-      label: "输出抖动", min: 0, max: 2, step: 0.05, value: gfx.dither ?? OUTPUT.dither,
-      format: (v) => (v <= 0 ? "关" : `${v.toFixed(2)} / 255`),
-      onInput: (v) => { gfx.dither = v; this.Apply(); },
-    }, "空间三角分布蓝噪声抖动：消除暗部与天空 8-bit 色带，静止帧零闪动。");
-    camera.Done();
 
     // ↑↓ 在各行的主控件之间移动（滑杆的 ↑↓ 本来会改值，同声音页：改成换行，←→ 才调值）。
     options.addEventListener("keydown", (event) => {
@@ -619,25 +522,16 @@ export class GraphicsSettings {
     gfx.firstPersonReflection = true;
     gfx.firstPersonWeaponLight = true;
     gfx.atmosphere = true;
-    gfx.contactShadows = true;
-    gfx.ssao = 1; gfx.ssil = 1; gfx.bloom = 1; gfx.god = 1; gfx.godEnabled = false;
-    // 体积雾的出厂值跟画质档走（medium 及以上开），不是固定的 true —— 同 TAA 那条先例。
-    // 读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null），不是 preset 那一位：
-    // 后者已经被 ApplyGraphics 按当前开关改写过，拿它当出厂值等于恢复了个寂寞。
+    gfx.contactShadows = this.host.post ? !!this.host.post.preset.contactShadows : true;
+    // 体积雾的出厂值跟画质档走（medium 及以上开）；读的是 froxel 网格在不在（VOLUMETRIC_GRIDS 里 low 是 null）。
     gfx.volumetrics = !!this.host.post?.volumetricsPass?.grid;
-    gfx.motionBlur = 1; gfx.grain = 1; gfx.vignette = 1; gfx.fov = 55;   // 颗粒大小由下面的 NormalizeGraphicsDetails(reset) 复位
+    gfx.fov = 55;
     gfx.gi = false; gfx.giStrength = 1;
-    // SSR 的出厂值跟画质档走（medium 及以上开），和 TAA 同一个先例：
-    // 在 low 档按「恢复出厂」应该回到关，而不是给它开一个建不出靶的开关。
     gfx.ssr = this.host.post ? !!this.host.post.preset.ssr : true;
     gfx.ssrStrength = 1;
     gfx.waterQuality = this.host.post?.preset.water || "high";
-    // 簇状局部光的出厂值跟画质档走（low 那一档的表里就是 false），
-    // 与 TAA 同一条规矩：别在 low 上「恢复出厂」反而把它打开。
     gfx.clusteredLights = this.host.post ? this.host.post.preset.clusteredLights !== false : true;
     gfx.clusterHeroShadow = false;
-    // 材质着色的开关恢复出厂 = **按当前画质档重取**，不是钉成 true/false ——
-    // 在 low 档按恢复出厂不该给它编上 POM（与 taa 那一行同一个道理）。
     const matPreset = this.host.post?.preset || {};
     gfx.pom = (matPreset.pom || 0) > 0;
     gfx.pomSelfShadow = !!matPreset.pomSelfShadow;
@@ -647,25 +541,9 @@ export class GraphicsSettings {
     gfx.skinSss = !!matPreset.skinSss;
     gfx.pomDepth = 1; gfx.detailNormalStrength = 1; gfx.microShadowStrength = 1;
     gfx.horizonStrength = 1; gfx.skinStrength = 1; gfx.pomSelfShadowStrength = 1;
-    // 相机那一栏：自动曝光与 LUT 的出厂值**跟画质档走**（同 TAA 的先例），
-    // 不是固定的 true/false —— 在 low 档按「恢复出厂」应该回到关。
-    gfx.exposureCompensation = 0;
-    gfx.lensFlare = 1; gfx.lensDirt = 1;
-    gfx.tonemap = "aces";
-    gfx.filmLook = FILM_LOOK.default;
-    gfx.bloomKaris = !!BLOOM.karis;
-    gfx.dither = OUTPUT.dither;
-    gfx.autoExposure = this.host.post ? this.host.post.preset.autoExposure !== false : true;
-    gfx.localTonemap = this.host.post ? this.host.post.preset.localTonemap !== false : true;
-    gfx.filmOptics = this.host.post ? this.host.post.preset.filmOptics !== false : true;
-    gfx.lut = this.host.post ? this.host.post.preset.lut !== false : true;
-    // 内容项：断肢出厂开（Data_Tuning_Gore.ENABLED）。`?gore=0` 那条硬覆盖在
-    // ApplyGraphics 里，这里照常写 true —— 恢复出厂不是绕过参数的后门。
+    // 内容项：断肢出厂开（Data_Tuning_Gore.ENABLED）。`?gore=0` 那条硬覆盖在 ApplyGraphics 里。
     gfx.gore = true;
     NormalizeGraphicsDetails(gfx, this.host.post, true);
-    // TAA 的出厂值跟画质档走（medium 及以上开），不是固定的 true/false ——
-    // 在 low 档上按「恢复出厂」应该回到关，而不是给它按上一份历史靶。
-    gfx.taa = this.host.post ? !!this.host.post.preset.taa : true;
     this.Apply();
     if (this.panel) {
       this.panel.body.innerHTML = "";
@@ -693,6 +571,8 @@ export class GraphicsSettings {
       // TAAU 开着时内部与输出是两组尺寸；只报一组会让人以为分辨率没生效。
       f.Set("输出靶", `${P.resolveWidth ?? P.width} × ${P.resolveHeight ?? P.height}`);
       f.Set("画质档", P.quality);
+      f.Set("相机档案", P.cameraProfileId === CAMERA_PROFILES.standard.id
+        ? `${CAMERA_PROFILES.standard.id}（固化白天基线）` : (P.cameraProfileId || "—"));
       f.Set("HDR", P.hdrCapable ? "可用" : "退回 8 位");
       // 读的是**管线的实际状态**不是设置里那一位：历史靶没建起来时这里会照实说
       // FXAA，而不是跟着开关喊 TAA。

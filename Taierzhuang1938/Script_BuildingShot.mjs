@@ -125,11 +125,13 @@ const shots = await page.evaluate(async ({ subjects, ids }) => {
   const W = await import("./Script_World.mjs");
   const { MaterialLibrary } = await import("./Script_Materials.mjs");
   const { ResolveTengxianMaterial } = await import("./Script_TengxianCity.mjs");
+  const { ApplyEditorLiteCameraProfile } = await import("./Script_CameraProfile.mjs");
 
   const CELL = 760;                       // 单视图边长（像素）
   const canvas = document.getElementById("c");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(CELL, CELL, false);
+  ApplyEditorLiteCameraProfile(renderer);
   renderer.setClearColor(0xffffff, 1);
 
   // 纯白背景 + 偏软的打光：正交三视图看的是**轮廓与构件关系**，硬阴影会把

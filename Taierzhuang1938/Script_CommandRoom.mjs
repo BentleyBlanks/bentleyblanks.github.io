@@ -4,14 +4,20 @@ import { ManagedGLTFLoader as GLTFLoader } from "./Script_ModelImports.mjs";
 import { COMMAND_ROOM as DATA } from "./Data_Tuning_CommandRoom.mjs";
 import { CommandRoomAtmosphere } from "./Script_CommandRoomAtmosphere.mjs";
 import { CommandRoomPapers, CommandRoomPaperUrl } from "./Script_CommandRoomPapers.mjs";
+import {
+  CAMERA_PROFILES, CreateStandardCameraPost, BuildStandardPostOptions,
+} from "./Script_CameraProfile.mjs";
 
 /** A real, batched Blender scene; uses the existing renderer only during title menu frames.
  * All geometry is static. Transparent moving dust is excluded from depth/velocity passes.
  * Gameplay camera, render targets, tone mapping and shadow settings are restored after every draw.
  */
 export class CommandRoom {
-  constructor(renderer, { isActive = () => true, getMenuMode = null } = {}) {
+  constructor(renderer, { isActive = () => true, getMenuMode = null, quality = "high" } = {}) {
     this.renderer = renderer;
+    this.quality = quality;
+    this.post = null;
+    this.lastDt = 1 / 60;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(DATA.background);
     this.camera = null;
@@ -26,7 +32,9 @@ export class CommandRoom {
     this.stats = null;
     this.savedViewport = new THREE.Vector4();
     this.savedScissor = new THREE.Vector4();
+    this.savedClearColor = new THREE.Color();
     this.drawSize = new THREE.Vector2();
+    this.bufferSize = new THREE.Vector2();
     this.focusCorners = [];
     this.focusViewPoint = new THREE.Vector3();
     this.pointerTarget = new THREE.Vector2();
@@ -115,7 +123,7 @@ export class CommandRoom {
       for (const mat of Array.isArray(object.material) ? object.material : [object.material]) {
         if (mat.name === DATA.depthOfField.focusMaterial) focusBounds.expandByObject(object,true);
         mat.lightMap = irradiance;
-        mat.lightMapIntensity = DATA.bakedLighting.scale * DATA.bakedLighting.intensity;
+        mat.lightMapIntensity = DATA.bakedLighting.scale * DATA.bakedLighting.intensity * DATA.radianceScale;
         if (mat.name === DATA.reflection.material) {
           mat.color.setHex(0xffffff);mat.lightMap=null;
           mat.transmission=DATA.glass.transmission;mat.roughness=DATA.glass.roughness;
@@ -127,7 +135,7 @@ export class CommandRoom {
           // both washes out its restrained rose tint under title exposure.
           mat.lightMap = null;mat.color.setHex(0x000000);
           mat.emissive.setHex(DATA.outside.color);
-          mat.emissiveIntensity = DATA.outside.intensity;
+          mat.emissiveIntensity = DATA.outside.intensity * DATA.radianceScale;
         }
         const set = byName.get(mat.name) || (mat.name === "CommandRoomCabinetWood" ? byName.get("CommandRoomWood") : null);
         if (!set) continue;
@@ -150,7 +158,7 @@ export class CommandRoom {
           // Distant landscape radiance is independent of the interior UV1 bake.
           mat.lightMap = null;mat.map = null;mat.color.setHex(0x000000);
           mat.emissiveMap = set.textures[0];mat.emissive.setHex(DATA.outside.color);
-          mat.emissiveIntensity = DATA.outside.intensity;
+          mat.emissiveIntensity = DATA.outside.intensity * DATA.radianceScale;
         }
         mat.needsUpdate = true;
       }
@@ -162,8 +170,13 @@ export class CommandRoom {
       for (const y of [focusBounds.min.y,focusBounds.max.y])
         for (const z of [focusBounds.min.z,focusBounds.max.z]) this.focusCorners.push(new THREE.Vector3(x,y,z));
     this.CaptureGlassReflection();
-    this.atmosphere = new CommandRoomAtmosphere(this.renderer,this.scene,DATA.windowHaze,DATA.depthOfField);
-    this.dust = this.atmosphere.BuildDust(DATA.dust);
+    this.atmosphere = new CommandRoomAtmosphere(
+      this.renderer,
+      this.scene,
+      { ...DATA.windowHaze, scatterGain: DATA.windowHaze.scatterGain * DATA.radianceScale },
+      DATA.depthOfField,
+    );
+    this.dust = this.atmosphere.BuildDust({ ...DATA.dust, brightness: DATA.dust.brightness * DATA.radianceScale });
     const physical = gltf.scene.userData.commandRoomPhysicalProps;
     const calibration = gltf.scene.userData.commandRoomCalibration;
     this.stats = { meshes, triangles, textureCount: this.textures.length, model: DATA.model, version: DATA.version, lighting: "Cycles diffuse UV1",
@@ -228,7 +241,9 @@ export class CommandRoom {
     }
   }
   Update(dt) {
-    this.time += Math.min(dt, 0.1);
+    const step = Math.max(0, Math.min(dt, 0.1));
+    this.lastDt = step;
+    this.time += step;
     if(this.getMenuMode)this.SetMenuMode(this.getMenuMode());
     const target=this.menuMode === "title" ? 0 : 1;
     this.panelFocus=this.motionQuery.matches ? target : THREE.MathUtils.lerp(this.panelFocus,target,
@@ -262,32 +277,50 @@ export class CommandRoom {
     if (!this.ready) return;
     const r = this.renderer;
     const target = r.getRenderTarget(), autoClear = r.autoClear, tone = r.toneMapping, exposure = r.toneMappingExposure;
+    const colorSpace = r.outputColorSpace;
     const scissorTest = r.getScissorTest(), shadowEnabled = r.shadowMap.enabled, shadowAuto = r.shadowMap.autoUpdate;
     const shadowUpdate = r.shadowMap.needsUpdate, cubeFace = r.getActiveCubeFace(), mip = r.getActiveMipmapLevel();
     r.getViewport(this.savedViewport); r.getScissor(this.savedScissor);
+    r.getClearColor(this.savedClearColor);
+    const savedClearAlpha = r.getClearAlpha();
     try {
       r.setRenderTarget(null);
       const size = r.getSize(this.drawSize);
+      const buf = r.getDrawingBufferSize(this.bufferSize);
+      const bufW = Math.max(2, buf.x | 0), bufH = Math.max(2, buf.y | 0);
+      if (!this.post) {
+        this.post = CreateStandardCameraPost(r, { width: bufW, height: bufH, quality: this.quality });
+      } else if (this.post.outputWidth !== bufW || this.post.outputHeight !== bufH) {
+        this.post.SetSize(bufW, bufH);
+      }
       r.setViewport(0, 0, size.x, size.y); r.setScissorTest(false);
       this.camera.aspect = size.x / size.y;
       this.camera.updateProjectionMatrix();
       this.UpdateLetterFocus();
       r.autoClear = true;
-      r.toneMapping = THREE.ACESFilmicToneMapping;
-      r.toneMappingExposure = DATA.exposure;
+      r.toneMapping = THREE.NoToneMapping;
+      r.toneMappingExposure = 1;
+      r.outputColorSpace = THREE.SRGBColorSpace;
       r.shadowMap.enabled = false;
       r.shadowMap.autoUpdate = false;
       r.shadowMap.needsUpdate = this.frames === 0;
-      this.atmosphere.Render(this.camera,this.time);
+      this.post.Render(this.scene, this.camera, BuildStandardPostOptions({
+        dt: Number.isFinite(this.lastDt) ? this.lastDt : (1 / 60),
+        steadyView: true,
+        renderLinearHdr: (renderer, hdrTarget) => this.atmosphere.Render(this.camera, this.time, hdrTarget),
+      }));
       this.frames++;
     } finally {
       r.autoClear = autoClear; r.toneMapping = tone; r.toneMappingExposure = exposure;
+      r.outputColorSpace = colorSpace;
+      r.setClearColor(this.savedClearColor, savedClearAlpha);
       r.shadowMap.enabled = shadowEnabled; r.shadowMap.autoUpdate = shadowAuto; r.shadowMap.needsUpdate = shadowUpdate;
       r.setRenderTarget(target, cubeFace, mip); r.setViewport(this.savedViewport); r.setScissor(this.savedScissor); r.setScissorTest(scissorTest);
     }
   }
   State() {
     return { ready: this.ready, frames: this.frames, ...this.stats, textureCount: this.textures.length,
+      cameraProfile: this.post?.cameraProfileId || CAMERA_PROFILES.standard.id,
       papers: this.papers ? { ...this.papers } : null,
       camera: this.camera ? { position: this.camera.getWorldPosition(new THREE.Vector3()).toArray(), fov: this.camera.fov } : null,
       parallax: { pointer: this.pointer.toArray(), target: this.pointerTarget.toArray(), reducedMotion: this.motionQuery.matches },
@@ -304,6 +337,8 @@ export class CommandRoom {
     window.removeEventListener("blur",this.ResetPointer);
     window.removeEventListener("resize",this.OnResize);
     this.motionQuery.removeEventListener("change",this.OnMotionPreference);
+    this.post?.Dispose();
+    this.post = null;
     this.atmosphere?.Dispose();
     this.reflection?.dispose();
     this.scene.traverse(object => {

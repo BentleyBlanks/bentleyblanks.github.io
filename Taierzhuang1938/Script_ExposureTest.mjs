@@ -644,13 +644,11 @@ async function GameSection(page, port, phase) {
     };
     game.StepFrames(240);
 
-    game.graphics.autoExposure = false;
-    game.ApplyGraphics();
+    post.SetAutoExposure(false);
     game.StepFrames(30);
     const meanOff = ReadMean();
 
-    game.graphics.autoExposure = true;
-    game.ApplyGraphics();
+    post.SetAutoExposure(true);
     post.exposurePass.RequestReset();
     game.StepFrames(60);
     const meanOn = ReadMean();

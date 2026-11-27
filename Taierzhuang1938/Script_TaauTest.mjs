@@ -72,10 +72,12 @@ try {
     // 记录游戏本帧真正喂给合成链的参数：后面要用**同一份**参数渲一张无 TAA
     // 参考图，不然雾/曝光/调色的差别会把鬼影指标整个淹掉。
     let lastOptions = {};
+    const testOptionOverrides = { grain: 0 };
     const baseRender = P.Render.bind(P);
     P.Render = function RecordingRender(scene, camera, options) {
-      lastOptions = options || {};
-      return baseRender(scene, camera, options);
+      const merged = { ...(options || {}), ...testOptionOverrides };
+      lastOptions = merged;
+      return baseRender(scene, camera, merged);
     };
 
     // --- 公共工具 ---------------------------------------------------------
@@ -176,8 +178,7 @@ try {
     out.soldiers = FreezeAi(true);
     out.state = { running: !!T.state.running, menu: !!T.state.menu,
       camera: T.camera.position.toArray().map((v) => +v.toFixed(1)) };
-    T.graphics.grain = 0;         // 颗粒是逐帧噪声，会把所有像素指标淹掉
-    T.ApplyGraphics();
+    // testOptionOverrides.grain = 0 已关闭逐帧颗粒噪声，避免淹没像素指标
     T.StepFrames(30);
 
     // =====================================================================
@@ -231,16 +232,11 @@ try {
     T.scene.add(edge);
     T.scene.updateMatrixWorld(true);
 
-    // 泛光必须关掉再量：纯黑板挨着亮天空，泛光会在边上铺出几十像素的软过渡，
-    // 逐行的 mid 阈值随左侧亮度漂移，量到的散布是泛光的、不是锯齿的。
-    // 暗角同理（它按半径压亮度，也会让阈值随行漂）。
-    const savedBloom = T.graphics.bloom;
-    const savedVignette = T.graphics.vignette;
-    T.graphics.bloom = 0;
-    T.graphics.vignette = 0;
+    // 泛光与暗角在斜边量测期间经测试覆盖归零
+    testOptionOverrides.bloom = 0;
+    testOptionOverrides.vignette = 0;
     const EdgeShot = (taaOn) => {
-      T.graphics.taa = taaOn;
-      T.ApplyGraphics();
+      P.SetTaaEnabled(taaOn);
       Settle(28);
       const img = ReadLdr();
       // 行范围只取上半屏：下半屏有第一人称的手与枪压在板子前面。
@@ -256,9 +252,9 @@ try {
     };
     out.edgeTaaOff = EdgeShot(false);
     out.edgeTaaOn = EdgeShot(true);
-    T.graphics.bloom = savedBloom;
-    T.graphics.vignette = savedVignette;
-    T.ApplyGraphics();
+    delete testOptionOverrides.bloom;
+    delete testOptionOverrides.vignette;
+    P.SetTaaEnabled(true);
 
     // =====================================================================
     // 4) TAAU 画质
@@ -671,7 +667,6 @@ try {
       T.player.health = 100;
       T.player.pitch = 0.02;
       T.graphics.renderScale = 1;
-      T.graphics.motionBlur = 1;
       T.ApplyGraphics();
       T.post.motionBlurPass.scale = 0.5;
       T.post.motionBlurPass.Resize(T.post.targets.ldr.width, T.post.targets.ldr.height);

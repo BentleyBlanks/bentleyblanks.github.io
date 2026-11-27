@@ -15,6 +15,7 @@ import {
 } from "../Data_Tuning_SquadSpline.mjs";
 import { BuildSceneCorridorEnv } from "../Script_SquadSpline.mjs";
 import { CompileSquadScene, ResolveSquadSplineTuning } from "../Script_SquadSplinePcg.mjs";
+import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 
 const DEG = Math.PI / 180;
 const $ = (id) => document.getElementById(id);
@@ -1852,18 +1853,19 @@ class SquadSplinePreviewApp {
     const canvas = $("canvas3d");
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    ApplyEditorLiteCameraProfile(renderer);
     renderer.setClearColor(0xb2c0c4, 1);
 
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0xb2c0c4, 65, 235);
     const camera = new THREE.PerspectiveCamera(46, 1.33, 0.2, 600);
 
-    const hemi = new THREE.HemisphereLight(0xf6f8fa, 0x67614c, 0.95);
+    const hemi = new THREE.HemisphereLight(0xf6f8fa, 0x67614c, 1.6);
     scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff1d6, 1.2);
+    const sun = new THREE.DirectionalLight(0xfff1d6, 2.0);
     sun.position.set(48, 76, 34);
     scene.add(sun);
-    const fill = new THREE.DirectionalLight(0xc2d8e6, 0.32);
+    const fill = new THREE.DirectionalLight(0xc2d8e6, 0.55);
     fill.position.set(-40, 28, -32);
     scene.add(fill);
 

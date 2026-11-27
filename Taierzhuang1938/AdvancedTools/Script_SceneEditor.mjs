@@ -27,6 +27,7 @@ import { MakeWhiteboxGridPatch } from "../Script_WhiteboxGrid.mjs";
 import { BuildContinuousWaterGeometry } from "../Script_WaterGeometry.mjs";
 import { WHITEBOX_MATERIAL } from "../Data_Tuning_WhiteboxMaterial.mjs";
 import { ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
+import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 import { SceneEditorEnvironment } from "./Script_SceneEditorEnvironment.mjs";
 
 export const SCENE_EDITOR = Object.freeze({
@@ -126,7 +127,7 @@ class SceneEditorApp {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    ApplyEditorLiteCameraProfile(this.renderer);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(E.fov, 1, E.near, E.far);
     this.camera.rotation.order = "YXZ";

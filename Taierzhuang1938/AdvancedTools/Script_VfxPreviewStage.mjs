@@ -1,34 +1,19 @@
-// 特效预览台：渲染器 + 场景 + 轨道相机 + HDR 靶 + 输出变换（曝光 → ACES → sRGB），外加预览灯、测试场与天穹。
+// 特效预览台：渲染器 + 场景 + 轨道相机 + 标准固化相机后处理管线（CAMERA_PROFILES.standard），外加预览灯、测试场与天穹。
 //
-// 不是游戏的渲染管线：没有预通道、SSAO、体积雾、GI、泛光、调色。特效着色器输出的是线性 HDR，
-// 所以这里只做「把 HDR 显示出来」必须的那一步（Script_ToneMapCurves 的 ACES，与游戏同一条曲线）。
-// 曝光取环境预设里的 exposure（游戏自动曝光稳态时的增益就是它），再乘上用户的 EV 补偿。
-// 天穹用预设的天顶 / 地平线 / 地面色与太阳方向画一个大气渐变；暗室模式切换为低反差中性暗棚。
+// 2026-11-28 CameraProfile 统一：弃用独立简化 ACES 输出通道，改为复用项目唯一完整后处理管线
+// `CreateStandardCameraPost` + `BuildStandardPostOptions`（与正片白天基线同源：TAA / 自动曝光 / Bloom /
+// ACES + 64³ 3D LUT / FilmOptics / 35mm 颗粒），保证特效在预览台与正片里的泛光、对比度、色彩响应一致；
+// 昼夜切换只改变灯光、天穹与雾，不再修改后处理。
 
 import * as THREE from "three";
-import { TONEMAP_GLSL } from "../Script_ToneMapCurves.mjs";
+import {
+  CAMERA_PROFILES, CreateStandardCameraPost, BuildStandardPostOptions,
+} from "../Script_CameraProfile.mjs";
+import { MarkNoPrepass } from "../Script_Post.mjs";
 import { Studio } from "../Script_EditorStage.mjs";
 import { PreviewLights } from "./Script_VfxPreviewLights.mjs";
 import { PreviewMaterialLibrary } from "./Script_VfxPreviewSurfaces.mjs";
 import { VfxPreviewArena } from "./Script_VfxPreviewArena.mjs";
-
-const OUTPUT_VERT = /* glsl */`
-varying vec2 vUv;
-void main() { vUv = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }
-`;
-const OUTPUT_FRAG = /* glsl */`
-uniform sampler2D tHdr;
-uniform float uExposure;
-varying vec2 vUv;
-${TONEMAP_GLSL}
-vec3 LinearToSrgb(vec3 c) {
-  return mix(c * 12.92, 1.055 * pow(max(c, vec3(1e-5)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
-}
-void main() {
-  vec3 hdr = texture2D(tHdr, vUv).rgb * uExposure;
-  gl_FragColor = vec4(LinearToSrgb(ApplyTonemap(hdr, 0.0)), 1.0);
-}
-`;
 
 const SKY_FRAG = /* glsl */`
 uniform vec3 uZenith;
@@ -83,22 +68,29 @@ export class VfxPreviewStage {
     this.canvas = canvas;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(pixelRatio);
-    this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.05, 2000);
     this.camera.position.set(0, 1.6, 6);
     this.scene.add(this.camera);
+    this.post = CreateStandardCameraPost(this.renderer, { width: 2, height: 2, quality });
     this.library = new PreviewMaterialLibrary();
     this.lights = new PreviewLights(this.scene, { quality, shadowMapSize: quality === "low" ? 1024 : 2048 });
     this.studio = new Studio({ scene: this.scene, camera: this.camera, library: this.library });
     this.arena = new VfxPreviewArena(this.studio);
-    this.exposure = 1;
+    if (this.arena.grid?.material) {
+      MarkNoPrepass(this.arena.grid.material);
+      this.arena.grid.userData.skipNormalDepth = true;
+    }
+    this.exposure = CAMERA_PROFILES.standard.exposure;
     this.exposureEv = 0;
     this.sunDirection = new THREE.Vector3(0.4, 0.8, 0.4).normalize();
+    this.sunColor = [...CAMERA_PROFILES.standard.defaultSunColor];
+    this.fog = CAMERA_PROFILES.standard.neutralFog;
+    this.volumetricPreset = CAMERA_PROFILES.standard.skyPreset;
 
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({
+    const skyMat = new THREE.ShaderMaterial({
       vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false,
       uniforms: {
         uZenith: { value: new THREE.Color() },
@@ -109,22 +101,15 @@ export class VfxPreviewStage {
         uSunGlow: { value: 0.4 },
         uDarkMode: { value: 0.0 },
       },
-    }));
+    });
+    MarkNoPrepass(skyMat);
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), skyMat);
     this.sky.name = "SkyDome"; // 摄影棚藏世界时按这个名字留下天穹（Script_EditorStage.WorldMask）
+    this.sky.userData.skipNormalDepth = true;
     this.sky.frustumCulled = false;
     this.sky.renderOrder = -1000;
     this.scene.add(this.sky);
 
-    this.hdr = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: quality === "low" ? 0 : 4, depthBuffer: true });
-    this.output = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.ShaderMaterial({
-      vertexShader: OUTPUT_VERT, fragmentShader: OUTPUT_FRAG, depthTest: false, depthWrite: false,
-      uniforms: { tHdr: { value: this.hdr.texture }, uExposure: { value: 1 } },
-    }));
-    this.output.geometry.setAttribute("position", new THREE.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
-    this.output.frustumCulled = false;
-    this.outputScene = new THREE.Scene();
-    this.outputScene.add(this.output);
-    this.outputCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     this.Resize();
     this._onResize = () => this.Resize();
     window.addEventListener("resize", this._onResize);
@@ -143,17 +128,19 @@ export class VfxPreviewStage {
     this._h = height;
     this.renderer.setSize(width, height, false);
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
-    this.hdr.setSize(size.x, size.y);
+    this.post.SetSize(Math.max(2, size.x), Math.max(2, size.y));
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
   }
 
-  /** 环境参数（与 SKY_PRESETS 同形）落到灯、天穹、测试场与曝光上。 */
+  /** 环境参数（与 SKY_PRESETS 同形）只落到灯、天穹与雾上；后处理曝光与调色锁定在 CAMERA_PROFILES.standard。 */
   ApplyEnvironment(env, sunDirection, flareSceneScale) {
     const direction = new THREE.Vector3(sunDirection.x, sunDirection.y, sunDirection.z).normalize();
     this.lights.ApplyEnvironment(env, direction, flareSceneScale);
-    this.exposure = Number.isFinite(env.exposure) ? env.exposure : 1;
-    // 天穹只是背景参照：预设的天顶 / 地平线 / 地面是线性辐亮度（与游戏天穹同一份数，HDR），照样过曝光与 ACES。
+    this.exposure = CAMERA_PROFILES.standard.exposure;
+    this.sunColor = Array.isArray(env.sunColor) ? env.sunColor : CAMERA_PROFILES.standard.defaultSunColor;
+    this.fog = env.fog || CAMERA_PROFILES.standard.neutralFog;
+    this.volumetricPreset = env.profile || CAMERA_PROFILES.standard.skyPreset;
     const u = this.sky.material.uniforms;
     SkyColor(env.zenith, [0.38, 0.52, 0.72], u.uZenith.value);
     SkyColor(env.horizon, [0.68, 0.76, 0.86], u.uHorizon.value);
@@ -175,24 +162,25 @@ export class VfxPreviewStage {
     this.arena.SetEffect(effectId, flags);
   }
 
-  SetExposureEv(ev) {
-    this.exposureEv = Number.isFinite(ev) ? ev : 0;
-    this.arena.SyncEnvironment(this.sky.material.uniforms.uHorizon.value, this.OutputExposure);
+  /** 兼容保留接口：标准 CameraProfile 曝光已固化为 0 EV，不接受外部漂移。 */
+  SetExposureEv() {
+    this.exposureEv = 0;
   }
 
-  get OutputExposure() { return this.exposure * Math.pow(2, this.exposureEv); }
+  get OutputExposure() { return CAMERA_PROFILES.standard.exposure; }
 
-  Render() {
+  Render(dt = 1 / 60) {
     this.sky.position.copy(this.camera.position);
     this.sky.scale.setScalar(Math.min(1500, this.camera.far * 0.9));
     this.arena.Update(this.studio.orbit.dist);
     this.lights.FollowView(this.studio.orbit.target, Math.max(20, Math.min(160, this.studio.orbit.dist * 3)));
-    this.renderer.setRenderTarget(this.hdr);
-    this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
-    this.renderer.setRenderTarget(null);
-    this.output.material.uniforms.uExposure.value = this.OutputExposure;
-    this.renderer.render(this.outputScene, this.outputCamera);
+    this.post.Render(this.scene, this.camera, BuildStandardPostOptions({
+      sunDirection: this.sunDirection,
+      sunColor: this.sunColor,
+      fog: this.arena.mode === "dark" ? CAMERA_PROFILES.standard.neutralFog : this.fog,
+      volumetricPreset: this.volumetricPreset,
+      dt,
+    }));
   }
 
   Dispose() {
@@ -200,7 +188,7 @@ export class VfxPreviewStage {
     this._resizeObserver?.disconnect();
     this.arena.Dispose();
     this.studio.Dispose();
-    this.hdr.dispose();
+    this.post.Dispose();
     this.renderer.dispose();
   }
 }

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "../vendor/three/examples/jsm/loaders/GLTFLoader.js";
+import { CreateStandardCameraPost, BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
 
 function DisposeModel(object) {
   const materials = new Set(), textures = new Set(), geometry = new Set();
@@ -19,10 +20,12 @@ export async function OpenViewer(container, url, signal) {
   const response = await fetch(url, { signal });
   if (!response.ok) throw Error("GLB 读取失败");
   const { scene: object } = await new GLTFLoader().parseAsync(await response.arrayBuffer(), "./");
-  let renderer, observer;
+  let renderer, post, observer;
   function Close() {
     observer?.disconnect();
     DisposeModel(object);
+    post?.Dispose();
+    post = null;
     if (!renderer) return;
     renderer.domElement.remove();
     renderer.dispose();
@@ -30,15 +33,17 @@ export async function OpenViewer(container, url, signal) {
   }
   try {
     signal.throwIfAborted();
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    post = CreateStandardCameraPost(renderer, { width: 2, height: 2, quality: "high" });
     const canvas = renderer.domElement;
     container.replaceChildren(canvas);
     canvas.setAttribute("aria-label", "可旋转的三维模型预览");
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#282b23");
-    scene.add(object, new THREE.HemisphereLight(0xfff7df, 0x768395, 2.3));
-    const key = new THREE.DirectionalLight(0xffedda, 2.5);
+    scene.background = new THREE.Color("#434740");
+    scene.add(object, new THREE.HemisphereLight(0xfff7df, 0x768395, 3.8));
+    const key = new THREE.DirectionalLight(0xffedda, 4.4);
+    const keyDir = new THREE.Vector3(4, 7, 5).normalize();
     key.position.set(4, 7, 5);
     scene.add(key);
     const fit = new THREE.Box3().setFromObject(object).getBoundingSphere(new THREE.Sphere());
@@ -50,7 +55,8 @@ export async function OpenViewer(container, url, signal) {
     function Draw() {
       camera.position.copy(position.setFromSpherical(orbit).add(fit.center));
       camera.lookAt(fit.center);
-      renderer.render(scene, camera);
+      camera.updateMatrixWorld(true);
+      post.Render(scene, camera, BuildStandardPostOptions({ sunDirection: keyDir, dt: 1 / 60, steadyView: true }));
     }
     function Zoom(multiplier) {
       orbit.radius = THREE.MathUtils.clamp(orbit.radius * multiplier, .55 * radius, 22 * radius);
@@ -82,6 +88,8 @@ export async function OpenViewer(container, url, signal) {
       const { clientWidth: width, clientHeight: height } = container;
       if (!width || !height || signal.aborted) return;
       renderer.setSize(width, height, false);
+      const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+      post.SetSize(Math.max(2, buf.x), Math.max(2, buf.y));
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       Draw();

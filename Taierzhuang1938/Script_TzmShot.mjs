@@ -45,10 +45,12 @@ const result = await page.evaluate(async ({ id, outDir }) => {
   const { LoadModel } = await import("./Script_MeshLoad.mjs");
   const { MESHES, MODEL_BASE, MERGE_PROFILES } = await import("./Data_Meshes.mjs");
   const { MaterialLibrary } = await import("./Script_Materials.mjs");
+  const { ApplyEditorLiteCameraProfile } = await import("./Script_CameraProfile.mjs");
 
   const canvas = document.getElementById("c");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
   renderer.setSize(1280, 720, false);
+  ApplyEditorLiteCameraProfile(renderer);
   renderer.shadowMap.enabled = false;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x8b8b93);

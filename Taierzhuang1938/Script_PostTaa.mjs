@@ -428,18 +428,31 @@ export class TaaPass {
     ctx.jitterX = jitter[0] * P.taaJitterScale;
     ctx.jitterY = jitter[1] * P.taaJitterScale;
     const pe = ctx.camera.projectionMatrix.elements;
-    P.savedProj8 = pe[8];
-    P.savedProj9 = pe[9];
-    pe[8] += (ctx.jitterX * 2) / P.width;
-    pe[9] += (ctx.jitterY * 2) / P.height;
+    P.savedProjOrtho = !!ctx.camera.isOrthographicCamera;
+    if (P.savedProjOrtho) {
+      P.savedProj8 = pe[12];
+      P.savedProj9 = pe[13];
+      pe[12] -= (ctx.jitterX * 2) / P.width;
+      pe[13] -= (ctx.jitterY * 2) / P.height;
+    } else {
+      P.savedProj8 = pe[8];
+      P.savedProj9 = pe[9];
+      pe[8] += (ctx.jitterX * 2) / P.width;
+      pe[9] += (ctx.jitterY * 2) / P.height;
+    }
   }
 
   RemoveJitter(ctx) {
     const P = this.pipeline;
     if (!ctx.taaActive) return;
     const pe = ctx.camera.projectionMatrix.elements;
-    pe[8] = P.savedProj8;
-    pe[9] = P.savedProj9;
+    if (P.savedProjOrtho) {
+      pe[12] = P.savedProj8;
+      pe[13] = P.savedProj9;
+    } else {
+      pe[8] = P.savedProj8;
+      pe[9] = P.savedProj9;
+    }
   }
 
   Render(ctx) {

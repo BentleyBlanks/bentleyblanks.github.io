@@ -755,8 +755,8 @@ export class GtaoPass {
 
   Enabled(ctx) {
     // `preset.ssao` 是 AO 的总闸（FrameProfileTest 的消融、调试面板的可用性判据
-    // 都读它，语义不许变）；`preset.gtao` 是档位名。任一为假就整趟不跑。
-    return ctx.preset.ssao !== false && !!ctx.preset.gtao;
+    // 都读它，语义不许变）；`preset.gtao` 是档位名。正交相机不跑透视地平线搜索。
+    return !ctx.camera?.isOrthographicCamera && ctx.preset.ssao !== false && !!ctx.preset.gtao;
   }
 
   Resize(width, height) {

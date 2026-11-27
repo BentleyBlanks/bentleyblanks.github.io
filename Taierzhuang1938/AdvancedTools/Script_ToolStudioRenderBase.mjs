@@ -22,10 +22,10 @@ import { FirstPersonSelfShadow } from "../Script_FirstPersonSelfShadow.mjs";
 import { FirstPersonReflectionProbe } from "../Script_FirstPersonReflectionProbe.mjs";
 import { StepRifleSlings } from "../Script_RifleSlingCloth.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "../Script_Gi.mjs";
-import { PostPipeline } from "../Script_Post.mjs";
-import { FilmGrainStrengthFor, FILM_LOOK, OUTPUT } from "../Data_Tuning_Camera.mjs";
-import { MakeAoUniforms, SyncAoUniforms } from "../Script_PostGtao.mjs";
-import { SSIL } from "../Data_Tuning_Gtao.mjs";
+import {
+  CreateStandardCameraPost, ApplyStandardCameraProfile,
+  CreateStandardAoUniforms, SyncStandardAoUniforms, BuildStandardPostOptions,
+} from "../Script_CameraProfile.mjs";
 import { MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs } from "../Script_MaterialShading.mjs";
 import { ActorFactory } from "../Script_Actor.mjs";
 import { ActorBatcher } from "../Script_ActorBatch.mjs";
@@ -44,7 +44,6 @@ import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 
 const Clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const PBR_LANES = 12;
-const SSAO_BASE = 0.80;
 const FLAT_NORMAL = { x: 0, y: 1, z: 0 };
 
 /** 天光那一帧用的预设名：高级工具首页那一关（ToolsHome）的天。 */
@@ -87,8 +86,7 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false;
-  renderer.toneMapping = THREE.NoToneMapping;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // toneMapping 与 outputColorSpace 由 CreateStandardCameraPost(renderer, ...) 统一装配。
 
   const scene = new THREE.Scene();
   scene.matrixWorldAutoUpdate = false;
@@ -97,13 +95,13 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
   camera.far = PHASE.cameraFar ?? 620;
   camera.updateProjectionMatrix();
 
-  const post = new PostPipeline(renderer, {
+  const post = CreateStandardCameraPost(renderer, {
     width: Math.max(2, renderer.domElement.width), height: Math.max(2, renderer.domElement.height), quality: QUALITY,
   });
-  const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
+  const ssao = CreateStandardAoUniforms(post);
   const ssrUniforms = post.SsrUniforms;
 
-  const graphics = CreateGameGraphics({ profile: GRAPHICS_PROFILE, preset: post.preset, taaEnabled: post.taaEnabled,
+  const graphics = CreateGameGraphics({ profile: GRAPHICS_PROFILE, preset: post.preset,
     gi: params.get("gi") === "1", gore: false });
   NormalizeGraphicsDetails(graphics, post);
   const CONTACT_SHADOWS_SUPPORTED = !!post.preset.contactShadows;
@@ -252,36 +250,20 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     const outW = Math.max(2, renderer.domElement.width);
     const outH = Math.max(2, renderer.domElement.height);
     const width = Math.max(2, Math.round(outW * scale)), height = Math.max(2, Math.round(outH * scale));
-    if (post.width !== width || post.height !== height
-      || post.outputWidth !== outW || post.outputHeight !== outH) {
-      post.SetSize(width, height, outW, outH);
-    }
-    post.SetTaaEnabled(graphics.taa !== false);
-    post.SetSsrEnabled(graphics.ssr !== false);
-    post.SetSsrStrength(graphics.ssrStrength ?? 1);
-    post.SetSsilEnabled(!!post.preset.ssil && graphics.ssil > 0);
-    post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
-    if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
-    post.taaJitterScale = graphics.taaJitterScale;
-    post.sharpenStrength = graphics.sharpen;
-    post.preset.volumetrics = graphics.volumetrics !== false;
+    ApplyStandardCameraProfile(post, {
+      width, height, outputWidth: outW, outputHeight: outH,
+      volumetrics: graphics.volumetrics !== false,
+      contactShadows: CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false && graphics.shadows !== false,
+      ssr: graphics.ssr !== false,
+      ssrStrength: graphics.ssrStrength ?? 1,
+      atmosphere: graphics.atmosphere !== false,
+    });
     lights.SetShadowTuning({
       bias: graphics.shadowBias, normalBias: graphics.shadowNormalBias,
       intensity: graphics.shadowIntensity, mapSize: graphics.shadowSize || lights.defaultShadowSize,
     });
     lights.SetShadowDistance(graphics.shadowDistance);
     lights.SetNearShadowBakeAllowed(true);
-    post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false && graphics.shadows !== false;
-    post.SetAutoExposure(graphics.autoExposure !== false);
-    post.SetLocalTonemap(graphics.localTonemap !== false);
-    post.SetLutEnabled(graphics.lut !== false);
-    post.SetFilmLook(graphics.filmLook || FILM_LOOK.default);
-    post.SetFilmOptics(graphics.filmOptics !== false);
-    post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
-    post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
-    post.bloomPass.karis = graphics.bloomKaris === true;
-    post.uniformsComposite.uDither.value = graphics.dither ?? OUTPUT.dither;
-    post.SetTonemap(graphics.tonemap || "aces");
     giUniforms.normalBias.value = graphics.giNormalBias;
     giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
     SyncShadingKnobs(shadingUniforms, graphics);
@@ -392,10 +374,7 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     }
     lights.ScheduleShadowUpdate(renderer);
     const giBlend = gi ? (giUniforms.enabled.value || 0) : 0;
-    SyncAoUniforms(ssao, post, {
-      strength: SSAO_BASE * graphics.ssao,
-      ssilStrength: SSIL.strength * graphics.ssil * (1 - (1 - SSIL.giScale) * giBlend),
-    });
+    SyncStandardAoUniforms(ssao, post, { giBlend });
     sky.mesh.position.copy(camera.position);
     const skyName = skyOverride || PHASE.sky;
     const preset = SKY_PRESETS[skyName] || SKY_PRESETS[PHASE.sky];
@@ -410,36 +389,16 @@ export async function CreateStudioBase({ canvas, search = location.search, onSte
     StepRifleSlings(dt, camera);
     if (firstPersonSelfShadow?.enabled) firstPersonSelfShadow.Render(sky.sunDirection, dt);
     if (actorBatch) actorBatch.Update(camera);
-    const ndStrength = nearDof?.strength > 0 ? nearDof.strength : 0;
-    post.Render(scene, camera, {
+    post.Render(scene, camera, BuildStandardPostOptions({
       sunDirection: sky.sunDirection,
       sunColor: preset.sunColor,
       fog: preset.fog,
-      exposure: preset.exposure,
-      skyPreset: skyName,
+      volumetricPreset: skyName,
       exposureAnchor: skyOverride ? null : PHASE.id,
       dt,
-      bloom: preset.bloom * graphics.bloom,
-      bloomThreshold: preset.bloomThreshold,
-      godStrength: (graphics.godEnabled && !post.preset.volumetrics) ? preset.godStrength * graphics.god : 0,
-      saturation: preset.saturation,
-      contrast: preset.contrast,
-      grain: FilmGrainStrengthFor(skyName) * graphics.grain,
-      grainSize: graphics.grainSize,
-      fade: 0, eyeClosure: 0,
-      vignette: 0.42 * graphics.vignette,
-      damage: 0, hitDisorientation: 0,
-      motionBlur: graphics.motionBlur,
-      dofStrength: 0, dofFocus: 1.5, dofRange: 2.8, dofMaxPx: 11.0,
-      lensFlare: (preset.lensFlare ?? 1) * lensFlareScale,
-      nearDofStrength: ndStrength,
-      ...(ndStrength > 0 ? {
-        nearDofFocus: nearDof.focus ?? 1.60,
-        nearDofRange: nearDof.range ?? 0.85,
-        nearDofMaxPx: nearDof.maxPx ?? 4.5,
-        nearDofSightUv: nearDof.sightUv || null,
-      } : null),
-    });
+      lensFlareScale,
+      nearDof,
+    }));
     if (firstPersonReflection?.enabled) {
       firstPersonReflection.Update(dt, camera.position, !!viewmodel?.root?.visible);
     }

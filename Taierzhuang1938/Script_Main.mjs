@@ -40,9 +40,10 @@ import { PrepassStaticBatch, InstallPrepassStaticBatch } from "./Script_PrepassS
 import { WithShadowDepthRekey } from "./Script_ShadowDepth.mjs";
 import { DeferredMaterialDispose } from "./Script_DeferredMaterialDispose.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
-import { PostPipeline } from "./Script_Post.mjs";
-import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
-import { SSIL } from "./Data_Tuning_Gtao.mjs";
+import {
+  CreateStandardCameraPost, ApplyStandardCameraProfile,
+  CreateStandardAoUniforms, SyncStandardAoUniforms, BuildStandardPostOptions,
+} from "./Script_CameraProfile.mjs";
 import {
   SetWaterSkyUniforms, SetWaterSsr, SetWaterSsrState, SetWaterLightRig, SetWaterAtmosphere,
   SetWaterFog, SetWaterQuality, SetWaterMode, SetWaterQualityOverride,
@@ -151,7 +152,7 @@ import { DebugOptions } from "./Script_DebugOptions.mjs";
 import { FrameProfiler } from "./Script_Profiler.mjs";
 import { FrameDebugger } from "./Script_FrameDebugger.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
-import { LENS_FLARE, FilmGrainStrengthFor, FILM_LOOK, OUTPUT } from "./Data_Tuning_Camera.mjs";
+import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
 import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
@@ -492,8 +493,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 // （同一帧里灯和投影体都没动过，重烘出来的本来就是同一张图）。
 // 每帧由 RenderScene 在出画前点一次 needsUpdate（见那里）。
 renderer.shadowMap.autoUpdate = false;
-renderer.toneMapping = THREE.NoToneMapping;      // 色调映射收在合成 pass 里
-renderer.outputColorSpace = THREE.SRGBColorSpace;
+// toneMapping 与 outputColorSpace 由 CreateStandardCameraPost(renderer, ...) 统一装配。
 
 const scene = new THREE.Scene();
 // 世界矩阵一帧只算一次。three 的 renderer.render() 每次都会把整棵场景树
@@ -504,26 +504,16 @@ const scene = new THREE.Scene();
 // 注意：以后任何在 RenderScene 之外要读 matrixWorld / getWorldPosition 的新代码，
 // 拿到的仍是「上一次出画时」的位姿 —— 这一点和改之前完全一样（原来也是渲染时才更新）。
 scene.matrixWorldAutoUpdate = false;
-// AO 的出厂强度。设置面板按倍率乘它，所以要有个名字。
-// 2026-09 换成 GTAO 之后这一位的语义不变（`mix(1.0, 可见度, strength)`），
-// 但底下那张图已经是解析积分的真可见度而不是半球计数，所以 0.80 压出来的
-// 暗带比旧 SSAO 的同一个数更贴根、更少整墙发灰。
-const SSAO_BASE = 0.80;
 const camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg,
   window.innerWidth / window.innerHeight, 0.06, 620);
 camera.rotation.order = "YXZ";
 
 const trailFocus = new THREE.Vector3();
-const post = new PostPipeline(renderer, {
+const post = CreateStandardCameraPost(renderer, {
   width: Math.max(2, renderer.domElement.width), height: Math.max(2, renderer.domElement.height), quality: QUALITY,
 });
-// AO / SSIL 的材质端 uniform 包。**构造与同步都走 Script_PostGtao 的共用工厂**
-// （探针页用的是同一份），免得两边各写一套分辨率：材质里的取样是
-//   texture2D(uSsaoMap, gl_FragCoord.xy / uSsaoResolution)
-// 而 gl_FragCoord 跑在**主渲染靶**的像素域里 —— 喂 AO 靶尺寸会把整张 AO
-// 放大并往左下错位（这条连吃两轮，上一轮反复调半径/强度毫无效果就是因为
-// 在调一张贴错位置的图）。
-const ssao = MakeAoUniforms(post, { strength: SSAO_BASE, ssilStrength: SSIL.strength });
+// AO / SSIL 的材质端 uniform 包（强度固化在 CAMERA_PROFILES.standard.ao）。
+const ssao = CreateStandardAoUniforms(post);
 // 屏幕空间反射的材质侧 uniform 包。**归 PostPipeline 所有**（SsrPass 每帧刷新
 // map / resolution / strength），这里只是把同一批对象交给 MaterialLibrary。
 // SSR 关档（low / 无浮点靶）时是 null，材质连补丁都不编 —— 与 GI 的编译期
@@ -650,7 +640,7 @@ function ProfilerFrameContext() {
  * ultra 1.0），TAA 把画面解算回满分辨率，所以低于 1 也不再是"整帧被拉伸"。
  * 关掉 TAA（或 low 档）时退回老行为：末趟送屏做一次双线性放大。
  */
-const graphics = CreateGameGraphics({ profile: GRAPHICS_PROFILE, preset: post.preset, taaEnabled: post.taaEnabled,
+const graphics = CreateGameGraphics({ profile: GRAPHICS_PROFILE, preset: post.preset,
   gi: params.get("gi") === "1", gore: IsGoreEnabled() });
 NormalizeGraphicsDetails(graphics, post);
 // 本档位到底编没编接触阴影那段材质 GLSL（编译期，见 Script_Csm.SetCsmContactCompiled）。
@@ -8813,10 +8803,7 @@ function RenderSceneContent(dt) {
   // 近场那一米会被算两遍。按 GI 的淡入量整体降 SSIL.giScale（−40%，实测见
   // docs/Data_TechRenderPipeline.md「GTAO / SSIL」一节），GI 关着时不打折。
   const giBlend = gi ? (giUniforms.enabled.value || 0) : 0;
-  SyncAoUniforms(ssao, post, {
-    strength: SSAO_BASE * graphics.ssao,
-    ssilStrength: SSIL.strength * graphics.ssil * (1 - (1 - SSIL.giScale) * giBlend),
-  });
+  SyncStandardAoUniforms(ssao, post, { giBlend });
   // 天空穹跟着相机走。它是一只半径 4000 m 的球，原来钉在原点 ——
   // 过场把独立布景摆到 (4000,4000) 之后相机就在球**外面**，画面上是一块
   // 黑底上的大亮盘（出川过场那张「什么鬼背景」就是这个）。着色器用的是
@@ -8949,69 +8936,36 @@ function RenderSceneContent(dt) {
   const openingLens = missionRuntime?.Perception().lens || null;
   hud.SetLens(openingLens);
   profiler.B("post");
-  const framePostOptions = ApplyBlastStunToPost(ApplyLensToPost({
+  const framePostOptions = ApplyBlastStunToPost(ApplyLensToPost(BuildStandardPostOptions({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
-    exposure: preset.exposure,
-    // 自动曝光要这两样：`skyPreset` 决定用哪一条实测锚点与 EV 钳位
-    // （Data_Tuning_Camera.SKY_EXPOSURE），`dt` 决定时域适应走多快。
-    // 过场自带天空时这里就是过场那一档 —— 与上面的 preset 同源，不会抄错。
-    skyPreset: skyName,
-    // 逐关锚点：`smokyDay` 被三关共用，而三关出生机位的实测亮度差 0.38 EV。
-    // 过场自带天空时不传（镜头已经不在这一关的出生点上，锚点对不上）。
-    // 环境系统出的是本关自己那一档天（profile = phase.sky，例如第一关 12:00）时照样用逐关锚点；换了时段就不用（锚点是按那一档量的）
+    // 体积雾按昼夜预设取局部介质参数；曝光、泛光、调色、颗粒、暗角全部锁定在白天固化 CameraProfile。
+    volumetricPreset: skyName,
     exposureAnchor: skyOverride || (envOut && envOut.profile !== phase.sky) ? null : phase.id,
     dt,
-    bloom: preset.bloom * graphics.bloom,
-    // 泛光阈值是**每时段**的（缺省 1.18 = 出厂常数；目前只有 dawn 写了值）。
-    // 理由见 SKY_PRESETS.dawn 的 bloomThreshold 注释：物理天穹把太阳侧与整圈地平线
-    // 抬到了 1.7—6.5，一个全局常数会让**整片下半天空**都变成泛光源。
-    bloomThreshold: preset.bloomThreshold,
-    // 屏幕空间太阳拖影：**froxel 体积雾开着时一律不给**。两者叠加是双份前向散射，
-    // 而径向模糊不认遮挡 —— 光柱被建筑切断的那条线会被它重新糊回去。
-    // low 档（没有体积雾）仍可用，这是它保留下来的唯一场合。
-    godStrength: (graphics.godEnabled && !post.preset.volumetrics)
-      ? preset.godStrength * graphics.god : 0,
-    // 体积雾按预设名查 Data_Tuning_Volumetrics（相函数、烟尘噪声、覆盖距离）。
-    // pass 也能靠 fog 块的对象同一性反查，这里显式给一份更稳（过场自带天光时尤其）。
-    skyPreset: skyName,
-    saturation: preset.saturation * (1 - suppression * 0.35),
-    contrast: preset.contrast,
-    // 胶片颗粒：出厂强度按时段取（Data_Tuning_Camera.FILM_GRAIN），乘面板「颗粒」倍率；大小是面板「颗粒大小」倍率。
-    grain: FilmGrainStrengthFor(skyName) * graphics.grain,
-    grainSize: graphics.grainSize,
-    // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
+    steadyView: !!SANDBOX_RANGE?.steadyView,
+    lensFlareScale: 1 - adsNearDof * (1 - LENS_FLARE.adsScale),
+    suppression,
+    damage: Clamp01(1 - health / 62) * 0.55,
     fade: player?.Alive ? missionRuntime?.Perception().blackout || 0 : 0,
     eyeClosure: player?.Alive ? Math.max(missionRuntime?.Perception().eyeClosure || 0, BlastEyeClosure()) : 0,
+    hitDisorientation: Math.max(hitDisorientation, stun?.double || 0),
     lidGlow: BlastLidGlow(skyName),
     lidEdge: BlastLidEdge(),
     lidLight: BlastLidLight(),
     eyeAdapt: BlastEyeAdapt(),
     afterimage: BlastAfterimage(skyName),
     concussion: MergeBlastDaze(missionRuntime?.Perception().concussion, stun),
-    vignette: (0.42 + suppression * 0.22) * graphics.vignette,
-    damage: Clamp01(1 - health / 62) * 0.55,
-    hitDisorientation: Math.max(hitDisorientation, stun?.double || 0),
-    // DOF 要把近景钉清楚；死亡时再叠运动模糊会把前景也抹掉，焦点层级就没了。
-    // 2026-09 起这是 **0–1 的总闸**，不再是「模糊长度倍率」——
-    // 长度由物理快门（Data_Tuning_TemporalDof.MOTION_BLUR.shutterFraction，180°）定。
-    motionBlur: SANDBOX_RANGE?.steadyView ? 0 : graphics.motionBlur * (1 - deathDof),
-    dofStrength: deathDof,
-    dofFocus: 1.5,
-    dofRange: 2.8,
-    dofMaxPx: 11.0,
-    // 镜头光晕：开镜时按 ADS 过渡压到 LENS_FLARE.adsScale（出厂 0.3×）。
-    // 铁瞄那一小块正是准星所在，彩虹扇压上去是直接的手感损失；
-    // 不整个关掉是因为「太阳还在那儿」这条信息本身对构图有用。
-    // An obscured sun contributes diffuse daylight but no lens starburst/ghosts.
-    lensFlare: (preset.lensFlare ?? 1) * (1 - adsNearDof * (1 - LENS_FLARE.adsScale)),
-    nearDofStrength: SANDBOX_RANGE?.steadyView ? 0 : adsNearDof * ADS_NEAR_DOF_STRENGTH,
-    nearDofFocus: ADS_NEAR_DOF_FOCUS_M,
-    nearDofRange: ADS_NEAR_DOF_RANGE_M,
-    nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
-    nearDofSightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
-  }, openingLens), stun);
+    dof: { strength: deathDof, focus: 1.5, range: 2.8, maxPx: 11.0 },
+    nearDof: {
+      strength: adsNearDof * ADS_NEAR_DOF_STRENGTH,
+      focus: ADS_NEAR_DOF_FOCUS_M,
+      range: ADS_NEAR_DOF_RANGE_M,
+      maxPx: ADS_NEAR_DOF_MAX_PX,
+      sightUv: adsNearDof > 0 && !SANDBOX_RANGE?.steadyView ? AdsSightUv() : null,
+    },
+  }), openingLens), stun);
   Object.assign(framePostOptions, sandbox?.PostOptions?.());
   post.Render(scene, camera, framePostOptions);
   sandbox?.AfterRender?.(dt, framePostOptions);
@@ -9334,38 +9288,21 @@ function ApplyGraphics() {
   const outW = Math.max(2, renderer.domElement.width);
   const outH = Math.max(2, renderer.domElement.height);
   const width = Math.max(2, Math.round(outW * scale)), height = Math.max(2, Math.round(outH * scale));
-  // 两组尺寸：内部（renderScale 缩过的）与输出（画布满物理分辨率）。TAAU 开着时
-  // TAA 把画面解算到后者，composite 与末趟都在满分辨率上跑；关着时两者由
-  // SetSize 内部拉平，行为与 TAAU 落地之前一致。
-  if (post.width !== width || post.height !== height
-    || post.outputWidth !== outW || post.outputHeight !== outH) {
-    post.SetSize(width, height, outW, outH);
-  }
-  // 排在 SetSize 之后：SetSize 按当前的 taaEnabled 建靶，这一行才是改它的人。
-  // 反过来的话，刚打开 TAA 的那一次 SetSize 会漏建历史靶（要等下一次改分辨率才补）。
-  post.SetTaaEnabled(graphics.taa !== false);
-  // 自动降档的第 3 级起摘 SSR、第 4 级起摘接触阴影（两者都是运行时开关，
-  // 不重编译 —— 在已经掉帧的时候送一次几百毫秒的编译只会更糟）。
   const autoSsr = !autoQuality.enabled || autoQuality.ssr;
   const autoContact = !autoQuality.enabled || autoQuality.contactShadows;
-  post.SetSsrEnabled(graphics.ssr !== false && autoSsr);
-  post.SetSsrStrength(graphics.ssrStrength ?? 1);
+  // 固化标准相机档案（TAA / Bloom / AutoExposure / LocalTonemap / LUT / FilmLook / FilmOptics / Dither / Tonemap / Sharpen / LensFlare），
+  // 仅同步允许的硬件/运行期通道（分辨率、体积雾开关、接触阴影、SSR、大气）。
+  ApplyStandardCameraProfile(post, {
+    width, height, outputWidth: outW, outputHeight: outH,
+    volumetrics: graphics.volumetrics !== false,
+    contactShadows: CONTACT_SHADOWS_SUPPORTED && graphics.contactShadows !== false && autoContact && graphics.shadows !== false,
+    ssr: graphics.ssr !== false && autoSsr,
+    ssrStrength: graphics.ssrStrength ?? 1,
+    atmosphere: graphics.atmosphere !== false,
+  });
   // 水面画质与 SSR 状态热同步（编辑器模式仍由 Script_Water 强制锁在 low，切入试玩后即按此档生效）
   SetWaterQuality(graphics.waterQuality || post.preset.water || QUALITY);
   SetWaterSsrState(graphics.ssr !== false && autoSsr, graphics.ssrStrength ?? 1);
-  // SSIL：档位给不给是构造期的（`preset.ssil`），倍率滑到 0 时把整趟也停掉 ——
-  // 材质端那一次取样会自动顶上一张 1×1 全黑，不用重编译任何材质。
-  post.SetSsilEnabled(!!post.preset.ssil && graphics.ssil > 0);
-  post.uniformsTaa.uCurrentWeight.value = graphics.taaCurrentWeight;
-  if (post.taaJitterScale !== graphics.taaJitterScale) post.hasTaaHistory = false;
-  post.taaJitterScale = graphics.taaJitterScale;
-  post.sharpenStrength = graphics.sharpen;
-  // froxel 体积雾：只是一位开关（靶与材质在 PostPipeline 构造期按画质档定死）。
-  // 关掉时 VolumetricsPass.Prepare 会把 Composite 的 uFogSource 归零，
-  // 合成 pass 当帧就退回解析式高度雾 —— 不留一张陈旧的散射图在那儿。
-  // low 档没有 froxel 网格（VOLUMETRIC_GRIDS.low = null），pass 自己就恒不跑，
-  // 所以这里不用再查一遍档位表 —— 玩家在 low 上打开这一位也只是空转一个布尔。
-  post.preset.volumetrics = graphics.volumetrics !== false;
   // 级联阴影：面板给的是**第 0 级的基准**，往外逐级按纹素尺度缩放
   // （见 Script_Csm.CsmRig._ApplyBias）。shadowSize 是**每一级**的图边长。
   lights.SetShadowTuning({
@@ -9375,29 +9312,7 @@ function ApplyGraphics() {
     mapSize: graphics.shadowSize || lights.defaultShadowSize,
   });
   lights.SetShadowDistance(graphics.shadowDistance);
-  // 「近级每帧烘」那第二张阴影图：三角预算由 CsmRig 自己实测（见 Data_Tuning_Shadows
-  // 抬头），这里给的是自动降档那道闸 —— 它是阶梯上唯一按 draw call 计价的一项，
-  // 第 2 级起摘掉（车厢实测 +163 draw / +2.09 ms）。
   lights.SetNearShadowBakeAllowed(!autoQuality.enabled || autoQuality.nearShadowBake);
-  // 接触阴影：只是「这一趟 pass 跑不跑」。关掉时 ContactShadowsPass.Idle 会把
-  // 材质那边还原成 1×1 纯白，不重编译。
-  // 总闸关掉时它也必须停：接触阴影补的是太阳影子贴地那一圈，太阳影子都没了
-  // 还留着一圈黑边，是「面板说关了、画面还有影子」的另一种说法。
-  post.preset.contactShadows = CONTACT_SHADOWS_SUPPORTED
-    && graphics.contactShadows !== false && autoContact && graphics.shadows !== false;
-  // --- 相机曝光轮：三位开关 + 四根旋钮（口径见 graphics 表里的注释）---------
-  // 两位走管线的运行时状态（同 SetTaaEnabled 的先例），不写 preset ——
-  // preset 是「这一档的出厂值」，面板的「恢复出厂」要从它读回去。
-  post.SetAutoExposure(graphics.autoExposure !== false);
-  post.SetLocalTonemap(graphics.localTonemap !== false);
-  post.SetLutEnabled(graphics.lut !== false);
-  post.SetFilmLook(graphics.filmLook || FILM_LOOK.default);
-  post.SetFilmOptics(graphics.filmOptics !== false);
-  post.exposurePass.SetBiasEv(graphics.exposureCompensation ?? 0);
-  post.lensFlarePass.SetUserScale(graphics.lensFlare ?? 1, graphics.lensDirt ?? 1);
-  post.bloomPass.karis = graphics.bloomKaris === true;
-  post.uniformsComposite.uDither.value = graphics.dither ?? OUTPUT.dither;
-  post.SetTonemap(graphics.tonemap || "aces");
   giUniforms.normalBias.value = graphics.giNormalBias;
   giUniforms.specularOcclusion.value = graphics.giSpecularOcclusion;
   // 材质着色升级：倍率直接写 uniform（免费），开关变了才整场重编译。

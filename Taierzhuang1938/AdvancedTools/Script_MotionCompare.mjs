@@ -27,6 +27,7 @@ import {
 } from "../Script_NpcLocomotion3C.mjs";
 import { FirstPersonGait, ModelToWorld } from "../Script_FirstPersonGait.mjs";
 import { FIRST_PERSON_BODY } from "../Data_Tuning_FirstPersonBody.mjs";
+import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const DEG = Math.PI / 180;
@@ -1732,14 +1733,14 @@ function MakeStageScene(renderer, floorTex) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1b1e21);
   scene.fog = new THREE.Fog(0x1b1e21, 12, 34);
-  scene.add(new THREE.HemisphereLight(0xf3ebd9, 0x35322c, 1.28));
-  const sun = new THREE.DirectionalLight(0xfff5e4, 2.05);
+  scene.add(new THREE.HemisphereLight(0xf3ebd9, 0x35322c, 2.1));
+  const sun = new THREE.DirectionalLight(0xfff5e4, 3.4);
   sun.position.set(2.8, 5.5, -3.5);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   Object.assign(sun.shadow.camera, { left: -3.5, right: 3.5, top: 3.5, bottom: -3.5, near: 0.5, far: 16 });
   scene.add(sun);
-  const rim = new THREE.DirectionalLight(0x88a8cc, 0.65);
+  const rim = new THREE.DirectionalLight(0x88a8cc, 1.1);
   rim.position.set(-3.2, 2.4, 3.0);
   scene.add(rim);
 
@@ -1753,7 +1754,7 @@ function MakeStageScene(renderer, floorTex) {
   room.add(new THREE.Mesh(sky, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(room, 0.04).texture;
-  scene.environmentIntensity = 0.55;
+  scene.environmentIntensity = 0.95;
   pmrem.dispose();
 
   // Tiled floor (zero flickering yellow cross; UV offset scrolls continuously with velocity)
@@ -1986,7 +1987,7 @@ async function Main() {
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  ApplyEditorLiteCameraProfile(renderer);
   renderer.setScissorTest(true);
   $("view").appendChild(renderer.domElement);
 

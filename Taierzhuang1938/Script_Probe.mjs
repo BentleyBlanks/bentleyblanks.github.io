@@ -7,10 +7,9 @@ import * as THREE from "three";
 import { MaterialLibrary } from "./Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { LightRig } from "./Script_Light.mjs";
-import { PostPipeline } from "./Script_Post.mjs";
-import { FilmGrainStrengthFor } from "./Data_Tuning_Camera.mjs";
-import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
-import { SSIL } from "./Data_Tuning_Gtao.mjs";
+import {
+  CreateStandardCameraPost, CreateStandardAoUniforms, SyncStandardAoUniforms, BuildStandardPostOptions,
+} from "./Script_CameraProfile.mjs";
 import { MakeBox, MakeSandbag, MakePlane, MakeBrokenWall, MakeRubbleField, MakeInstanced, TILE_METERS, CarveCraters } from "./Script_Geo.mjs";
 import { RECIPES } from "./Script_TexBake.mjs";
 import { ProbeVolume, MakeGiUniforms, MakeProbeDebugMesh } from "./Script_Gi.mjs";
@@ -41,18 +40,14 @@ renderer.shadowMap.enabled = true;
 // 只在 type===PCFShadowMap 时给 depthTexture 设 compareFunction + LinearFilter。
 // 写 PCFSoftShadowMap 拿到的是**硬阴影 + 最近邻**，看着就是一圈马赛克边。
 renderer.shadowMap.type = THREE.PCFShadowMap;
-renderer.toneMapping = THREE.NoToneMapping;      // 色调映射在合成 pass 里做
-renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.08, 900);
 camera.position.set(0, 1.68, 8);
 
-const post = new PostPipeline(renderer, { width: window.innerWidth, height: window.innerHeight, quality });
-// AO / SSIL 的材质端 uniform 包，与正片同一份工厂（Script_PostGtao）。
-// 旧版这里喂的是 aoBlur 的尺寸 —— 那是错的：材质里 gl_FragCoord 跑在**主靶**
-// 的像素域，喂 AO 靶尺寸整张 AO 会放大并错位。工厂里已经分成两个 uniform。
-const ssao = MakeAoUniforms(post, { strength: 0.78, ssilStrength: SSIL.strength * ssilScale });
+const post = CreateStandardCameraPost(renderer, { width: window.innerWidth, height: window.innerHeight, quality });
+const ssao = CreateStandardAoUniforms(post);
+if (ssilScale === 0) ssao.ssilStrength.value = 0;
 const giUniforms = MakeGiUniforms();
 // 与正片同一套双层注入：gi=0 时材质只留调试视图基建（探针采样代码编译期剔除），
 // 与正片出厂默认档完全同构 —— GiTest 的「默认材质不含采样代码」就在这页上验。
@@ -352,23 +347,17 @@ function Frame(dt) {
   // 所以每帧必须自己点一次「这一帧要烘哪几级」，否则探针页一张阴影图都不会烘。
   lights.ScheduleShadowUpdate(renderer);
   if (gi) gi.Update(dt, camera.position, lights);
-  // 靶引用每帧重接（SetSize 会换靶）。分辨率的两个 uniform 在工厂里分好了。
-  SyncAoUniforms(ssao, post);
+  SyncStandardAoUniforms(ssao, post);
+  if (ssilScale === 0) ssao.ssilStrength.value = 0;
   const preset = SKY_PRESETS[presetName];
-  post.Render(scene, camera, {
+  post.Render(scene, camera, BuildStandardPostOptions({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
-    exposure: preset.exposure,
-    bloom: preset.bloom,
-    godStrength: preset.godStrength,
-    saturation: preset.saturation,
-    contrast: preset.contrast,
-    grain: FilmGrainStrengthFor(presetName),
+    volumetricPreset: presetName,
     dt,
-    vignette: 0.42,
-    fade: 0,
-  });
+    steadyView: false,
+  }));
 }
 
 /** 给截图脚本用：推进固定帧数（不依赖真实时间，出图可复现）。 */

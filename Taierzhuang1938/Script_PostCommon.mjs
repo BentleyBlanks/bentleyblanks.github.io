@@ -123,12 +123,33 @@ export class Blitter {
     this.mesh = new THREE.Mesh(QUAD_GEOMETRY, null);
     this.mesh.frustumCulled = false;
     this.scene.add(this.mesh);
+    this._savedViewport = new THREE.Vector4();
+    this._savedScissor = new THREE.Vector4();
   }
 
-  /** 把 material 画满 target（target = null 表示画布）。 */
-  Blit(material, target) {
+  /** 把 material 画满 target（target = null 表示画布；viewport 仅在画布输出时裁剪信箱区域）。 */
+  Blit(material, target, viewport = null) {
     this.mesh.material = material;
     this.renderer.setRenderTarget(target ?? null);
+    if (viewport && !target) {
+      this.renderer.getViewport(this._savedViewport);
+      this.renderer.getScissor(this._savedScissor);
+      const savedScissorTest = this.renderer.getScissorTest();
+      try {
+        this.renderer.setScissorTest(false);
+        this.renderer.setClearColor(0x000000, 0);
+        this.renderer.clear(true, false, false);
+        this.renderer.setViewport(viewport.x, viewport.y, viewport.w, viewport.h);
+        this.renderer.setScissor(viewport.x, viewport.y, viewport.w, viewport.h);
+        this.renderer.setScissorTest(true);
+        this.renderer.render(this.scene, QUAD_CAMERA);
+      } finally {
+        this.renderer.setViewport(this._savedViewport);
+        this.renderer.setScissor(this._savedScissor);
+        this.renderer.setScissorTest(savedScissorTest);
+      }
+      return;
+    }
     this.renderer.render(this.scene, QUAD_CAMERA);
   }
 
@@ -323,9 +344,14 @@ export class FrameContext {
     this.outputHeight = pipeline.resolveHeight ?? pipeline.height;
     this.outputResolution.set(this.outputWidth, this.outputHeight);
 
-    const tanHalf = Math.tan(THREE_MathUtils.degToRad(camera.fov * 0.5));
-    const projScaleY = 1 / tanHalf;
-    this.projScale.set(projScaleY / camera.aspect, projScaleY);
+    if (camera.isOrthographicCamera) {
+      const pe = camera.projectionMatrix.elements;
+      this.projScale.set(Math.abs(pe[0]) || 1, Math.abs(pe[5]) || 1);
+    } else {
+      const tanHalf = Math.tan(THREE_MathUtils.degToRad((camera.fov || 55) * 0.5));
+      const projScaleY = 1 / tanHalf;
+      this.projScale.set(projScaleY / (camera.aspect || 1), projScaleY);
+    }
 
     this.projection.copy(camera.projectionMatrix);
     this.view.copy(camera.matrixWorldInverse);

@@ -29,7 +29,7 @@ try {
     }
     // Let all fire/dust/shockwaves expire. Only permanent surface detail remains.
     t.StepFrames(600);
-    t.graphics.ssao = 0; t.StepFrames(1, 0);
+    t.post.preset.ssao = false; t.StepFrames(1, 0);
     const view = field.deformation, debris = [...new Set([...view.debris.tiles.values()].flatMap((tile) => tile.meshes))];
     let tallestFragment = 0;
     for (const mesh of debris) {

@@ -2,6 +2,8 @@ import { EncounterGpuOverlay } from "./Script_LevelFlowGpuOverlay.mjs";
 import { FLOW_RENDERING } from "../Data_Tuning_LevelFlow.mjs";
 import { TERRAIN_SETS } from "../Data_Tuning_Terrain.mjs";
 import { TerrainLayerUrls } from "../Script_Tuning_Terrain.mjs";
+import { CAMERA_PROFILES } from "../Data_CameraProfile.mjs";
+import { TONEMAP_GLSL } from "../Script_ToneMapCurves.mjs";
 
 // One offscreen context for all panes. Each pane retains its native linear
 // depth for GPU overlays and on-demand surface picking.
@@ -473,6 +475,7 @@ class GpuRaster {
           surf=farT>=0.999?farS:TerrainVpMix(surf,farS,farT,sMean);
         }
       }
+      ${TONEMAP_GLSL}
       void main() {
         vec3 twDx=dFdx(worldPosition),twDy=dFdy(worldPosition);
         bool smoothTerrain=dot(worldNormal,worldNormal)>0.01;
@@ -743,8 +746,8 @@ class GpuRaster {
         vec3 surface=rgb;
         if(useLayered) {
           float diffuse=max(0.0,dot(litNormal,sun));
-          vec3 litLinear=layeredLinear*(lightBalance.x*terrainAo+lightBalance.y*diffuse)*1.75;
-          surface=pow(clamp(litLinear,0.0,1.0),vec3(1.0/2.2));
+          vec3 litLinear=layeredLinear*(lightBalance.x*terrainAo+lightBalance.y*diffuse)*2.55;
+          surface=pow(AcesFitted(litLinear*${CAMERA_PROFILES.editorLite.exposure.toFixed(4)}),vec3(1.0/2.2));
         } else if(terrainSurface&&smoothTerrain) {
           surface=vec3(198.0,207.0,169.0)/255.0;
           vec2 distantUv=(worldPosition.xz-distantBounds.xy)/distantBounds.zw;

@@ -14,6 +14,10 @@ import { ClearMeshCache, LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl, WeaponMeshId } from "../Script_Meshes.mjs";
 import { Mulberry32 } from "../Script_Noise.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
+import {
+  CreateStandardCameraPost, BuildStandardPostOptions, ApplyEditorLiteCameraProfile,
+} from "../Script_CameraProfile.mjs";
+import { MarkNoPrepass } from "../Script_Post.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 import { WeaponMaterialPreview } from "./Script_WeaponMaterialPreview.mjs";
 
@@ -198,9 +202,11 @@ async function LoadMaterials(library) {
   return missing.length;
 }
 
+const STUDIO_EXPOSURE_COMPENSATION = 2.3;
+
 function CreateLighting(renderer, scene) {
-  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25));
-  const key = new THREE.DirectionalLight(0xfff5e7, 2.4);
+  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * STUDIO_EXPOSURE_COMPENSATION));
+  const key = new THREE.DirectionalLight(0xfff5e7, 2.4 * STUDIO_EXPOSURE_COMPENSATION);
   key.position.copy(KEY_LIGHT_DIRECTION);
   key.castShadow = true;
   key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -209,7 +215,8 @@ function CreateLighting(renderer, scene) {
   key.shadow.bias = -1 / SHADOW_MAP_SIZE;
   scene.add(key, key.target);
   for (const [color, intensity, x, y, z] of [
-    [0xd6eaff, 1.15, 3, 1, 3], [0xffffff, 1.75, 2, 3, -5],
+    [0xd6eaff, 1.15 * STUDIO_EXPOSURE_COMPENSATION, 3, 1, 3],
+    [0xffffff, 1.75 * STUDIO_EXPOSURE_COMPENSATION, 2, 3, -5],
   ]) {
     const light = new THREE.DirectionalLight(color, intensity);
     light.position.set(x, y, z);
@@ -228,6 +235,7 @@ function CreateLighting(renderer, scene) {
   const pmrem = new THREE.PMREMGenerator(renderer);
   const environment = pmrem.fromScene(room, 0.025);
   scene.environment = environment.texture;
+  scene.environmentIntensity = STUDIO_EXPOSURE_COMPENSATION;
   pmrem.dispose();
   for (const card of room.children) {
     card.geometry.dispose();
@@ -275,12 +283,12 @@ export class WeaponInspectionScene {
     this.canvas = canvas;
     this.onDraw = onDraw;
     this.scene = new THREE.Scene();
+    this.studioBackground = new THREE.Color(0x282b2e);
     this.camera = new THREE.OrthographicCamera();
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "high-performance" });
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.post = CreateStandardCameraPost(this.renderer, { width: 2, height: 2, quality: "high" });
     SetTextureImportRenderer(this.renderer);
     this.library = new MaterialLibrary(this.renderer);
     this.factory = new ActorFactory(this.library, {view: {camera: this.camera, renderer: this.renderer}});
@@ -299,10 +307,12 @@ export class WeaponInspectionScene {
       color: 0xffc75e, opacity: .56, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2, toneMapped: false,
     });
+    MarkNoPrepass(this.selectionMaterial);
     this.occludedMaterial = new THREE.MeshBasicMaterial({
       color: 0xffc75e, opacity: .3, transparent: true, depthWrite: false, side: THREE.DoubleSide,
       depthFunc: THREE.GreaterDepth, wireframe: true, toneMapped: false,
     });
+    MarkNoPrepass(this.occludedMaterial);
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
@@ -463,10 +473,13 @@ export class WeaponInspectionScene {
       this.grid = new THREE.GridHelper(step * 24, 24, 0xc2b99d, 0xaaa694);
       this.grid.material.transparent = true;
       this.grid.material.opacity = .31;
+      MarkNoPrepass(this.grid.material);
+      this.grid.userData.skipNormalDepth = true;
       this.grid.visible = this.gridVisible;
       this.scene.add(this.grid);
       this.Fit();
     }
+    this.post.NotifyCameraCut();
     this.RequestDraw();
   }
 
@@ -476,6 +489,8 @@ export class WeaponInspectionScene {
     this.width = width;
     this.height = height;
     this.renderer.setSize(width, height, false);
+    const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.post.SetSize(Math.max(2, size.x), Math.max(2, size.y));
     if (this.model && this.zoom === 1) this.Fit();
     this.RequestDraw();
   }
@@ -488,6 +503,7 @@ export class WeaponInspectionScene {
 
   SetFirstPerson(preview) {
     this.firstPerson = preview;
+    this.post.NotifyCameraCut();
     this.RequestDraw();
   }
 
@@ -495,6 +511,7 @@ export class WeaponInspectionScene {
     const mode = CHANNELS[name];
     if (!Number.isInteger(mode) || mode === this.channel.value) return;
     this.channel.value = mode;
+    this.post.NotifyCameraCut();
     this.RequestDraw();
   }
 
@@ -502,6 +519,7 @@ export class WeaponInspectionScene {
     this.wireframe = on;
     this.selectionMaterial.wireframe = on;
     this.renderer.shadowMap.enabled = !on;
+    this.post.NotifyCameraCut();
     this.RequestDraw();
   }
 
@@ -514,14 +532,18 @@ export class WeaponInspectionScene {
     if (part?.count) {
       const geometry = SelectionGeometry(part);
       const group = new THREE.Group();
+      group.userData.skipNormalDepth = true;
       const fill = new THREE.Mesh(geometry, this.selectionMaterial);
       const occluded = new THREE.Mesh(geometry, this.occludedMaterial);
+      fill.userData.skipNormalDepth = true;
+      occluded.userData.skipNormalDepth = true;
       fill.renderOrder = 3;
       occluded.renderOrder = 4;
       group.add(fill, occluded);
       part.object.add(group);
       this.selection = { group, geometry };
     }
+    this.post.NotifyCameraCut();
     this.RequestDraw();
   }
 
@@ -568,7 +590,7 @@ export class WeaponInspectionScene {
       this.channel.value = CHANNELS.beauty;
       try {
         if (this.materialPreview.pending) this.materialPreview.Draw(this.renderer);
-        this.firstPerson?.Draw(this.renderer, this.width, this.height);
+        this.firstPerson?.Draw(this.renderer, this.width, this.height, this.post);
       } finally { this.channel.value = channel; }
       if (this.firstPerson) {
         this.onDraw?.();
@@ -588,13 +610,48 @@ export class WeaponInspectionScene {
     camera.lookAt(this.center);
     camera.updateProjectionMatrix();
     if (this.wireframe) {
+      this.scene.background = null;
+      this.renderer.setRenderTarget(null);
+      this.renderer.setClearColor(0x000000, 0);
       for (const { object, wire } of this.meshMaterials) object.material = wire;
       try { this.renderer.render(this.scene, camera); } finally {
         for (const { object, shaded } of this.meshMaterials) object.material = shaded;
       }
+    } else if (this.channel.value !== CHANNELS.beauty) {
+      // 诊断通道（法线/切线/底色/粗糙/金属/AO/反射/阴影）直接输出数值，不经标准后处理；
+      // 反射通道单独启用 editorLite ACESFilmic 映射，用完还原线性态。
+      this.scene.background = null;
+      this.renderer.setRenderTarget(null);
+      this.renderer.setClearColor(0x000000, 0);
+      const savedTone = this.renderer.toneMapping;
+      const savedExp = this.renderer.toneMappingExposure;
+      const savedSpace = this.renderer.outputColorSpace;
+      try {
+        if (this.channel.value === CHANNELS.reflection) ApplyEditorLiteCameraProfile(this.renderer);
+        this.renderer.render(this.scene, camera);
+      } finally {
+        this.renderer.toneMapping = savedTone;
+        this.renderer.toneMappingExposure = savedExp;
+        this.renderer.outputColorSpace = savedSpace;
+      }
     } else {
-      this.renderer.render(this.scene, camera);
+      this.scene.background = this.studioBackground;
+      try {
+        this.post.Render(this.scene, camera, BuildStandardPostOptions({
+          sunDirection: KEY_LIGHT_DIRECTION,
+          dt: 1 / 60,
+          steadyView: true,
+        }));
+      } finally {
+        this.scene.background = null;
+      }
     }
     this.onDraw?.();
+  }
+
+  Dispose() {
+    this.resizeObserver?.disconnect();
+    this.post?.Dispose();
+    this.renderer?.dispose();
   }
 }

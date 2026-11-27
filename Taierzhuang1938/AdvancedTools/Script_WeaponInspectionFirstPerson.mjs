@@ -3,6 +3,7 @@ import { CAMERA } from "../Data_Tuning_Main.mjs";
 import { LoadSavedGraphics } from "../Script_EditorSettings.mjs";
 import { LoadRiggedAssets } from "../Script_RiggedModel.mjs";
 import { Viewmodel } from "../Script_Viewmodel.mjs";
+import { BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
 
 const FRAME_ASPECT = 16 / 9;
 
@@ -17,6 +18,7 @@ export class WeaponInspectionFirstPerson {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x525448);
     this.scene.environment = stage.scene.environment;
+    this.scene.environmentIntensity = stage.scene.environmentIntensity;
     this.scene.add(this.camera);
     for (const source of stage.scene.children) {
       if (!source.isLight) continue;
@@ -44,11 +46,19 @@ export class WeaponInspectionFirstPerson {
     viewmodel.Update(1 / 60, { elapsed: 0 });
   }
 
-  Draw(renderer, width, height) {
+  Draw(renderer, width, height, post = null) {
     const frameWidth = Math.min(width, height * FRAME_ASPECT);
     const frameHeight = frameWidth / FRAME_ASPECT;
     const left = (width - frameWidth) / 2;
     const bottom = (height - frameHeight) / 2;
+    if (post) {
+      post.Render(this.scene, this.camera, BuildStandardPostOptions({
+        dt: 1 / 60,
+        steadyView: true,
+        outputViewport: { x: left, y: bottom, w: frameWidth, h: frameHeight },
+      }));
+      return;
+    }
     renderer.clear();
     renderer.setViewport(left, bottom, frameWidth, frameHeight);
     renderer.setScissor(left, bottom, frameWidth, frameHeight);

@@ -14,10 +14,13 @@ import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl } from "../Script_Meshes.mjs";
 import { InstantiateExternalProp } from "../Script_ExternalProps.mjs";
+import { CreateStandardCameraPost, BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
+import { MarkNoPrepass } from "../Script_Post.mjs";
 import { BuildPlaceableVisual } from "./Script_PlaceableCatalog.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 
 const KEY_LIGHT_DIRECTION = new THREE.Vector3(-3, 5, 4).normalize();
+const STUDIO_EXPOSURE_COMPENSATION = 2.3;
 const SHADOW_MAP_SIZE = 2048;
 const PBR_LANES = 8;
 const PERSON_HEIGHT = 1.7;
@@ -34,8 +37,8 @@ export const LENSES = Object.freeze({ wide: 58, normal: 38, tele: 20 });
 const NextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
 function CreateLighting(renderer, scene) {
-  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x8e9aa4, 1.15));
-  const key = new THREE.DirectionalLight(0xfff3e0, 2.5);
+  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x8e9aa4, 1.15 * STUDIO_EXPOSURE_COMPENSATION));
+  const key = new THREE.DirectionalLight(0xfff3e0, 2.5 * STUDIO_EXPOSURE_COMPENSATION);
   key.castShadow = true;
   key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   key.shadow.autoUpdate = false;
@@ -44,7 +47,10 @@ function CreateLighting(renderer, scene) {
   // 第一帧就要有阴影图：投影接收地面在没有构件时也会采样它，没建过的阴影图会被当成普通纹理绑上去。
   key.shadow.needsUpdate = true;
   scene.add(key, key.target);
-  for (const [color, intensity, x, y, z] of [[0xd6eaff, 1.05, 3, 1.2, 3], [0xffffff, 1.5, 2, 3, -5]]) {
+  for (const [color, intensity, x, y, z] of [
+    [0xd6eaff, 1.05 * STUDIO_EXPOSURE_COMPENSATION, 3, 1.2, 3],
+    [0xffffff, 1.5 * STUDIO_EXPOSURE_COMPENSATION, 2, 3, -5],
+  ]) {
     const light = new THREE.DirectionalLight(color, intensity);
     light.position.set(x, y, z);
     scene.add(light);
@@ -59,6 +65,7 @@ function CreateLighting(renderer, scene) {
   }
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(room, 0.025).texture;
+  scene.environmentIntensity = STUDIO_EXPOSURE_COMPENSATION;
   pmrem.dispose();
   for (const card of room.children) { card.geometry.dispose(); card.material.dispose(); }
   return key;
@@ -80,20 +87,22 @@ export class PropLibraryStage {
   constructor(canvas, onDraw = null) {
     this.canvas = canvas;
     this.onDraw = onDraw;
-    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer = new THREE.WebGLRenderer({ canvas, alpha: false, antialias: false, powerPreference: "high-performance" });
+    this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     SetTextureImportRenderer(this.renderer);
+    this.post = CreateStandardCameraPost(this.renderer, { width: 2, height: 2, quality: "high" });
     this.library = new MaterialLibrary(this.renderer);
     this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x464a46);
     this.camera = new THREE.PerspectiveCamera(LENSES.normal, 1, 0.05, 500);
     this.keyLight = CreateLighting(this.renderer, this.scene);
 
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.32 }));
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.32 });
+    MarkNoPrepass(groundMat);
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), groundMat);
+    this.ground.userData.skipNormalDepth = true;
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
@@ -213,6 +222,8 @@ export class PropLibraryStage {
     this.grid.material.transparent = true;
     this.grid.material.opacity = 0.28;
     this.grid.material.depthWrite = false;
+    MarkNoPrepass(this.grid.material);
+    this.grid.userData.skipNormalDepth = true;
     this.grid.visible = this.gridVisible;
     this.grid.position.y = 0.0005;
     this.scene.add(this.grid);
@@ -310,6 +321,8 @@ export class PropLibraryStage {
     this.width = width;
     this.height = height;
     this.renderer.setSize(width, height, false);
+    const buf = this.renderer.getDrawingBufferSize(new THREE.Vector2());
+    this.post.SetSize(Math.max(2, buf.x), Math.max(2, buf.y));
     this.camera.aspect = width / height;
     this.Fit();
     this.RequestDraw();
@@ -340,7 +353,11 @@ export class PropLibraryStage {
     camera.far = this.dist + this.radius * 40;
     camera.lookAt(this.center);
     camera.updateProjectionMatrix();
-    this.renderer.render(this.scene, camera);
+    this.post.Render(this.scene, camera, BuildStandardPostOptions({
+      sunDirection: KEY_LIGHT_DIRECTION,
+      dt: 1 / 60,
+      steadyView: true,
+    }));
     this.onDraw?.();
   }
 

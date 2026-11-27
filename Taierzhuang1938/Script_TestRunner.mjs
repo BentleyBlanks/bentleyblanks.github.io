@@ -615,6 +615,7 @@ export const testDefs = {
   PostFrameGraphTest: { file: "Script_PostFrameGraphTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "渲染帧图地基契约：pass 顺序 / MRT 速度靶 / HZB / 太阳阴影接口 / 材质补丁三态 / 不重编译" },
   GraphicsProfileTest: { file: "Script_GraphicsProfileTest.mjs", desc: "画质档只有 low / medium / high / ultra：?quality= 与存档解析、旧 whitebox 值回落默认、Inspect() 没有白盒字段" },
+  CameraProfileTest: { file: "Script_CameraProfileTest.mjs", desc: "统一相机后处理档案（CameraProfile）：纯数据校验、四档后处理统一、玩家设置收口、昼夜冻结与全仓渲染入口静态审计（纯 Node，毫秒级）" },
   WhiteboxMaterialTest: { file: "Script_WhiteboxMaterialTest.mjs", desc: "白盒材质：灰表面 + 米格线补丁、语义色保留、水材质，数据文件纯数据" },
   SsrTest: { file: "Script_SsrTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "屏幕空间反射：受控场景倒影 / 置信度边界 / 粗糙度上限 / 时域收敛与拖影 / 三张调试图" },
@@ -814,6 +815,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "EncounterPlayTest",
+  "CameraProfileTest",
   "EncounterTankTest",
   "EncounterVariantsTest",
   "HairGroomTest",
@@ -980,7 +982,7 @@ export const domains = {
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothBloodAsyncTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
   levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterTankTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "EncounterWeaponPickupBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
-  advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["AdvancedToolsTest", "AdvancedToolsBrowserTest", "PropLibraryBrowserTest", "AssetStandardsTest", "AssetStandardsSaveTest", "AssetStandardsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
+  advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["CameraProfileTest", "AdvancedToolsTest", "AdvancedToolsBrowserTest", "PropLibraryBrowserTest", "AssetStandardsTest", "AssetStandardsSaveTest", "AssetStandardsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["CameraProfileTest", "GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
   firstLevelDressing: {label:"第一关道具换模型、碎砖瓦与植被",tests:["FirstLevelPropDressingTest","WardPropsTest","FirstLevelVegetationTest","FirstLevelWhiteboxBrowserTest","SamplerBudgetTest","MotionVectorContractTest","ModuleGraphTest"]},
@@ -1095,7 +1097,7 @@ export const domains = {
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
     // 开机顺序（存档画质何时套上）与关卡预热的改动连着 SavedGraphicsWarmTest 跑（约一分半）；
     // 第一关开机预热编对没有，看 WhiteboxShaderWarmTest（约一分半，high 档）。
-    tests: ["FirstPersonLightingBrowserTest", "MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "FilmGrainTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "DeferredMaterialDisposeTest", "ShadowSkipTest","BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "WaterTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
+    tests: ["CameraProfileTest", "FirstPersonLightingBrowserTest", "MuzzleFlashTest", "CharacterSurfaceTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest", "TestSceneLightingTest", "PostTest", "FilmGrainTest", "AutoQualityTest", "TerrainBlendTest", "TerrainTrailsTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "DeferredMaterialDisposeTest", "ShadowSkipTest","BonePruneTest", "PrepassSkipTest", "ShadowCasterBatchTest", "ShadowBatchWarmBrowserTest", "ShadowCasterPartitionBrowserTest", "StaticInstanceCullingTest", "StaticInstanceCullingBrowserTest", "ShadowInstanceCullingTest", "ShadowInstanceCullingBrowserTest", "PrepassStaticBatchTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "WaterTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "FrameDebuggerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest", "SavedGraphicsWarmTest", "WhiteboxShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -1176,7 +1178,7 @@ const changedDomainRules = [
   { domain: "menu", pattern: /Data_DevTools(?:Stub)?\.mjs|Script_SettingsHost\.mjs/ },
   { domain: "textureAssets", pattern: /CommandRoom/ },
   {domain:"textureAssets",pattern:/TextureImport|TextureManager|EditorTextures/},
-  { domain: "graphicsProfile", pattern: /EyelidMask|GraphicsProfile|Tuning_Graphics|WhiteboxMaterial|WhiteboxGrid|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
+  { domain: "graphicsProfile", pattern: /CameraProfile|EyelidMask|GraphicsProfile|Tuning_Graphics|WhiteboxMaterial|WhiteboxGrid|EditorSettings|Script_Post\.mjs|Script_Main\.mjs/ },
   // 贴图资产规范：Texture/ 下任何文件、清单、通用烘焙脚本与预设、烘焙记录、关卡按需集。
   {domain:"textureAssets",pattern:/\/Texture\/|Data_TextureManifest|Script_BakePbrTexture|Data_TextureBakePresets|\/TextureBakes\/|Script_TextureStandards|Data_LevelTextureSets|Script_LevelTextureSets/},
   {domain:"allyGait",pattern:/AllyGait|Script_FirstLevelP012CastAppearance/},
@@ -1194,7 +1196,7 @@ const changedDomainRules = [
   {domain:"distantSmoke",pattern:/BurntTimberPile/},
   {domain:"render",pattern:/BurntTimberPile/},
   // 2026-09-28 B4：第一关天空 / 调色 / 室内天光遮蔽 / 曝光锚点（docs/Data_TechRenderPipeline.md §2.10 §5.11）
-  {domain:"skyGrade",pattern:/FirstLevelSkyGrade|FirstLevelInteriors|InteriorSkyOcclusion|Script_Sky\.mjs|Data_Tuning_Camera|Data_Tuning_Volumetrics|Script_PostComposite|Data_Tuning_Lights|FirstLevelDistantSmoke|BattleSmoke/},
+  {domain:"skyGrade",pattern:/CameraProfile|FirstLevelSkyGrade|FirstLevelInteriors|InteriorSkyOcclusion|Script_Sky\.mjs|Data_Tuning_Camera|Data_Tuning_Volumetrics|Script_PostComposite|Data_Tuning_Lights|FirstLevelDistantSmoke|BattleSmoke/},
   {domain:"render",pattern:/InteriorSkyOcclusion/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear|Front|Terrain|0518)/},

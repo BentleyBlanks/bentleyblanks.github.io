@@ -26,8 +26,7 @@ assert.deepEqual(Object.keys(QUALITY_PRESETS).sort(), ["high", "low", "medium", 
 for (const [name, preset] of Object.entries(QUALITY_PRESETS)) {
   assert.ok(preset.filmGrain === 0 || preset.filmGrain === 1, `${name} 档给了 filmGrain 算法位（0/1）`);
 }
-assert.equal(QUALITY_PRESETS.low.filmGrain, 0, "low 档走便宜路径");
-for (const name of ["medium", "high", "ultra"]) assert.equal(QUALITY_PRESETS[name].filmGrain, 1, `${name} 档走完整路径`);
+for (const name of ["low", "medium", "high", "ultra"]) assert.equal(QUALITY_PRESETS[name].filmGrain, 1, `${name} 档走统一标准胶片颗粒路径`);
 assert.ok(FILM_GRAIN.strength > 0 && FILM_GRAIN.nightStrength >= FILM_GRAIN.strength, "夜战关不比白天淡");
 assert.ok(FILM_GRAIN.sizeRange.min > 0 && FILM_GRAIN.sizeRange.min <= FILM_GRAIN.sizeRange.value
   && FILM_GRAIN.sizeRange.value <= FILM_GRAIN.sizeRange.max, "颗粒大小滑杆的出厂值在范围内");
@@ -324,28 +323,21 @@ try {
     return out;
   }, config);
 
-  // ---- 3. 设置层：出厂值、钳制、存档回灌、旧存档兼容（真实模块，不走面板 DOM）----
+  // ---- 3. 设置层：CameraProfile 固化后颗粒不再进玩家画质面板与存档 ----
   settings = await page.evaluate(async () => {
-    const { NormalizeGraphicsDetails, GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_EditorSettings.mjs");
+    const { GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_EditorSettings.mjs");
     const { CreateGameGraphics } = await import("./Script_Tuning_GameGraphics.mjs");
     const preset = { ...window.Probe.post.preset };
     const Make = () => CreateGameGraphics({ profile: "high", preset });
     const KEY = "tengxian1938_graphics_v1";
     const out = {};
     const g = Make();
-    out.factory = { grain: g.grain, grainSize: g.grainSize };
-    out.controls = GraphicsDetailControls({ preset }).grain.map((c) => ({ key: c.key, min: c.min, max: c.max, value: c.value }));
-    g.grainSize = 99; NormalizeGraphicsDetails(g, { preset }); out.clampHigh = g.grainSize;
-    g.grainSize = -3; NormalizeGraphicsDetails(g, { preset }); out.clampLow = g.grainSize;
-    g.grainSize = NaN; NormalizeGraphicsDetails(g, { preset }); out.nan = g.grainSize;
-    g.grainSize = 2.2; NormalizeGraphicsDetails(g, { preset }, true); out.reset = g.grainSize;
+    out.hasGrainKey = "grain" in g || "grainSize" in g;
+    out.controls = GraphicsDetailControls({ preset }).grain || [];
     try {
-      localStorage.setItem(KEY, JSON.stringify({ grain: 0.4, grainSize: 1.7 }));
+      localStorage.setItem(KEY, JSON.stringify({ grain: 0.4, grainSize: 1.7, fov: 68 }));
       const loaded = Make(); LoadSavedGraphics(loaded);
-      out.loaded = { grain: loaded.grain, grainSize: loaded.grainSize };
-      localStorage.setItem(KEY, JSON.stringify({ grain: 0.6 }));           // 旧存档：只有强度倍率
-      const legacy = Make(); LoadSavedGraphics(legacy);
-      out.legacy = { grain: legacy.grain, grainSize: legacy.grainSize };
+      out.loaded = { hasGrain: "grain" in loaded, hasGrainSize: "grainSize" in loaded, fov: loaded.fov };
     } finally { localStorage.removeItem(KEY); }
     return out;
   });
@@ -430,19 +422,11 @@ assert.ok(wiring.seeds.every((s, i) => i === 0 || s === (wiring.seeds[i - 1] + 1
 assert.ok(wiring.seeds.every((s) => Number.isInteger(s) && s >= 0 && s < wiring.seedRange), "种子是 [0, seedCount) 的整数");
 assert.ok(wiring.blends.every((b) => b === 0), "零跨帧混合（uGrainBlend 恒为 0，消除 8–16 Hz 闪动蠕动）");
 
-// 3. 设置层
+// 3. 设置层（CameraProfile 固化：颗粒不再暴露给玩家，旧存档自动忽略）
 assert.ok(settings, "设置层有结果");
 console.log("设置层", JSON.stringify(settings));
-const sizeRange = FILM_GRAIN.sizeRange;
-assert.deepEqual(settings.controls, [{ key: "grainSize", min: sizeRange.min, max: sizeRange.max, value: sizeRange.value }],
-  "画质面板的「颗粒大小」控件取自 FILM_GRAIN.sizeRange");
-assert.equal(settings.factory.grainSize, sizeRange.value, "graphics 表里 grainSize 的出厂值");
-assert.equal(settings.factory.grain, 1, "「颗粒」强度倍率出厂 ×1");
-assert.equal(settings.clampHigh, sizeRange.max, "存档里越界的大小被钳到上限");
-assert.equal(settings.clampLow, sizeRange.min, "存档里越界的大小被钳到下限");
-assert.equal(settings.nan, sizeRange.value, "存档里坏掉的大小回到出厂值");
-assert.equal(settings.reset, sizeRange.value, "恢复出厂把大小放回出厂值");
-assert.deepEqual(settings.loaded, { grain: 0.4, grainSize: 1.7 }, "存档里的强度与大小回灌到 graphics");
-assert.deepEqual(settings.legacy, { grain: 0.6, grainSize: sizeRange.value }, "旧存档（只有强度倍率）照常读，大小取出厂值");
+assert.equal(settings.hasGrainKey, false, "CreateGameGraphics 不再暴露 grain / grainSize");
+assert.deepEqual(settings.controls, [], "画质面板不再暴露颗粒控件");
+assert.deepEqual(settings.loaded, { hasGrain: false, hasGrainSize: false, fov: 68 }, "旧存档里的 grain/grainSize 被忽略，允许键照常恢复");
 
 console.log("ok  全屏胶片颗粒：着色器层、接线层与设置层全部通过");

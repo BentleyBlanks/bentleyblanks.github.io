@@ -166,42 +166,31 @@ const RESERVED_OFF = {
  * 三位**全部关掉时，合成输出逐比特等于 2026-09 帧图重构后的版本** ——
  * 这是本轮的硬约束（用户对画面明暗极敏感，历史事故「画面为什么这么黑」）。
  */
-const CAMERA_OFF = { autoExposure: false, lensFlare: false, lut: true, localTonemap: false, filmOptics: false };
-const CAMERA_ON = { autoExposure: true, lensFlare: false, lut: true, localTonemap: true, filmOptics: true };
+// 2026-11-28 CameraProfile 固化规范（Data_CameraProfile.mjs）：
+// 全项目画质档（low / medium / high / ultra）在后处理链路（TAA / Bloom / AutoExposure / LocalTonemap /
+// 3D LUT / FilmOptics / LensFlare / MotionBlur / DoF / CAS 锐化 / 35mm 颗粒）上保持同一套 `standard` 相机档案，
+// 画质档位只区分硬件性能负载项（渲染分辨率、阴影/CSM/接触阴影、AO/SSIL/SSR/体积雾/簇光/水面/POM/材质贴图）。
 const CAMERA_FULL = { autoExposure: true, lensFlare: true, lut: true, localTonemap: true, filmOptics: true };
 
 export const QUALITY_PRESETS = {
-  // 抗锯齿分工：taa 是 medium 及以上的**出厂默认**（UE 的默认 AA 也是 TAA），
-  // FXAA 只在 taa 关着时兜底。low 出厂不开：两张全分辨率 RGBA16F 历史靶
-  // 在集显上是实打实的带宽，low 档的定位就是"能跑"。
-  // 但这一位只是默认值不是上限 —— 画质面板可以运行时开关（SetTaaEnabled），
-  // low 档玩家想要也给得了，靶到那时候才建。
   // AO 分档（2026-09 GTAO）：low 出厂不开 AO（`ssao: false`），但 `gtao` 仍写
-  // "low" —— 玩家在 low 上手动打开时走 1 切片 4 步无时域的最便宜那一档，
-  // 而不是掉进 high 的 2×6。SSIL 只给 high / ultra：它要多一张颜色历史靶
-  // 与每采样一次颜色读，medium 的定位是"1080p 稳 60"。
+  // "low" —— 性能消融对照时走 1 切片 4 步无时域的最便宜那一档。
+  // SSIL 只给 high / ultra：它要多一张颜色历史靶与每采样一次颜色读，medium 的定位是"1080p 稳 60"。
   low: {
     ...RESERVED_OFF,
-    ...CAMERA_OFF,
+    ...CAMERA_FULL,
     ssao: false, gtao: "low", ssil: false,
-    bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
-    aoScale: 0.5, sharpen: 0.20, taa: false,
+    bloomLevels: 6, godrays: false, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.50, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: false, water: "low",
-    // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §17.5「自动降档」
-    // 那一段为低配档写死的那个数（「集显同时把 setPixelRatio(1) 并允许 0.85×
-    // 内部分辨率 + FXAA 拉回来」）。2026-09-08 分档定稿把它从 1.0 落到 0.85：
-    // low 出厂**没有** TAAU，1.0 意味着这一档反而在比 high（0.8）更多的像素上
-    // 跑主场景 —— 实测 3394×1348 下 low 与 high 的整帧 GPU 几乎持平，
-    // 这不是「能跑」该有的样子。抗锯齿仍由 FXAA + CAS 承担。
-    taaUpscale: false, renderScale: 0.85,
-    motionBlurTaps: 0, motionBlurScale: 1.0, dof: false, dofScale: 0.5,
+    taaUpscale: true, renderScale: 0.85,
+    motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
     // low 不跑 SSR：连靶都不建，材质也不编入补丁（`ssr` 进 cache key）。
     ssr: false, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
     // low 不跑簇：每帧几千次球-AABB 判定 + 一张表上传，换来的画面收益抵不过
     // 它在 CPU 上的占用（low 档本来就卡在 CPU 提交）。这一档仍是两盏三方点光。
     clusteredLights: false,
     // low 唯一保留解析式高度雾的一档（Composite 的 uFogSource = 0 那条路永久保留）。
-    // 也是唯一还能开屏幕空间太阳拖影（godrays）的一档 —— 体积雾开着时两者会双份。
     // 这一档的雾色仍由大气透视供（atmosphere 开着），只是散射按解析式一条常数走。
     volumetrics: false,
     // 级联阴影四档全开（low 是 2 级）；接触阴影 low 不跑。
@@ -219,15 +208,15 @@ export const QUALITY_PRESETS = {
     microShadow: true, horizonOcclusion: true, skinSss: false,
     materialTexture: 256,
     stunTrail: true,
-    filmGrain: 0,
+    filmGrain: 1,
   },
   medium: {
     ...RESERVED_OFF,
-    ...CAMERA_ON,
+    ...CAMERA_FULL,
     clusteredLights: true,   // 局部光预算 32 盏（Data_Tuning_Lights.CLUSTER_TIERS.medium）
     ssao: true, gtao: "medium", ssil: false,
-    bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
-    aoScale: 0.5, sharpen: 0.42, taa: true,
+    bloomLevels: 6, godrays: false, msaa: 0, motionBlur: true,
+    aoScale: 0.5, sharpen: 0.50, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "medium", water: "medium",
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
@@ -246,7 +235,7 @@ export const QUALITY_PRESETS = {
     // 同一个 ~11.4 ms 上，而 CPU 提交是 12–16 ms），压内部分辨率买不到时间、
     // 只买到更软的画面。真要在 medium 上再省，省的是 draw call 不是像素。
     taaUpscale: true, renderScale: 0.75,
-    motionBlurTaps: 8, motionBlurScale: 0.5, dof: true, dofScale: 0.5,
+    motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 0.5,
   },
   // high 的抗锯齿由 TAA 承担。超宽屏再给 RGBA16F 主靶叠 4×MSAA 会多占
   // 上百 MB 显存并重复抗锯齿；把 4× 留给主动选择 ultra 的玩家
@@ -256,7 +245,7 @@ export const QUALITY_PRESETS = {
     ...CAMERA_FULL,
     clusteredLights: true,   // 局部光预算 64 盏（Data_Tuning_Lights.CLUSTER_TIERS.high）
     ssao: true, gtao: "high", ssil: true,
-    bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
+    bloomLevels: 6, godrays: false, msaa: 0, motionBlur: true,
     aoScale: 0.5, sharpen: 0.50, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "high", water: "high",
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
@@ -280,8 +269,8 @@ export const QUALITY_PRESETS = {
     ...CAMERA_FULL,
     clusteredLights: true,   // 局部光预算 128 盏（Data_Tuning_Lights.CLUSTER_TIERS.ultra）
     ssao: true, gtao: "ultra", ssil: true,
-    bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
-    aoScale: 1.0, sharpen: 0.48, taa: true,
+    bloomLevels: 6, godrays: false, msaa: 4, motionBlur: true,
+    aoScale: 1.0, sharpen: 0.50, taa: true,
     velocity: true, hzb: true, atmosphere: true, terrainBlend: true, terrainTrails: "ultra", water: "ultra",
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
@@ -299,7 +288,7 @@ export const QUALITY_PRESETS = {
     // ultra 是「内部 = 输出」，TAA 退回纯抗锯齿（TAAU 的上采样部分不生效，
     // 因为两组尺寸相等）。留 taaUpscale: true 是为了玩家手动下调分辨率时它照样接上。
     taaUpscale: true, renderScale: 1.0,
-    motionBlurTaps: 16, motionBlurScale: 1.0, dof: true, dofScale: 1.0,
+    motionBlurTaps: 12, motionBlurScale: 1.0, dof: true, dofScale: 1.0,
   },
 };
 

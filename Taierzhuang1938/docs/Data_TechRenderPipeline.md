@@ -93,6 +93,8 @@ function generateShadowMapTypeDefine( parameters ) {
 
 | 模块 | 职责 | 对外的东西 |
 |---|---|---|
+| `Data_CameraProfile.mjs` | **统一相机后处理档案唯一数据表**（纯数据、零 three，2026-11-28）。固化 `standard`（白天基线完整后处理）与 `editorLite`（多视口简易 ACESFilmic）两套档案，以及允许的运行期局部覆写白名单与冻结设置键清单 | `CAMERA_PROFILE_SCHEMA`、`CAMERA_PROFILE_RUNTIME_OVERRIDES`、`CAMERA_PROFILE_FROZEN_SETTINGS_KEYS`、`CAMERA_PROFILES` |
+| `Script_CameraProfile.mjs` | **相机后处理档案唯一装配器**（2026-11-28）。全仓渲染器均经此装配 `PostPipeline` 或 `editorLite` 映射、同步固化 AO/SSIL、过滤旧存档冻结键 | `CreateStandardCameraPost`、`ApplyStandardCameraProfile`、`CreateStandardAoUniforms`、`SyncStandardAoUniforms`、`BuildStandardPostOptions`、`ApplyEditorLiteCameraProfile`、`StripFrozenCameraSettings`、`IsFrozenCameraSettingKey` |
 | `Script_Post.mjs` | **编排器**。持有有序 pass 列表、具名靶、运行时状态（TAA 开关/历史、调试视图、着色模式）。所有旧的公共 API 都还在这里。 | `PostPipeline`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`InjectDepthPull`、`FOREGROUND_VIEW_DEPTH`、`SHADING_MODES`、`POST_QUALITY_KEYS` |
 | `Script_PostCommon.mjs` | 地基：全屏 blit、`GLSL_COMMON`、靶工厂、瞬时靶池、`FrameContext`、pass 契约文档 | `Blitter`、`RenderTargetPool`、`FrameContext`、`MakeRenderTarget`、`MakeFullscreenMaterial`、`QUAD_GEOMETRY/CAMERA`、`VERT_QUAD`、`GLSL_COMMON`、`GLSL_VIEW_POS` |
 | `Script_TerrainBlend.mjs` | 地形专用材质 G-buffer，石土交界（§1.4.1） | `TerrainBlendPass`、`TerrainBlendUniforms`、`TERRAIN_BLEND_GLSL` |
@@ -127,6 +129,21 @@ function generateShadowMapTypeDefine( parameters ) {
 | `Data_Tuning_Graphics.mjs` | 画质档位表（纯数据，零 three 依赖） | `QUALITY_PRESETS`、`POST_QUALITY_KEYS`、`MakeQualityPreset`、`HZB`、`VELOCITY`、`SSR`、`AUTO_QUALITY` |
 | `Script_AutoQuality.mjs` | 自动降档的规则层（纯 Node 可单测，零 three 依赖），数值取 `Data_Tuning_Graphics.AUTO_QUALITY`；口径见 §17.5 | `AutoQuality`、`AutoQualityKnobs` |
 | `Script_Light.mjs` | 太阳阴影的公共采样接口（新增） | `SUN_SHADOW_GLSL`、`BindSunShadowUniforms`、`LightRig.RegisterShadowUniforms/SyncShadowUniforms` |
+
+### 1.1.1 统一相机后处理档案（CameraProfile，2026-11-28）
+
+参考 Unity Camera / Volume Profile 思路，全仓会影响画面观感的后处理参数（曝光、色调映射、3D LUT 分级、Bloom、TAA、自动曝光、局部色调映射、Purkinje、胶片光学、35mm 颗粒、暗角、色差、镜头光晕、输出抖动、AO/SSIL 强度）统一收口并固化进 `Data_CameraProfile.mjs`，经 `Script_CameraProfile.mjs` 装配：
+
+| 档案 | 管线组成 | 固化核心参数 | 适用范围 |
+|---|---|---|---|
+| `CAMERA_PROFILES.standard` | 完整 `PostPipeline` | 第一关白天 `firstLevelBattleDay` 基线：`exposure = 0.78`、`ACES Hill` + 64³ LUT + `cod14`、`bloom = 0.04 / 1.18`、`lensFlare = 0`、`taa = true`、`sharpen = 0.50`、`autoExposure = true`、`localTonemap = true`、`purkinje = 0.22`、`filmOptics = true`、`grain = 0.0055 / 1`、`vignette = 0.42`、`dither = 0.75`、`ao = 0.80 / ssil = 0.70`（四档画质统一） | 游戏正片、标题菜单指挥室、全部单视口视觉验收工具（摄影棚、特效预览、枪械检查台、构件库、Mixamo 预览、模型工作台、渲染探针） |
+| `CAMERA_PROFILES.editorLite` | 无 `PostPipeline`，仅 Three.js 原生色调映射 | `THREE.ACESFilmicToneMapping` + `toneMappingExposure = 0.468`（`0.78 × 0.6`，与 Hill ACES 逐系数等价）+ `THREE.SRGBColorSpace`；无 Bloom / TAA / LUT / LensFlare / AutoExposure / 颗粒 / 暗角 | 多视口与编辑器向视口（`EncounterPlayView` 观察视口、`MotionCompare`、`SceneEditor`、`SquadSplinePreview`、`LevelFlowGpuRaster` 分层地表） |
+
+**硬边界（门禁 `Script_CameraProfileTest.mjs` 守护）**：
+1. **昼夜不改后处理**：环境系统与昼夜预设只改天穹、光照、反射与雾/体积雾，不再覆写后处理曝光、调色、泛光或颗粒。
+2. **运行期局部覆写白名单**（`CAMERA_PROFILE_RUNTIME_OVERRIDES`）：仅允许 **DoF（景深 / 近景散焦）**、**体积雾 / 雾** 与 **玩法瞬态生理反馈（受伤 / 压制 / 眩晕 / 震荡 / 闭眼 / 黑场）**。
+3. **玩家画质设置收口**：`Script_EditorSettings.mjs` / `Script_Tuning_GameGraphics.mjs` 不暴露任何冻结后处理旋钮，旧存档中属于 `CAMERA_PROFILE_FROZEN_SETTINGS_KEYS` 的字段在读盘与存盘时自动剔除。
+4. **唯一装配口**：业务与工具代码禁止在 `Script_CameraProfile.mjs` 之外直接 `new PostPipeline(`、直接写 `renderer.toneMapping*` 或调用后处理美术参数 setter。
 
 ### 1.2 帧图（有序 pass 列表，`PostPipeline.passes`）
 

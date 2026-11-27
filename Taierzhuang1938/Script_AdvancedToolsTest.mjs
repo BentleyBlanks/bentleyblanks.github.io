@@ -137,14 +137,29 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     const bad = modules.filter((name) => /^Script_(Main|Editor|EditorStage|EditorUi|DevTools\w*|ToolStudio\w*|FrameModes)\.mjs$/.test(name));
     Check(`Tool_PropLibrary.html 的模块图不含游戏主程序 / 编辑器宿主 / 工具宿主（${modules.length} 个模块）`, bad.length === 0, bad.join(", "));
     const stage = fs.readFileSync(path.join(toolsDir, "Script_PropLibraryStage.mjs"), "utf8");
-    Check("构件库三维台不建游戏的后处理、天空与灯光组", !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|VfxSystem|AudioEngine)\b/.test(stage));
+    Check("构件库三维台接入标准相机档案且不建游戏天空与灯光组",
+      /CreateStandardCameraPost/.test(stage) && !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|VfxSystem|AudioEngine)\b/.test(stage));
   }
-  for (const [entry, page] of [["Script_AudioPreview.mjs", "Tool_AudioPreview.html"], ["Script_VfxPreview.mjs", "Tool_VfxPreview.html"]]) {
-    const modules = Closure(entry);
-    const bad = modules.filter((name) => FORBIDDEN.test(name));
-    Check(`${page} 的模块图不含游戏灯光 / 后处理 / 天空 / 材质库 / 关卡（${modules.length} 个模块）`, bad.length === 0, bad.join(", "));
-    Check(`${page} 页面存在并只登记 three`, fs.existsSync(path.join(toolsDir, page))
-      && /"imports":\s*\{\s*"three":/.test(fs.readFileSync(path.join(toolsDir, page), "utf8")));
+  {
+    const audioModules = Closure("Script_AudioPreview.mjs");
+    const bad = audioModules.filter((name) => FORBIDDEN.test(name));
+    Check(`Tool_AudioPreview.html 的模块图不含游戏灯光 / 后处理 / 天空 / 材质库 / 关卡（${audioModules.length} 个模块）`, bad.length === 0, bad.join(", "));
+    Check("Tool_AudioPreview.html 页面存在并只登记 three", fs.existsSync(path.join(toolsDir, "Tool_AudioPreview.html"))
+      && /"imports":\s*\{\s*"three":/.test(fs.readFileSync(path.join(toolsDir, "Tool_AudioPreview.html"), "utf8")));
+  }
+  // 2026-11-28 CameraProfile 固化：单视口视觉验收工具 Tool_VfxPreview.html 统一走标准相机档案（Script_CameraProfile → PostPipeline），
+  // 但仍与游戏主程序、编辑器宿主、材质库、世界与城市场景解耦，且不实例化 SkyDome / LightRig / ProbeVolume / AudioEngine。
+  {
+    const vfxModules = Closure("Script_VfxPreview.mjs");
+    const VFX_FORBIDDEN = /^(Script_(Main|Materials|World|TengxianCity|TengxianField|Editor|ToolStudioRenderBase|DevTools\w*|FrameModes)|Data_(Battle|Tengxian|FirstLevelDistantSmoke))\.mjs$/;
+    const bad = vfxModules.filter((name) => VFX_FORBIDDEN.test(name));
+    const vfxStage = fs.readFileSync(path.join(toolsDir, "Script_VfxPreviewStage.mjs"), "utf8");
+    Check(`Tool_VfxPreview.html 接入统一标准相机档案且不含游戏主程序 / 材质库 / 编辑器宿主（${vfxModules.length} 个模块）`,
+      bad.length === 0 && vfxModules.includes("Script_CameraProfile.mjs")
+      && /CreateStandardCameraPost/.test(vfxStage) && !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|AudioEngine)\b/.test(vfxStage),
+      bad.join(", "));
+    Check("Tool_VfxPreview.html 页面存在并只登记 three", fs.existsSync(path.join(toolsDir, "Tool_VfxPreview.html"))
+      && /"imports":\s*\{\s*"three":/.test(fs.readFileSync(path.join(toolsDir, "Tool_VfxPreview.html"), "utf8")));
   }
   const audioModules = Closure("Script_AudioPreview.mjs");
   const audioScene = audioModules.filter((name) => /^Script_(Vfx|Particle\w*|EditorStage)\.mjs$/.test(name));

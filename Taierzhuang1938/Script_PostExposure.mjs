@@ -620,7 +620,7 @@ export class ExposurePass {
       this.snapFrames = AUTO_EXPOSURE.snapFrames;
       return;
     }
-    const skyName = ctx.options.skyPreset || null;
+    const skyName = ctx.options.exposureProfile || ctx.options.skyPreset || null;
     const anchorKey = ctx.options.exposureAnchor || null;
     if (skyName !== this.skyName || anchorKey !== this.anchorKey) {
       this.skyName = skyName;

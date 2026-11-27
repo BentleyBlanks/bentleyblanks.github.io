@@ -738,7 +738,6 @@ const gfx = await page.evaluate(() => {
   // activate the independent automatic multiplier (e.g. .6*.92), so disable it.
   g.gfx.autoQuality = false;
   g.gfx.renderScale = 0.6;
-  g.gfx.bloom = 0.25;
   g.gfx.fov = 62;
   g.Apply();
   window.Taierzhuang.StepFrames(4);
@@ -758,92 +757,29 @@ Check("画质面板：渲染分辨率真的改到合成靶上（内部 0.6×，�
   && gfx.after.outW === gfx.inner[0],
   `${gfx.before.w}×${gfx.before.h} → ${gfx.after.w}×${gfx.after.h}`
   + ` ｜ 输出 ${gfx.after.outW}×${gfx.after.outH} TAAU=${gfx.after.taau}`);
-Check("画质面板：设置落盘",
-  !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.bloom === 0.25,
-  gfx.saved ? `renderScale=${gfx.saved.renderScale} bloom=${gfx.saved.bloom}` : "没存上");
+Check("画质面板：设置落盘且不含冻结后处理键",
+  !!gfx.saved && gfx.saved.renderScale === 0.6 && gfx.saved.fov === 62
+  && !("bloom" in gfx.saved) && !("taa" in gfx.saved) && !("grain" in gfx.saved),
+  gfx.saved ? `renderScale=${gfx.saved.renderScale} fov=${gfx.saved.fov}` : "没存上");
 
-// TAA 开关：**点真按钮**，不是直接改 gfx.taa 再调 Apply。
-// 面板上的开关如果没接上回调（或者接错了那一位），直接改字段的测法一样是绿的，
-// 而玩家点了没反应 —— 这一栏加进来的起因正是「设置里根本没有 TAA」。
-const taaToggle = await page.evaluate(() => {
+// 2026-11-28 CameraProfile 固化：TAA / 颗粒 / 泛光 / 色调映射 / 曝光补偿不再暴露给玩家面板，统一锁定在 standard。
+const frozenCameraProfile = await page.evaluate(() => {
   const T = window.Taierzhuang;
-  // Toggle 使用带状态的原生 button.edBtn（Script_EditorUi.Toggle），
-  // 按标签选而不是按位置选：面板加一栏就不该让这条测试挪窝。
-  const Btn = () => Array.from(document.querySelectorAll(".edPanel.work .edBtn"))
-    .find((b) => (b.textContent || "").includes("TAA"));
-  const button = Btn();
-  if (!button) return { found: false };
-  const boot = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
-  button.click();
-  T.StepFrames(3);
-  const off = { taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa };
-  Btn().click();
-  // 重开的第一帧必须没有历史可混：关着的那几帧没人写历史靶，
-  // 里面躺的是关掉之前那一张，混上去就是一层脏东西。
-  const firstFrameHistory = T.post.hasTaaHistory;
-  T.StepFrames(6);
-  const on = {
-    taa: T.post.taaEnabled, targets: !!T.post.targets.taaA, gfx: T.graphics.taa,
-    settled: T.post.hasTaaHistory,
+  const names = Array.from(document.querySelectorAll(".edPanel.work .gfxRow")).map((r) => r.dataset.gfxName || "");
+  const forbidden = ["TAA（时域抗锯齿）", "泛光", "颗粒", "颗粒大小", "曝光补偿", "色调映射", "暗角"];
+  const leaked = forbidden.filter((label) => names.includes(label));
+  return {
+    leaked,
+    profileId: T.post.cameraProfileId,
+    taa: T.post.taaEnabled,
+    targets: !!T.post.targets.taaA,
+    grainUniform: T.post.uniformsFxaa.uGrain.value,
   };
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
-  return { found: true, boot, off, on, firstFrameHistory, saved: saved ? saved.taa : null };
 });
-Check("画质面板：TAA 开关点得动，管线状态与历史靶跟着走",
-  taaToggle.found && taaToggle.boot.taa === true && taaToggle.off.taa === false
-  && taaToggle.off.targets === false && taaToggle.on.taa === true && taaToggle.on.targets === true,
-  taaToggle.found
-    ? `开机=${taaToggle.boot.taa} → 关=${taaToggle.off.taa}/靶${taaToggle.off.targets}`
-      + ` → 开=${taaToggle.on.taa}/靶${taaToggle.on.targets}`
-    : "面板上找不到 TAA 开关");
-Check("画质面板：TAA 关掉再打开不吃陈旧历史，落盘同步",
-  taaToggle.found && taaToggle.firstFrameHistory === false
-  && taaToggle.on.settled === true && taaToggle.saved === true,
-  `重开首帧历史=${taaToggle.firstFrameHistory} 六帧后=${taaToggle.on?.settled} 落盘=${taaToggle.saved}`);
-
-// 胶片颗粒：面板里的「颗粒」（强度倍率）与「颗粒大小」都是真滑杆，拖动要落到 graphics、存档和送屏 uniform 上。
-// 同样按标签找控件、派发真实 input 事件，而不是直接改 gfx 字段（面板没接回调时后者一样是绿的）。
-const grainSliders = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const SliderOf = (label) => {
-    const row = Array.from(document.querySelectorAll(".edPanel.work .gfxRow"))
-      .find((r) => (r.dataset.gfxName || "") === label);
-    return row ? row.querySelector('input[type="range"]') : null;
-  };
-  const Drag = (input, value) => {
-    input.value = String(value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    T.StepFrames(3);
-  };
-  const strengthInput = SliderOf("颗粒"), sizeInput = SliderOf("颗粒大小");
-  if (!strengthInput || !sizeInput) return { found: false, strength: !!strengthInput, size: !!sizeInput };
-  const U = T.post.uniformsFxaa;
-  const out = { found: true, bootGrain: T.graphics.grain, bootSize: T.graphics.grainSize, bootPx: U.uGrainPx.value, bootStrength: U.uGrain.value,
-    range: { min: Number(sizeInput.min), max: Number(sizeInput.max) } };
-  Drag(sizeInput, 2);
-  out.size2 = { gfx: T.graphics.grainSize, px: U.uGrainPx.value };
-  Drag(strengthInput, 0);
-  out.strength0 = { gfx: T.graphics.grain, uniform: U.uGrain.value };
-  Drag(strengthInput, 2);
-  out.strength2 = { gfx: T.graphics.grain, uniform: U.uGrain.value };
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem("tengxian1938_graphics_v1")); } catch (e) { saved = null; }
-  out.saved = saved ? { grain: saved.grain, grainSize: saved.grainSize } : null;
-  Drag(sizeInput, out.bootSize); Drag(strengthInput, out.bootGrain);   // 还原，不影响后面的取证
-  out.restored = { grain: T.graphics.grain, size: T.graphics.grainSize };
-  return out;
-});
-Check("画质面板：「颗粒」「颗粒大小」是真滑杆，拖动改到 graphics / 送屏 uniform / 存档",
-  grainSliders.found
-  && grainSliders.size2.gfx === 2 && grainSliders.size2.px > grainSliders.bootPx
-  && grainSliders.strength0.gfx === 0 && grainSliders.strength0.uniform === 0
-  && grainSliders.strength2.gfx === 2 && Math.abs(grainSliders.strength2.uniform - 2 * grainSliders.bootStrength) < 1e-6 * 100
-  && grainSliders.saved?.grain === 2 && grainSliders.saved?.grainSize === 2
-  && grainSliders.restored.grain === grainSliders.bootGrain && grainSliders.restored.size === grainSliders.bootSize,
-  grainSliders.found
-    ? `大小 ×2：px ${grainSliders.bootPx.toFixed(2)} → ${grainSliders.size2.px.toFixed(2)}；强度 0 → uGrain=${grainSliders.strength0.uniform}，×2 → uGrain=${grainSliders.strength2.uniform.toFixed(4)}（出厂 ${grainSliders.bootStrength.toFixed(4)}）；落盘 ${JSON.stringify(grainSliders.saved)}`
-    : `面板上找不到颗粒滑杆（颗粒=${grainSliders.strength} 颗粒大小=${grainSliders.size}）`);
+Check("画质面板：后处理美术参数已收口到 CameraProfile.standard，不再暴露给玩家",
+  frozenCameraProfile.leaked.length === 0 && frozenCameraProfile.profileId === "standard"
+  && frozenCameraProfile.taa === true && frozenCameraProfile.targets === true && frozenCameraProfile.grainUniform > 0,
+  JSON.stringify(frozenCameraProfile));
 
 // 第一人称自阴影：同样点真实按钮，并读回独立深度靶。只验 DOM/布尔位会放过
 // 「开关在、材质也注入了，但深度 pass 一直是清屏白色」这一类静默坏法。

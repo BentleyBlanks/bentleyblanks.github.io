@@ -36,7 +36,7 @@
 | `Clouds` | 云层 | 天空 | 旧云项 `cloudShape`、结构化层积云 `cloudDeck` 及按世界方位调节的低云带 |
 | `Atmosphere` | 物理大气 | 天空 | `atmosphere.*`：霾、瑞利、臭氧、辐照度、色调、大气透视 |
 | `Fog` | 雾 | 雾 | `fog.*`：浓度、高度衰减、最浓、雾色、朝阳增亮、去饱和 |
-| `Grade` | 曝光与调色 | 后期 | 曝光、饱和、对比、泛光、光束、镜头光晕、分离调色 `fog.grade.*`；**后期档案**（`profile`）决定自动曝光锚点、体积雾参数、胶片颗粒、照明弹昼夜口径按哪一档 `SKY_PRESETS` 查 |
+| `Grade` | 曝光与调色 | 后期 | 曝光、饱和、对比、泛光、光束、镜头光晕、分离调色 `fog.grade.*`；**后期档案**（`profile`）决定体积雾与照明弹昼夜口径按哪一档 `SKY_PRESETS` 查。**2026-11-28 CameraProfile 固化补充**：`Grade` 字段保留在预设 schema 中以保持数据兼容，运行时后处理参数（曝光、调色、泛光、颗粒等）统一锁定于 `CAMERA_PROFILES.standard`（白天基线），昼夜切换仅作用于天空、光照、反射、角色/武器光照与雾/体积雾，不再覆写后处理（口径见 [渲染管线 §1.1.1](Data_TechRenderPipeline.md)） |
 | `CharacterLight` | 角色光照 | 人物 | 补光强度 / 色（迎着镜头那面提亮，加在间接漫反射上）、轮廓光强度 / 色 / 收边（侧对镜头的边缘一圈，加在直接漫反射上）→ `characterLight.*`，由组件的 `Apply` 写进人物材质补丁 |
 | `WeaponLight` | 武器补光 | 人物 | 只照第一人称那把枪：补光 `fill`、高光 `spec`、色 `color`，枪的环境光 `ambient`、枪受的阳光 `sun`（1 = 跟场景一样）→ `weaponLight.*`，`Apply` 调 `host.weaponLight.Set` 写 `Script_FirstPersonSelfShadow` 的 uniform；口径见渲染管线 §6.12.1 |
 

@@ -53,7 +53,7 @@ const settings = new SettingsHost({
   },
 });
 ApplySavedSettings(settings.pageHost);
-const room = new CommandRoom(renderer, {isActive: () => !!menu?.open || settings.IsOpen,
+const room = new CommandRoom(renderer, {quality, isActive: () => !!menu?.open || settings.IsOpen,
   getMenuMode: () => settings.ActiveId || menu?.mode || 'title'});
 const previewValue = params.get('menuPreview');
 const preview = new CommandRoomPreview(room, () => Progress.Read(), /^[0-6]$/.test(previewValue ?? '') ? Number(previewValue) : null);
@@ -116,6 +116,7 @@ menu = new MainMenu({root: document.getElementById('menu'), camera, staticBackdr
   FirstLevelJump: stage => GoToSandbox('firstLevelP012Whitebox', {stage}),
 });
 const api = {renderer, camera, scene: room.scene, audio, state, menu, graphics, GraphicsProfile: graphicsProfile, StepFrames,
+  get post() { return room.post; },
   get MenuParticles() { return room.atmosphere?.particles ?? null; },
   Debug: {
     Menu: () => ({open: menu.open, live: menu.live, mode: menu.mode, items: menu.items.map(item => item.id),

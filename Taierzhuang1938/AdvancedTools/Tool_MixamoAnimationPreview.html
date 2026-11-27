@@ -130,6 +130,8 @@ import { AimAt, AimBandFor, PrepareRifleTrack, RifleTrackPose } from "./Script_M
 import { XBOT_CHARACTERS } from "./Data_XBotCharacters.mjs";
 import { ClipForCharacter } from "./Script_XBotCharacters.mjs";
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset } from "./Script_HairGroom.mjs";
+import { CreateStandardCameraPost, BuildStandardPostOptions } from "./Script_CameraProfile.mjs";
+import { MarkNoPrepass } from "./Script_Post.mjs";
 
 const BASE = "./Animation/Mixamo/";
 const FPS = 30;
@@ -137,18 +139,19 @@ const $ = id => document.getElementById(id);
 const loader = new GLTFLoader();
 
 // ---------- scene ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
 SetTextureImportRenderer(renderer);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
-renderer.outputColorSpace = THREE.SRGBColorSpace;
+const post = CreateStandardCameraPost(renderer, { width: 2, height: 2, quality: "high" });
 $("view").appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x24221e);
-scene.fog = new THREE.Fog(0x24221e, 14, 40);
+scene.background = new THREE.Color(0x35322d);
+scene.fog = new THREE.Fog(0x35322d, 14, 40);
 const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 200);
-scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a332a, 1.1));
-const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+scene.add(new THREE.HemisphereLight(0xfff4e0, 0x3a332a, 1.9));
+const sun = new THREE.DirectionalLight(0xffffff, 3.6);
+const sunDir = new THREE.Vector3(3, 6, 4).normalize();
 sun.position.set(3, 6, 4); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 20 });
@@ -167,10 +170,12 @@ ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground)
   room.add(new THREE.Mesh(sky, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide })));
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(room, 0.04).texture;
-  scene.environmentIntensity = 0.6;
+  scene.environmentIntensity = 1.0;
   pmrem.dispose();
 }
 const grid = new THREE.GridHelper(40, 80, 0x6e5a33, 0x47403a);
+MarkNoPrepass(grid.material);
+grid.userData.skipNormalDepth = true;
 grid.position.y = 0.001; scene.add(grid);
 
 // ---------- orbit ----------
@@ -204,8 +209,11 @@ let rows = [];
 
 function Resize() {
   const r = $("view").getBoundingClientRect();
-  renderer.setSize(r.width, r.height, false);
-  camera.aspect = r.width / Math.max(1, r.height); camera.updateProjectionMatrix();
+  const w = Math.max(2, Math.round(r.width)), h = Math.max(2, Math.round(r.height));
+  renderer.setSize(w, h, false);
+  const buf = renderer.getDrawingBufferSize(new THREE.Vector2());
+  post.SetSize(Math.max(2, buf.x), Math.max(2, buf.y));
+  camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 new ResizeObserver(Resize).observe($("view"));
 
@@ -973,11 +981,12 @@ function Frame() {
     t.z + orbit.dist * Math.cos(orbit.pitch) * Math.cos(orbit.yaw));
   camera.lookAt(t);
   activeGroom?.Update(dt, camera, renderer);
-  renderer.render(scene, camera);
+  post.Render(scene, camera, BuildStandardPostOptions({ sunDirection: sunDir, dt, steadyView: true }));
 }
 
 addEventListener("pagehide", event => {
   if (event.persisted) return;
+  post.Dispose();
   activeGroom?.Dispose();
   for (const promise of groomCache.values()) promise.then(DisposeHairGroomAsset).catch(() => {});
   hairAtlas?.then(atlas => atlas.dispose()).catch(() => {});

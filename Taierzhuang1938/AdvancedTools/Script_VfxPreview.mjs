@@ -48,13 +48,13 @@ async function Main() {
   vfx = new VfxSystem(stage.scene, stage.library, { quality, maxParticles: SCALE_PRESETS.medium.vfxBudget, lights: stage.lights });
   vfx.SetBloodSurface((from, direction, distance) => FlatRaycast(from, direction, distance));
   vfx.SetFallingSoilSurface({ groundAt: () => 0, raycast: (from, direction, distance) => FlatRaycast(from, direction, distance) });
-  vfx.SetDepthSource(null);
+  vfx.SetDepthSource(stage.post.NormalDepthTexture, stage.post.width, stage.post.height, stage.post.SceneDepthTexture);
   ApplyEnvironment();
 
   const host = {
     standalone: true,
     renderer: stage.renderer, scene: stage.scene, camera: stage.camera, canvas,
-    library: stage.library, lights: stage.lights, vfx, post: null,
+    library: stage.library, lights: stage.lights, vfx, post: stage.post,
     previewEnvironment: {
       get presetId() { return environment.presetId; },
       get lookId() { return environment.lookId; },
@@ -88,9 +88,14 @@ async function Main() {
     if (event.code === "Escape" && !event.target.closest?.("input, textarea, select")) shell.Return();
   });
 
+  const RenderStage = (dt) => {
+    vfx.SetDepthSource(stage.post.NormalDepthTexture, stage.post.width, stage.post.height, stage.post.SceneDepthTexture);
+    stage.post.SetGroundDustSource?.(vfx.dustFields || null);
+    stage.Render(dt);
+  };
   const Step = (dt) => {
     editor.Update(dt);
-    stage.Render();
+    RenderStage(dt);
   };
   const manual = params.get("manual") === "1";
   let last = performance.now();
@@ -106,7 +111,7 @@ async function Main() {
     StepFrames(count = 1, dt = 1 / 60) {
       const n = Math.max(0, Math.floor(count));
       for (let i = 0; i < n; i += 1) editor.Update(dt);
-      stage.Render();
+      RenderStage(dt);
     },
     Inspect: () => ({ environment: environment.State(), lights: stage.lights.Inspect(), exposure: stage.OutputExposure, editor: editor.Inspect() }),
   };

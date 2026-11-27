@@ -5,7 +5,9 @@ export const COMMAND_ROOM = Object.freeze({
   background: 0x26292c,
   cameraNear: 0.05,
   cameraFar: 80,
-  exposure: 2.05,
+  // 后处理固化走 CAMERA_PROFILES.standard（Hill ACES exposure = 0.78）；
+  // 原先使用 Three ACESFilmic exposure = 2.05（等价 Hill ACES 3.4167），按 3.4167 / 0.78 ≈ 4.38 标定室内线性光能量。
+  radianceScale: 4.38,
   depthOfField: Object.freeze({ focusMaterial: "CommandRoomLetter", focus: 1.3, range: .12, focusPadding: .025,
     aperture: 10, maxRadius: 3.2,
     panelBlur: 7.5, transitionSeconds: .18 }),

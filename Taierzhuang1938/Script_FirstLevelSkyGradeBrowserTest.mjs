@@ -107,7 +107,7 @@ try {
       bound: g.post.AoTexture === g.post.interiorSkyPass.combined?.texture,
       ssilBound: g.post.contactShadowsPass.uniformsCompose?.uSsil.value === g.post.interiorSkyPass.SsilTexture };
   }, { pose, withRooms });
-  await page.evaluate(() => { const g = window.Tengxian; g.graphics.autoExposure = false; g.ApplyGraphics(); });
+  await page.evaluate(() => { const g = window.Tengxian; g.post.SetAutoExposure(false); });
   const kitchenOn = await Shoot(Pose("09_2"), true);
   Check("第一关装上了室内遮蔽体，材质 AO 与 SSIL 都改采合成图", kitchenOn.stats.rooms >= 6 && kitchenOn.bound && kitchenOn.ssilBound,
     `${kitchenOn.stats.rooms} rooms / ${kitchenOn.stats.portals} portals: ${kitchenOn.stats.ids.join(",")} ssil=${kitchenOn.ssilBound}`);
@@ -131,7 +131,7 @@ try {
   const ev = await page.evaluate(async (poses) => {
     const g = window.Tengxian;
     const { SkyExposureFor } = await import("./Data_Tuning_Camera.mjs");
-    g.graphics.autoExposure = true; g.ApplyGraphics();
+    g.post.SetAutoExposure(true);
     const pass = g.post.exposurePass;
     pass.SetAnchorOverride({ logLum: null, evUp: 0, evDown: 0 });   // 只测不调
     const tool = g.editor.active, values = [];

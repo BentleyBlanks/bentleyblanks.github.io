@@ -19,6 +19,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexServer.mjs";
 import { TOOL_INFO } from "./Data_DevTools.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { CAMERA_PROFILES } from "./Data_CameraProfile.mjs";
 import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS } from "./AdvancedTools/Data_AdvancedTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
@@ -243,6 +244,12 @@ try {
     Check("载具栏只列九四式和八九式乙型", listedVehicles.join(",") === vehicleIds.join(","), listedVehicles.join(","));
     const ReadPixels = () => page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
+      if (stage.post) {
+        stage.post.frame = 0;
+        stage.post.hasTaaHistory = false;
+        stage.post.fxaaPass.grainClock = 0;
+        stage.post.fxaaPass.grainFrame = 0;
+      }
       stage.Draw();
       const copy = document.createElement("canvas");
       copy.width = stage.canvas.width;
@@ -250,29 +257,65 @@ try {
       const ctx = copy.getContext("2d");
       ctx.drawImage(stage.canvas, 0, 0);
       const data = ctx.getImageData(0, 0, copy.width, copy.height).data;
+      const useDepthMask = stage.channel.value === 0 && !stage.wireframe && !!stage.post?.targets?.normalDepth;
+      let nd = null, ndW = 0, ndH = 0;
+      if (useDepthMask) {
+        const rt = stage.post.targets.normalDepth;
+        ndW = rt.width; ndH = rt.height;
+        nd = new Uint16Array(ndW * ndH * 4);
+        stage.renderer.readRenderTargetPixels(rt, 0, 0, ndW, ndH, nd);
+      }
       let minX = copy.width, maxX = 0, count = 0, min = 255, max = 0, chromatic = 0, hash = 0;
       let dark = 0, midtone = 0;
-      for (let i = 3; i < data.length; i += 4) {
-        if (data[i] < 245) continue;
-        const x = ((i - 3) / 4) % copy.width;
-        const r = data[i - 3], g = data[i - 2], b = data[i - 1];
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        min = Math.min(min, r);
-        max = Math.max(max, r);
-        if (r < 16) dark += 1;
-        else if (r < 250) midtone += 1;
-        if (r !== g || g !== b) chromatic += 1;
-        hash = Math.imul(hash ^ ((r << 16) | (g << 8) | b), 16777619);
-        count += 1;
+      const sample = [];
+      for (let y = 0; y < copy.height; y++) {
+        const sampleRow = (y & 7) === 0;
+        for (let x = 0; x < copy.width; x++) {
+          const i = (y * copy.width + x) * 4;
+          const sampleCell = sampleRow && (x & 7) === 0;
+          let inside = false;
+          if (useDepthMask) {
+            const sx = Math.min(ndW - 1, Math.floor(x * ndW / copy.width));
+            const sy = Math.max(0, ndH - 1 - Math.floor(y * ndH / copy.height));
+            inside = (nd[(sy * ndW + sx) * 4 + 3] & 0x7fff) !== 0;
+          } else {
+            inside = data[i + 3] >= 245;
+          }
+          if (!inside) {
+            if (sampleCell) sample.push(-1, -1, -1);
+            continue;
+          }
+          const r = data[i], g = data[i + 1], b = data[i + 2];
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          min = Math.min(min, r);
+          max = Math.max(max, r);
+          if (r < 16) dark += 1;
+          else if (r < 250) midtone += 1;
+          if (r !== g || g !== b) chromatic += 1;
+          hash = Math.imul(hash ^ ((r << 16) | (g << 8) | b), 16777619);
+          if (sampleCell) sample.push(r, g, b);
+          count += 1;
+        }
       }
-      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, dark, midtone, chromatic, hash,
+      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, dark, midtone, chromatic, hash, sample,
         triangles: stage.model.triangles, quiet: stage.model.blade?.visible === false };
     });
+    const MeanSampleDiff = (a, b) => {
+      const n = Math.min(a.sample.length, b.sample.length);
+      let sum = 0, compared = 0;
+      for (let i = 0; i < n; i += 3) {
+        if (a.sample[i] < 0 || b.sample[i] < 0) continue;
+        sum += Math.abs(a.sample[i] - b.sample[i]) + Math.abs(a.sample[i + 1] - b.sample[i + 1]) + Math.abs(a.sample[i + 2] - b.sample[i + 2]);
+        compared += 3;
+      }
+      return compared ? sum / compared : Infinity;
+    };
     const pixels = await ReadPixels();
     Check("中正式真实模型在视口内居中且占主要宽度",
       pixels.count > 2500 && pixels.left > .03 && pixels.right < .97 && pixels.right - pixels.left > .60
-      && pixels.triangles === 6703 && pixels.quiet, JSON.stringify(pixels));
+      && pixels.triangles === 6703 && pixels.quiet,
+      JSON.stringify({ count: pixels.count, left: pixels.left, right: pixels.right, triangles: pixels.triangles, quiet: pixels.quiet }));
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
 
     const canvas = page.locator("#view");
@@ -314,7 +357,7 @@ try {
     }
     const views = Object.values(rendered);
     Check("汉阳造九个通道各自绘制模型并保持机位",
-      channelSelection && views.every((view) => view.count > 2500 && view.count === rendered.beauty.count)
+      channelSelection && views.every((view) => view.count > 2500 && Math.abs(view.count - rendered.beauty.count) <= rendered.beauty.count * 0.03)
       && new Set(views.map((view) => view.hash)).size === channels.length
       && (await CameraState()).join() === beforeChannels.join());
     Check("法线、切线、底色和反射保留色彩，粗糙度、金属度和阴影有真实灰阶",
@@ -322,7 +365,9 @@ try {
       && [rendered.roughness, rendered.metallic, rendered.shadow].every((view) => view.chromatic === 0 && view.max - view.min > 10)
       && rendered.shadow.min < 128 && rendered.shadow.max === 255);
     await Channel("beauty");
-    Check("切回完整材质恢复同一画面", (await ReadPixels()).hash === rendered.beauty.hash);
+    const restoredBeauty = await ReadPixels();
+    Check("切回完整材质恢复同一画面", MeanSampleDiff(restoredBeauty, rendered.beauty) < 4,
+      `diff=${MeanSampleDiff(restoredBeauty, rendered.beauty).toFixed(2)}`);
 
     const SampleTimber = () => page.evaluate(async () => {
       const { Raycaster, Vector3 } = await import("three");
@@ -468,13 +513,16 @@ try {
     Check("双指同向拖动平移检视中心", await page.evaluate((before) => window.WeaponInspection.scene.center.toArray()
       .some((value, index) => Math.abs(value - before[index]) > .001), centerBeforeTouchPan));
 
+    await page.evaluate(() => { window.WeaponInspection.scene.renderer.getContext().finish(); });
+    await Frames();
     await Touch("touchStart", [[cx, cy]]);
     await Touch("touchEnd", []);
     await Touch("touchStart", [[cx + 2, cy]]);
     await Touch("touchEnd", []);
     await Frames();
     const [, , tapZoom, ...tapCenter] = await CameraState();
-    Check("双击适配复位倍率和中心", tapZoom === 1 && tapCenter.every((value, index) => Math.abs(value - fitCenter[index]) < .001));
+    Check("双击适配复位倍率和中心", tapZoom === 1 && tapCenter.every((value, index) => Math.abs(value - fitCenter[index]) < .001),
+      JSON.stringify({ tapZoom, tapCenter, fitCenter }));
     await cdp.send("Emulation.setTouchEmulationEnabled", { enabled: false });
     await cdp.detach();
     await page.locator("#gridToggle").click();
@@ -541,9 +589,13 @@ try {
       && (await ReadPixels()).hash !== highlighted.hash
       && await page.evaluate(() => window.WeaponInspection.scene.selectionMaterial.wireframe));
     await wireframe.click();
-    Check("关闭线框恢复选中的完整材质画面", (await ReadPixels()).hash === highlighted.hash);
+    const afterWireframe = await ReadPixels();
+    Check("关闭线框恢复选中的完整材质画面", MeanSampleDiff(afterWireframe, highlighted) < 4,
+      `diff=${MeanSampleDiff(afterWireframe, highlighted).toFixed(2)}`);
     await meshSlot.click();
-    Check("再次点选清除高亮", await meshSlot.getAttribute("aria-pressed") === "false" && (await ReadPixels()).hash === originalModel.hash);
+    const afterDeselect = await ReadPixels();
+    Check("再次点选清除高亮", await meshSlot.getAttribute("aria-pressed") === "false" && MeanSampleDiff(afterDeselect, originalModel) < 4,
+      `diff=${MeanSampleDiff(afterDeselect, originalModel).toFixed(2)}`);
 
     const split = page.getByRole("button", { name: "双视口" });
     const single = page.getByRole("button", { name: "单视口" });
@@ -733,9 +785,11 @@ try {
     await page.close();
   }
 
-  // --- 3b. 特效预览 / 音效音乐独立窗口（2026-11-23 从工具宿主拆出）---------------------------
-  // 只装各自要预览的系统：特效窗口 = 特效系统 + 中性预览台 + 环境预设；声音窗口 = 音频引擎。
-  const MEDIA_FORBIDDEN = /\/Script_(Main|Post\w*|Light|Sky|Gi|Atmosphere|Materials|MaterialShading|World|ClusteredLights|ToolStudioRenderBase|TengxianCity|TengxianField)\.mjs|\/Data_(Battle|Tengxian|FirstLevelMissionLayout)\.mjs|\/__scene\//;
+  // --- 3b. 特效预览 / 音效音乐独立窗口（2026-11-23 从工具宿主拆出；2026-11-28 特效台接入统一 CameraProfile.standard）---
+  // 特效窗口复用统一后处理管线（Script_CameraProfile / Script_Post*，内部按帧图引用大气/光雾辅助模块），
+  // 但仍不装游戏主入口、GI、材质库、世界、摄影棚宿主与正片关卡数据；声音窗口完全不装 three 或任何渲染/后处理模块。
+  const VFX_FORBIDDEN = /\/Script_(Main|Materials|MaterialShading|World|ToolStudioRenderBase|TengxianCity|TengxianField)\.mjs|\/Data_(Battle|Tengxian|FirstLevelMissionLayout)\.mjs|\/__scene\//;
+  const AUDIO_FORBIDDEN = /\/Script_(Main|Post\w*|CameraProfile|Light|Sky|Gi|Atmosphere|Materials|MaterialShading|World|ClusteredLights|ToolStudioRenderBase|TengxianCity|TengxianField)\.mjs|\/Data_(Battle|Tengxian|FirstLevelMissionLayout)\.mjs|\/__scene\//;
   if (!only || only.has("vfx")) {
     const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=vfx&effect=ExplosionGrenade`, { waitUntil: "commit" });
     await legacy.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_VfxPreview.html") && url.searchParams.get("effect") === "ExplosionGrenade");
@@ -767,7 +821,7 @@ try {
     Check("特效窗口：视口不是一片纯色", spread > 12, `spread=${spread.toFixed(1)}`);
     if (shots) await fs.writeFile(path.join(shotDir, "VfxPreview_FireMedium.png"), buffer);
 
-    // 换昼夜：灯与曝光取预设那一档的数值，不是写死的一套
+    // 换昼夜：灯与天光取预设那一档的数值；后处理曝光锁定为标准 CameraProfile（昼夜不再改后处理）
     const looks = {};
     for (const look of fire.looks) {
       await page.locator("[data-vfx-environment]").selectOption(look);
@@ -775,12 +829,13 @@ try {
       looks[look] = await page.evaluate(() => {
         const v = window.VfxPreview;
         return { look: v.environment.lookId, sun: v.stage.lights.sun.intensity, wanted: v.environment.env.lightIntensity,
-          exposure: v.stage.OutputExposure, wantedExposure: v.environment.env.exposure, probe: v.stage.lights.globalProbe.intensity,
+          exposure: v.stage.OutputExposure, profile: v.stage.post?.cameraProfileId, probe: v.stage.lights.globalProbe.intensity,
           wantedProbe: v.environment.env.shProbeIntensity, flareScale: v.stage.lights.flareSceneScale };
       });
     }
-    Check("特效窗口：每一档的主光、天光与曝光都等于环境预设拼出来的值",
-      Object.entries(looks).every(([id, s]) => s.look === id && Math.abs(s.sun - s.wanted) < 1e-6 && Math.abs(s.exposure - s.wantedExposure) < 1e-6
+    Check("特效窗口：每一档的主光与天光等于环境预设拼出来的值，后处理曝光固化为标准 CameraProfile",
+      Object.entries(looks).every(([id, s]) => s.look === id && Math.abs(s.sun - s.wanted) < 1e-6
+        && Math.abs(s.exposure - CAMERA_PROFILES.standard.exposure) < 1e-6 && s.profile === CAMERA_PROFILES.standard.id
         && Math.abs(s.probe - s.wantedProbe) < 1e-6) && new Set(Object.values(looks).map((s) => s.sun)).size > 1, JSON.stringify(looks));
     const presetOptions = await page.locator("[data-vfx-env-preset] option").evaluateAll((options) => options.map((option) => option.value));
     if (presetOptions.length > 1) {
@@ -804,8 +859,8 @@ try {
       JSON.stringify({ look: flare.look, shadow: flare.shadowLight, scale: flare.lights.flareSceneScale, phase: flare.flare?.flares?.[0]?.phase }));
     const flareShot = await page.screenshot();
     if (shots) await fs.writeFile(path.join(shotDir, "VfxPreview_IlluminationNight.png"), flareShot);
-    Check("特效窗口：不加载游戏的灯光装置、后处理、天空、材质库与关卡", !requests.some((url) => MEDIA_FORBIDDEN.test(url)),
-      requests.filter((url) => MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
+    Check("特效窗口：复用标准后处理，不加载游戏的灯光装置、天空、材质库与关卡", !requests.some((url) => VFX_FORBIDDEN.test(url)),
+      requests.filter((url) => VFX_FORBIDDEN.test(url)).slice(0, 4).join(", "));
     Check("特效窗口：没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
     await page.close();
   }
@@ -872,8 +927,8 @@ try {
     Check("音效窗口：环境与音乐各自都能停", stopped.ambience === "silence" && stopped.music === null && !stopped.musicLive, JSON.stringify(stopped));
     if (shots) await page.screenshot({ path: path.join(shotDir, "AudioPreview.png") });
     Check("音效窗口：不建渲染器、不加载 three 与任何渲染模块、不加载 Data_DevTools", audio.canvas === 0
-      && !requests.some((url) => /\/vendor\/three\/|\/Script_(Vfx|Particle\w*|EditorStage|EditorMediaEntry)\.mjs|\/Data_DevTools\.mjs/.test(url) || MEDIA_FORBIDDEN.test(url)),
-      requests.filter((url) => /\/vendor\/three\/|Script_(Vfx|Particle|EditorMediaEntry)|Data_DevTools/.test(url) || MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
+      && !requests.some((url) => /\/vendor\/three\/|\/Script_(Vfx|Particle\w*|EditorStage|EditorMediaEntry)\.mjs|\/Data_DevTools\.mjs/.test(url) || AUDIO_FORBIDDEN.test(url)),
+      requests.filter((url) => /\/vendor\/three\/|Script_(Vfx|Particle|EditorMediaEntry)|Data_DevTools/.test(url) || AUDIO_FORBIDDEN.test(url)).slice(0, 4).join(", "));
     Check("音效窗口：没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
     await page.close();
   }

@@ -757,6 +757,12 @@ export class PostPipeline {
       // 所有边全画出来（Unity 的 Wireframe 同样不做隐藏线消除）。
       renderer.setClearColor(WIRE_BACKGROUND_PURE, 1);
       renderer.clear(true, true, false);
+    } else if (typeof ctx.options?.renderLinearHdr === "function") {
+      // 线性 HDR 自定义注入（例如标题菜单指挥室的窗光体积与局部景深合成），
+      // 之后照常进入标准 CameraProfile 的 TAA / 自动曝光 / Bloom / 合成 / 颗粒链。
+      renderer.setClearColor(0x000000, 1);
+      renderer.clear(true, true, false);
+      ctx.options.renderLinearHdr(renderer, this.targets.hdr, ctx);
     } else {
       renderer.setClearColor(0x000000, 1);
       renderer.clear(true, true, false);

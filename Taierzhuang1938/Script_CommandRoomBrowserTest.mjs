@@ -260,30 +260,54 @@ try {
   assert.ok(result.dust.movingPixels>30&&result.dust.visiblePixels>15,"World-space motes must produce visible moving pixels, not just advance a clock");
   assert.ok(result.dust.glintPixels>4&&result.dust.peakGlint>.05,"Occasional dust glints must add real HDR highlights beyond the matte dust");
   result.optics=await page.evaluate(()=>{
-    const Read=()=>{room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+    // 锁定单帧后处理相位（TAA 抖动与 35mm 颗粒种子）以孤立比较 DoF 开关前后的像素差；
+    // 同时直接读取 atmosphere 线性 HDR 输出，核对 DoF 自身在信纸内像素上误差严格为 0，
+    // 最终经过 CameraProfile.standard（6 级 Bloom + 80×45 LocalTonemap）后的全屏微耦合仍保持清晰。
+    const Read=()=>{
+      if(room.post){room.post.frame=0;room.post.hasTaaHistory=false;room.post.fxaaPass.grainClock=0;room.post.fxaaPass.grainFrame=0;}
+      room.lastDt=0;room.Render();
+      const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;
+    };
+    const ReadHdr=()=>{
+      const rt=new THREE.WebGLRenderTarget(1280,720,{type:THREE.FloatType});
+      try{
+        room.UpdateLetterFocus();
+        room.atmosphere.Render(room.camera,room.time,rt);
+        const p=new Float32Array(1280*720*4);renderer.readRenderTargetPixels(rt,0,0,1280,720,p);return p;
+      }finally{renderer.setRenderTarget(null);rt.dispose();}
+    };
     const dof=room.atmosphere.compositeMaterial.uniforms.dof.value,aperture=dof.z;
-    const soft=Read();dof.z=0;const sharp=Read();dof.z=aperture;room.Render();
+    const soft=Read(),softHdr=ReadHdr();dof.z=0;const sharp=Read(),sharpHdr=ReadHdr();dof.z=aperture;room.Render();
     let changed=0,backgroundChanged=0;for(let i=0;i<soft.length;i+=4)if(Math.abs(soft[i]-sharp[i])>2){changed++;if(i/(1280*4)>400)backgroundChanged++;}
     // Independently ray-pick interior paper pixels, then compare actual GPU
     // outputs with DOF on/off. A globally disabled blur cannot pass both gates.
     const mesh=LetterMesh(),ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),bounds=LetterFocus().bounds;
-    let paperSamples=0,paperDifference=0,maxPaperDifference=0;
+    let paperSamples=0,paperDifference=0,maxPaperDifference=0,hdrDifference=0,maxHdrDifference=0;
     for(let y=Math.ceil(bounds[1]);y<bounds[1]+bounds[3];y+=4)for(let x=Math.ceil(bounds[0]);x<bounds[0]+bounds[2];x+=4){
       ndc.set((x+.5)/1280*2-1,1-(y+.5)/720*2);ray.setFromCamera(ndc,room.camera);
       const hit=ray.intersectObject(mesh,false)[0];if(!hit||hit.uv.x<.1||hit.uv.x>.9||hit.uv.y<.1||hit.uv.y>.9)continue;
-      const pixel=((719-y)*1280+x)*4;for(let c=0;c<3;c++){const delta=Math.abs(soft[pixel+c]-sharp[pixel+c]);paperDifference+=delta;maxPaperDifference=Math.max(maxPaperDifference,delta);}paperSamples++;
+      const pixel=((719-y)*1280+x)*4;for(let c=0;c<3;c++){
+        const delta=Math.abs(soft[pixel+c]-sharp[pixel+c]);paperDifference+=delta;maxPaperDifference=Math.max(maxPaperDifference,delta);
+        const hd=Math.abs(softHdr[pixel+c]-sharpHdr[pixel+c]);hdrDifference+=hd;maxHdrDifference=Math.max(maxHdrDifference,hd);
+      }paperSamples++;
     }
     let glass=null;room.scene.traverse(o=>{if(o.material?.name==='CommandRoomInkGlass')glass={transmission:o.material.transmission,thickness:o.material.thickness,reflection:!!o.material.envMap};});
-    return {changed,backgroundChanged,glass,paperSamples,paperMeanDifference:paperDifference/(paperSamples*3),maxPaperDifference};
+    return {changed,backgroundChanged,glass,paperSamples,paperMeanDifference:paperDifference/(paperSamples*3),maxPaperDifference,
+      hdrPaperMeanDifference:hdrDifference/(paperSamples*3),maxHdrPaperDifference:maxHdrDifference};
   });
   assert.ok(result.optics.changed>200,"Depth of field must affect actual scene pixels");
   assert.ok(result.optics.backgroundChanged>1000,"The background still has real depth blur");
-  assert.ok(result.optics.paperSamples>500&&result.optics.paperMeanDifference<.1&&result.optics.maxPaperDifference<=1,
-    "Actual letter text pixels must be as sharp as the no-DOF image");
+  assert.ok(result.optics.paperSamples>500&&result.optics.hdrPaperMeanDifference===0&&result.optics.maxHdrPaperDifference===0
+    &&result.optics.paperMeanDifference<1&&result.optics.maxPaperDifference<=4,
+    `Actual letter text pixels must be as sharp as the no-DOF image: ${JSON.stringify(result.optics)}`);
   assert.ok(result.optics.glass.transmission>.9&&result.optics.glass.thickness>0&&result.optics.glass.reflection,"Bottle uses thick transmitting glass with room reflections");
   result.panelFocus=await page.evaluate(()=>{
-    // Freeze animated fog noise so the return comparison measures focus alone.
-    const Read=()=>{room.time=10;room.Render();const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;};
+    // Freeze animated fog noise and CameraProfile temporal state (TAA/GTAO/SSR/grain) so the return comparison measures focus alone.
+    const Read=()=>{
+      if(room.post){room.post.NotifyCameraCut();room.post.frame=0;room.post.fxaaPass.grainClock=0;room.post.fxaaPass.grainFrame=0;}
+      room.lastDt=0;room.time=10;room.Render();
+      const gl=renderer.getContext(),p=new Uint8Array(1280*720*4);gl.readPixels(0,0,1280,720,gl.RGBA,gl.UNSIGNED_BYTE,p);return p;
+    };
     const EdgeEnergy=p=>{let e=0;for(let y=80;y<640;y++)for(let x=700;x<1150;x++){
       const i=(y*1280+x)*4;e+=Math.abs(p[i]-p[i+4])+Math.abs(p[i]-p[i+1280*4]);}return e;};
     room.dust.visible=false;const title=Read();room.SetMenuMode("levels");
@@ -300,7 +324,7 @@ try {
   assert.ok(focus.entering>0&&focus.entering<.15&&focus.half>focus.entering&&focus.half<.8,"Opening a panel eases through intermediate focus values");
   assert.ok(focus.reversing<focus.half&&focus.reversing>0&&focus.reversedAgain>focus.reversing&&focus.reversedAgain<.8,"Rapid reversals continue from the current focus, without a snap");
   assert.ok(focus.changed>50000&&focus.panelEdges<focus.titleEdges*.45,"Secondary background must be visibly softer in the rendered pixels");
-  assert.ok(focus.settled>.999&&focus.returnedDifference<.1,"Returning to title restores its original depth of field");
+  assert.ok(focus.settled>.999&&focus.returnedDifference<.1,`Returning to title restores its original depth of field: ${JSON.stringify(focus)}`);
   await page.emulateMedia({reducedMotion:"reduce"});
   assert.equal(await page.evaluate(()=>{room.SetMenuMode("levels");return Advance(1/60).presentation.panelFocus;}),1);
   assert.equal(await page.evaluate(()=>{room.SetMenuMode("title");return Advance(1/60).presentation.panelFocus;}),0);
