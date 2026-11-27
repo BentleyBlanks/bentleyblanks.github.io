@@ -1,14 +1,22 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v29
+## 当前交付版 v30
 
-游戏使用 `511-seated-plate-29`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-service-wear-30`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 尾盘轮廓与材质使用痕迹
+
+按用户第一人称参考图调整尾盘外圈，缩小单侧外凸，收顺圆面与侧壁的过渡并降低盘面点纹的微法线幅度。局部重烘尾盘、钢环、覆壳及木托上的接触遮蔽。
+
+木托握持区烘入旧漆磨薄、顺纹擦痕和局部积污色。覆壳和周围钢件用底色与粗糙度形成断续磨亮的倒角。尾盘下方钢片增加沿形的斑驳磨光与细擦痕。采用材质通道、同机位斜光与第一人称作为核对视图。 [使用痕迹与尾盘修整脚本](../../_blender/Script_Type38ServiceWear.py)
+
+局部重烘可用 `Script_Type38ServiceWear.py --input <v29 资产目录> --output <输出目录>`。
 
 ## 尾盘下方的钢片贴合缝 · 2026-11-27
 

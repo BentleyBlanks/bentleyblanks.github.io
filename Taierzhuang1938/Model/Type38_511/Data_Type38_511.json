@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 37,
+  "version": 39,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "49f58f3998759f7f5da27b3745078e164b174be436773f1c8d9e6a557bdd907b",
+  "runtimeSha256": "f06f1e7f1a6abe391825b084116f621e07cdbaae54ad8dd993410371e8de1005",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 79894,
@@ -64,14 +64,14 @@
     {
       "index": 5,
       "name": "Texture_Type38_BodyBatch03_baseColorTexture",
-      "bytes": 1350019,
-      "sha256": "204d2ab97aeae2dfe2a69b0575c9f17ec1404e16e5b9979c6abfc44ec2ce9c2b"
+      "bytes": 1450705,
+      "sha256": "80213b5ee27b31e5c14041eb4dfd24509a4738eaf9c64f96c3312867e129e5e3"
     },
     {
       "index": 6,
       "name": "Texture_Type38_BodyBatch03_metallicRoughnessTexture",
-      "bytes": 1505382,
-      "sha256": "ac92f5f2deaf82ccf02824152c059619d9c6febd6ef09d93086cb431ff39e5bd"
+      "bytes": 1534402,
+      "sha256": "bb82a8b50fcdbce324c27a41486b2409da1c870874bd1d5c5a15763c30178851"
     },
     {
       "index": 7,
@@ -118,8 +118,8 @@
     {
       "index": 14,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 518106,
-      "sha256": "1b7537f0d782ec528cf0d45cc6a05a8f854c1e39516a660eef0e94683d97532e"
+      "bytes": 555909,
+      "sha256": "43672d914dd5bf81c2d2dd9116aae56c8d6c9533a0f4a374048b1d8968b30835"
     },
     {
       "index": 15,
@@ -136,14 +136,14 @@
     {
       "index": 17,
       "name": "Texture_Type38Sample05Base",
-      "bytes": 509585,
-      "sha256": "1b41388f0741aa9537710c3a0bfe9b8b94796d385e7967bfeb7d4b7ac71a0150"
+      "bytes": 589878,
+      "sha256": "6b4403ea092b3909bddf7cb2bf547cf9953edfbd2c03f2685329f3d1ff186241"
     },
     {
       "index": 18,
       "name": "Texture_Type38Sample05Orm",
-      "bytes": 688079,
-      "sha256": "0cb7d7b4d90c5100a8c713daf3c63b01a397ac01624be7f590ce81441c9016f9"
+      "bytes": 707957,
+      "sha256": "d54140d03ea27a4c658705e6db3b9dcae3508f9d36b21ae806541594afa95760"
     },
     {
       "index": 19,
@@ -238,20 +238,20 @@
     {
       "index": 34,
       "name": "Texture_Type38_CoverBatch14_normalTexture",
-      "bytes": 1394063,
-      "sha256": "4f72df9136339c5423914d77928129a920fb892f17f95c34c298a772028a6507"
+      "bytes": 1398237,
+      "sha256": "391ffffb9ae43a605c3327c4a57147ae94db007323c735ce95423d3394434f89"
     },
     {
       "index": 35,
       "name": "Texture_Type38_CoverBatch14_baseColorTexture",
-      "bytes": 1108617,
-      "sha256": "27e158edfc0ab2bb03edae8e630f08074fcc2a380b7589b990c8abdb959757d4"
+      "bytes": 1226916,
+      "sha256": "07f0467480af830b023555ab3e78209d6756e39705c9a525d4b9d1416d3a5680"
     },
     {
       "index": 36,
       "name": "Texture_Type38_CoverBatch14_metallicRoughnessTexture",
-      "bytes": 1303936,
-      "sha256": "06dac11b81440aff7e039ea0f39638ff7fc6e8974af7ba43b973ff646d78e19d"
+      "bytes": 1341536,
+      "sha256": "721f741530bc1a7fabfdf721d394d1386f9e24a86bc7827d46faf428b8200721"
     },
     {
       "index": 37,
@@ -298,8 +298,8 @@
     {
       "index": 44,
       "name": "Texture_Type38Sample35Orm",
-      "bytes": 253546,
-      "sha256": "8eb033f7040ed2028f1156d5bdb13144ff85b44f54f711115b8cba095b8791e1"
+      "bytes": 251977,
+      "sha256": "241839b8b94ee6468ecf6c7eab0207204f0e9bb9bd0c7f83e379c0ec79f9678e"
     },
     {
       "index": 45,
@@ -334,8 +334,8 @@
     {
       "index": 50,
       "name": "Texture_Type38Sample37Normal",
-      "bytes": 228446,
-      "sha256": "a8a5bc3fd86afcb1559241a43b9f11fd15448b49f0f7ee278d832fc1d14ae2e4"
+      "bytes": 223657,
+      "sha256": "72fa209da80c519efe078009e300ccadefba3ce8cf604622053b2be757c80ced"
     },
     {
       "index": 51,
@@ -346,14 +346,14 @@
     {
       "index": 52,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 230513,
-      "sha256": "6a26588b7f4a4b72863847ef7153971969c4665ec079f0ac8a9013ddad70d4af"
+      "bytes": 230323,
+      "sha256": "78b1f6e6515de692d9436762e222087788d1e813d6887ad693b18180c96fa121"
     },
     {
       "index": 53,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 2195246,
-      "sha256": "943190f8a4b3498a8886052c8b0085282e9fe2fd439cbc8b839eb43cbdbcfa59"
+      "bytes": 2237639,
+      "sha256": "9e795c5802390c9d4277eabdb211b8be0ceefcc96043631893e116d627e9c393"
     },
     {
       "index": 54,
@@ -364,20 +364,20 @@
     {
       "index": 55,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 2399041,
-      "sha256": "e289f2a17123f17ded4f49d247e4f0deb95cac1605acf67e63a4e36bf1dd1f8e"
+      "bytes": 2400680,
+      "sha256": "e890298fb126bd9846c6457d56b964071f200fc3fd7d446af5eddf95412e7371"
     },
     {
       "index": 56,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2295439,
-      "sha256": "1e89546d2f77f42637da09c54df754fe425aa876ea6c8c8b9d0cf84e8268b7b5"
+      "bytes": 2358649,
+      "sha256": "cb98353b518d750eb548b42c2c2f6b6651d12b74a68a4a83431993cdc0ee1a27"
     },
     {
       "index": 57,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 2453981,
-      "sha256": "d42702e6b6c20c2fd772337fbfbff5c6b7afbf55bef1ea5be9faf51ae3e2eeb2"
+      "bytes": 2471263,
+      "sha256": "2b33699d8a16b6e47d0645e8184bf1191d638c34e32f1bf0cdda7ffc67a57d8b"
     },
     {
       "index": 58,
@@ -1039,6 +1039,40 @@
     "coveredFaceSamples": 0,
     "aoImages": [
       6,
+      57
+    ]
+  },
+  "serviceWear": {
+    "parts": [
+      "Exterior_SeatedTang05",
+      "T38_430B_IndependentLeftCoverSkin",
+      "T38_430B_RetainedRightCoverHalf",
+      "T38_430L_VisibleUpperShoulderCoordination",
+      "T38_440D2_IndependentVisibleRecess",
+      "T38_460G_WoodGroove_VisualCandidate",
+      "Wood_UpperFittedCrown05"
+    ],
+    "images": [
+      5,
+      6,
+      14,
+      17,
+      18,
+      34,
+      35,
+      36,
+      50,
+      53,
+      55,
+      56,
+      57
+    ],
+    "diskOutlineRatio": 1.095408320426941,
+    "contactImages": [
+      6,
+      36,
+      44,
+      52,
       57
     ]
   }
