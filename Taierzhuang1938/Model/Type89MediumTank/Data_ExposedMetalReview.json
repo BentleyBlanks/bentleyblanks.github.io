@@ -1,0 +1,92 @@
+{
+  "schema": "Type89ExposedMetalReviewV1",
+  "revision": "SurfaceV19",
+  "geometryVersion": "20261126GeometryV55",
+  "baseline": "SurfaceV18",
+  "baselineRuntimeSha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+  "profileSha256": "ec3de95fcd8c4ea29d0f797deb12aae8cf361de8cacd71b4ea4d40dd23b39541",
+  "regions": {
+    "paintExposure": {
+      "coreTexels": 3545,
+      "affectedUvTexels": 15564,
+      "oldMedian": 0.2392,
+      "newMedian": 0.851,
+      "oldP90": 0.3216,
+      "newP90": 0.9412
+    },
+    "steelHardware": {
+      "coreTexels": 15326,
+      "affectedUvTexels": 17322,
+      "oldMedian": 0.7216,
+      "newMedian": 0.8471,
+      "oldP90": 0.7686,
+      "newP90": 0.8745
+    },
+    "trackContact": {
+      "coreTexels": 138275,
+      "affectedUvTexels": 195556,
+      "oldMedian": 0.5373,
+      "newMedian": 0.902,
+      "oldP90": 0.7961,
+      "newP90": 0.902
+    }
+  },
+  "maps": {
+    "Texture_Type89GameBodyBase.png": {
+      "size": [
+        4096,
+        4096
+      ],
+      "changedTexels": 39011,
+      "pixelSha256": "62d9a1bfdd139c094b0a1408e73d833aed3a7e6b2025a73b55e09bf02a6568e4",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameBodyOrm.png": {
+      "size": [
+        4096,
+        4096
+      ],
+      "changedTexels": 39011,
+      "pixelSha256": "108ac37d7f23acaf0fc3b3ca94c9f41b49ad0622caa55dfefb555e4cb665a223",
+      "metallicSha256": "6a0bc26f39aa0792ef7694a69789c1aa6007cd02a4d6ebd292f2ce23817e7641"
+    },
+    "Texture_Type89GameTrackBase.png": {
+      "size": [
+        2048,
+        2048
+      ],
+      "changedTexels": 200926,
+      "pixelSha256": "10b6b3a56d394bb4685ad9cf4533e1b1a2ce9d5b4f64ecf7d76da79e47775658",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameTrackOrm.png": {
+      "size": [
+        2048,
+        2048
+      ],
+      "changedTexels": 202133,
+      "pixelSha256": "a66971077fa12cc2ce73f67c675e72890847da1a59a18c4789cce832252bff5b",
+      "metallicSha256": "7edce8cf4d5d940559017796fc3ec81d1684b8c8a2d8b985fcd0c5eb7884cd62"
+    }
+  },
+  "runtime": {
+    "nodes": 530,
+    "meshInstances": 269,
+    "renderedTriangles": 79997,
+    "revision": "SurfaceV19",
+    "baselineRuntimeSha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+    "profileSha256": "ec3de95fcd8c4ea29d0f797deb12aae8cf361de8cacd71b4ea4d40dd23b39541",
+    "highSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+    "aoChannelExact": true,
+    "sha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
+    "bytes": 39506640,
+    "verifiedUntouchedPayloads": 800,
+    "gameSourceSha256": "7ff405ef5729250d1d004fdb94d4d9649fca4963545f6ee3ec462540dd33c555"
+  },
+  "verification": {
+    "weaponInspectionPairs": 8,
+    "renderer": "WeaponInspection",
+    "verifiedRevision": "SurfaceV19",
+    "localEvidence": "Review/WeaponInspection, Review/Comparisons, Review/Blender"
+  }
+}

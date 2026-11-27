@@ -1,0 +1,65 @@
+{
+  "schema": "Type89ExposedMetalProfileV1",
+  "revision": "SurfaceV19",
+  "baseline": "SurfaceV18",
+  "baselineRuntimeSha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+  "geometryVersion": "20261126GeometryV55",
+  "paintExposure": {
+    "maskRamp": [
+      0.13,
+      0.59
+    ],
+    "metallic": 0.94,
+    "roughness": 0.54,
+    "reflectanceFloorSrgb": [
+      151,
+      149,
+      142
+    ],
+    "colorBlend": 0.79,
+    "roughnessBlend": 0.85
+  },
+  "trackContact": {
+    "cleanContactRamp": [
+      0.22,
+      0.77
+    ],
+    "coveredRamp": [
+      0.13,
+      0.51
+    ],
+    "leadingBandM": [
+      0.031,
+      0.061
+    ],
+    "metallic": 0.9,
+    "roughness": 0.46,
+    "reflectanceFloorSrgb": [
+      143,
+      139,
+      126
+    ],
+    "colorBlend": 0.77,
+    "roughnessBlend": 0.91
+  },
+  "steelHardware": {
+    "meshes": [
+      "Mesh_BowMgJacket",
+      "Mesh_TurretMachineGun"
+    ],
+    "metallicRamp": [
+      0.5,
+      0.79
+    ],
+    "strength": 0.82,
+    "metallic": 0.9,
+    "roughness": 0.54,
+    "reflectanceFloorSrgb": [
+      117,
+      118,
+      116
+    ],
+    "colorBlend": 0.6,
+    "roughnessBlend": 0.82
+  }
+}

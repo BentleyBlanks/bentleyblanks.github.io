@@ -56,7 +56,7 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV18",
+  "materialRevision": "SurfaceV19",
   "runtimeTriangleTarget": 80000,
   "runtimeTriangleCeiling": 80000,
   "runtimeRenderedTriangles": 79997,
@@ -73,7 +73,7 @@
   "status": "AuthorReviewedWithDeclaredInferences",
   "reviewedAt": "2026-11-27",
   "reviewScope": "V6 registered front, left and top finish, neutral inspection, packed GLB and mechanism review",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV18",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV19",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
@@ -81,7 +81,7 @@
   "materialReview": "Data_BattleWearReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+  "runtimeSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -124,7 +124,8 @@
       "Retain SurfaceV15 AO, guard alpha and protected badge/non-metal footprints",
       "V6 anchors are traced in the G55 cameras and projected onto visible rest-pose armour.",
       "Bake the finish, shallow relief and local dirt occlusion over the V16 photographed-material calibration; four shoe-local texture variants and independent physical mud deposits.",
-      "SurfaceV18 two-distance contact AO from assembled geometry, with separate receiving UVs for rigid moving groups."
+      "SurfaceV18 two-distance contact AO from assembled geometry, with separate receiving UVs for rigid moving groups.",
+      "SurfaceV19 raises only genuinely exposed steel on the painted impact witnesses, the clean tread lands and the exposed steel jackets."
     ],
     "extensions": [
       "KHR_materials_clearcoat",
@@ -140,7 +141,8 @@
   ],
   "exportTriangulationZeroAreaTriangles": 0,
   "exporterOmittedTriangles": 58,
-  "highSourceSha256": "100be20f1fac15c4fa71d3fcaaf13610bca6123a97a8e4443b83f05c97175232",
-  "materialHighSourceSha256": "100be20f1fac15c4fa71d3fcaaf13610bca6123a97a8e4443b83f05c97175232",
-  "materialOcclusionReview": "Data_AmbientOcclusionReview.json"
+  "highSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+  "materialHighSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+  "materialOcclusionReview": "Data_AmbientOcclusionReview.json",
+  "exposedMetalReview": "Data_ExposedMetalReview.json"
 }

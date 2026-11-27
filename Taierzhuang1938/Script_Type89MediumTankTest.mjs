@@ -514,7 +514,7 @@ if(paintFinish){
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
   }
 }
-if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18'].includes(contract.materialRevision)) {
+if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.materialRevision)) {
   const profileFile = path.join(here,'Model/Type89MediumTank/Data_MetalFinishProfile.json');
   const profileBytes = Buffer.from(fs.readFileSync(profileFile,'utf8').replace(/\r\n/g,'\n'));
   const profile = JSON.parse(profileBytes);
@@ -558,7 +558,7 @@ if (contract.materialRevision === 'SurfaceV16') {
   Check(lands.length>=8&&webs.length>=8&&land[0]+.16<web[0]&&land[1]>web[1]+.21,
     'Baked tread lands are smoother and more conductive than their cast webs',JSON.stringify({land,web}));
 }
-if (['SurfaceV17', 'SurfaceV18'].includes(contract.materialRevision)) {
+if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.materialRevision)) {
   const recipeFile=path.join(here,'Model/Type89MediumTank/Data_BattleWearProfile.json');
   const recipeBytes=Buffer.from(fs.readFileSync(recipeFile,'utf8').replace(/\r\n/g,'\n'));
   const recipe=JSON.parse(recipeBytes);
@@ -594,12 +594,12 @@ if (['SurfaceV17', 'SurfaceV18'].includes(contract.materialRevision)) {
     && trackImage.info.width===2048 && trackImage.info.height===2048,
   'All articulated shoes share unchanged shape and tangents and use four distinct tread atlas tiles');
 }
-if (contract.materialRevision === 'SurfaceV18') {
+if (['SurfaceV18','SurfaceV19'].includes(contract.materialRevision)) {
   const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_AmbientOcclusionReview.json'),'utf8'));
   const recorded=g.asset.extras?.Type89AmbientOcclusion;
   Check(recorded?.revision===audit.revision && recorded?.baselineRuntimeSha256===audit.baselineRuntimeSha256
     && recorded?.packedOrmRedOnly===true && recorded?.bandsMetres?.join(',')==='0.042,0.145'
-    && g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras.surfaceRevision===audit.revision,
+    && g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras.surfaceRevision===contract.materialRevision,
   'The game GLB binds the two-distance assembled AO to the Type89 release');
   for (const [group,role] of [['Body','Armor'],['Track','Track'],['Guard','Guard']]) {
     const material=g.materials.find(value=>value.extras?.Type89Role===role);
@@ -610,6 +610,29 @@ if (contract.materialRevision === 'SurfaceV18') {
     Check(createHash('sha256').update(red).digest('hex')===witness.redSha256
       && (material.occlusionTexture.strength??1)===1,
     'Actual full-strength ORM visibility matches the saved contact bake: '+group);
+  }
+}
+if (contract.materialRevision === 'SurfaceV19') {
+  const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalReview.json'),'utf8'));
+  const finish=g.asset.extras?.Type89ExposedMetal;
+  const recipe=Buffer.from(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalProfile.json'),'utf8').replace(/\r\n/g,'\n'));
+  Check(finish?.revision===contract.materialRevision && finish?.aoChannelExact===true
+    && finish?.profileSha256===createHash('sha256').update(recipe).digest('hex'),
+  'Localized metal correction uses the reviewed mask ramps and retains SurfaceV18 AO');
+  for (const [group,role] of [['Body','Armor'],['Track','Track']]) {
+    const material=g.materials.find(material=>material.extras?.Type89Role===role);
+    const atlas=await ImageFor(material.pbrMetallicRoughness.metallicRoughnessTexture);
+    const metal=Buffer.alloc(atlas.info.width*atlas.info.height);
+    for (let i=0;i<metal.length;i++) metal[i]=atlas.data[i*4+2];
+    Check(createHash('sha256').update(metal).digest('hex')===audit.maps['Texture_Type89Game'+group+'Orm.png'].metallicSha256,
+      'Actual metallic-channel bytes match the calibrated exposure: '+group);
+    if (role==='Armor') {
+      const samples=UvSamples(g.materials.indexOf(material));
+      const area=samples.reduce((sum,sample)=>sum+sample.area,0);
+      const dielectric=samples.filter(sample=>Sample(atlas,sample.uv,2)<.07).reduce((sum,sample)=>sum+sample.area,0);
+      Check(dielectric/area>.95,'Intact painted armour remains dielectric beside the exposed steel',
+        'fraction='+Number(dielectric/area).toFixed(3));
+    }
   }
 }
 console.log(`Type89MediumTank: ${checks-failures}/${checks} passed`);
