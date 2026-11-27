@@ -1227,11 +1227,20 @@ async function handleApi(req, res, urlObj) {
       if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(t)) {
         return sendJson(res, 400, { ok: false, error: "时间格式无效，请使用 HH:MM（如 06:00）" });
       }
-      if (state.schedule.runTime !== t) {
-        state.schedule.runTime = t;
-        state.schedule.lastTriggeredDate = null;
-        state.schedule.lastTriggeredSlots = { ...(state.schedule.lastTriggeredSlots || {}) };
-        delete state.schedule.lastTriggeredSlots[t];
+      state.schedule.runTime = t;
+      state.schedule.lastTriggeredDate = null;
+      state.schedule.lastTriggeredSlots = { ...(state.schedule.lastTriggeredSlots || {}) };
+      delete state.schedule.lastTriggeredSlots[t];
+      // Also reschedule all currently pending items to the newly selected slot so clicking 04:00 / 06:00 / etc. takes immediate effect!
+      if (body.reschedulePending !== false) {
+        for (const it of state.schedule.items || []) {
+          if (it.status === "pending") {
+            it.scheduledTime = t;
+            it.message = `等待 ${t} 错峰自动启动`;
+            delete it.deferredFrom;
+            delete it.deferHistory;
+          }
+        }
       }
     }
     await saveSchedule();

@@ -2655,8 +2655,12 @@ async function saveScheduleConfig(patch) {
       body: JSON.stringify(patch),
     });
     appState.schedule = res.schedule;
-    renderScheduleUI();
-    toast(`定时策略已更新：${res.schedule.enabled ? `每日 ${res.schedule.runTime}` : "已暂停自动触发"}`);
+    renderAll();
+    toast(
+      patch.runTime
+        ? `已将待执行队列改排至 ${res.schedule.runTime}`
+        : `定时策略已更新：${res.schedule.enabled ? `已开启自动触发` : "已暂停自动触发"}`
+    );
   } catch (err) {
     toast(err.message, 4000);
   }
