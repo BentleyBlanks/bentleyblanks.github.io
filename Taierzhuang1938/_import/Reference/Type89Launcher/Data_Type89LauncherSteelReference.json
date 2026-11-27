@@ -11194,19 +11194,41 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherSleeveJointWear.png",
-      "sha256": "69e283eec142b294b8828f11c2f5bac4b1aea820e2b6f25adc12ab96cbca2433",
-      "scale": 49800,
+      "sha256": "b27c2ef5a9fb80d985967304919d6b5dbc765f2c5ae54c6402069990329f243d",
+      "scale": 39000,
       "strength": 1.0,
       "fields": [
         "gain",
         "tintRed",
         "tintBlue",
-        "roughness"
+        "roughness",
+        "metalness"
       ],
       "registeredTexels": 3668,
       "rearReference": "V76SleeveAligned",
       "stressReference": "V76SleeveAligned",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
+    },
+    "rearResponse": {
+      "previousWearSha256": "69e283eec142b294b8828f11c2f5bac4b1aea820e2b6f25adc12ab96cbca2433",
+      "photoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "sharedCoverage": 0.04,
+      "coarseStrength": 0.82,
+      "grainStrength": 0.72,
+      "rearRigSha256": "0081a29ec0a79402c7f5522c1fdf38476ded8878952a05a8e169c8b54a345c30",
+      "coarseResponseSha256": "3a8f4d24569ef8ae1ea16f830f8eead7140ce3904d933e03d5f558087d4e4a5c",
+      "frames": {
+        "UV": "cdaacc35343e3e6b96757fe7dac9770f062f3c305c50b186c59aa789f198df11",
+        "UVContact": "aa05f7e8758d9bd023c90a8eb9b7e4dabc87aa1722005cf44de039e2c33b7233",
+        "MaterialChannels": "6ad603c48e8ae96e3b0ea2747563c1f24647d8cdf62c8b8fed58559bc3f6d660",
+        "Matched": "fc15076c133fff2eae12b57435cf72d75be4528644e4ca8dc3e79787c2e93ae6",
+        "MatchedGainPlus": "b1c23d8424c6300f27538063b17492f24828182ea2963c115687873dc95f8a04",
+        "MatchedGainMinus": "0edd1777930d3700b0a015db7b728a94609b7f6ea1e9723dfba0e81459382b89",
+        "Broad": "0bf7e5ee4f95c95e33b8659422cccebc265fcd0f8e37a1dd74174e889f90c765",
+        "BroadGainPlus": "495dd9339f9006a0452650ed7338f13980a61b46b18b6675106d0b980708d166",
+        "BroadGainMinus": "6c5acb15836c8ee3124b2cf24156abd22193d0cbbf4aefa368965fb08bdb68df",
+        "HeldOut": "2b7831a29c4c8b40a866647afa065ba762c05a693c9929db258db93181bb4f93"
+      }
     }
   },
   "collarReflectanceFinish": {
