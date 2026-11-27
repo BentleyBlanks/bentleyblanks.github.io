@@ -14410,20 +14410,69 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "2bd56a5997021cc3880ecb656c3d5966ac3666388f09f223b94be81a920d6194",
-      "scale": 55500,
+      "sha256": "38d4d82cc1a88f7411338227fb76992a682fdc787523906a909dbe86d0a33958",
+      "scale": 40000,
       "strength": 0.76,
       "fields": [
         "gain",
         "tintRed",
         "tintBlue",
-        "roughness"
+        "roughness",
+        "tilt",
+        "tiltV",
+        "metalness"
       ],
       "frontTexels": 29006,
       "rearTexels": 17157,
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
     },
-    "baseQuality": 83.86
+    "baseQuality": 83.86,
+    "frontLightCalibration": {
+      "previousDetailSha256": "2bd56a5997021cc3880ecb656c3d5966ac3666388f09f223b94be81a920d6194",
+      "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "reservedAxialRanges": [
+        [
+          0.25,
+          0.32
+        ],
+        [
+          0.64,
+          0.72
+        ]
+      ],
+      "frames": {
+        "default": {
+          "beauty": "50913898eb1db1505a845d32666c71bb0750a26ae45aa8b3ee0b7ef8587b87ce",
+          "uvHi": "d9fe21ee9a7d61614c703ee63814d859d1eac104e5ef68d25f58c224476bbb8e",
+          "uvLo": "a3be5555b986e6d1af80bfdac60a82830f3c0901c32bf40ce08f478e69cec10b",
+          "BasePlus": "1bb3128304f106938b1fc44aedcc0b4be3a8b2ca056a08394688b746e9a4d75b",
+          "BaseMinus": "930a5e645bdcf982f5a6c3fdb20b90f144e7279b68fa9af10e269ff2b3c874d9",
+          "AcrossPlus": "77912f02aee4609ba92a0475cb00438037d34ff2baa2280c6a918a945792a6b0",
+          "AcrossMinus": "a50411105de91982fdb2c3274014d64a06381ac34dcd974eccd6c8d2fb63d30c",
+          "AlongPlus": "a0169444b25358f3c502cc01aa5524942b6ea15151ccd185bf4c103a49d56281",
+          "AlongMinus": "58c0acf514feeba5fd1c47649c0c516de35b4a956cdd629ffb26cdb9e0204be2",
+          "RoughPlus": "cf66c6cb3badd4b8357656320dc476ca23ebbdb11214041435724d794082e212",
+          "RoughMinus": "f57fe09e47a2858bcc276c24dd89de6752f7550648480414a4a771059e74bf39",
+          "MetalPlus": "50913898eb1db1505a845d32666c71bb0750a26ae45aa8b3ee0b7ef8587b87ce",
+          "MetalMinus": "fe09202f32d26ffebd8acdc2ee44018606eb92e064a979874e3b758270924636"
+        },
+        "museum": {
+          "beauty": "8144559c69452c6abd9b7936e44d616b6724ec033631ff5df73df5d7fe4816c0",
+          "uvHi": "d9fe21ee9a7d61614c703ee63814d859d1eac104e5ef68d25f58c224476bbb8e",
+          "uvLo": "a3be5555b986e6d1af80bfdac60a82830f3c0901c32bf40ce08f478e69cec10b",
+          "BasePlus": "c6395d3a7391ade65dd84287633c5549bfd1e28d794d828a850e1f7a9ed62e28",
+          "BaseMinus": "c63a98a50171018ec00419824c25be3086a72528de899c63a1b5c83ce85b79b2",
+          "AcrossPlus": "dd0e647ee2f34bd82e8a4b90c8a52caae734dbe679fb492a8491efe48d5b5e1d",
+          "AcrossMinus": "70590f67b2069c80c5fb11af358b2f883ba40236020c3f2912759a4069338e30",
+          "AlongPlus": "19765a0e92620cdb50213108a98bc92d0b10ece368161d3577c219e28070f072",
+          "AlongMinus": "3eecfdd2124a5d81aee7707d8ffe28b310dfe485ac4bb5a51dbd9cb5b3baf93a",
+          "RoughPlus": "c6d323eb3625ce11d2e37af0e2aebba53931ed41e8e5cec5874afd84f7a339be",
+          "RoughMinus": "5034bf4fdfd482f0d7cc9c28ec220bfbdbd0a53c2dd9476053322f1341cdf456",
+          "MetalPlus": "daff934872b80d63cbe83c811519be89d2e26a7db4bb6c3bcfa77230e17d3a09",
+          "MetalMinus": "95bee0df3aac27bd260771ed5eac964ef7d7c14d843935475f83e6bbd6c8fc88"
+        }
+      }
+    }
   }
 }
