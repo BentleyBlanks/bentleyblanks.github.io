@@ -46,6 +46,12 @@ const woodCoatImages=D.wood.map(part=>{
  return doc.textures[coat.clearcoatTexture.index].source;
 });
 assert.deepEqual(edgeFinish.clearcoatImages,woodCoatImages.sort((a,b)=>a-b));
+const rear=contract.rearContact;
+assert(rear.samples>=128&&rear.atlasLimit>=1536,'rear contact bake must use dense sampling');
+assert(rear.images.every(index=>aoImages.has(index))&&rear.images.length>=8);
+const normalImages=new Set(doc.materials.flatMap(mat=>mat.normalTexture?[doc.textures[mat.normalTexture.index].source]:[]));
+assert(rear.normalImages.length>=3&&rear.normalImages.every(index=>normalImages.has(index)));
+assert([...D.bolt,...D.dustCover,'T38_433E_VisibleSideBlockRimInset',D.wood[0]].every(part=>rear.parts.includes(part)));
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
  node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);

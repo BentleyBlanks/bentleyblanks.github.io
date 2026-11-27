@@ -114,12 +114,15 @@ def Attribute(doc, views, index, width):
     return np.frombuffer(views[field['bufferView']], dtype={5123: '<u2', 5125: '<u4', 5126: '<f4'}[field['componentType']]).reshape(-1, width)
 
 
-def SurfaceAtlas(doc, views, primitive, size, padding=18):
+def SurfaceAtlas(doc, views, primitive, size, padding=18, indexSpan=None, faceDirections=False):
     attrs = primitive['attributes']
     points = Attribute(doc, views, attrs['POSITION'], 3)
     uv = Attribute(doc, views, attrs['TEXCOORD_0'], 2) * size - .5
     smooth = Attribute(doc, views, attrs['NORMAL'], 3)
     faces = Attribute(doc, views, primitive['indices'], 3).astype(np.int32)
+    if indexSpan is not None:
+        first, count = indexSpan
+        faces = faces[first // 3:(first + count) // 3]
     unique, weld = np.unique(np.round(points, 6), axis=0, return_inverse=True)
     accum = np.zeros((len(unique), 3), np.float32)
     cross = np.cross(points[faces[:, 1]] - points[faces[:, 0]], points[faces[:, 2]] - points[faces[:, 0]])
@@ -128,7 +131,7 @@ def SurfaceAtlas(doc, views, primitive, size, padding=18):
         np.add.at(accum, weld[faces[:, corner]], cross)
     accum /= np.maximum(1e-8, np.linalg.norm(accum, axis=1, keepdims=True))
     bend = np.linalg.norm(cross[:, None] - accum[weld[faces]], axis=2)
-    field = np.zeros((size[1], size[0], 7), np.float32)
+    field = np.zeros((size[1], size[0], 10 if faceDirections else 7), np.float32)
     valid = np.zeros(field.shape[:2], bool)
     for faceIndex, face in enumerate(faces):
         triangle = uv[face]
@@ -149,6 +152,8 @@ def SurfaceAtlas(doc, views, primitive, size, padding=18):
             continue
         row, col = np.nonzero(hit)
         values = np.column_stack((points[face], smooth[face], bend[faceIndex]))
+        if faceDirections:
+            values = np.column_stack((values, np.broadcast_to(cross[faceIndex], (3, 3))))
         field[top + row, left + col] = values[0] + weightB[hit, None] * (values[1]-values[0]) + weightC[hit, None] * (values[2]-values[0])
         valid[top + row, left + col] = True
     assert valid.any()
@@ -944,7 +949,7 @@ def FinishSteelAtlas(doc, views, source, load, store):
 def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
     folder.mkdir(exist_ok=True,parents=True)
     digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
-    version = (32 if 'edgeHighlights' in manifest else 30) + int(not author)
+    version = 30 + 2 * ('edgeHighlights' in manifest) + 2 * ('rearContact' in manifest) + int(not author)
     manifest.update(version=version,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
                     images=len(doc['images']))
     manifest['imagePayloads'] = []
@@ -960,6 +965,7 @@ def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
 def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     from Script_Type38AmbientOcclusion import BakeContactOcclusion
     from Script_Type38EdgeHighlights import BakeEdgeHighlights
+    from Script_Type38RearFinish import BakeRearFinish
 
     manifest['authorImages'] = len(doc['images'])
     if not author:
@@ -967,6 +973,7 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
         manifest['publishImageRules'] = rules
     manifest['ambientOcclusion'] = BakeContactOcclusion(repo, doc, views)
     manifest['edgeHighlights'] = BakeEdgeHighlights(repo, doc, views)
+    manifest['rearContact'] = BakeRearFinish(repo, doc, views)
     SaveType38Assets(folder, doc, views, manifest, lod, author)
 
 
