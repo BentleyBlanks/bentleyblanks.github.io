@@ -1905,7 +1905,7 @@ class SquadSplinePreviewApp {
     const panScale = dist * 0.0018;
     const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
-    return baseTarget.clone().addScaledVector(right, -dx * panScale).addScaledVector(fwd, -dy * panScale);
+    return baseTarget.clone().addScaledVector(right, -dx * panScale).addScaledVector(fwd, dy * panScale);
   }
 
   Bind3DCanvas() {
