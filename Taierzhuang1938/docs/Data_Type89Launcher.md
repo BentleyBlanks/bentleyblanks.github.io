@@ -104,6 +104,8 @@
 - 外套筒背面按第 8 张整件馆藏照重估布光，提取亮带、氧化色和多组布光共有的磨蚀细纹。细纹修正避开沟槽的周期明暗和深缝。独立布光下平均亮度误差从 14.56 降到 13.77 个灰阶，细纹相关系数从 0.578 提至 0.611。另复测正面默认灯、斜视、相邻筒身和十个接缝 AO 视角。 [外套筒采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒尾肩部背面按第 8 张馆藏照校准发蓝钢面、氧化色和反光，以第 4 张近照复测正面和斜视。按十个 AO 视角的实渲差异定位到 UV，在交界暗部平滑衰减材质修正。独立布光下平均亮度误差从 12.58 降到 6.01 个灰阶，细纹相关系数从 0.306 提至 0.440。另以原照核对相邻箍圈的亮度。 [肩部采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 筒身背面按第 8 张馆藏照复校钢面亮带、氧化色和磨蚀纹理。用两套布光下的材质响应分配底色、凹凸、粗糙度和金属度，沿共见表面和接缝遮蔽边缘过渡。独立布光下平均亮度误差从 9.77 降至 8.37 个灰阶，磨蚀细纹相关系数从 0.724 提至 0.769。另复测两段留出的钢面、正面刻印和十个接缝 AO 视角。 [筒身采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -152,4 +154,4 @@
 - 尾套背面校准保存在 `sleeveReverseFinish`。烘焙核对原正面拟合、沟槽方向遮挡、接缝 AO 及背面 16 位磨蚀采样的哈希。系数只应用于尾套的底色和切线法线图集区域。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 箍圈联合校准保存在 `collarJointFinish`。底色和法线按周向、轴向响应表合成，粗糙度在校验既有 AO 烘焙后写入 ORM 绿通道。磨蚀细纹、红蓝色差来自 16 位采样图。重新编码后，在实际渲染中检查接缝暗度和阴影覆盖。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 驻钣联合校准保存在 `saddleJointFinish`。背面色差和明暗细纹来自 16 位采样图。烘焙核对正面拟合、原钢材和接缝 AO 的哈希，粗糙度修正在恢复已烘焙的接触遮蔽后合入绿通道。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV86/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV87/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

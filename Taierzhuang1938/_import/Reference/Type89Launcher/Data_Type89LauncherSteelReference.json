@@ -14467,7 +14467,7 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "dee293cdfba133620bdf07cc31b23416165f9ed61380bc47ad42f00ccd329c5a",
+      "sha256": "69f4abe4f67eb4d086f69502d43730931a40cd3eae48ac56aad8583332f9891c",
       "scale": 32157,
       "strength": 0.76,
       "fields": [
@@ -14593,6 +14593,51 @@
           "uvHi": "f1a8d59a64ff1a828c5b1a2684280383570ebe374e26ab29b4701c7cec66f4ed",
           "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
         }
+      }
+    },
+    "currentRearFit": {
+      "sourceRevision": "72b5efbcae8bc8bc2945805f9df4b96162621fe1",
+      "previousDetailSha256": "dee293cdfba133620bdf07cc31b23416165f9ed61380bc47ad42f00ccd329c5a",
+      "photoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "rigSha256": "dc9d92a3518f53f7c6d3ed6bc0c342af28e8cacfc49aedd0d4e3a583e0bc05ea",
+      "frames": {
+        "UV": "97c9e66824eaf40de7d55e3fcf3efd77d6b572bd6a4f1df0e455ccee98db4d6e",
+        "UVContact": "62b0f6f647437f0498327c5dcb22c79215079f4b49812d839e94f2e099d8257a",
+        "MaterialChannels": "1ff9cec87339cf699f52f2349de35761318c66ba19e247f9da63825d1ed6aa92",
+        "Matched": "3ee751eda76de71780a4333ed60a24bdd47c63df1f35d6bd47c36a31c654a760",
+        "Broad": "fa16761500c1753afb30244b8aaf959dec241d0be3c4b0cb0d9a3b38cfc7abac",
+        "MatchedRoughPlus": "88b8f51a8150156f9d818cf6ffbcb842f96bf086482dc6b08625740dd4713df6",
+        "BroadGainPlus": "64caaa6f8a259419cc5037c1f99aa47f3f83fb74cfb392f0b4a731eec64f9b0c"
+      },
+      "withheldAxialRanges": [
+        [
+          0.24,
+          0.31
+        ],
+        [
+          0.65,
+          0.72
+        ]
+      ],
+      "strength": 0.93,
+      "grainResponseRevision": "V87BarrelRearCandidate",
+      "grainFrames": {
+        "Matched": "e727a3030871cf4624003b3f6484eb9db54b89e94c813fc0c25add1c4cc3cdeb",
+        "Broad": "91e034efb2107fb7f0ccde12ee5dc5f1e59772f90210877f43e8485781fb10e5",
+        "MatchedGainPlus": "cdd1475f4d63599bc6a16364d780bc549be323e4b626090f8cbeec0dfb406c61",
+        "MatchedRoughPlus": "e710d5dc51d21d9ea6742386b896b548ac439a2fd8642c78c756208b53025ba7",
+        "BroadRedPlus": "288350ce87593c9b9cf0e0c57d23e40aeb563aad3e7d2a13f5ba28b916b59236",
+        "BroadBlueMinus": "b0c0d5f1bda79eac97e15670dd5e48257a8a3a142828535b9e3385fb8df6ebc2"
+      },
+      "heldOut": {
+        "meanGrayError": [
+          9.768451,
+          8.373053
+        ],
+        "fineWearCorrelation": [
+          0.723935,
+          0.768626
+        ]
       }
     }
   },
