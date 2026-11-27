@@ -56,7 +56,7 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV21",
+  "materialRevision": "SurfaceV22",
   "runtimeTriangleTarget": 80000,
   "runtimeTriangleCeiling": 80000,
   "runtimeRenderedTriangles": 79997,
@@ -72,8 +72,8 @@
   "activePackedImages": 10,
   "status": "AuthorReviewedWithDeclaredInferences",
   "reviewedAt": "2026-11-27",
-  "reviewScope": "V6 registered front, left and top finish, neutral inspection, packed GLB and mechanism review",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV21",
+  "reviewScope": "Archived V6 registered front, left and top finish. SurfaceV22 same-camera neutral and raking-light mud review, packed GLB and mechanism tests.",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV22",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
@@ -81,7 +81,7 @@
   "materialReview": "Data_BattleWearReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "3cea8620fcfffcafb88c74496e9c09890710bf48ffe9ee4da0f7a6f81d294c81",
+  "runtimeSha256": "480751539c3c4714c2882868658cf79027f4aee0246e3dd0bc49a73386060f0a",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -122,7 +122,8 @@
       "SurfaceV18 two-distance contact AO from assembled geometry, with separate receiving UVs for rigid moving groups.",
       "SurfaceV19 raises only genuinely exposed steel on the painted impact witnesses, the clean tread lands and the exposed steel jackets.",
       "SurfaceV20 consolidates the opaque body using constant per-primitive UV1 swatches for clearcoat and specular intensity.",
-      "SurfaceV21 revises the V6-matched drying mud and sheltered silt, with four shoe coverages and widened original soil geometry."
+      "SurfaceV21 revises the V6-matched drying mud and sheltered silt, with four shoe coverages and widened original soil geometry.",
+      "SurfaceV22 uses CC0 scanned soil relief and drying gradients in four clod tiles and in the existing packed mud on the shoes."
     ],
     "extensions": [
       "KHR_materials_clearcoat",
@@ -142,10 +143,11 @@
   ],
   "exportTriangulationZeroAreaTriangles": 0,
   "exporterOmittedTriangles": 58,
-  "highSourceSha256": "87627ba2ba767cb40f46adbba92964b5df64cf35b205ffe3c35780e71525791d",
-  "materialHighSourceSha256": "87627ba2ba767cb40f46adbba92964b5df64cf35b205ffe3c35780e71525791d",
+  "highSourceSha256": "59f2fafd60c5081aebc73a5a8dbb71f1d08c77ecb766386f5074cb5f1035aaad",
+  "materialHighSourceSha256": "59f2fafd60c5081aebc73a5a8dbb71f1d08c77ecb766386f5074cb5f1035aaad",
   "materialOcclusionReview": "Data_AmbientOcclusionReview.json",
   "exposedMetalReview": "Data_ExposedMetalReview.json",
   "materialMergeReview": "Data_MaterialMergeReview.json",
-  "sedimentReview": "Data_SedimentReview.json"
+  "sedimentReview": "Data_SedimentReview.json",
+  "soilMaterialReview": "Data_SoilMaterialReview.json"
 }

@@ -1,0 +1,222 @@
+{
+  "schema": "Type89SoilMaterialReviewV1",
+  "revision": "SurfaceV22",
+  "baselineSha256": "3cea8620fcfffcafb88c74496e9c09890710bf48ffe9ee4da0f7a6f81d294c81",
+  "reference": "Type89BattleWornV6",
+  "recipeSha256": "74644f367aa0ddce747339673c5bb71ac421bb8c7050082dd25ab7a8936a9d1a",
+  "clodTiles": [
+    [
+      2204,
+      3008,
+      256,
+      256
+    ],
+    [
+      2189,
+      2711,
+      256,
+      256
+    ],
+    [
+      2503,
+      3019,
+      256,
+      256
+    ],
+    [
+      76,
+      2521,
+      256,
+      256
+    ]
+  ],
+  "trackSoilTexels": 498798,
+  "denseTreadTexels": {
+    "3": 184915,
+    "2": 146208,
+    "1": 73015,
+    "0": 33960
+  },
+  "maps": {
+    "Texture_Type89GameBodyBase.png": {
+      "sha256": "62b999f4a5ed4e6aecea73398e65397d5a24b235f9bedbc65b765a0b0803309d",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameBodyNormal.png": {
+      "sha256": "de5b2fac3f7012bc5e6e1050ef4b35f39b77bee9b5d5a1bde4842fee36caf18d",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameBodyOrm.png": {
+      "sha256": "a148b3526320c9f62a118f44d202856a918e688879fc8e73bb1d806cee3e4546",
+      "metallicSha256": "465fecef56d569cb2896787bd0da7fad2a7efb2b9f47caca5341420ea3829a20"
+    },
+    "Texture_Type89GameTrackBase.png": {
+      "sha256": "ec06091af3b42b10fb062d9a12d6df48e33261c5b635e958f9b4969f2393ae3b",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameTrackNormal.png": {
+      "sha256": "34c6859ff94f48a7ea316ec3a556cd1e73f057c3fa2d06874382a518fb374a18",
+      "metallicSha256": null
+    },
+    "Texture_Type89GameTrackOrm.png": {
+      "sha256": "210e06cf160b3c730e18dde77a1a596fb13d292ed5a2e3fd5ff15214869b45e1",
+      "metallicSha256": "243fb856df11a2b10426a6c9c8314d859d1846893bf979d4367a6cc28e4f08a9"
+    }
+  },
+  "sourceClods": {
+    "High": 248,
+    "Game": 17
+  },
+  "runtime": {
+    "nodes": 535,
+    "meshInstances": 274,
+    "renderedTriangles": 79997,
+    "sha256": "480751539c3c4714c2882868658cf79027f4aee0246e3dd0bc49a73386060f0a",
+    "bytes": 42184756,
+    "materials": 4,
+    "highSourceSha256": "59f2fafd60c5081aebc73a5a8dbb71f1d08c77ecb766386f5074cb5f1035aaad",
+    "gameSourceSha256": "f19763a20eb1f106eef7b93328271b11468cdbe062c19d9d53b004650e8ecd43"
+  },
+  "verification": {
+    "weaponInspectionPairs": 4,
+    "motionSamples": 324,
+    "motionMaxMudContactM": 0.0005510753943758218,
+    "originalBodySurfaceAndTreadAoExact": true,
+    "localEvidence": "Review/Comparisons, Review/WeaponInspection, Review/Blender",
+    "renderDifferences": {
+      "method": "Matched size and camera, source pixels. Blender alpha is composited against RGB 24/27/31. RGB deltas are 8-bit channel values. Luminance detail is the RMS residual after a 2 px Gaussian blur in fixed near-track regions. These are image-space differences, not measured soil properties.",
+      "before": "SurfaceV21",
+      "after": "SurfaceV22",
+      "pairs": {
+        "Blender/FrontTrack": {
+          "width": 1040,
+          "height": 760,
+          "absoluteMeanRgbDelta8bit": 1.0521,
+          "pixelsWithAnyChannelDeltaAtLeast8": 43531
+        },
+        "Blender/Macro": {
+          "width": 1040,
+          "height": 760,
+          "absoluteMeanRgbDelta8bit": 2.1254,
+          "pixelsWithAnyChannelDeltaAtLeast8": 101147,
+          "mudRegions": [
+            {
+              "boxXYXY": [
+                483,
+                50,
+                579,
+                78
+              ],
+              "absoluteMeanRgbDelta8bit": 9.8503,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                2.564,
+                7.753
+              ]
+            },
+            {
+              "boxXYXY": [
+                463,
+                349,
+                554,
+                380
+              ],
+              "absoluteMeanRgbDelta8bit": 5.3215,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                0.918,
+                3.037
+              ]
+            }
+          ]
+        },
+        "Blender/Raking": {
+          "width": 1040,
+          "height": 760,
+          "absoluteMeanRgbDelta8bit": 4.8494,
+          "pixelsWithAnyChannelDeltaAtLeast8": 178791,
+          "mudRegions": [
+            {
+              "boxXYXY": [
+                483,
+                50,
+                579,
+                78
+              ],
+              "absoluteMeanRgbDelta8bit": 18.7072,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                5.86,
+                14.132
+              ]
+            },
+            {
+              "boxXYXY": [
+                463,
+                349,
+                554,
+                380
+              ],
+              "absoluteMeanRgbDelta8bit": 18.1424,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                6.071,
+                12.903
+              ]
+            }
+          ]
+        },
+        "WeaponInspection/Near_beauty": {
+          "width": 841,
+          "height": 688,
+          "absoluteMeanRgbDelta8bit": 0.6517,
+          "pixelsWithAnyChannelDeltaAtLeast8": 17342
+        },
+        "WeaponInspection/Aft_beauty": {
+          "width": 841,
+          "height": 688,
+          "absoluteMeanRgbDelta8bit": 0.5853,
+          "pixelsWithAnyChannelDeltaAtLeast8": 16072
+        },
+        "WeaponInspection/Crust_beauty": {
+          "width": 841,
+          "height": 688,
+          "absoluteMeanRgbDelta8bit": 1.7576,
+          "pixelsWithAnyChannelDeltaAtLeast8": 50841,
+          "mudRegions": [
+            {
+              "boxXYXY": [
+                148,
+                51,
+                433,
+                193
+              ],
+              "absoluteMeanRgbDelta8bit": 8.7346,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                7.835,
+                8.155
+              ]
+            }
+          ]
+        },
+        "WeaponInspection/Crust_normal": {
+          "width": 841,
+          "height": 688,
+          "absoluteMeanRgbDelta8bit": 1.9396,
+          "pixelsWithAnyChannelDeltaAtLeast8": 63943,
+          "mudRegions": [
+            {
+              "boxXYXY": [
+                148,
+                51,
+                433,
+                193
+              ],
+              "absoluteMeanRgbDelta8bit": 9.7584,
+              "lumaHighPassRmsBeforeAfter8bit": [
+                13.501,
+                14.223
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

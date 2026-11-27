@@ -1,6 +1,6 @@
 # 八九式中战车乙型（馆藏外形复原）
 
-**GeometryV55 / SurfaceV21** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,842 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
+**GeometryV55 / SurfaceV22** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,842 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
 
 炮盾外框、炮塔下缘、车首板、侧裙和后翼子板按多视角复核，后甲板补做弧形把手并校正百叶边沿。低模保留主要履带开孔、中央减料槽、轮盘轮廓、罩板边缘和可见关节。小销眼和细铸纹由高模投射。实体排气罩的孔阵在游戏中由双面遮罩表现。游戏版共四个材质，车体、履带、排气护网和玻璃。原贴图加一张 32×8 的漆膜参数图，共十张图像。车体图集 4K，护网 1K，履带在 2K 图集内保留四套 1K 鞋面。底色、OpenGL 切线法线和 ORM 分通道烘焙。ORM 红通道包含高模投射、积泥边缘和按装配几何重烘的接触遮蔽。
 
@@ -18,14 +18,16 @@ V20 把六类不透明部件共用到一个车体材质。装甲漆和铸面在�
 
 V21 按 V6 的压实半干泥重做前后履带绕圈、履板槽和轮组。团泥由深棕内层、干结碎边和局部的薄尘形成。两块泥转到前下绕圈，整理原有泥块拓扑并在前后绕圈增加五块实体泥。车首下缘、裙板边和翼子板落尘处增加局部材质起伏。参见[泥尘对照](Data_SedimentReview.json)。
 
+V22 用 Poly Haven 的 CC0 泥面扫描重新校准泥块和履带槽内的压实泥。潮泥与干壳采用同组扫描的底色、粗糙度、法线和颗粒遮蔽。游戏的泥块在车体图集中取样，使用四块 256×256 的泥面图，沿用无漆膜取样。掠射光与检查台默认灯下均检查了颗粒及凹坑。参见[泥料复核](Data_SoilMaterialReview.json)、[Brown Mud](https://polyhaven.com/a/brown_mud)和[Brown Mud Dry](https://polyhaven.com/a/brown_mud_dry)。
+
 ## 源工程与重建
 
-新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV21。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存泥尘近景、新旧同机位和 V6 外观对照。V20 的材质合并复核保存在 GeometryV55SurfaceV20。V19 的露钢复核保存在 GeometryV55SurfaceV19。V18 的接缝 AO 与开盖复查保存在 GeometryV55SurfaceV18。V17 战损三视图保存在 GeometryV55SurfaceV17。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
+新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV22。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存泥料微距、掠射光和实机同机位对照。V21 的泥块造型与 V6 外观对照保存在 GeometryV55SurfaceV21。V20 的材质合并复核保存在 GeometryV55SurfaceV20。V19 的露钢复核保存在 GeometryV55SurfaceV19。V18 的接缝 AO 与开盖复查保存在 GeometryV55SurfaceV18。V17 战损三视图保存在 GeometryV55SurfaceV17。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
 
-从仓库根重建。脚本在冻结的 V20 上重烘泥和尘的底色、粗糙度与法线，通过 BlenderMCP 写入两份可编辑源。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=maps、--stage=bind、--stage=runtime 单独执行。
+从仓库根重建。脚本读取冻结的 V21、Maps/Scan 中记录过 SHA-256 的扫描源，为高模与运行时分别重烘表面，通过 BlenderMCP 写入两份可编辑源。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=maps、--stage=bind、--stage=runtime 单独执行。
 
 ```powershell
-node Taierzhuang1938/_blender/Script_RebuildType89Sediment.mjs
+node Taierzhuang1938/_blender/Script_RebuildType89SoilMaterial.mjs
 ```
 
 ## 运行与验收

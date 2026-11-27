@@ -13,7 +13,7 @@ export const OPTIONAL_VEHICLE_ASSETS = Object.freeze([
     catalogId: "type89MediumTank",
     name: "八九式中战车乙型",
     label: "八九式中战车乙型 · 可动参考复原",
-    url: "./Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261127GeometryV55SurfaceV21",
+    url: "./Model/Type89MediumTank/Model_Type89MediumTank.glb?v=20261127GeometryV55SurfaceV22",
     trackPathUrl: "./Model/Type89MediumTank/Data_TrackPath.json?v=20261126GeometryV55SurfaceV15",
     sourceNose: Object.freeze({ x: 0, z: -1 }),
     scale: 1,

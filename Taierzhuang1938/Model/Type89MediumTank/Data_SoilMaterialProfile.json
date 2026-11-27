@@ -1,0 +1,96 @@
+{
+  "schema": "Type89SoilMaterialV1",
+  "revision": "SurfaceV22",
+  "baseline": "SurfaceV21",
+  "baselineSha256": "3cea8620fcfffcafb88c74496e9c09890710bf48ffe9ee4da0f7a6f81d294c81",
+  "reference": "Type89BattleWornV6",
+  "sourceLicense": "CC0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "scanWidthM": 1.298,
+  "source": {
+    "DampBase": {
+      "asset": "brown_mud",
+      "channel": "Diffuse",
+      "file": "Texture_ScanDampBase.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud/brown_mud_diff_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA",
+      "sha256": "4709452f41154926d6d6355207044fb13b8bedc2b234f2870bb3e0d5bd5a026d"
+    },
+    "DampNormal": {
+      "asset": "brown_mud",
+      "channel": "nor_gl",
+      "file": "Texture_ScanDampNormal.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud/brown_mud_nor_gl_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "RGBA",
+      "sha256": "06f04240c8aad947bb37acd118763e92736f57c8edaf27e95fe8185d32bbbabd"
+    },
+    "DampHeight": {
+      "asset": "brown_mud",
+      "channel": "Displacement",
+      "file": "Texture_ScanDampHeight.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud/brown_mud_disp_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "L",
+      "sha256": "c75285ef351f683c35f419c3ed9fe5460f71f01719935baafc877ddac2ac9b93"
+    },
+    "DampAmbient": {
+      "asset": "brown_mud",
+      "channel": "AO",
+      "file": "Texture_ScanDampAmbient.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud/brown_mud_ao_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "L",
+      "sha256": "59911c0f15b2bbd040830d2c25c12e6b8a5c894ffbaea6a8ac134c4065ea954d"
+    },
+    "DampRoughness": {
+      "asset": "brown_mud",
+      "channel": "Rough",
+      "file": "Texture_ScanDampRoughness.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud/brown_mud_rough_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "L",
+      "sha256": "7b3586a50c725b5231004da7784248f8768b00b407e104203921ed35b6d3c75a"
+    },
+    "DryBase": {
+      "asset": "brown_mud_dry",
+      "channel": "Diffuse",
+      "file": "Texture_ScanDryBase.png",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/brown_mud_dry/brown_mud_dry_diff_2k.png",
+      "size": [
+        2048,
+        2048
+      ],
+      "mode": "RGB",
+      "sha256": "0d20a4256657755ea98960787ad54830e5dd1ba70a5037d12a30f354e08c0463"
+    }
+  },
+  "clodTilePixels": 256,
+  "tilePaddingPixels": 10,
+  "dampMedianSrgb": [
+    47,
+    40,
+    34
+  ],
+  "dryMedianSrgb": [
+    92,
+    80,
+    68
+  ]
+}
