@@ -1,4 +1,4 @@
-// 游戏里「高级工具 → 特效与声音」的两项入口：只负责打开独立窗口，不在游戏里建任何工具。
+// 游戏里「高级工具 → 特效与声音 → 特效预览」的入口：只负责打开独立窗口，不在游戏里建任何工具。
 //
 // 特效预览另带 harness：游戏内的照明弹 / 粒子回归测试（?editor=vfx、Debug.OpenEditor）要在
 // 正片的灯光与后处理下量画面，那条路径照旧把同一个 VfxEditor 装进游戏宿主；菜单与控制中心
@@ -26,12 +26,4 @@ export class VfxPreviewEntry {
   static harness = VfxEditor;
   static win = null;
   static Open() { return OpenToolWindow(this, TOOL_INFO.vfx.label); }
-}
-
-export class AudioPreviewEntry {
-  static id = "audio";
-  static label = TOOL_INFO.audio.label;
-  static hint = TOOL_INFO.audio.hint;
-  static win = null;
-  static Open() { return OpenToolWindow(this, TOOL_INFO.audio.label); }
 }

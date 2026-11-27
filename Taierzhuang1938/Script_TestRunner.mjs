@@ -69,7 +69,7 @@ export const testDefs = {
   LevelFlowDebugBrowserTest: { file: "Script_LevelFlowDebugBrowserTest.mjs", timeoutMs: 240000, desc: "Editor Profiler and frame captures ordered by viewport, WebGL2/Canvas2D and popup lifecycle" },
   LevelFlowTouchBrowserTest: { file: "Script_LevelFlowTouchBrowserTest.mjs", timeoutMs: 90000, desc: "Native touchscreen pinch, XZ pan, twist, contact transitions, mouse recovery and optional HUD" },
   AdvancedToolsTest: { file: "Script_AdvancedToolsTest.mjs", timeoutMs: 180000, desc: "高级工具拆分（纯 Node）：目录表与 TOOL_INFO 对账、搬走的页面、四个入口类的窗口地址、控制中心卡片、启动器 dry-run / .lnk / 真起预览服" },
-  AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 19 张卡片与链接、摄影棚工具在独立工具宿主里逐个打开、四个搬走的独立页面新地址可用" },
+  AdvancedToolsBrowserTest: { file: "Script_AdvancedToolsBrowserTest.mjs", timeoutMs: 20 * 60 * 1000, desc: "高级工具拆分（真浏览器）：控制中心 22 张卡片与链接、摄影棚工具与独立工具页面（含音效音乐）打开与交互正常" },
   PropLibraryBrowserTest: { file: "Script_PropLibraryBrowserTest.mjs", timeoutMs: 10 * 60 * 1000, desc: "构件库预览（控制中心独立只读页面）：卡片与旧地址、目录收录与品类、筛选 / 搜索 / 键盘换项、程序化构件与院落专属 PBR、外部 GLB 来源、八九式可动件演示" },
   ToolStudioParityBrowserTest: { file: "Script_ToolStudioParityBrowserTest.mjs", timeoutMs: 60 * 60 * 1000, desc: "独立工具宿主与游戏宿主画面对照：九个摄影棚工具各取确定状态，整页截图平均绝对差 ≤ 2/255（每个工具要开两次整套游戏，约 20+ 分钟）" },  HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},
   HairReferenceBrowserTest: {file:"Script_HairReferenceBrowserTest.mjs",timeoutMs:600000,desc:"Personal-reference comparison, shared tool theme, compact panel, Unity Scene mouse/keyboard navigation and focus guards"},

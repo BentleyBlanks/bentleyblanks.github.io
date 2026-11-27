@@ -13,7 +13,7 @@ export const STUDIO_TOOL_IDS = Object.freeze([
   "actor", "facial",
 ]);
 
-export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "motionWorkbench", "weapon", "firstPerson", "vfx", "audio", "textures", "splines", "propPcg"]);
+export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "motionWorkbench", "weapon", "firstPerson", "vfx", "textures", "splines", "propPcg"]);
 
 export const GAME_TOOL_IDS = Object.freeze(["blockout", "timeline"]);
 
@@ -41,6 +41,9 @@ export const STANDALONE_TOOLS = Object.freeze([
   Object.freeze({ id: "squadSplinePreview", group: "level", slot: "tail", label: "小队 PCG 样条预览",
     hint: "独立预览各行进 Profile、走廊宽窄自适应、跨队交叉避让与行进间左顾右盼（复用场景配置，不接入游戏）",
     window: Object.freeze({ url: "./Tool_SquadSplinePreview.html", name: "TengxianSquadSplinePreview" }) }),
+  Object.freeze({ id: "audio", group: "media", slot: "tail", label: "音效音乐",
+    hint: "在新标签页打开：全部配方的试听、混音参数与盲听指认",
+    window: Object.freeze({ url: "./Tool_AudioPreview.html", name: "TengxianAudioPreview" }) }),
 ]);
 
 /** 控制中心页（相对游戏根目录 Taierzhuang1938/，Tool_Studio 的「返回控制中心」用）。 */

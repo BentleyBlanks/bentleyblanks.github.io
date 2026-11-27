@@ -24,7 +24,9 @@ import { Panel, Section, Slider, Chips, ButtonRow, Button, Facts, Note, ListBox,
   from "../Script_EditorUi.mjs";
 import { SOUND_NAMES, AMBIENCE_PRESETS, MUSIC_CUES } from "../Script_Audio.mjs";
 import { VOICE_LINES } from "../Data_Voice.mjs";
-import { TOOL_INFO } from "../Data_DevTools.mjs";
+import { STANDALONE_TOOLS } from "./Data_AdvancedTools.mjs";
+
+const AUDIO_TOOL = STANDALONE_TOOLS.find((tool) => tool.id === "audio");
 
 /**
  * 配方 → 「这是什么声音、什么时候响」。
@@ -43,6 +45,8 @@ const SOUND_INFO = {
   magIn: ["枪械", "弹匣入位", "捷克式从上方插弹匣"],
   shellDrop: ["枪械", "抛壳落地", "空壳落在砖石地上。压得极低 —— 它是玩法反馈的边料，不是事件"],
   grenadePin: ["爆炸", "拧弹盖 / 拉弦", "木柄手榴弹的引信。攥弹倒计时从这一声起"],
+  grenadeCordPull: ["爆炸", "特制手榴弹拉弦", "特制拉线木柄弹：麻绳抽拉摩擦 + 瓷珠脱扣脆响 + 拉发火管起燃"],
+  grenadeFuseHiss: ["爆炸", "手榴弹引信嘶声", "引信持续燃烧嘶声（带火药细碎爆裂声，温雷临爆时抬高音调）"],
   grenadeThrow: ["爆炸", "投掷", "抡臂出手的风声"],
   grenadeExplosionNra: ["爆炸", "中方手榴弹爆炸", "木柄手榴弹（国军）落地起爆：干脆的装药冲击与碎土"],
   grenadeExplosionIja: ["爆炸", "日军手榴弹爆炸", "九一式手榴弹（日军）起爆：更尖锐的破片爆响与拖尾"],
@@ -166,7 +170,7 @@ const SOUND_INFO = {
 };
 
 /**
- * 分类签。**导出给测试用**：`Script_EditorTest` 的「每个配方都有分类与说明」
+ * 分类签。**导出给测试用**：`Script_AdvancedToolsBrowserTest` 的「每个配方都有分类与说明」
  * 要逐类点一遍再与 `SOUND_NAMES` 对账；那边拄一份同样的列表的话，
  * 新开一类（断肢就是）会让那条断言莫名其妙地红一次。
  */
@@ -187,8 +191,8 @@ function FirstError(list) {
 
 export class AudioEditor {
   static id = "audio";
-  static label = TOOL_INFO.audio.label;
-  static hint = TOOL_INFO.audio.hint;
+  static label = AUDIO_TOOL.label;
+  static hint = AUDIO_TOOL.hint;
 
   constructor(host) {
     this.host = host;

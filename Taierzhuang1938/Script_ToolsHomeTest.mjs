@@ -27,9 +27,10 @@ try {
       home: !document.querySelector("#edRoot .edHome").hidden,
       empty: !document.querySelector("#edRoot .edInspectorEmpty").hidden,
       cards: document.querySelectorAll("#edRoot .edHomeTool").length,
+      hasAudio: !!document.querySelector('#edRoot .edHomeTool[data-home-tool="audio"]'),
     }));
     assert.deepEqual(state.phases, ["ToolsHome"], "工具首页不建任何关卡");
-    assert.ok(state.home && !state.empty && state.cards > 15, JSON.stringify(state));
+    assert.ok(state.home && !state.empty && state.cards === 15 && !state.hasAudio, JSON.stringify(state));
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
     assert.ok(fits, "首页无横向滚动");
     await page.screenshot({ path: path.join(out, `Home${name}.png`) });

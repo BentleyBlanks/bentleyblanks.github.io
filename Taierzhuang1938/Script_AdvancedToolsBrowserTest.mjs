@@ -90,7 +90,8 @@ try {
     }));
     Check("控制中心标题 AdvancedTool ControlCenter", /^AdvancedTool ControlCenter/.test(info.title) && info.brand === "AdvancedTool ControlCenter", `${info.title} / ${info.brand}`);
     Check("六组：场景 / 关卡 / 角色 / 武器 / 特效与声音 / 资产", info.groups.map((group) => group.label).join(",") === "场景,关卡,角色,武器,特效与声音,资产", info.groups.map((group) => group.label).join(","));
-    Check("22 张卡片，含角色制作管线、测试场景、小队 PCG 样条预览、构件库预览、资产规范与模型制作工作台", info.cards.length === 22
+    Check("22 张卡片，含音效音乐、角色制作管线、测试场景、小队 PCG 样条预览、构件库预览、资产规范与模型制作工作台", info.cards.length === 22
+      && info.cards.some((entry) => entry.id === "audio" && entry.href === `${base}Tool_AudioPreview.html` && entry.target === "TengxianAudioPreview")
       && info.cards.some((entry) => entry.id === "testScenes" && entry.href.includes("TestScenes.html"))
       && info.cards.some((entry) => entry.id === "squadSplinePreview" && entry.href.includes("Tool_SquadSplinePreview.html"))
       && info.cards.some((entry) => entry.id === "assetStandards" && entry.href.includes("Tool_AssetStandards.html"))
@@ -121,6 +122,12 @@ try {
     await studio.waitForFunction(() => window.ToolStudio?.ready && window.ToolStudio.activeId === "actor", null, { timeout: 180000 });
     Check("点「人物动作」卡片开出独立工具宿主并打开该工具", studio.url() === `${base}Tool_Studio.html?tool=actor`, studio.url());
     await studio.close();
+    const audioPopup = page.waitForEvent("popup", { timeout: 20000 });
+    await page.click('[data-home-tool="audio"]');
+    const audioWin = await audioPopup;
+    await audioWin.waitForFunction(() => window.AudioPreview?.ready, null, { timeout: 60000 });
+    Check("点「音效音乐」卡片开出 Tool_AudioPreview.html 独立试听页", audioWin.url() === `${base}Tool_AudioPreview.html`, audioWin.url());
+    await audioWin.close();
     await page.close();
   }
 
@@ -804,9 +811,9 @@ try {
   }
 
   if (!only || only.has("audio")) {
-    const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=audio`, { waitUntil: "commit" });
-    await legacy.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_AudioPreview.html"));
-    Check("旧工具宿主链接转到音效音乐独立窗口", true);
+    const { page: legacy } = await OpenPage(`${base}Tool_Studio.html?tool=audio&audio=0`, { waitUntil: "commit" });
+    await legacy.waitForURL((url) => url.pathname.endsWith("/AdvancedTools/Tool_AudioPreview.html") && url.searchParams.get("audio") === "0");
+    Check("旧工具宿主链接转到音效音乐独立窗口并保留参数", true, legacy.url());
     await legacy.close();
 
     const requests = [];
@@ -818,6 +825,19 @@ try {
     await page.goto(`${base}Tool_AudioPreview.html`, { waitUntil: "load", timeout: 120000 });
     await page.waitForFunction(() => window.AudioPreview?.ready, null, { timeout: 60000 });
     await page.mouse.click(40, 600);
+    await page.locator(".edVolumeRange").fill("45");
+    const volumeCheck = await page.evaluate(() => {
+      const a = window.AudioPreview.audio;
+      const saved = JSON.parse(localStorage.getItem("tengxian1938_tools_volume_v1") || "null");
+      const playerSaved = localStorage.getItem("tengxian1938_audio_v1");
+      return { masterVolume: a.masterVolume, toolsVolume: a.toolsVolume, saved, playerSaved };
+    });
+    await page.locator(".edVolumeRange").fill("100");
+    await page.evaluate(() => localStorage.removeItem("tengxian1938_tools_volume_v1"));
+    Check("音效窗口：顶栏音量条改写总音量并存入 tools_volume，不调 SetToolsVolume 也不碰玩家存档",
+      Math.abs(volumeCheck.masterVolume - 0.45) < 1e-4 && volumeCheck.toolsVolume === null
+      && Math.abs((volumeCheck.saved?.volume ?? -1) - 0.45) < 1e-4 && volumeCheck.playerSaved === null,
+      JSON.stringify(volumeCheck));
     const audio = await page.evaluate(async () => {
       const { editor } = window.AudioPreview;
       const names = editor.Names();
@@ -851,9 +871,9 @@ try {
     });
     Check("音效窗口：环境与音乐各自都能停", stopped.ambience === "silence" && stopped.music === null && !stopped.musicLive, JSON.stringify(stopped));
     if (shots) await page.screenshot({ path: path.join(shotDir, "AudioPreview.png") });
-    Check("音效窗口：不建渲染器、不加载 three 与任何渲染模块", audio.canvas === 0
-      && !requests.some((url) => /\/vendor\/three\/|\/Script_(Vfx|Particle\w*|EditorStage)\.mjs/.test(url) || MEDIA_FORBIDDEN.test(url)),
-      requests.filter((url) => /\/vendor\/three\/|Script_(Vfx|Particle)/.test(url) || MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
+    Check("音效窗口：不建渲染器、不加载 three 与任何渲染模块、不加载 Data_DevTools", audio.canvas === 0
+      && !requests.some((url) => /\/vendor\/three\/|\/Script_(Vfx|Particle\w*|EditorStage|EditorMediaEntry)\.mjs|\/Data_DevTools\.mjs/.test(url) || MEDIA_FORBIDDEN.test(url)),
+      requests.filter((url) => /\/vendor\/three\/|Script_(Vfx|Particle|EditorMediaEntry)|Data_DevTools/.test(url) || MEDIA_FORBIDDEN.test(url)).slice(0, 4).join(", "));
     Check("音效窗口：没有浏览器错误", errors.length === 0, errors.slice(0, 3).join(" | "));
     await page.close();
   }

@@ -4139,8 +4139,8 @@ export const AMBIENCE_PRESETS = {
  * 这场仗的声音本体是枪炮，音乐只负责在缝隙里给一个情绪的落点。
  * 所以 level 全部压得很低，而且大部分时间根本不放。
  */
-// `label` 只有一个消费者：编辑器音频面板的试听按钮（Script_EditorAudio）。
-// 编辑器不本地化（docs/Data_TextAndTuning.md §2「什么不走文本表」），所以这九条
+// `label` 只给控制中心独立工具「音效音乐」（AdvancedTools/Script_EditorAudio）的试听按钮用。
+// 开发工具不做本地化（docs/Data_TextAndTuning.md §2「什么不走文本表」），所以这九条
 // 逐行登记 @text-ok，而不是搬进 Data_Text_*。**玩家在任何界面上都看不到它们。**
 export const MUSIC_CUES = {
   ...FIRST_LEVEL_MUSIC_CUES,
@@ -6571,7 +6571,9 @@ export class AudioEngine {
     this.SyncDeafenVolume();
   }
 
-  /** 把背景层（环境床 + 音乐）就地停掉。暂停与「退出音效编辑器时游戏还停着」都走它。 */
+  /**
+   * 停掉背景层（环境床 + 音乐）：暂停玩法，以及独立工具退出前清理背景试听时都走它。
+   */
   StopBackground() {
     this.StopAmbience();
     this.StopMusic();
@@ -6585,8 +6587,8 @@ export class AudioEngine {
    * 每一轮按概率撒远处的枪炮；音乐同理。玩法停了它们照响 ——
    * 表现就是「我暂停了，背景里的枪声还在」。
    *
-   * 这里只停背景层，**不 suspend 整个 AudioContext**：音效编辑器要在暂停时试听，
-   * 过场编辑器要听得见过场自己的音效。已经在飞的一次性音（最长两秒的尾巴）
+   * 这里只停背景层，**不 suspend 整个 AudioContext**：让过场或编辑器在暂停时
+   * 仍能播自己的音。已经在飞的一次性音（最长两秒的尾巴）
    * 让它自己响完，硬掐会「咔」一声。
    */
   SetPaused(on) {

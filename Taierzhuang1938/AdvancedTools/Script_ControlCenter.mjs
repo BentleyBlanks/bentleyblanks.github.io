@@ -15,7 +15,7 @@ import { BlockoutEntry } from "../Script_EditorBlockoutEntry.mjs";
 import { TimelineEditor } from "../Script_EditorTimeline.mjs";
 import {
   STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl, GameToolUrl, GAME_PAGE,
-} from "./Data_AdvancedTools.mjs?v=20261127Tripo";
+} from "./Data_AdvancedTools.mjs?v=20261128AudioStandalone";
 
 /** 控制中心的名字（页面标题与顶栏）。 */
 export const CONTROL_CENTER_TITLE = "AdvancedTool ControlCenter";

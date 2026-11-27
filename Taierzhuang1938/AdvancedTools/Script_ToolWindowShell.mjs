@@ -10,7 +10,7 @@ import { CONTROL_CENTER_URL } from "./Data_AdvancedTools.mjs";
 /**
  * @param {object} options
  *   title   菜单栏左侧的工具名
- *   audio   有 SetToolsVolume 的音频引擎时挂音量条（高级工具自己那份音量，不改游戏「声音」设置）
+ *   audio   有 SetMasterVolume 的独立工具音频引擎时挂音量条（读写工具自己的存储键，不碰游戏「声音」设置）
  * → { root, workHost, SetStatus(text), Return() }
  */
 export function ToolWindowShell({ title, audio = null } = {}) {
@@ -31,9 +31,9 @@ export function ToolWindowShell({ title, audio = null } = {}) {
   status.setAttribute("role", "status");
   bar.appendChild(status);
 
-  if (audio?.SetToolsVolume) {
+  if (audio?.SetMasterVolume) {
     const volume = LoadToolsVolume(audio.masterVolume ?? 1);
-    const Sync = () => audio.SetToolsVolume(ToolsVolumeLevel(volume));
+    const Sync = () => audio.SetMasterVolume(ToolsVolumeLevel(volume));
     const control = ToolsVolumeControl(volume, Sync);
     bar.appendChild(control.root);
     Sync();

@@ -18,13 +18,12 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 
 开发工具分两块，**都不对玩家开放**，出图模式（`?shot=1`）下整棵 DOM 是 `display:none`：
 
-- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：共 17 项，按场景、关卡、角色、武器、特效与声音、资产六组排列。15 项经独立工具边界接入，白盒关卡编辑器和 Timeline 使用整页入口。
+- **高级工具**（菜单 设置 → 高级工具、齿轮或 `` ` ``）：共 15 项，按场景、关卡、角色、武器、特效与声音、资产六组排列。13 项经独立工具边界接入，白盒关卡编辑器和 Timeline 使用整页入口。
 - **高级工具音量**（2026-10-20，用户：高级工具页面要有独立的音量调节）：菜单栏右侧（Debug工具下拉与「返回主菜单」之间）一条
   喇叭 + 滑条 + 百分比（`Script_EditorVolume`），点喇叭静音 / 取消，滑条上滚轮一格 5%。存在自己的 localStorage 键
   `tengxian1938_tools_volume_v1`（`{ volume, muted }`），**不碰**游戏「声音」设置那份 `tengxian1938_audio_v1`；第一次用时从
-  玩家当前的总音量起步。高级工具开着（或有工具在跑）、或者在白盒关卡编辑器页面里时，`EditorSuite.SyncToolsVolume` 调
-  `Script_Audio.SetToolsVolume(音量)` 盖过玩家的总音量（`outputVolume = toolsVolume ?? masterVolume`）；退出高级工具调
-  `SetToolsVolume(null)` 还回去。白盒关卡编辑器右上角工具条里也有同一条（同一份存档）。
+  玩家当前的总音量起步。游戏内高级工具 / `Tool_Studio` / 白盒关卡编辑器开启或预演时，`Script_Audio.SetToolsVolume(音量)` 盖过玩家的总音量（`outputVolume = toolsVolume ?? masterVolume`），退出时调
+  `SetToolsVolume(null)` 还回去；`ToolWindowShell` 独立页面（如 `Tool_AudioPreview.html`）本身不读玩家设置，改用 `SetMasterVolume` 直接同步并写入 `tengxian1938_tools_volume_v1`。白盒关卡编辑器右上角工具条里也有同一条（同一份存档）。
 - **Debug工具**（菜单 设置 → Debug工具；高级工具菜单栏右侧、音量条左边的「Debug工具」下拉）：Debug Rendering / Profiler / Frame Debugger / WorldInfo / 玩家状态 / 敌军 AI / 环境，外加 FPS 显示。两处入口开关同一份状态
   （`EditorSuite.DebugToolStates` / `ToggleDebugTool`，顺序与文案都取 `Data_DevTools.DEBUG_TOOL_IDS` 与
   `Data_Text_Menu` 的 `menu.debugTools.*`）；下拉条目带 `data-debug-tool`，不算编辑器条目（不带 `data-editor`），
@@ -67,8 +66,8 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
   「拆件模型」阶段可逐件选择「用 Tripo 生成」；确认后用已核对的拆件图经本机 Codex 的 Tripo Studio MCP 生成一个 GLB，并按当前参考版本登记。手动 Studio 入口仍可用。两套工作台共用同一次 [Tripo MCP 配置与授权](Data_ModelWorkbench.md#本机依赖与记录)。
 - **独立工具宿主** `AdvancedTools/Tool_Studio.html?tool=<id>`（`Script_ToolStudio.mjs` 外壳 + `Script_ToolStudioRenderBase.mjs` 渲染底座）：不改 `Script_Main`，底座照 Main 的建系统与出画顺序自己装配（画质档与玩家存档同一套，天光 / 地台照工具首页那一关），host 字段同 `EditorSuite.editorHost`，差别只有 `game` 是最小桩、`playerWeaponId` 取 `DEFAULT_PLAYER_WEAPON`。页面 `<base href="../">`，游戏模块里按游戏根写的 `./Model/…` 相对路径照旧可用；外部 PBR 清单照抄 Main 的表（`Data_ToolStudioPbrSets.mjs`，Main 改表要同步）。`?manual=1` 时钟归测试（`window.ToolStudio.StepFrames`）。
 - **搬家后的路径**：独立页面读 `../index.html` 的 import map，键值按 index.html 位置解析成绝对地址再插入（避免同一模块两个实例）；入口类用 `new URL("../", import.meta.url)` 解析 `TOOL_INFO.window.url`（相对 `Taierzhuang1938/` 根）。`index.html` 的 import map 里搬走的模块登记为 `./AdvancedTools/X.mjs`。
-- **游戏内入口暂时保留、行为不变**：两对拆分边界模块（写法同 `Script_DevTools` / `Data_DevTools`）——`Script_DevToolsSplit.mjs` 导出 `SPLIT_TOOL_CLASSES`（15 个工具类，游戏里唯一可以 import `./AdvancedTools/` 的模块）、`Data_DevToolsSplit.mjs` 导出 `SPLIT_TOOLS_AVAILABLE`（零依赖）；`TOOL_INFO` 里 15 项带 `split: true`，`TOOL_MENUS` 按 `!split || SPLIT_TOOLS_AVAILABLE` 过滤；`Script_Editor` 的类表 / 互斥表由本地类加 `SPLIT_TOOL_CLASSES` 组装。
-- **线上剔除**：Pages 发布始终把这两对换成 `*Stub`（`Script_BuildBrowserBundle --deploy` 自动带，`--strip-dev-tools` 全剔路径仍可用），发布副本不含 `AdvancedTools/`（`PUBLISH_EXCLUDE` + `Script_PublishScope.IsPublishedSource`），`Script_PublishPrune.StripAdvancedToolsImports` 摘掉 `index.html` import map 里指向它的条目（排在盖戳之前），`Script_StampImportMaps` 不进该目录。效果：线上菜单 / 设置 → 高级工具里这 15 项消失（整组拆空的「特效与声音」也不列），其余工具照旧。
+- **游戏内入口暂时保留、行为不变**：两对拆分边界模块（写法同 `Script_DevTools` / `Data_DevTools`）——`Script_DevToolsSplit.mjs` 导出 `SPLIT_TOOL_CLASSES`（13 个工具类，游戏里唯一可以 import `./AdvancedTools/` 的模块）、`Data_DevToolsSplit.mjs` 导出 `SPLIT_TOOLS_AVAILABLE`（零依赖）；`TOOL_INFO` 里 13 项带 `split: true`，`TOOL_MENUS` 按 `!split || SPLIT_TOOLS_AVAILABLE` 过滤；`Script_Editor` 的类表 / 互斥表由本地类加 `SPLIT_TOOL_CLASSES` 组装。
+- **线上剔除**：Pages 发布始终把这两对换成 `*Stub`（`Script_BuildBrowserBundle --deploy` 自动带，`--strip-dev-tools` 全剔路径仍可用），发布副本不含 `AdvancedTools/`（`PUBLISH_EXCLUDE` + `Script_PublishScope.IsPublishedSource`），`Script_PublishPrune.StripAdvancedToolsImports` 摘掉 `index.html` import map 里指向它的条目（排在盖戳之前），`Script_StampImportMaps` 不进该目录。效果：线上菜单 / 设置 → 高级工具里这 13 项消失（整组拆空的「特效与声音」也不列），其余工具照旧。
 - **桌面启动器** `AdvancedTools/Script_ControlCenterLaunch.mjs` 和本地预览快捷方式共用端口规则。默认优先复用 8080 上同一检出的当前预览服务，其次查找相邻端口上同一检出的当前服务。旧版同检出服务可原地更新。没有同检出的服务时只尝试 8080，被占用会提示。测试时可通过命令行传入数字端口以保留端口回退。`--dry-run` 只打印计划，`--shortcut` 创建桌面快捷方式，`--shortcut-dir=<dir>` 指定创建位置。
 - **门禁**：`Script_AdvancedToolsTest`（纯 Node：目录表、搬家、入口类地址、卡片、启动器）、`Script_AdvancedToolsBrowserTest`（控制中心、九个工具在独立宿主逐个打开、四个页面新地址）、`Script_ToolStudioParityBrowserTest`（九个工具游戏宿主 vs 独立宿主整页截图平均绝对差 ≤ 2/255，约 20+ 分钟，tier2）、`Script_DevToolsIsolationTest`（拆分边界导出对账、游戏不 import AdvancedTools、发布构建 / 发布副本 / 菜单剔除）。
 
@@ -80,6 +79,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 - **2026-11-25**：高级工具控制中心与所有拆分独立工具页面改为普通浏览器标签页打开（移除 `TOOL_INFO[id].window` / `STANDALONE_TOOLS` 的 `popup,width=...,height=...` `features` 以及控制中心点击拦截的 `window.open(..., features)`，改为原生 `<a target="...">` 或无 `features` 的 `window.open(url, name)`；同源命名标签页不设 `rel="noopener"` 以保留同名标签页复用及「← 控制中心」返回原标签页）。仅在游戏内伴随实时画面运行的 Debug 工具（Profiler / FrameDebugger / WorldInfo / PlayerState / Environment）仍保留独立弹窗。
 - **2026-11-25**：资产规范拆出游戏，改成只在控制中心出现的独立配置器 `Tool_AssetStandards.html`（见 [资产规范与限制](#资产规范与限制-advancedtoolstool_assetstandardshtml只在控制中心)）；规范真相从游戏根的 `Data_AssetStandards.mjs` 搬到 `AssetPipeline/Data_AssetStandards.json`，游戏运行时不再读它。游戏菜单 16 项（14 项拆分、2 项游戏内），控制中心仍 19 张卡（另含构件库预览、资产规范与限制、模型制作工作台三张只在控制中心的卡）；工具宿主只剩人物、面部两个摄影棚工具，旧地址 `Tool_Studio.html?tool=assetStandards` 转到新页。
 - **2026-11-23**：特效预览与音效音乐拆为独立窗口（`Tool_VfxPreview.html`、`Tool_AudioPreview.html`，共用窗口壳 `Script_ToolWindowShell.mjs`、入口类 `Script_EditorMediaEntry.mjs`），从游戏灯光 / 后处理 / 天空 / 材质库 / 关卡数据解耦：音效窗口只装 `AudioEngine` 与固定听者，零渲染依赖；特效窗口装 `VfxSystem` + 中性预览台 `Script_VfxPreviewStage.mjs` / 预览灯 `Script_VfxPreviewLights.mjs`（与游戏共用 `Script_EffectLightEnvelope.mjs`、`Script_ToneMapCurves.mjs`）+ 昼夜读取项目环境预设 `Script_VfxPreviewEnvironment.mjs`（`Environment/EnvPreset_*.json` 的 looks，不写死时段）。共享预通道标记（`Script_RenderTags.mjs`）、太阳阴影采样（`Script_SunShadowSampling.mjs`）、体积噪声（`Script_VolumetricNoise.mjs`）与烟场样式（`Data_SmokePlumeStyles.mjs`）从重模块拆出，也顺带让主菜单包去掉了整条后处理与灯光链。游戏内回归测试（`?editor=vfx`、`Debug.OpenEditor("vfx")`）经 `VfxPreviewEntry.harness` 保留原游戏宿主口径；旧 `Tool_Studio.html?tool=vfx|audio` 重定向至新页。控制中心现有 4 项使用工具宿主（`actor facial props assetStandards`）、11 项开独立窗口（另含模型制作工作台共 12 张独立窗口卡）、2 项走游戏入口。
+- **2026-11-28**：音效音乐（`audio` / `Tool_AudioPreview.html`）彻底切出游戏高级工具菜单、拆分边界与运行时，改为 `ControlCenter` 独占独立工具（`Data_AdvancedTools.STANDALONE_TOOLS`，归入 `media` 分组 `vfx` 之后；旧地址 `Tool_Studio.html?tool=audio` 仍重定向并保留 `?audio=` 参数）：从 `Data_DevTools`、`Script_DevToolsSplit`、`Script_EditorMediaEntry` 移除 `audio` / `AudioPreviewEntry`；清除 `Script_Editor` 中已失效的 `activeId === "audio"` 特判；`Script_EditorAudio` 改从 `Data_AdvancedTools` 读取名称与提示、脱离 `Data_DevTools`；`ToolWindowShell` 改用 `SetMasterVolume`（仍读写 `tengxian1938_tools_volume_v1`，不再调核心引擎的 `SetToolsVolume`；`SetToolsVolume` 仍保留供游戏内 `Script_Editor`、`Script_EditorBlockout`、`Script_EncounterPlay`、`Script_ToolStudio` 使用）。改动后游戏菜单 15 项（13 项拆分、2 项游戏内；`media` 组本地仅剩 `vfx`，发布构建中该组消失），控制中心共 22 张卡片（含 7 项 `STANDALONE_TOOLS`）。
 
 ## 精简测试界面
 

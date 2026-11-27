@@ -148,6 +148,7 @@ const afterGear = await page.evaluate(() => {
     squadMarch: !!document.querySelector('#edRoot .edMenuBar [data-editor="squadMarch"]'),
     facial: !!document.querySelector('#edRoot .edMenuBar [data-editor="facial"]'),
     textures: !!document.querySelector('#edRoot .edMenuBar [data-editor="textures"]'),
+    audio: !!document.querySelector('#edRoot .edMenuBar [data-editor="audio"]'),
     sceneEditor: !!document.querySelector('#edRoot .edMenuBar [data-editor="sceneEditor"]'),
     orchestration: !!document.querySelector('#edRoot [data-editor="orchestration"]'),
     blockout: !!document.querySelector('#edRoot .edMenuBar [data-editor="blockout"]'),
@@ -162,11 +163,11 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏有六组高级工具、右侧 Debug工具；入口数同 TOOL_MENUS（构件库预览只在控制中心，不进游戏菜单）。
+// 菜单栏有六组高级工具、右侧 Debug工具；入口数同 TOOL_MENUS（构件库、资产规范、音效音乐只在控制中心，不进游戏菜单）。
 const menuToolCount = TOOL_MENUS.flatMap((menu) => menu.items).length;
 Check("菜单栏列出全部编辑器入口", afterGear.entries === menuToolCount
   && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
-  && !afterGear.squadMarch && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
+  && !afterGear.squadMarch && !afterGear.audio && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
 Check("Debug工具八项在音量条旁的下拉里，不混进编辑器条目",
@@ -1430,17 +1431,20 @@ Check("特效预览器可重播瞬时爆炸且 shader 无 GL 错误",
   !!vfxEditor.instant && vfxEditor.glError === 0, JSON.stringify(vfxEditor.instant));
 
 // ---------------------------------------------------------------------------
-// 5) 音效音乐：独立窗口（Tool_AudioPreview，只装音频引擎）。试听、环境床 / 音乐的播放与停止、
-//    盲听与「每个配方都有分类与说明」在 AdvancedToolsBrowserTest 里对着那个窗口验；这里只验菜单开的是它。
+// 5) 音效音乐已迁到控制中心独占（Tool_AudioPreview，不在游戏菜单与运行时）：
+//    菜单与工具表里没有它，调 Debug.OpenEditor / editor.Open("audio") 返回 null 且不打开；
+//    特效与声音组里仍保留 VFX。
 // ---------------------------------------------------------------------------
 {
   await page.evaluate(() => window.Taierzhuang.editor.CloseTool?.());
-  const popupReady = page.waitForEvent("popup");
-  await ClickTool("audio");
-  const popup = await popupReady;
-  Check("音效音乐从菜单打开独立窗口", popup.url().includes("AdvancedTools/Tool_AudioPreview.html"), popup.url());
-  await popup.close();
-  await page.bringToFront();
+  const audioCheck = await page.evaluate(() => {
+    const item = document.querySelector('#edRoot [data-editor="audio"]');
+    const result = window.Taierzhuang.editor.Open("audio");
+    return { inMenu: !!item, result, active: window.Taierzhuang.editor.ActiveId, paused: window.Taierzhuang.audio.paused };
+  });
+  Check("游戏菜单与运行时已移除音效音乐工具",
+    !audioCheck.inMenu && audioCheck.result === null && audioCheck.active === null && audioCheck.paused === true,
+    JSON.stringify(audioCheck));
 }
 
 // ---------------------------------------------------------------------------

@@ -53,15 +53,15 @@ Check("具名工具、游戏宿主、关卡和测试场仍走游戏入口", game
 // --- 1. 目录表 -------------------------------------------------------------------
 const menuIds = TOOL_MENUS.flatMap((menu) => menu.items);
 const splitIds = Object.keys(TOOL_INFO).filter((id) => TOOL_INFO[id].split);
-Check("split 条目共 14 项", splitIds.length === 14, splitIds.join(","));
+Check("split 条目共 13 项", splitIds.length === 13, splitIds.join(","));
 Check("独立窗口 + 摄影棚 = split 的全部", Same([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS], splitIds));
 Check("独立窗口 = split 且带 window 的条目", Same(WINDOW_TOOL_IDS, splitIds.filter((id) => TOOL_INFO[id].window)));
 Check("留在游戏里的 = 没有 split 的菜单条目", Same(GAME_TOOL_IDS, menuIds.filter((id) => !TOOL_INFO[id].split)));
-Check("菜单 16 项且三类互不重叠", menuIds.length === 16 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 16);
+Check("菜单 15 项且三类互不重叠", menuIds.length === 15 && new Set([...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS]).size === 15);
 Check("只在控制中心的独立工具不进游戏清单与拆分边界", STANDALONE_TOOLS.every((tool) => !TOOL_INFO[tool.id] && !menuIds.includes(tool.id)
   && ![...STUDIO_TOOL_IDS, ...WINDOW_TOOL_IDS, ...GAME_TOOL_IDS].includes(tool.id))
-  && !/PropLibrary|AssetStandards/.test(fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8"))
-  && !/PropLibrary|PlaceableCatalog|AssetStandards|AssetPipeline/.test(fs.readFileSync(path.join(projectDir, "index.html"), "utf8")));
+  && !/PropLibrary|AssetStandards|AudioPreview/.test(fs.readFileSync(path.join(projectDir, "Script_DevToolsSplit.mjs"), "utf8"))
+  && !/PropLibrary|PlaceableCatalog|AssetStandards|AssetPipeline|EditorAudio|AudioPreview/.test(fs.readFileSync(path.join(projectDir, "index.html"), "utf8")));
 
 // --- 2. 搬家 ---------------------------------------------------------------------
 const pages = ["SceneEditor.html", "Tool_LevelFlow.html", "Tool_MixamoAnimationPreview.html", "Tool_MotionCompare.html", "Tool_MotionWorkbench.html",
@@ -97,7 +97,6 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     ["splines", "Script_EditorPcgEntry.mjs", "SplineEntry", "Tool_Pcg.html"],
     ["propPcg", "Script_EditorPcgEntry.mjs", "PropPcgEntry", "Tool_Pcg.html"],
     ["vfx", "Script_EditorMediaEntry.mjs", "VfxPreviewEntry", "Tool_VfxPreview.html"],
-    ["audio", "Script_EditorMediaEntry.mjs", "AudioPreviewEntry", "Tool_AudioPreview.html"],
   ];
   for (const [id, file, name, page] of entries) {
     const module = await import(pathToFileURL(path.join(toolsDir, file)).href);
@@ -109,6 +108,8 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     Check(`${id} 以普通标签页打开（沿用目标名、不传 popup features）`,
       opened.at(-1).name === TOOL_INFO[id].window.name && !opened.at(-1).features && !TOOL_INFO[id].window.features);
   }
+  const mediaEntry = await import(pathToFileURL(path.join(toolsDir, "Script_EditorMediaEntry.mjs")).href);
+  Check("Script_EditorMediaEntry 不再导出 AudioPreviewEntry", !("AudioPreviewEntry" in mediaEntry));
   delete globalThis.window;
 }
 
@@ -145,8 +146,14 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     Check(`${page} 页面存在并只登记 three`, fs.existsSync(path.join(toolsDir, page))
       && /"imports":\s*\{\s*"three":/.test(fs.readFileSync(path.join(toolsDir, page), "utf8")));
   }
-  const audioScene = Closure("Script_AudioPreview.mjs").filter((name) => /^Script_(Vfx|Particle\w*|EditorStage)\.mjs$/.test(name));
+  const audioModules = Closure("Script_AudioPreview.mjs");
+  const audioScene = audioModules.filter((name) => /^Script_(Vfx|Particle\w*|EditorStage)\.mjs$/.test(name));
   Check("音效音乐窗口不装渲染：模块图里没有特效、粒子与摄影棚", audioScene.length === 0, audioScene.join(","));
+  Check("音效音乐窗口与游戏清单解耦：不引入 Data_DevTools / MediaEntry 且不调 SetToolsVolume",
+    !audioModules.includes("Data_DevTools.mjs") && !audioModules.includes("Script_EditorMediaEntry.mjs")
+    && !/SetToolsVolume|toolsVolume/.test(fs.readFileSync(path.join(toolsDir, "Script_AudioPreview.mjs"), "utf8"))
+    && !/SetToolsVolume|toolsVolume/.test(fs.readFileSync(path.join(toolsDir, "Script_ToolWindowShell.mjs"), "utf8")),
+    audioModules.join(","));
   const studio = fs.readFileSync(path.join(toolsDir, "Script_ToolStudio.mjs"), "utf8");
   Check("工具宿主不再装特效 / 声音编辑器，旧地址转到独立窗口", !/Script_Editor(Vfx|Audio)\.mjs/.test(studio) && /vfx: \[/.test(studio) && /audio: \[/.test(studio));
   const vfxEditor = fs.readFileSync(path.join(toolsDir, "Script_EditorVfx.mjs"), "utf8");
@@ -173,6 +180,13 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   Check("角色制作管线是控制中心角色组的独立工具", cards.some((card) => card.id === "characterWorkbench"
     && card.group === "character" && card.kind === "window" && card.target === "TengxianCharacterWorkbench"
     && card.href === new URL("./Tool_CharacterWorkbench.html", page).href));
+  const media = cards.filter((card) => card.group === "media").map((card) => card.id);
+  Check("音效音乐只在控制中心的特效与声音组作为独立窗口卡片（紧跟特效预览后），不在游戏工具菜单",
+    media.join(",") === "vfx,audio" && !TOOL_INFO.audio && !menuIds.includes("audio")
+    && cards.some((card) => card.id === "audio" && card.group === "media" && card.kind === "window"
+      && card.target === "TengxianAudioPreview"
+      && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_AudioPreview.html")),
+    media.join(","));
   const assets = cards.filter((card) => card.group === "assets").map((card) => card.id);
   Check("构件库预览、资产规范是控制中心资产组前两张独立窗口卡片", assets[0] === "props" && assets[1] === "assetStandards" && assets.at(-1) === "modelWorkbench"
     && cards.some((card) => card.id === "props" && card.kind === "window" && card.target === "TengxianPropLibrary"

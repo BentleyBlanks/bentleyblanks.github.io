@@ -404,17 +404,20 @@ function StepFrame(base, studio, dt) {
 async function Main() {
   const params = new URLSearchParams(location.search);
   // 已改成独立窗口的工具：旧地址（书签、旧测试）转到新页，带上它们认的网址参数。
-  const moved = { vfx: ["effect", "flareCamera", "env", "look", "quality", "manual"], audio: ["audio"] }[params.get("tool")];
+  const moved = { vfx: ["effect", "flareCamera", "env", "look", "quality", "manual"] }[params.get("tool")];
   if (moved) {
     const dest = new URL(TOOL_INFO[params.get("tool")].window.url, document.baseURI);
     for (const key of moved) { const value = params.get(key); if (value != null) dest.searchParams.set(key, value); }
     location.replace(dest);
     return;
   }
-  // 构件库预览、资产规范 2026-11-25 改成只在控制中心出现的独立页面（游戏与本宿主里都不再挂），旧地址转过去。
+  // 构件库预览、资产规范、音效音乐只在控制中心出现，不挂在游戏或本宿主里；旧地址转过去并保留对应参数。
   const standalone = STANDALONE_TOOLS.find((tool) => tool.id === params.get("tool"));
   if (standalone) {
-    location.replace(new URL(standalone.window.url, location.href));
+    const dest = new URL(standalone.window.url, location.href);
+    const keepParams = { audio: ["audio"] }[standalone.id] || [];
+    for (const key of keepParams) { const value = params.get(key); if (value != null) dest.searchParams.set(key, value); }
+    location.replace(dest);
     return;
   }
   if (params.get("tool") === "weapon") {

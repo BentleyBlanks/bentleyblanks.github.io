@@ -44,8 +44,6 @@ export const TOOL_INFO = Object.freeze({
     window: { url: "./AdvancedTools/Tool_FirstPersonInspection.html", name: "TengxianFirstPersonInspection" } },
   vfx: { label: "特效预览", hint: "在新标签页打开：查看火焰、烟雾、爆炸、命中、枪口焰与曳光；昼夜取环境预设", split: true,
     window: { url: "./AdvancedTools/Tool_VfxPreview.html", name: "TengxianVfxPreview" } },
-  audio: { label: "音效音乐", hint: "在新标签页打开：全部配方的试听、混音参数与盲听指认", split: true,
-    window: { url: "./AdvancedTools/Tool_AudioPreview.html", name: "TengxianAudioPreview" } },
   textures: { label: "贴图管理", hint: "在新标签页打开贴图管理：导入设置、发布压缩与程序化预览", split: true,
     window: { url: "./AdvancedTools/TextureManager.html", name: "TengxianTextureManager" } },
 });
@@ -56,7 +54,7 @@ const TOOL_MENU_DEFS = [
   { id: "level", label: "关卡", items: ["blockout", "timeline", "levelFlow"] },
   { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare", "motionWorkbench"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson"] },
-  { id: "media", label: "特效与声音", items: ["vfx", "audio"] },
+  { id: "media", label: "特效与声音", items: ["vfx"] },
   { id: "assets", label: "资产", items: ["textures"] },
 ];
 // 已拆出去的工具在剔除拆分边界的版本（线上发布）里不列；一整组都拆走了就连这一组也不列。

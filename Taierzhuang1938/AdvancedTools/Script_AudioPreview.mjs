@@ -2,7 +2,7 @@
 //
 // 只装音频引擎（Script_Audio）与编辑器界面件，不建渲染器、不装灯光 / 后处理 / 场景。
 // 试听的空间化按一个固定的听者站位算（原点、耳高 1.6 m、面朝 -Z），「距离」滑条把声源摆在正前方。
-// 编辑器本体是 Script_EditorAudio（与过去在游戏里、工具宿主里开的是同一个类），这里只给它一个最小宿主。
+// 编辑器本体是 Script_EditorAudio，在控制中心独立页运行时只给它一个最小宿主。
 
 import { AudioEngine } from "../Script_Audio.mjs";
 import { AudioEditor } from "./Script_EditorAudio.mjs";
