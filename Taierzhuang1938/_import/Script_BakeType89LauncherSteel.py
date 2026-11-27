@@ -18,6 +18,8 @@ STEM = "Type89LauncherSteel"
 SOURCE = HERE / "Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp"
 CONTACT_AO = SOURCE.with_name("Texture_Type89LauncherContactAo.png")
 CONTACT_RECORD = CONTACT_AO.with_name("Data_Type89LauncherContactAo.json")
+SEAM_AO = SOURCE.with_name("Texture_Type89LauncherSeamAo.png")
+SEAM_RECORD = SEAM_AO.with_name("Data_Type89LauncherSeamAo.json")
 REFERENCE = HERE / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 ATLAS_FILE = HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json"
 ATLAS = json.loads(ATLAS_FILE.read_text(encoding="utf-8"))
@@ -1326,18 +1328,18 @@ def BuildAtlas(reference, contactAo=None):
     return maps
 
 
-def ReadContactAo():
-    record = json.loads(CONTACT_RECORD.read_bytes())
+def ReadContactAo(imagePath=CONTACT_AO, recordPath=CONTACT_RECORD):
+    record = json.loads(recordPath.read_bytes())
     model = HERE.parent / "Model/Model_Type89Launcher.tzm.json"
-    expected = {"file": CONTACT_AO.name, "sha256": Sha256(CONTACT_AO),
+    expected = {"file": imagePath.name, "sha256": Sha256(imagePath),
                 "modelSha256": Sha256(model), "atlasSha256": Sha256(ATLAS_FILE)}
     if any(record.get(field) != value for field, value in expected.items()):
-        raise ValueError("Rebake the contact AO from the current launcher mesh and UV atlas")
-    with Image.open(CONTACT_AO) as image:
+        raise ValueError(f"Rebake {imagePath.name} from the current launcher mesh and UV atlas")
+    with Image.open(imagePath) as image:
         pixels = np.array(image.convert("L"))
     if (pixels.shape != (record["size"], record["size"])
             or sha256(pixels.tobytes()).hexdigest() != record["pixelSha256"]):
-        raise ValueError("The launcher contact AO does not match its linear bake")
+        raise ValueError(f"{imagePath.name} does not match its linear bake")
     return pixels, record
 
 
@@ -1351,8 +1353,12 @@ def ComposeContactAo(orm, visibility):
 
 def Bake():
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
-    visibility, contact = ReadContactAo()
-    maps = BuildAtlas(reference, visibility)
+    calibrationVisibility, contact = ReadContactAo()
+    seamVisibility, seams = ReadContactAo(SEAM_AO, SEAM_RECORD)
+    # The photographed material fits use the original visibility weights.
+    # Keep the darker AO sample so a joint hit by either pass keeps its shadow.
+    maps = BuildAtlas(reference, calibrationVisibility)
+    visibility = np.minimum(calibrationVisibility, seamVisibility)
     size = ATLAS["size"]
     for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 82)):
         image = Image.fromarray(pixels)
@@ -1369,6 +1375,8 @@ def Bake():
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
     record["contactAo"] = {"path": CONTACT_AO.relative_to(HERE.parent).as_posix(), "sha256": contact["sha256"],
                            "record": CONTACT_RECORD.relative_to(HERE.parent).as_posix()}
+    record["seamAo"] = {"path": SEAM_AO.relative_to(HERE.parent).as_posix(), "sha256": seams["sha256"],
+                        "record": SEAM_RECORD.relative_to(HERE.parent).as_posix()}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
                "sleeveDetail": reference["closeups"]["Sleeve"]["detail"],

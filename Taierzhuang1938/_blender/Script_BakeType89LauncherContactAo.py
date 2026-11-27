@@ -11,13 +11,14 @@ from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
 
-IMAGE_NAME = "Texture_Type89LauncherContactAo.png"
-RECORD_NAME = "Data_Type89LauncherContactAo.json"
 EDGE = 1024
-RAY_COUNT = 40
-# Both distances are fractions of the authored prop's overall visual span.
-NEAR_FRACTION, FAR_FRACTION = .016, .036
 GOLDEN_ANGLE = pi * (3 - sqrt(5))
+# Distances are fractions of the authored prop's visual span. The gentler
+# falloff retains the sides of shallow seams as well as their bottoms.
+SEAM_PROFILE = dict(rays=64, nearFraction=.022, farFraction=.043,
+                    nearWeight=.72, nearFalloff=.60, farFalloff=1.)
+CALIBRATION_PROFILE = dict(rays=40, nearFraction=.016, farFraction=.036,
+                           nearWeight=.76, nearFalloff=2., farFalloff=2.)
 
 
 def Digest(path):
@@ -68,21 +69,23 @@ def TexelSamples(uv):
     return rows + top, columns + left, weights[included]
 
 
-def Hemisphere(normal):
+def Hemisphere(normal, rays):
     axis = Vector((0, 0, 1)) if abs(normal.z) < .9 else Vector((0, 1, 0))
     tangent = axis.cross(normal).normalized()
     bitangent = normal.cross(tangent)
-    for sample in range(RAY_COUNT):
-        radius = sqrt((sample + .5) / RAY_COUNT)
+    for sample in range(rays):
+        radius = sqrt((sample + .5) / rays)
         angle = sample * GOLDEN_ANGLE
         yield tangent * (radius * cos(angle)) + bitangent * (radius * sin(angle)) + normal * sqrt(1 - radius**2)
 
 
-def BakeVisibility(vertices, triangles, uvs):
+def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
+                   nearWeight, nearFalloff, farFalloff):
     tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True)
     points = np.asarray([tuple(vertex) for vertex in vertices])
     length = float(np.ptp(points, axis=0).max())
-    near, far = NEAR_FRACTION * length, FAR_FRACTION * length
+    near, far = nearFraction * length, farFraction * length
+    farWeight = 1. - nearWeight
     offset = 4e-5 * length
     baked = np.zeros((EDGE, EDGE), dtype=np.float32)
     coverage = np.zeros(baked.shape, dtype=np.uint16)
@@ -93,7 +96,7 @@ def BakeVisibility(vertices, triangles, uvs):
         rows, columns, weights = sample
         a, b, c = (vertices[i] for i in indices)
         normal = (b - a).cross(c - a).normalized()
-        directions = tuple(Hemisphere(normal))
+        directions = tuple(Hemisphere(normal, rays))
         origins = weights @ points[list(indices)] + np.asarray(tuple(normal * offset))
         visibility = np.ones(len(origins), dtype=np.float32)
         for i, position in enumerate(origins):
@@ -102,11 +105,10 @@ def BakeVisibility(vertices, triangles, uvs):
             for direction in directions:
                 _, _, _, distance = tree.ray_cast(point, direction, far)
                 if distance is not None:
-                    # Favor tight contact, with a short softer falloff around it.
                     tight = max(0., 1. - distance / near)
-                    broad = 1. - distance / far
-                    blocked += .76 * tight * tight + .24 * broad * broad
-            visibility[i] = 1. - blocked / RAY_COUNT
+                    broad = max(0., 1. - distance / far)
+                    blocked += nearWeight * tight**nearFalloff + farWeight * broad**farFalloff
+            visibility[i] = 1. - blocked / rays
         # Repeated UVs cannot store each owner's shadow. Keep the least occluded
         # owner so a buried face cannot paint a dark mark on an exposed surface.
         baked[rows, columns] = np.maximum(baked[rows, columns], visibility)
@@ -163,10 +165,12 @@ def SavePlate(pixels, path):
         bpy.data.images.remove(image)
 
 
-def Main(output=None):
+def Main(output=None, *, calibration=False):
     project = Path(__file__).resolve().parents[1]
     output = Path(output) if output is not None else project / "_import/Source/Type89Launcher"
     output.mkdir(parents=True, exist_ok=True)
+    profile = CALIBRATION_PROFILE if calibration else SEAM_PROFILE
+    suffix = "ContactAo" if calibration else "SeamAo"
     model = project / "Model/Model_Type89Launcher.tzm.json"
     layoutFile = project / "_blender/Data_Type89LauncherSteelAtlas.json"
     collection = bpy.data.collections.get("Type89LauncherExterior")
@@ -177,13 +181,15 @@ def Main(output=None):
     if len(triangles) != modelInfo["triangles"] or len(triangles) > 10000:
         raise ValueError("Contact bake geometry does not match the game mesh triangle budget")
     layout = json.loads(layoutFile.read_bytes())
-    pixels, charts = ComposeCharts(*BakeVisibility(vertices, triangles, uvs), layout)
-    image = output / IMAGE_NAME
+    pixels, charts = ComposeCharts(*BakeVisibility(vertices, triangles, uvs, **profile), layout)
+    image = output / f"Texture_Type89Launcher{suffix}.png"
     SavePlate(pixels, image)
-    record = {"file": IMAGE_NAME, "sha256": Digest(image), "pixelSha256": sha256(pixels.tobytes()).hexdigest(),
+    record = {"file": image.name, "sha256": Digest(image), "pixelSha256": sha256(pixels.tobytes()).hexdigest(),
               "modelSha256": Digest(model), "atlasSha256": Digest(layoutFile), "size": EDGE,
-              "triangles": len(triangles), "rays": RAY_COUNT, "charts": charts}
-    (output / RECORD_NAME).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+              "triangles": len(triangles), "rays": profile["rays"], "charts": charts}
+    if not calibration:
+        record["falloff"] = {key: value for key, value in profile.items() if key != "rays"}
+    (output / f"Data_Type89Launcher{suffix}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     total = sum(chart["contact"] for chart in charts.values())
     print(f"Baked {EDGE}² contact AO with {total:,} shaded surface texels and {len(triangles):,} triangles")
 

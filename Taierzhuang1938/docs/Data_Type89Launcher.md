@@ -79,11 +79,12 @@
 - 在已配准的滚花侧面分别测两条斜纹的重复间距和位置。以第 4 张馆藏照为基准，对侧面格纹做局部校正，并在可见带边缘平滑回到原格纹。另用检查台默认灯和两组未参与格纹拟合的布光复测。 [配准数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 按第 4 张近照的两道斜纹对比度，分开校准槽纹深浅、槽底氧化色和棱面反光。以相同亮度核对暗槽、磨面和亮棱的色差。纹理自身的细槽遮蔽随槽纹修正，装配网格烘焙出的几何接触遮蔽继续参与 ORM 合成。 [材质采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 第 5 张照片的金属环用于校准同框布光，再测拨片的遮暗面与亮棱。用第 4 张近照的机位及检查台中性补光一起约束反光，平衡两张近照在强弱光下的亮度。滚花侧面以第 4 张近照重新测量侧光下的棱面反射和中间调。两处修正沿接触遮蔽衰减，并用未参与拟合的布光复测。 [多灯光采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 加深肩部箍圈、旋钮根部、拨片底座和环扣、支柱槽、尾套沟槽及驻钣接头的接触遮蔽。用装配网格增加半球采样，并减缓近处遮挡的距离衰减。检查台以默认灯和柔光复核接缝。按七个机位计算，开阔钢面的亮度变化平均约半个灰阶。 [接缝遮蔽记录](../_import/Source/Type89Launcher/Data_Type89LauncherSeamAo.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
-- 在 BlenderMCP 中打开对应的工程，再运行 `_blender/Script_BakeType89LauncherContactAo.py` 的 `Main()` 以重烘接触遮蔽。脚本读取装配后的网格和钢材 UV，沿表面半球测量附近几何的可见度，并把采样结果扩展到图集边距。复用 UV 取较浅的结果，避免其他零件把暗痕印在开阔表面。合并 ORM 前会核对模型和 UV 图集的版本。 [几何烘焙脚本](../_blender/Script_BakeType89LauncherContactAo.py)
+- 在 BlenderMCP 中打开对应工程，运行 `_blender/Script_BakeType89LauncherContactAo.py` 的 `Main()` 重烘接缝遮蔽。脚本读取装配网格和钢材 UV，测量表面半球的可见度，并将结果延伸到图集边距。复用 UV 取较浅的结果，避免开阔表面出现其他零件的暗痕。`Main(calibration=True)` 可重建照片拟合使用的原始接触遮蔽。两份遮蔽按较深值合入 ORM 红通道，合入前核对模型和 UV 图集的版本。 [几何烘焙脚本](../_blender/Script_BakeType89LauncherContactAo.py)
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 重新推导筒身亮度修正时，为采样命令加 `--barrel-evidence <MetalFinishV38/Evidence>`。三组控制帧的 SHA-256 与原照投影记录在 `registeredCalibration` 中。只重算照片采样时，匹配同一照片和投影的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 重新推导外套筒底色时加 `--sleeve-evidence <MetalFinishV39/Evidence>`。记录包含两组配准帧哈希、原照哈希和表面采样范围。只重算照片采样时，原照、采样线和采样范围一致的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
@@ -107,4 +108,4 @@
 - 加 `--knurl-pattern-evidence <MetalFinishV60/Evidence/V59GripLocal>` 可从三种校准灯下已配准的旧版帧重算格纹间距与位置。 [格纹配准脚本](../_import/Script_MeasureType89LauncherLightResponse.py)
 - 滚花侧面槽纹和氧化色的参数保存在 `flankWear.grooveFinish`。用原照及已配准的同机位布光对照帧复核两道斜纹、亮度和同亮度下的色差。正式烘焙会校验这些参数对应的近照、格纹配准、材质响应和接触遮蔽。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 用 `python Taierzhuang1938/_import/Script_MeasureType89LauncherLightBalance.py --photos <ReferencePhotos> --tab-evidence <MetalFinishV62/Evidence/V62TabGuardResponses> --neutral-evidence <MetalFinishV62/Evidence/V62LegacyFillResponses> --photo4-evidence <MetalFinishV62/Evidence/V62LegacyPhoto4Responses> --grip-evidence <MetalFinishV62/Evidence/V62GripResponses>` 重算当前拨片和滚花的多灯光修正。输入包括配准后的照片、基准帧和测得的材质响应。 [采样脚本](../_import/Script_MeasureType89LauncherLightBalance.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV62/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV63/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

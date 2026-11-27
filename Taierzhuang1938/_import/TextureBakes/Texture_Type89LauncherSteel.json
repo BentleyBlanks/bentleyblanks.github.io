@@ -35,11 +35,11 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 56114,
-      "sha256": "db5782684afc3b74342236f5ce01bdd853877cbdc7539896d5441267451485eb"
+      "bytes": 58274,
+      "sha256": "2877b57bb38b9344d65eea9114864051fadd8bba955d6cbc64db6b05f34b1ad2"
     }
   ],
-  "totalBytes": 1024554,
+  "totalBytes": 1026714,
   "metrics": {
     "meanSrgb": [
       0.4367,
@@ -184,5 +184,10 @@
     "path": "_import/Source/Type89Launcher/Texture_Type89LauncherContactAo.png",
     "sha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
     "record": "_import/Source/Type89Launcher/Data_Type89LauncherContactAo.json"
+  },
+  "seamAo": {
+    "path": "_import/Source/Type89Launcher/Texture_Type89LauncherSeamAo.png",
+    "sha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+    "record": "_import/Source/Type89Launcher/Data_Type89LauncherSeamAo.json"
   }
 }
