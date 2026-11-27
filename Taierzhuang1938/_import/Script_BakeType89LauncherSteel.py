@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from scipy.ndimage import gaussian_filter, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
+from Script_MeasureType89LauncherSteel import SurfaceBalanceIdentity
 
 
 HERE = Path(__file__).resolve().parent
@@ -1338,6 +1339,15 @@ def ApplyShoulderReflection(tile, shoulder, seamVisibility):
     ApplyMaterialFields([pixels[:, split:] for pixels in tile], fields, coverage)
 
 
+def ApplyCloseupSurfaceBalance(tile, spec, u, v, seamVisibility):
+    calibration = spec["surfaceBalance"]
+    if any(calibration.get(key) != value for key, value in SurfaceBalanceIdentity(spec).items()):
+        raise ValueError("Surface balance does not match the registered photograph, finish and seam AO")
+    coverage = SmoothRamp((seamVisibility - .61) / .27)
+    channels = ("gain", "tilt", "tiltV", "tintRed", "tintBlue")
+    ApplyResponseFields(tile, calibration, channels, u, v, coverage)
+
+
 def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -1349,13 +1359,16 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
         quadrants.append(source.crop((x + margin, y + margin, x + side - margin, y + side - margin)))
 
     size = ATLAS["size"]
-    tab = reference["closeups"]["Tab"]
+    closeups = reference["closeups"]
+    tab = closeups["Tab"]
     flank = reference["knurl"]["flankWear"]
     shoulder = reference["shoulder"]["Flank"]
+    surfaceBalances = {name: closeups[name] for name in ("Barrel", "Saddle") if "surfaceBalance" in closeups[name]}
     if "albedoBalance" in flank and "surfaceCalibration" not in flank:
         raise ValueError("Knurl albedo balance requires the registered flank response")
     visibility = seamVisibility = None
-    needsSeamVisibility = "steelBalance" in tab or "albedoBalance" in flank or "reflectionBalance" in shoulder
+    needsSeamVisibility = ("steelBalance" in tab or "albedoBalance" in flank
+                           or "reflectionBalance" in shoulder or bool(surfaceBalances))
     if needsSeamVisibility or "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
@@ -1430,6 +1443,13 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
                     ApplyCollarResponse(tile, collar, calibration)
+        if name in surfaceBalances:
+            if name == "Barrel":
+                u, v = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
+            else:
+                u, v = PlanarTexelCenters(width, height)
+            ApplyCloseupSurfaceBalance(tile, surfaceBalances[name], u, v,
+                                       seamVisibility[y:y + height, x:x + width])
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1528,6 +1548,9 @@ def Bake():
     for key, name in (("surfaceCalibration", "knurlFlankResponse"), ("lightBalance", "knurlLightBalance")):
         if (calibration := reference["knurl"]["flankWear"].get(key)) is not None:
             details[name] = calibration
+    for name in ("Barrel", "Saddle"):
+        if (calibration := reference["closeups"][name].get("surfaceBalance")) is not None:
+            details[f"{name.lower()}SurfaceBalance"] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

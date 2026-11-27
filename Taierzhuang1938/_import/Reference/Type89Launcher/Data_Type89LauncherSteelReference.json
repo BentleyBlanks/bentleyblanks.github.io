@@ -3863,6 +3863,70 @@
             "MarkBaseDark.png": "9c83104dacfd642fe8292e81a88ab55e27bc32a9c9028df4b19b20b016a935ce"
           }
         }
+      },
+      "surfaceBalance": {
+        "photoSha256": "3dd0279a644a79e2190a3dea67492e91ff8fb773f05cc6db901eb3985a230848",
+        "footprint": {
+          "uCenter": 0.398,
+          "uHalfSpan": 0.154,
+          "vRange": [0.722, 0.849]
+        },
+        "sourceFinishSha256": "827556e5b27e806b924946267b5ce893d99e9967de68e26d885fb7ea53553c55",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "seamAoSha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+        "file": "Texture_Type89LauncherBarrelSurfaceBalance.png",
+        "sha256": "6eec9d09b41b8d1118bcc6ef733409277303852ac5d554eae49bde10fa1fd0ef",
+        "scale": 120000,
+        "frameSha256": {
+          "V67BarrelBeforeMuseum": {
+            "beauty.png": "9c628ba16efac22e44527c0b9c7179617ae96eb45a54ee5980680c15d08b2e6c",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "2503d06ffe63bb976a93b5223516c090deb1c799bdae5977b004ec57109891f2",
+            "BaseMinus.png": "441112695ab4e6a1f4cf790b8f3b8ab54a8625245b0d6bbe3a9da39932b74f09",
+            "AcrossPlus.png": "385d644839dac057e858829e27620a0743ab9a6de34388ed6d0bcadfe260ea6c",
+            "AcrossMinus.png": "a2143f814ce5e4384125f5a10a5f863c2df1d1bbd07189d842432275d839b8fd",
+            "AlongPlus.png": "5677f4b7a4213b980a3394c31e9145295f492167c0a5f9b9cdc41c97bb5ced79",
+            "AlongMinus.png": "faadb98477d40f86e050454f48b62bb3f8c04f28e604394558aa822f04b76efd"
+          },
+          "V67BarrelFitRake": {
+            "beauty.png": "16af66ff5179a7d2f1fa67807f9076d4fd14fddc26a631d2665dc2c296661aea",
+            "uvHi.png": "1bd6507a6c2699252c20d0efa0cb273ea92e543ac9eb8a24c783691f1d974cc8",
+            "uvLo.png": "c5ee4c628296908f2f6bd5d129259ee3f8076fa77988d4547f746e0f9c20ce71",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "d06f597ed613001751746ea3f44977f799b3ac5644b3280de428fadeec15b9fa",
+            "BaseMinus.png": "cb993443f32f7325951c0a0629e7e1855241eb56dad142e4733b62bc9b2ffdfc",
+            "AcrossPlus.png": "c249afdad62c0f6ed60544d1bf4f653cbdd604a0b3545bc1b84236e909162274",
+            "AcrossMinus.png": "bd5f57009badc33bf63f995a5f084c070d26b13e7153f355620cde9b91c5f2b6",
+            "AlongPlus.png": "4575b96ee374ef312bad27b96f3aef6c0a314fae780f68d888eb1759d0e41b17",
+            "AlongMinus.png": "fa05995e6ff35065d4cd94383828b9afcef7268bbf35e6a85b7f38ce052bad4a"
+          },
+          "V67BarrelBeforeDefault": {
+            "beauty.png": "78748a88d7271bd3999921ac820ca2b64ffe264a25a863a4f5413c918a475e2e",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "d316d8b8b0433365dac8073c15872e6648fbc779e074d5a0a26446f8bb73c14c",
+            "BaseMinus.png": "7436a9038481a515e0bb03abf770f4d0c9f6eb248ed4d75746c20da7451e1835",
+            "AcrossPlus.png": "01f401f18808bbbfcaba2774f9f6f9cd7a5f5dca688dd5d9fdc20c87348e43f5",
+            "AcrossMinus.png": "111fbd7f0dffe4652a9fa61410b19726b414128cae25c7b2235dffe7adae7b78",
+            "AlongPlus.png": "9d5a0d9820fa4d187937c699e24045d36b212fafa6924f4b7d6b9dd003571df7",
+            "AlongMinus.png": "d6604cd0bb517a8e10bdb016d5e3612f355e8fe4b0654404ca65311316b06fc2"
+          },
+          "V67BarrelFitSoft": {
+            "beauty.png": "7e105d7b5a2ae7f4eac3e8a824b14a83985b584b5669358768201d0e15ed27ad",
+            "uvHi.png": "c52c483b0da45560fa556cd990a187f0b2b657f08fa9907c2bef4148382a5088",
+            "uvLo.png": "30bb621387e0fce4838fd9992b67bc7618fe44ad5055212f140cfbde6a89a3c3",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "2abf1f392470bc94494e1f12cb423cbee41d7ba076855325b360ee4dfe4aa7d4",
+            "BaseMinus.png": "2f54f8835edb0e9520d138787e66efeb9b73ecada1d33c20436102a20ed408d0",
+            "AcrossPlus.png": "ffb81d5e4d63e57b1dc5fa1646e0654cdecca7f69a1438ae038d56ad3f139528",
+            "AcrossMinus.png": "c23c5cdc31e645c84cc6f977ed74519b0f34973e7d6c1fc59aa715852642cf36",
+            "AlongPlus.png": "324b7928c4701d20b6d5f44953d0b2c196a4254c49daedf0cedfcfb065d74147",
+            "AlongMinus.png": "0ad3c6a90425b34eb2218df5b82ca76624fec12cbf6d0e10ab85bc15278763d8"
+          }
+        }
       }
     },
     "CollarRing": {
@@ -5512,6 +5576,70 @@
             "AcrossMinus.png": "e6ae7fd921a865cb3f255fa44a39b5074e5fccb77cb048191ccc697de760132b",
             "BasePlus.png": "80aeca9caa9b637c6aeb64acd4e03c6aa7a4048342c1c6c3ad4197ac9f10ce12",
             "BaseMinus.png": "30efd066ae4a11e037d68a3678455a1db83cd6736ea3d063925244600268b744"
+          }
+        }
+      },
+      "surfaceBalance": {
+        "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+        "footprint": {
+          "uCenter": 0.5,
+          "uHalfSpan": 0.383,
+          "vRange": [0.14, 0.585]
+        },
+        "sourceFinishSha256": "6016c5930d36e3a34b7469e932b88bd1b8296ba9911fe7725cc8159145031182",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "seamAoSha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+        "file": "Texture_Type89LauncherSaddleSurfaceBalance.png",
+        "sha256": "7347a93fb88355d1a70d74c93121b2a14caf098100bd342a55ef73845cc9c9cc",
+        "scale": 120000,
+        "frameSha256": {
+          "V67SaddleBeforeFill": {
+            "beauty.png": "d0edb1e739e05005de64fc0d12dc23db7b7c6d33329e8b1ca314f833aa178620",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "9d6a2f1832eab1e85366566739323de0faf37de03f92f47619b21fca1fd4a440",
+            "BaseMinus.png": "5849f91128ff6c54a2ef35d0e9d1546b2758399fb7e4a32bbb8417f87676ada8",
+            "AcrossPlus.png": "0389a858aadf65ef2c8705e6e03c465216f8ed1e0b07100621a39b6a17b00121",
+            "AcrossMinus.png": "b2ca3405869fef2723af1bb66b6c991a22abde9e7179278450bf9ba8656e55a6",
+            "AlongPlus.png": "78c562ba39858746d7e27e65c7a717a77f3c9b0ac1505df87e82b56cd1bdad11",
+            "AlongMinus.png": "11b42a69e64a354dff0838b7c2a6330d1459e2aa578436661560ba02dc726e59"
+          },
+          "V67SaddleFitRake": {
+            "beauty.png": "d023e58c3048fe38b302262951627b103a4e18987d6236e1af64897a7a16d373",
+            "uvHi.png": "003b3b71cd398e738682e2af49fd4995dbcde0cd20a18157ee869726691fa4f1",
+            "uvLo.png": "df0e2efd0ceb27a01366bdfcf29913d7ae6f33cb6c41346be256d376f775e21c",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "468e48947f33522e773d002db2baf6419d7b7b5d2862f57fe7da133d06b8f62e",
+            "BaseMinus.png": "090df8e66075a27cd8b06f7af6f49333f13475886ef14bff4acac5f7326f8e90",
+            "AcrossPlus.png": "dd59b596a5ecab88202e7c352315a65a93a9713260da6cb85f71b51911f8e965",
+            "AcrossMinus.png": "99bd0e7654ffd22b449dd6861bae9d3a3cb82fbc479c8a8ec7fc6ec53bd049b4",
+            "AlongPlus.png": "3ddd0605222da665ff43c1997a67972f676241dc7ef7f854168450b71f9416aa",
+            "AlongMinus.png": "38b4599c0ca7a9e14fb119e5f7ace166fe266c1267a0a20d18a19ded08865af6"
+          },
+          "V67SaddleBeforeDefault": {
+            "beauty.png": "b161601030ddc3c76ff97db1e4c31896058f241a558ce42ac2309f8387af3f0e",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "1cd66f199acb4bb9771ee96a81a81ef2d0ac078c3e9abb9e5782a5487e3240f8",
+            "BaseMinus.png": "36ef5579b71cb14ae92eb4e03cfe70d235c8ad5fc93713fc234d03ac8cb51159",
+            "AcrossPlus.png": "9fc55934a023515e1bc47783156ed0682f2d67fcffda20713c25c00444678c95",
+            "AcrossMinus.png": "71e39ded793d3f135aeee69d9ac1dc6c8b6afa1141011bd11e760bd7c826ace6",
+            "AlongPlus.png": "7f9b4f0f09ff11959d874751aae538e045fc1ae1c078f283e548c63e6512558d",
+            "AlongMinus.png": "b1b47d919d563b25ae1ea7164dc05d2269033b9465a1bffb63d849ecd68ebf47"
+          },
+          "V67SaddleFitSoft": {
+            "beauty.png": "a40f0a8bc052ab5c06f35c481a3f6b93e7553a7ad68976231b8f535f55a29eef",
+            "uvHi.png": "e7fd4744cf8d8c991022fb4fc7b8a71f3d0f89f294099015d1e613166d9f8ce6",
+            "uvLo.png": "cff0452c0a919f8b2e3a361be32206577589844a20098e009895148e8ab79cfe",
+            "Published.json": "eb1652cfd78e4029e8e52ffff88ec1be3ba184d2f2bd7fffd65bc3e6630ac4f1",
+            "BasePlus.png": "09672227f27ecbb9f10975059941cc9f0d78198d6c7ed179ee7acbc2f144231c",
+            "BaseMinus.png": "1e4f708d70d39a5a4483f3766a6a77794524295566ce1eab205bc54040506b10",
+            "AcrossPlus.png": "ebdda03b82ba809cf2355e1c72ddb15f1b6e97646a20b6b2a7cb2872daf34fc3",
+            "AcrossMinus.png": "9d394534c6ccf26d8aa190579e3dc0c13474b057f87849767bf826a876631f0c",
+            "AlongPlus.png": "cc62ecc1b18d64f52e97d31bc9f162772fbbaad3a19e009fff5f43beec27dfac",
+            "AlongMinus.png": "b6d359edb1dbf6ecbabf2c81841e9c6e3a785cc50f7959fb4ab03892f5deaca3"
           }
         }
       }

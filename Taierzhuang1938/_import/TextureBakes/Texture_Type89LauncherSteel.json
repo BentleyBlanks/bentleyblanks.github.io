@@ -19,16 +19,16 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 562880,
-      "sha256": "a76aded208878842312f5d9003e3e7d71f13d385a355b93884f7424bef99c8fe"
+      "bytes": 555740,
+      "sha256": "2da8dd3b22190270a5ca40b5229e6ddc7db917f6a50fbb5c571df53d2d937353"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 403188,
-      "sha256": "d1a2f8b4128f7864eac925af7129791282061fda1a0fdc9b3f973f0002c175f6"
+      "bytes": 403394,
+      "sha256": "3ef3068cb2a63a483d8de506ab922d14724b209d621b6c7bbeadeaeff86ae7b0"
     },
     {
       "channel": "Orm",
@@ -39,30 +39,30 @@
       "sha256": "0f26c08b8f76b79f17ebf199d143fc564e6c612219af2000908da1fb693e6765"
     }
   ],
-  "totalBytes": 1024358,
+  "totalBytes": 1017424,
   "metrics": {
     "meanSrgb": [
-      0.4369,
+      0.4368,
       0.4256,
       0.3973
     ],
     "luma": 0.4199,
     "lumaStd": 0.1075,
-    "sat": 0.0908,
+    "sat": 0.0905,
     "clipLow": 0.0,
     "clipHigh": 0.0,
-    "lowFreq": 0.1029,
-    "seam": 0.1229,
-    "interior": 0.0255,
-    "seamRatio": 4.826,
-    "border": 0.743,
-    "swing": 0.0907,
+    "lowFreq": 0.1031,
+    "seam": 0.1227,
+    "interior": 0.0251,
+    "seamRatio": 4.892,
+    "border": 0.744,
+    "swing": 0.088,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "297a9deaadd9cbc6dbf01ef022e086c97a97436148301a2900f30800b6f74340",
+    "sha256": "4ae0958980d9d3b59e6236ba5941e86f08cfe63caef1fc027b2e0ef609dfc6d9",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -182,6 +182,14 @@
     "knurlLightBalance": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherGripLightBalance.png",
       "sha256": "5141cf64228025d67bbc791301954001ec561f6bee566066ff4bb6bef8cedfd1"
+    },
+    "barrelSurfaceBalance": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelSurfaceBalance.png",
+      "sha256": "6eec9d09b41b8d1118bcc6ef733409277303852ac5d554eae49bde10fa1fd0ef"
+    },
+    "saddleSurfaceBalance": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSaddleSurfaceBalance.png",
+      "sha256": "7347a93fb88355d1a70d74c93121b2a14caf098100bd342a55ef73845cc9c9cc"
     }
   },
   "contactAo": {

@@ -84,6 +84,14 @@ def ShoulderReflectionIdentity(flank):
             "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
 
 
+def SurfaceBalanceIdentity(spec):
+    previous = {key: value for key, value in spec.items() if key != "surfaceBalance"}
+    encoded = json.dumps(previous, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {"photoSha256": spec["source"]["sha256"], "footprint": spec["footprint"],
+            "sourceFinishSha256": sha256(encoded).hexdigest(), "contactAoSha256": ContactAoSha256(),
+            "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2622,6 +2630,11 @@ def Main():
     albedo = priorFlank.get("albedoBalance")
     if albedo and all(albedo.get(field) == value for field, value in GripAlbedoBalanceIdentity(flank).items()):
         flank["albedoBalance"] = albedo
+    for name in ("Barrel", "Saddle"):
+        previous = prior.get(name, {}).get("surfaceBalance")
+        spec = record["closeups"][name]
+        if previous and all(previous.get(field) == value for field, value in SurfaceBalanceIdentity(spec).items()):
+            spec["surfaceBalance"] = previous
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)
