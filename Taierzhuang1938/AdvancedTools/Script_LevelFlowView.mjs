@@ -619,6 +619,35 @@ export class FlowMapView {
     const p=this.ToScreen(actor.p),color=FLOW_COLORS[actor.side];
     if(actor.tetherTo) Line(context,[p,this.ToScreen(actor.tetherTo)],"#75613e",1.5);
     if(actor.id==="liu" && frame.stealth?.pulling) this.DrawPath(context,[actor.p,frame.player],"#75613e",2.5);
+    if (actor.pose !== "dead" && actor.kind === "person" && !actor.firing
+      && Number.isFinite(actor.gazeYaw) && Math.abs(actor.gazeYaw) > 0.14 && this.scale >= 4.5) {
+      const baseHeading = Number.isFinite(actor.marchHeading) ? actor.marchHeading : (Number.isFinite(actor.heading) ? actor.heading : 0);
+      const lookHeading = baseHeading - actor.gazeYaw;
+      const screenAngle = lookHeading - Math.PI / 2;
+      const coneLen = Clamp(this.scale * 1.45, 11, 23);
+      const halfSpread = 0.26;
+      const kind = actor.gazeKind || "scan";
+      const fillStyle = kind === "poi" ? "rgba(230, 179, 76, 0.28)"
+        : (kind === "leaderCheck" || kind === "social") ? "rgba(91, 192, 217, 0.25)"
+        : "rgba(118, 184, 118, 0.23)";
+      const strokeStyle = kind === "poi" ? "rgba(208, 146, 36, 0.56)"
+        : (kind === "leaderCheck" || kind === "social") ? "rgba(64, 160, 188, 0.52)"
+        : "rgba(84, 146, 84, 0.48)";
+      context.save();
+      context.beginPath();
+      context.moveTo(p[0], p[1]);
+      context.arc(p[0], p[1], coneLen, screenAngle - halfSpread, screenAngle + halfSpread);
+      context.closePath();
+      context.fillStyle = fillStyle;
+      context.fill();
+      context.beginPath();
+      context.moveTo(p[0], p[1]);
+      context.lineTo(p[0] + Math.cos(screenAngle) * coneLen * 0.92, p[1] + Math.sin(screenAngle) * coneLen * 0.92);
+      context.strokeStyle = strokeStyle;
+      context.lineWidth = 1.1;
+      context.stroke();
+      context.restore();
+    }
     if(actor.pose==="dead") {Line(context,[[p[0]-3,p[1]-3],[p[0]+3,p[1]+3]],color+"66",1.3);Line(context,[[p[0]-3,p[1]+3],[p[0]+3,p[1]-3]],color+"66",1.3);}
     else if(actor.kind==="tank"||actor.kind==="cart") {
       context.save();context.translate(...p);context.rotate(actor.heading||0);context.fillStyle=actor.pose==="burn"?"#74432c":"#6c7258";context.strokeStyle=color;context.lineWidth=1.4;

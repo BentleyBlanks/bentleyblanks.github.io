@@ -5,6 +5,18 @@ import { FLOW_PREVIOUS_AMBUSH, FLOW_PREVIOUS_FRONT_DEFENSE, FLOW_PREVIOUS_TANK_A
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { FLOW_VILLAGE_STEALTH } from "./Data_LevelFlow.mjs";
 import { FLOW_PREVIOUS_STREET_DEFENSE } from "./Data_LevelFlowAmbushBaseline.mjs";
+import { SQUAD_SPLINE_PROFILES } from "../../Data_Tuning_SquadSpline.mjs";
+import { FIRST_LEVEL_SQUAD_SPLINE_CONFIG } from "../../Data_FirstLevelSquadSplines.mjs";
+import { ResolveSquadSplineTuning } from "../../Script_SquadSplinePcg.mjs";
+import { HashString } from "../../Script_ProceduralGaze.mjs";
+import { ResolveEncounterGroupSplineConfig, SampleSquadSplinePoint, SampleDeterministicGaze } from "../../Script_FirstLevelSquadSpline.mjs";
+
+const stationaryGazeTuning = ResolveSquadSplineTuning(FIRST_LEVEL_SQUAD_SPLINE_CONFIG.stationaryGazeProfile);
+const Smoothstep = (e0, e1, x) => {
+  if (e1 <= e0) return x >= e1 ? 1 : 0;
+  const t = Clamp((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+};
 
 export const ENCOUNTER_SCHEMA = "tengxian-encounter/2";
 export const ENCOUNTER_BEHAVIORS = {
@@ -249,6 +261,7 @@ export function ValidateEncounterDocument(input, timeline) {
     Require(group.engageOn===undefined||timeline.some(beat=>beat.id===group.engageOn),"接战拍号无效");
     Require(group.tankId===undefined||["", "tank1","tank2"].includes(group.tankId),"跟随战车无效");
     Require(group.weapon===undefined||["rifle","machineGun"].includes(group.weapon),"武器配置无效");
+    Require(group.splineProfile===undefined||Object.hasOwn(SQUAD_SPLINE_PROFILES,group.splineProfile),"小队行进预设无效");
     Require(group.grenadeInterval===undefined||group.grenadeInterval===0||Number.isFinite(group.grenadeInterval)&&group.grenadeInterval>=8&&group.grenadeInterval<=120,"投弹间隔须为 0 或 8–120 秒");
     Require(Number.isInteger(group.count) && group.count>=0 && group.count<=100, "数量须在 0–100 内");
     Require(Number.isInteger(group.maxAlive) && group.maxAlive>=1 && group.maxAlive<=40, "同时在场须在 1–40 内");
@@ -507,19 +520,85 @@ function GroupActor(group,index,time,coreActors) {
   const spread=offset?[0,0]:group.area.shape==="circle"
     ? [Math.cos(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4,Math.sin(slot*2.39996)*Math.sqrt((slot+0.5)/slots)*group.area.size[0]*0.4]
     : [((slot%columns+0.5)/columns-0.5)*group.area.size[0]*0.8,((Math.floor(slot/columns)+0.5)/rows-0.5)*group.area.size[1]*0.8];
-  position=[position[0]+spread[0],position[1]+spread[1]];
   let pose=dead?"dead":time<readyAt?"kneel":movement.moving?"run":group.behavior==="withdraw"?"stand":"shoot";
   if(time<group.engageAt && pose==="shoot") pose="kneel";
   if(group.withdrawAlongRoute && time>=group.end && !dead) pose="run";
+  const splineCfg = !stationary && total >= 4.0 ? ResolveEncounterGroupSplineConfig(group) : null;
+  let pcg = null;
+  if (splineCfg) {
+    const memberRole = slot === 0 ? (group.weapon === "machineGun" ? "mgGunner" : "leader") : "rifleman";
+    pcg = SampleSquadSplinePoint({
+      squadKey: group.id,
+      config: splineCfg,
+      memberIndex: slot,
+      memberCount: Math.max(1, slots),
+      role: memberRole,
+      route: path,
+      distance,
+      totalLength: total,
+      time,
+      moving: !dead && (movement.moving || (group.withdrawAlongRoute && time >= group.end && distance > 0)),
+      firing: false,
+      pose,
+      noAdvanceBeyondDistance: !!group.standoffMetres || group.behavior === "escort" || group.behavior === "bounds",
+    });
+  }
+  const hasSpatialPcg = !!(pcg && ((splineCfg.maxOffsetM ?? 0) > 0.01 || (splineCfg.paceJitterM ?? 0) > 0.01 || (splineCfg.splineBlend ?? 0) > 0.01));
+  if (hasSpatialPcg) {
+    const headM = Math.max(splineCfg.featherStartM ?? 2.0, splineCfg.concealmentHeadM ?? 0);
+    const tailM = splineCfg.featherEndM ?? 2.4;
+    let midW = Smoothstep(0.15, Math.min(headM, total * 0.35), distance)
+      * (1 - Smoothstep(Math.max(0, total - Math.min(tailM, total * 0.35)), Math.max(0.01, total - 0.08), distance));
+    if (group.suppressionStop) {
+      const stopDist = RouteProjection(path, group.suppressionStop);
+      midW *= Smoothstep(0.3, 3.5, Math.abs(distance - stopDist));
+    }
+    const baseP = position;
+    const blendedX = Lerp(baseP[0], pcg.p[0], midW);
+    const blendedZ = Lerp(baseP[1], pcg.p[1], midW);
+    const spreadW = (splineCfg.maxOffsetM ?? 0) > 0.01 ? (1 - midW) : 1;
+    position = [blendedX + spread[0] * spreadW, blendedZ + spread[1] * spreadW];
+  } else {
+    position=[position[0]+spread[0],position[1]+spread[1]];
+  }
   const inFiringArea=!group.firingArea || InsideArea(position,group.firingArea);
   const firingWindow=!group.fireCycle || (time-life.born+group.fireCycle.offset+slot*0.7)%group.fireCycle.seconds<group.fireCycle.active;
   const firing=time<group.end && group.behavior!=="withdraw" && group.target!=="none" && pose==="shoot" && inFiringArea && firingWindow;
   if(pose==="shoot" && !firing && group.fireCycle) pose="kneel";
   const heading=group.afterRouteLookAt&&!movement.moving&&distance>=total-0.001
     ?Math.atan2(group.afterRouteLookAt[0]-position[0],-(group.afterRouteLookAt[1]-position[1])):undefined;
+  let gazeExtra = null;
+  if (!dead && !firing) {
+    if (pcg) {
+      gazeExtra = {
+        marchHeading: pcg.heading,
+        gazeYaw: pcg.gazeYaw,
+        gazePitch: pcg.gazePitch,
+        gazeKind: pcg.gazeKind,
+        splineProfile: pcg.splineProfile,
+      };
+    } else if (stationary) {
+      const g = SampleDeterministicGaze({
+        seed: HashString(`${group.id}:guard:${slot}`),
+        time,
+        tuning: stationaryGazeTuning,
+        role: slot === 0 ? "leader" : "rifleman",
+        moving: false,
+        firing: false,
+        pose,
+      });
+      gazeExtra = {
+        gazeYaw: g.gazeYaw,
+        gazePitch: g.gazePitch,
+        gazeKind: g.gazeKind,
+        splineProfile: FIRST_LEVEL_SQUAD_SPLINE_CONFIG.stationaryGazeProfile,
+      };
+    }
+  }
   return {id:`${group.id}_${index}`,name:`${group.label} ${index+1}`,side:group.side,kind:"person",p:position,pose,heading,
     groupId:group.id,wave:group.id,target:group.target,born:life.born,fall:life.fall,
     ...(group.withdrawAlongRoute ? {withdrawn:time>=group.end && !dead && distance<=0} : {}),
+    ...(gazeExtra || {}),
     heavy:group.weapon==="machineGun"&&index%group.maxAlive===0||group.target==="ramp",firing};
 }
 

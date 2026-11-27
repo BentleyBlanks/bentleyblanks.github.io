@@ -12,10 +12,16 @@ const DEG = Math.PI / 180;
 const Clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const WrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
-/** 确定性伪随机（与 Script_SquadMarch 同源 Mulberry32/FNV1a）。 */
-export function MakeGazeRandom(seed) {
+/** FNV-1a 32-bit 确定性字符串哈希（供无状态时间轴采样复用）。 */
+export function HashString(seed) {
   let h = 2166136261;
   for (const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+}
+
+/** 确定性伪随机（与 Script_SquadMarch 同源 Mulberry32/FNV1a）。 */
+export function MakeGazeRandom(seed) {
+  let h = HashString(seed);
   return () => {
     h = (h + 0x6D2B79F5) >>> 0;
     let t = h;
@@ -24,6 +30,7 @@ export function MakeGazeRandom(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+export const MakeRng = MakeGazeRandom;
 
 /** 根据总观察偏航角，按人体解剖学拆分为 Head / Neck / Spine2 三个安全权重份额（不扭断脖子，不甩枪口）。 */
 export function SplitGazeChain(gazeYawRad) {

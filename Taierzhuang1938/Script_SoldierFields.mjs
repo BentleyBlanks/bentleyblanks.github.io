@@ -161,6 +161,10 @@ export class SoldierFieldAccessors {
   set lookPitch(value) { this.aiming.lookPitch = value; }
   get lookPitchBlend() { return this.aiming.lookPitchBlend; }
   set lookPitchBlend(value) { this.aiming.lookPitchBlend = value; }
+  get gazeYaw() { return this.aiming.gazeYaw; }
+  set gazeYaw(value) { this.aiming.gazeYaw = value; }
+  get gazePitch() { return this.aiming.gazePitch; }
+  set gazePitch(value) { this.aiming.gazePitch = value; }
   get aimTime() { return this.aiming.aimTime; }
   set aimTime(value) { this.aiming.aimTime = value; }
   get playerLockAt() { return this.aiming.playerLockAt; }

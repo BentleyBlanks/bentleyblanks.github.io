@@ -1627,8 +1627,8 @@ const bend = FLOW_OPENING.retreatRoute[FLOW_OPENING.enemyEntryBendIndex];
 const entryFrame = EvaluateFlow(OPENING_ENEMY_ENTRY_TIME);
 const withdrawing = entryFrame.actors.filter(actor => ["luo", "he", "liu"].includes(actor.id) || /^openingAlly/.test(actor.id));
 assert.equal(withdrawing.length, 12);
-assert.ok(withdrawing.every(actor => actor.p[1] >= bend[1] - 0.001), "all twelve soldiers clear the bend before the first attacker enters");
-assert.ok(Distance(withdrawing.at(-1).p, bend) < 0.001);
+assert.ok(withdrawing.every(actor => actor.p[1] >= bend[1] - 0.65), "all twelve soldiers clear the bend corridor before the first attacker enters");
+assert.ok(Distance(withdrawing.at(-1).p, bend) < 0.65, "tail soldier clears the bend inside the PCG trench corridor");
 const waiting = EvaluateFlow(OPENING_GUNFIRE_TIME - 0.001).actors.filter(actor => ["luo", "he", "liu"].includes(actor.id) || /^openingAlly/.test(actor.id));
 for (const actor of waiting) assert.ok(waiting.filter(other => other !== actor).every(other => Distance(actor.p, other.p) > 1.9), "the delayed call leaves individual waiting places instead of stacking twelve soldiers at the route end");
 assert.equal(entryFrame.actors.filter(actor => /^opening\d+$/.test(actor.id)).length, 1);
@@ -1645,8 +1645,8 @@ const pathDistance = (point,route) => Math.min(...route.slice(1).map((end,index)
 for (let stamp=24;stamp<OPENING_GUNFIRE_TIME;stamp+=0.5) {
   for (const id of retreatIds) {
     const actor=ActorAt(id,stamp);
-    assert.ok(pathDistance(actor.p,FLOW_OPENING.retreatRoute)<0.01,"the whole party uses the later withdrawal route");
-    assert.ok(actor.p[1]>=ActorAt(id,stamp-0.1).p[1],"the rescue party does not return before the machine gun opens fire");
+    assert.ok(pathDistance(actor.p,FLOW_OPENING.retreatRoute)<0.68,"the whole party uses the later withdrawal trench corridor");
+    assert.ok(actor.p[1]>=ActorAt(id,stamp-0.1).p[1]-0.03,"the rescue party does not return before the machine gun opens fire");
   }
 }
 assert.ok(ActorAt("luo",OPENING_GUNFIRE_TIME+0.5).p[1]<ActorAt("luo",OPENING_GUNFIRE_TIME).p[1],"gunfire reverses retreat toward the branch before winter cries");

@@ -10,6 +10,7 @@ import { StageVillageActors, VillageStealthAt } from "./Script_LevelFlowVillage.
 import { BeishaheActors, BeishaheEffects, BeishaheSignals, ApplyBeishaheSurfaces } from "./Script_LevelFlowBeishahe.mjs";
 import { FLOW_FRONT_ARTILLERY } from "./Data_LevelFlowArtillery.mjs";
 import { CompileArtillerySchedule, SampleArtilleryEffects, ApplyArtilleryEvasion } from "./Script_LevelFlowArtillery.mjs";
+import { ResolveScriptedSquadConfig, SampleSquadSplinePoint, SampleDeterministicGaze } from "../../Script_FirstLevelSquadSpline.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -246,6 +247,17 @@ function RouteLength(route) {
   return route.slice(1).reduce((total, point, index) => total + Distance(route[index], point), 0);
 }
 
+const openingRetreatCfg = ResolveScriptedSquadConfig("OpeningRetreat");
+const openingGunCfg = ResolveScriptedSquadConfig("OpeningGunTeam");
+const openingEnemyCfgs = [
+  ResolveScriptedSquadConfig("OpeningEnemyNorthMg"),
+  ResolveScriptedSquadConfig("OpeningEnemyMidFlank"),
+  ResolveScriptedSquadConfig("OpeningEnemyEastFlank"),
+];
+const openingSurvivorsCfg = ResolveScriptedSquadConfig("OpeningSurvivors");
+const walkingWoundedCfg = ResolveScriptedSquadConfig("WalkingWounded");
+const pitSurvivorsCfg = ResolveScriptedSquadConfig("PitSurvivors");
+
 function OpeningWithdrawal(index) {
   const departure = BeatById("01c").start + index * FLOW_OPENING.departureInterval;
   const origin = [64 + index % 3 * 0.65, 63.5 + Math.floor(index / 3) * 0.35];
@@ -253,6 +265,33 @@ function OpeningWithdrawal(index) {
   const total = RouteLength(route);
   const stopDistance = total - index * FLOW_OPENING.retreatSpacing;
   return {departure, route, total, stopDistance};
+}
+
+function OpeningWithdrawalSample(index, time) {
+  const {departure, route, total, stopDistance} = openingWithdrawals[index];
+  const distance = Math.min(stopDistance, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed);
+  const moving = time > departure && distance < stopDistance;
+  const role = index === 0 ? "leader" : index < 3 ? "core" : "rifleman";
+  const pcg = SampleSquadSplinePoint({
+    squadKey: "OpeningRetreat",
+    config: openingRetreatCfg,
+    memberIndex: index,
+    memberCount: FLOW_OPENING.retreatCount,
+    role,
+    route,
+    distance,
+    totalLength: total,
+    time,
+    moving,
+    firing: false,
+    pose: moving ? "walk" : "stand",
+  });
+  return {
+    distance,
+    p: pcg ? pcg.p : SampleRoute(route, distance / total),
+    pose: moving ? "walk" : "stand",
+    ...(pcg ? { marchHeading: pcg.heading, gazeYaw: pcg.gazeYaw, gazePitch: pcg.gazePitch, gazeKind: pcg.gazeKind, splineProfile: pcg.splineProfile } : {}),
+  };
 }
 
 const openingWithdrawals = Array.from({length: FLOW_OPENING.retreatCount}, (_, index) => OpeningWithdrawal(index));
@@ -268,8 +307,9 @@ function BuildOpeningRetreat(index) {
   const member = group.members.indexOf(index);
   const {departure, route, total, stopDistance} = openingWithdrawals[index];
   const heard = OPENING_GUNFIRE_TIME + group.responseDelay + member * FLOW_OPENING_RESCUE.memberResponseInterval;
-  const distance = Math.min(stopDistance, (heard - departure) * FLOW_OPENING.retreatSpeed);
-  const turn = SampleRoute(route, distance / total);
+  const turnSample = OpeningWithdrawalSample(index, heard);
+  const distance = turnSample.distance;
+  const turn = turnSample.p;
 
   // Preserve every traversed traffic-trench bend before the two lanes split.
   let traveled = 0;
@@ -325,14 +365,33 @@ function OpeningRetreat(time, index) {
   const plan = openingRetreatPlans[index];
   const {departure, heard, route, total, rim, landing, arrival, keys, pauses} = plan;
   if (time < heard) {
-    const distance = Math.min(plan.stopDistance, Math.max(0, time - departure) * FLOW_OPENING.retreatSpeed);
-    return {p: SampleRoute(route, distance / total), pose: time > departure && distance < plan.stopDistance ? "walk" : "stand"};
+    const s = OpeningWithdrawalSample(index, time);
+    return {
+      p: s.p,
+      pose: s.pose,
+      ...(s.marchHeading !== undefined ? { marchHeading: s.marchHeading, gazeYaw: s.gazeYaw, gazePitch: s.gazePitch, gazeKind: s.gazeKind, splineProfile: s.splineProfile } : {}),
+    };
   }
   const identity = {rescueLane: plan.rescueLane, rescueGroup: plan.rescueGroup};
   if (index === 0 && time < BeatById("02f").start) identity.status = time < OPENING_FRIENDLY_CRY_TIME
     ? "循枪声接近，准备投弹" : "沟里有自己人，暂缓投弹";
-  if (time < arrival) return {p: Track(keys, time),
-    pose: pauses.some(([start, end]) => time >= start && time < end) ? "kneel" : "walk", ...identity};
+  if (time < arrival) {
+    const p = Track(keys, time);
+    const nextP = Track(keys, Math.min(arrival, time + 0.08));
+    const dx = nextP[0] - p[0], dz = nextP[1] - p[1];
+    const marchHeading = Math.hypot(dx, dz) > 0.005 ? Math.atan2(dx, -dz) : undefined;
+    const paused = pauses.some(([start, end]) => time >= start && time < end);
+    const gaze = openingRetreatCfg ? SampleDeterministicGaze({
+      seed: 1009 + index * 97, time, tuning: openingRetreatCfg.tuning, role: index === 0 ? "leader" : "rifleman", moving: !paused, firing: false, pose: paused ? "kneel" : "walk",
+    }) : null;
+    return {
+      p,
+      pose: paused ? "kneel" : "walk",
+      ...(marchHeading !== undefined ? { marchHeading } : {}),
+      ...(gaze ? { gazeYaw: gaze.gazeYaw, gazePitch: gaze.gazePitch, gazeKind: gaze.gazeKind, splineProfile: openingRetreatCfg.profile } : {}),
+      ...identity,
+    };
+  }
   const jump = BeatById("02f").start + 3 + index * 0.08;
   if (time < jump) return {p: rim, pose: "kneel", ...identity};
   if (time < BeatById("02f").end) return {p: SampleRoute([rim, landing], (time - jump) / (BeatById("02f").end - jump)), pose: "run", ...identity};
@@ -372,8 +431,26 @@ function OpeningGunTeam(time, index) {
   const departure = BeatById("01c").start + index * FLOW_OPENING.gunInterval;
   const distance = Math.max(0, time - departure) * FLOW_OPENING.gunSpeed;
   const total = RouteLength(route);
-  const p = SampleRoute(route, distance / total);
-  return {p, pose: time > departure && distance < total ? "run" : "stand"};
+  const moving = time > departure && distance < total;
+  const pcg = SampleSquadSplinePoint({
+    squadKey: "OpeningGunTeam",
+    config: openingGunCfg,
+    memberIndex: index,
+    memberCount: 4,
+    role: index === 0 ? "leader" : index === 2 ? "mgGunner" : "rifleman",
+    route,
+    distance,
+    totalLength: total,
+    time,
+    moving,
+    firing: false,
+    pose: moving ? "run" : "stand",
+  });
+  return {
+    p: pcg ? pcg.p : SampleRoute(route, distance / total),
+    pose: moving ? "run" : "stand",
+    ...(pcg ? { marchHeading: pcg.heading, gazeYaw: pcg.gazeYaw, gazePitch: pcg.gazePitch, gazeKind: pcg.gazeKind, splineProfile: pcg.splineProfile } : {}),
+  };
 }
 
 function ReturnFromPit(actors, time) {
@@ -398,14 +475,50 @@ function ReturnFromPit(actors, time) {
     if (time < start) continue;
     const route = [member.origin, ...plan.route.slice(1)];
     const length = RouteLength(route);
-    let p = SampleRoute(route, Math.max(0, Math.min(distance, length) - member.gap) / length);
+    const sampleDist = Math.max(0, Math.min(distance, length) - member.gap);
+    const prePcg = SampleSquadSplinePoint({
+      squadKey: "PitSurvivors",
+      config: pitSurvivorsCfg,
+      memberIndex: index,
+      memberCount: plan.survivors.length,
+      role: index === 0 ? "leader" : "rifleman",
+      route,
+      distance: sampleDist,
+      totalLength: length,
+      time,
+      moving: time < join && sampleDist > 0 && sampleDist < length,
+      firing: false,
+      pose: "walk",
+    });
+    let p = prePcg ? prePcg.p : SampleRoute(route, sampleDist / length);
+    let gazeProps = prePcg ? { marchHeading: prePcg.heading, gazeYaw: prePcg.gazeYaw, gazePitch: prePcg.gazePitch, gazeKind: prePcg.gazeKind, splineProfile: prePcg.splineProfile } : {};
     if (time >= join) {
-      const last = SampleRoute(route, (length-member.gap)/length);
+      const endPcg = SampleSquadSplinePoint({
+        squadKey: "PitSurvivors",
+        config: pitSurvivorsCfg,
+        memberIndex: index,
+        memberCount: plan.survivors.length,
+        role: index === 0 ? "leader" : "rifleman",
+        route,
+        distance: Math.max(0, length - member.gap),
+        totalLength: length,
+        time: join,
+        moving: false,
+        firing: false,
+        pose: "walk",
+      });
+      const last = endPcg ? endPcg.p : SampleRoute(route, (length-member.gap)/length);
       const retreat = Keys(plan.retreatKeys).map(([stamp,x,z]) => [stamp+index*plan.retreatInterval,x,z]);
-      p = Track([[join,...last],...retreat,...Keys(member.evacuationKeys)],time);
+      const fullKeys = [[join,...last],...retreat,...Keys(member.evacuationKeys)];
+      p = Track(fullKeys, time);
+      const nextP = Track(fullKeys, time + 0.08);
+      const dx = nextP[0] - p[0], dz = nextP[1] - p[1];
+      const mh = Math.hypot(dx, dz) > 0.005 ? Math.atan2(dx, -dz) : undefined;
+      const g = pitSurvivorsCfg ? SampleDeterministicGaze({ seed: 4201 + index * 131, time, tuning: pitSurvivorsCfg.tuning, role: "rifleman", moving: mh !== undefined, firing: false, pose: "walk" }) : null;
+      gazeProps = g ? { ...(mh !== undefined ? { marchHeading: mh } : {}), gazeYaw: g.gazeYaw, gazePitch: g.gazePitch, gazeKind: g.gazeKind, splineProfile: pitSurvivorsCfg.profile } : {};
     }
     Object.assign(actor, {name: member.name, p:[p[0]+member.offset*Clamp(distance/5,0,1),p[1]], pose:"walk",
-      wounded:true, alive:true, status:"负伤撤退", groupId:"PitSurvivors"});
+      wounded:true, alive:true, status:"负伤撤退", groupId:"PitSurvivors", ...gazeProps});
   }
 }
 
@@ -426,12 +539,36 @@ function WoundedEvacuation(actors, time) {
     const departure = start + memberIndex * plan.departureInterval;
     const length = RouteLength(route), arrival = departure + length / plan.speed;
     const evacuation = Keys(plan.evacuationKeys).map(([stamp,x,z]) => [stamp,x + memberIndex * 0.6,z]);
-    const Position = stamp => stamp < arrival
-      ? SampleRoute(route, Clamp((stamp - departure) * plan.speed / length, 0, 1))
-      : Track([[arrival,...route.at(-1)],...evacuation], stamp);
-    const p = Position(time), moving = Distance(p, Position(time + 0.02)) > 0.001;
+    const Position = stamp => {
+      if (stamp < arrival) {
+        const dist = Clamp((stamp - departure) * plan.speed, 0, length);
+        const wPcg = SampleSquadSplinePoint({
+          squadKey: "WalkingWounded",
+          config: walkingWoundedCfg,
+          memberIndex,
+          memberCount: plan.members.length,
+          role: memberIndex === 0 ? "leader" : "rifleman",
+          route,
+          distance: dist,
+          totalLength: length,
+          time: stamp,
+          moving: stamp > departure && dist < length,
+          firing: false,
+          pose: "walk",
+        });
+        return wPcg ? wPcg.p : SampleRoute(route, dist / length);
+      }
+      return Track([[arrival,...route.at(-1)],...evacuation], stamp);
+    };
+    const p = Position(time), nextP = Position(time + 0.04), moving = Distance(p, nextP) > 0.002;
+    const dx = nextP[0] - p[0], dz = nextP[1] - p[1];
+    const mh = Math.hypot(dx, dz) > 0.002 ? Math.atan2(dx, -dz) : undefined;
+    const wGaze = walkingWoundedCfg ? SampleDeterministicGaze({
+      seed: 5107 + memberIndex * 113, time, tuning: walkingWoundedCfg.tuning, role: memberIndex === 0 ? "leader" : "rifleman", moving, firing: false, pose: moving ? "walk" : "wounded",
+    }) : null;
     Object.assign(actor, {name:`川军 ${index - 2}（负伤）`, p, pose:moving ? "walk" : "wounded", alive:true, wounded:true, firing:false,
-      groupId:"WalkingWounded", status:moving ? "轻伤先撤，沿沟去后送点" : time < departure ? "等前一名伤员起行" : "后送点待转运"});
+      groupId:"WalkingWounded", status:moving ? "轻伤先撤，沿沟去后送点" : time < departure ? "等前一名伤员起行" : "后送点待转运",
+      ...(wGaze ? { ...(mh !== undefined ? { marchHeading: mh } : {}), gazeYaw: wGaze.gazeYaw, gazePitch: wGaze.gazePitch, gazeKind: wGaze.gazeKind, splineProfile: walkingWoundedCfg.profile } : {})});
     delete actor.meleePartnerId;
     delete actor.heading;
   }
@@ -693,10 +830,32 @@ function OpeningActors(time) {
   if (time < BeatById("01c").start || time >= BeatById(retreat.endBeat).end) return [];
   const defeated = time >= BeatById("02g").start;
   return Array.from({ length: 9 }, (_,index) => {
-    const route = [...FLOW_OPENING.enemyRoutes[index < 2 ? 0 : index < 6 ? 1 : 2], FLOW_OPENING.enemyPositions[index]];
+    const laneIdx = index < 2 ? 0 : index < 6 ? 1 : 2;
+    const laneStart = laneIdx === 0 ? 0 : laneIdx === 1 ? 2 : 6;
+    const laneCount = laneIdx === 0 ? 2 : laneIdx === 1 ? 4 : 3;
+    const laneMember = index - laneStart;
+    const laneRole = laneIdx === 0 ? (laneMember === 0 ? "mgGunner" : "mgAssistant") : (laneMember === 0 ? "leader" : "rifleman");
+    const route = [...FLOW_OPENING.enemyRoutes[laneIdx], FLOW_OPENING.enemyPositions[index]];
+    const total = RouteLength(route);
     const born = OPENING_ENEMY_ENTRY_TIME + index * FLOW_OPENING.enemyInterval;
-    const arrival = born + RouteLength(route) / FLOW_OPENING.enemySpeed;
-    let p = SampleRoute(route, (time - born) / (arrival - born));
+    const arrival = born + total / FLOW_OPENING.enemySpeed;
+    const rawDist = Clamp((time - born) * FLOW_OPENING.enemySpeed, 0, total);
+    const movingIn = time >= born && time < arrival;
+    const pcg = SampleSquadSplinePoint({
+      squadKey: `OpeningEnemyLane${laneIdx}`,
+      config: openingEnemyCfgs[laneIdx],
+      memberIndex: laneMember,
+      memberCount: laneCount,
+      role: laneRole,
+      route,
+      distance: rawDist,
+      totalLength: total,
+      time,
+      moving: movingIn,
+      firing: false,
+      pose: movingIn ? "run" : "stand",
+    });
+    let p = pcg ? pcg.p : SampleRoute(route, (time - born) / (arrival - born));
     if (time < born || index < 6 && time >= BeatById(retreat.blockBeat).start) return null;
     const melee = openingMeleePlans[index - 6];
     if (melee && time >= melee.approach && time < melee.escape) {
@@ -709,21 +868,40 @@ function OpeningActors(time) {
       const rally = BeatById(retreat.rallyBeat);
       const approaching = time < rally.end;
       const spread = Clamp((time - melee.escape) / (melee.arrival - melee.escape), 0, 1);
-      p = time < rally.start
-        ? SampleRoute(melee.route, spread)
-        : SampleRoute([retreat.rally,retreat.junction,retreat.block], (time-rally.start)/rally.duration);
-      p = [p[0],p[1]+(index-7)*0.65*spread];
+      const escapeRoute = time < rally.start ? melee.route : [retreat.rally, retreat.junction, retreat.block];
+      const escTotal = RouteLength(escapeRoute);
+      const escFrac = time < rally.start ? spread : Clamp((time - rally.start) / rally.duration, 0, 1);
       const end = BeatById(retreat.endBeat);
       const fall = end.start+end.duration*retreat.fallFractions[index-6];
       const dead = time >= fall;
       const moving = time < rally.start ? time < melee.arrival : approaching;
+      const escPcg = !dead ? SampleSquadSplinePoint({
+        squadKey: "OpeningSurvivors",
+        config: openingSurvivorsCfg,
+        memberIndex: index - 6,
+        memberCount: 3,
+        role: index === 6 ? "leader" : "rifleman",
+        route: escapeRoute,
+        distance: escFrac * escTotal,
+        totalLength: escTotal,
+        time,
+        moving,
+        firing: !dead && !moving,
+        pose: moving ? "run" : "shoot",
+      }) : null;
+      p = escPcg ? escPcg.p : SampleRoute(escapeRoute, escFrac);
+      p = [p[0],p[1]+(index-7)*0.45*spread];
       return Actor(`opening${index}`, "退逃日军", "enemy", "person", p, dead ? "dead" : moving ? "run" : "shoot",
-        {groupId:"OpeningSurvivors",firing:!dead&&!moving,fall,born,arrival});
+        {groupId:"OpeningSurvivors",firing:!dead&&!moving,fall,born,arrival,
+          ...(escPcg ? { marchHeading: escPcg.heading, gazeYaw: escPcg.gazeYaw, gazePitch: escPcg.gazePitch, gazeKind: escPcg.gazeKind, splineProfile: escPcg.splineProfile } : {})});
     }
     const firing = index === 0 && !defeated && time >= arrival && time >= OPENING_GUNFIRE_TIME && time < BeatById("02e").start;
     const pose = defeated && index < 6 ? "dead" : time < arrival ? "run" : firing ? "shoot" : index < 2 ? "kneel" : "stand";
     const status = index === 0 && !defeated ? time < arrival ? "静默包抄" : firing ? "向后沟开火" : time < OPENING_GUNFIRE_TIME ? "静默架枪" : "停火" : undefined;
-    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {born,arrival,firing,status});
+    return Actor(`opening${index}`, index < 2 ? "北沿机枪组" : index === 4 ? "丙" : "日军", "enemy", "person", p, pose, {
+      born, arrival, firing, status,
+      ...(pcg && pose !== "dead" && !firing ? { marchHeading: pcg.heading, gazeYaw: pcg.gazeYaw, gazePitch: pcg.gazePitch, gazeKind: pcg.gazeKind, splineProfile: pcg.splineProfile } : {}),
+    });
   }).filter(Boolean);
 }
 

@@ -21,6 +21,9 @@ import {
 import { BuildSceneCorridorEnv, BuildSquadCorridor } from "./Script_SquadSpline.mjs";
 import { SplitGazeChain } from "./Script_ProceduralGaze.mjs";
 import { CompileSquadScene } from "./Script_SquadSplinePcg.mjs";
+import { BeatById, EvaluateFlow, DEFAULT_ENCOUNTER_DOCUMENT } from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
+import { ENCOUNTER_VARIANTS, CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
+import { ResolveEncounterGroupSplineConfig, BuildLiveSquadWaypoints } from "./Script_FirstLevelSquadSpline.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 let passed = 0;
@@ -141,6 +144,67 @@ Check("独立预览工具复用 Data_SceneAssets 与 FetchResolvedScene 且不�
   && toolJs.includes("Data_SceneAssets.mjs")
   && toolJs.includes("FetchResolvedScene")
   && !toolJs.includes("Script_Main"));
+
+// 9. 验证第一关真实接入（战壕撤退排、三路野外包抄、双版本全部机动遭遇组与实时 3D 路点端点守恒）
+const retreatMidFrame = EvaluateFlow(BeatById("01c").start + 14, DEFAULT_ENCOUNTER_DOCUMENT);
+const retreatIds = ["luo", "he", "liu", ...Array.from({ length: 9 }, (_, i) => `openingAlly${i + 3}`)];
+const retreatSquad = retreatIds.map((id) => retreatMidFrame.actors.find((a) => a.id === id)).filter(Boolean);
+const retreatWithProfile = retreatSquad.filter((a) => a.splineProfile === "trench_march_cautious").length;
+const retreatGlancing = retreatSquad.filter((a) => Math.abs(a.gazeYaw || 0) > 0.08).length;
+// 检查 12 人是否已打破单线串珠（按首尾向量算垂直横向离散）
+const rHead = retreatSquad[0].p, rTail = retreatSquad.at(-1).p;
+const rDx = rTail[0] - rHead[0], rDz = rTail[1] - rHead[1], rLen = Math.hypot(rDx, rDz) || 1;
+const retreatLatOffsets = retreatSquad.map((a) => ((a.p[0] - rHead[0]) * (-rDz / rLen) + (a.p[1] - rHead[1]) * (rDx / rLen)));
+const retreatLatSpan = Math.max(...retreatLatOffsets) - Math.min(...retreatLatOffsets);
+Check("第一关 01c 交通沟川军撤退排全部接入 trench_march_cautious 且形成拉链横向展开与行进张望",
+  retreatSquad.length === 12 && retreatWithProfile === 12 && retreatLatSpan >= 0.45 && retreatGlancing >= 2,
+  `count=${retreatSquad.length} profile=${retreatWithProfile}/12 latSpan=${retreatLatSpan.toFixed(2)}m glancing=${retreatGlancing}`);
+
+const flankMidFrame = EvaluateFlow(BeatById("02a").start + 5, DEFAULT_ENCOUNTER_DOCUMENT);
+const midFlank = [2, 3, 4, 5].map((i) => flankMidFrame.actors.find((a) => a.id === `opening${i}`)).filter(Boolean);
+const flankWithProfile = midFlank.filter((a) => a.splineProfile === "tactical_flank_open").length;
+let flankLatSpan = 0;
+if (midFlank.length >= 2) {
+  const fh = midFlank[0].p, ft = midFlank.at(-1).p;
+  const fdx = ft[0] - fh[0], fdz = ft[1] - fh[1], flen = Math.hypot(fdx, fdz) || 1;
+  const offs = midFlank.map((a) => ((a.p[0] - fh[0]) * (-fdz / flen) + (a.p[1] - fh[1]) * (fdx / flen)));
+  flankLatSpan = Math.max(...offs) - Math.min(...offs);
+}
+Check("第一关 01c–02e 野外包抄日军接入 tactical_flank_open 且开阔散兵展开宽度大于战壕",
+  midFlank.length === 4 && flankWithProfile === 4 && flankLatSpan > retreatLatSpan,
+  `count=${midFlank.length} profile=${flankWithProfile}/4 openSpan=${flankLatSpan.toFixed(2)}m > trenchSpan=${retreatLatSpan.toFixed(2)}m`);
+
+// 核验 L1_Original 与 L1_BeishaheMerged 全部机动遭遇组均能解析合法 Profile，且实时 3D 路点精确保留起终点
+let movingGroupCount = 0;
+let validProfileCount = 0;
+let endpointsPreserved = true;
+for (const variantId of Object.keys(ENCOUNTER_VARIANTS)) {
+  const compiledVar = CompileEncounterVariant(variantId);
+  for (const group of compiledVar.defaultDocument.groups) {
+    if (["guard", "suppress"].includes(group.behavior) || !group.route || group.route.length < 2) continue;
+    movingGroupCount += 1;
+    const cfg = ResolveEncounterGroupSplineConfig(group);
+    if (cfg && SQUAD_SPLINE_PROFILES[cfg.profile]) {
+      validProfileCount += 1;
+      const wp = BuildLiveSquadWaypoints({
+        squadKey: group.id,
+        config: cfg,
+        memberIndex: 1,
+        memberCount: Math.max(2, group.maxAlive || 2),
+        role: "rifleman",
+        route: group.route,
+      });
+      const s0 = group.route[0], e0 = group.route.at(-1);
+      const s1 = wp[0], e1 = wp.at(-1);
+      if (s0[0] !== s1[0] || s0[1] !== s1[1] || e0[0] !== e1[0] || e0[1] !== e1[1]) {
+        endpointsPreserved = false;
+      }
+    }
+  }
+}
+Check("第一关双版本（L1_Original + L1_BeishaheMerged）全部机动遭遇组均匹配合法 Profile 且 3D 路点起终点零偏移",
+  movingGroupCount >= 40 && validProfileCount === movingGroupCount && endpointsPreserved,
+  `movingGroups=${validProfileCount}/${movingGroupCount} endpointsPreserved=${endpointsPreserved}`);
 
 console.log(`\n[SquadSplinePcgTest] 通过 ${passed} 项，失败 ${failed} 项`);
 assert.equal(failed, 0, `${failed} 项检查未通过`);

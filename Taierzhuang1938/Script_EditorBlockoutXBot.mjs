@@ -1674,6 +1674,34 @@ export class XBotSkin {
     if (this.last3C) this.last3C.aimOffsetMode = "none";
     if (activeW < 1e-3 || (Math.abs(yawRad) < 1e-3 && Math.abs(pitchRad) < 1e-3)) return;
 
+    // 非据枪、非原地转身的行进/警戒左顾右盼（PCG Procedural Gaze）：
+    // 只旋转 Head(62%) / Neck(28%) / Spine2(10%)，不碰锁骨与双臂，保证端枪/携枪行进时枪口稳定不乱甩。
+    if (aimWeight < 0.15 && Math.abs(lowerYawOff) <= 0.01 && stance !== "prone") {
+      const yaw = intent.yaw || 0;
+      const clampedYaw = THREE.MathUtils.clamp(yawRad, -1.05, 1.05);
+      const clampedPitch = THREE.MathUtils.clamp(pitchRad, -0.28, 0.35);
+      _aimRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+      const gazeWeights = [
+        ["Spine2", 0.10, 0.0],
+        ["Neck", 0.28, 0.35],
+        ["Head", 0.62, 0.65],
+      ];
+      for (const [boneName, yw, pw] of gazeWeights) {
+        const bone = this.H(boneName);
+        if (!bone) continue;
+        const dy = clampedYaw * yw;
+        const dp = clampedPitch * pw;
+        if (Math.abs(dy) < 1e-4 && Math.abs(dp) < 1e-4) continue;
+        _aimQ.identity();
+        if (Math.abs(dy) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_up, dy));
+        if (Math.abs(dp) >= 1e-4) _aimQ.premultiply(_aimQ2.setFromAxisAngle(_aimRight, dp));
+        RotateBoneWorld(bone, _aimQ);
+      }
+      this.container.updateMatrixWorld(true);
+      if (this.last3C) this.last3C.aimOffsetMode = "gaze";
+      return;
+    }
+
     const grid = rifle && stance !== "prone" ? this.skins.aimOffsetGrid : null;
     if (grid) {
       const w = EvaluateAimOffsetGridWeights({

@@ -5,6 +5,11 @@ import {
   MERGED_SIGNALS, MERGED_SURFACES, MERGED_DIALOGUE,
 } from "./Data_LevelFlowMerged.mjs";
 import { Clamp, Distance, Lerp, SampleBeatRoute, SampleRoute } from "../FirstLevelEncounter/Script_LevelFlowGeometry.mjs";
+import { ResolveScriptedSquadConfig, SampleDeterministicGaze } from "../../Script_FirstLevelSquadSpline.mjs";
+import { HashString } from "../../Script_ProceduralGaze.mjs";
+
+const villageEscortCfg = ResolveScriptedSquadConfig("VillageEscortCore");
+const ditchEvacueeCfg = ResolveScriptedSquadConfig("WalkingWounded");
 
 function Actor(id, name, side, kind, p, pose = "stand", extra = {}) {
   return { id, name, side, kind, p: [...p], pose, ...extra };
@@ -232,11 +237,22 @@ export function MergedActors(beat, time, player, progress, timeline) {
       : beat.id === "13a" ? "摆脱村内追兵，全速奔向铁桥北坎"
       : beat.id === "13b" || beat.id === "13c" ? "借顺子掩护抢渡四孔钢梁桥"
       : "随队行动";
+    const mh = leaderMoving ? Math.atan2(leaderNext[0] - leader[0], -(leaderNext[1] - leader[1])) : undefined;
+    const g = !firing && !stuck && villageEscortCfg ? SampleDeterministicGaze({
+      seed: HashString(`VillageEscortCore:${id}`),
+      time,
+      tuning: villageEscortCfg.tuning,
+      role: index === 0 ? "leader" : id === "yao" ? "mgGunner" : "rifleman",
+      moving: leaderMoving || time < At("08b") || beat.id === "13e",
+      firing: false,
+      pose: "walk",
+    }) : null;
     actors.push(Actor(id, name, "friend", "person", p, stuck ? "down" : firing ? "shoot" : "walk", {
       heavy: id === "yao",
       firing,
       coveringEvacuation: leaderCovering,
       status,
+      ...(g ? { ...(mh !== undefined ? { marchHeading: mh } : {}), gazeYaw: g.gazeYaw, gazePitch: g.gazePitch, gazeKind: g.gazeKind, splineProfile: villageEscortCfg.profile } : {}),
     }));
   }
 
@@ -425,12 +441,20 @@ export function MergedActors(beat, time, player, progress, timeline) {
     );
   }
 
-  // 过板桥的老乡与散兵：严格沿官道中心线南行（0 穿掩体/篱笆）
+  // 过板桥的老乡与散兵：严格沿官道中心线南行（0 穿掩体/篱笆），附带行进间自然左顾右盼
   if (["08c", "08d"].includes(beat.id)) {
+    const evacRoute = [[102.5, 434], [101, 452], [99, 466], [99, 476], [103.5, 486]];
     for (let index = 0; index < 5; index++) {
       const start = At("08c") + index * 4.0;
-      const p = SampleRoute([[102.5, 434], [101, 452], [99, 466], [99, 476], [103.5, 486]], Clamp((time - start) / 22, 0, 1));
-      actors.push(Actor(`ditchEvacuee${index}`, `过板桥的老乡与散兵 ${index + 1}`, index % 2 ? "friend" : "civilian", "person", p, "run"));
+      const frac = Clamp((time - start) / 22, 0, 1);
+      const p = SampleRoute(evacRoute, frac);
+      const pNext = SampleRoute(evacRoute, Clamp(frac + 0.02, 0, 1));
+      const mh = Distance(p, pNext) > 0.005 ? Math.atan2(pNext[0] - p[0], -(pNext[1] - p[1])) : Math.PI;
+      const g = ditchEvacueeCfg ? SampleDeterministicGaze({
+        seed: HashString(`DitchEvacuee:${index}`), time, tuning: ditchEvacueeCfg.tuning, role: "rifleman", moving: frac > 0 && frac < 1, firing: false, pose: "run",
+      }) : null;
+      actors.push(Actor(`ditchEvacuee${index}`, `过板桥的老乡与散兵 ${index + 1}`, index % 2 ? "friend" : "civilian", "person", p, "run",
+        g ? { marchHeading: mh, gazeYaw: g.gazeYaw, gazePitch: g.gazePitch, gazeKind: g.gazeKind, splineProfile: ditchEvacueeCfg.profile } : {}));
     }
   }
 

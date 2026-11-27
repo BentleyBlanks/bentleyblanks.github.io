@@ -365,6 +365,8 @@ export class Soldier extends SoldierFieldAccessors {
       lookYaw: 0,
       lookPitch: 0,          // 持续跟踪瞄点的抬枪角（向上为正）
       lookPitchBlend: 0,     // 限速之后真正喂给 Actor 的那个
+      gazeYaw: 0,            // 行进/警戒程序化左顾右盼偏航（非接战时驱动头颈）
+      gazePitch: 0,          // 行进/警戒程序化左顾右盼俯仰
       aimTime: 0,
       /** 上一次「把枪口转到玩家身上」的时刻。首发必偏窗口按它算（见 TryFire）。 */
       playerLockAt: -99,
@@ -1014,8 +1016,10 @@ export class AiDirector {
   }
 
   /** Scene director orders use the existing movement/combat components. */
-  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7, coverSlackM=0, suppressible=false, allowCover=false, tacticalRadiusM=0, fixBayonet=false } = {}) {
+  DirectActor(s, { x, z, yaw, forceYaw=false, stance=0, combat=true, moving=false, speed=2.6, arrivalRadius=0.7, coverSlackM=0, suppressible=false, allowCover=false, tacticalRadiusM=0, fixBayonet=false, gazeYaw=0, gazePitch=0 } = {}) {
     if (!s?.alive) return;
+    s.gazeYaw = Number.isFinite(gazeYaw) ? Clamp(gazeYaw, -0.92, 0.92) : 0;
+    s.gazePitch = Number.isFinite(gazePitch) ? Clamp(gazePitch, -0.22, 0.30) : 0;
     const closeVisible = !!(s.target && s.targetVisible && s.target.position
       && Math.hypot(s.target.position.x - s.position.x, s.target.position.z - s.position.z) <= 18);
     const inContact = combat && ((allowCover && (!!s.target || s.suppression >= 0.35)) || closeVisible);
@@ -4150,9 +4154,11 @@ export class AiDirector {
     // 枪口/上身偏航必须相对**这一帧真实的身体朝向**。旧版拿 wantedYaw 当基准，
     // 导航场在相邻格之间切方向时 wantedYaw 会左右跳，身体因为有转速限制尚且平滑，
     // 枪却每帧直接吃跳变后的 lookYaw，于是原地疯狂改枪口方向。
+    const idleGazeYaw = !evading && !ambient ? Clamp(s.gazeYaw || 0, -0.92, 0.92) : 0;
     const wantedLookYaw = targetYaw === null
-      ? 0 : Clamp(AngleDelta(s.yaw, s.target ? (s.muzzleAimYaw ?? targetYaw) : targetYaw), -0.92, 0.92);
-    s.lookYaw += Clamp(wantedLookYaw - s.lookYaw, -4.8 * dt, 4.8 * dt);
+      ? idleGazeYaw : Clamp(AngleDelta(s.yaw, s.target ? (s.muzzleAimYaw ?? targetYaw) : targetYaw), -0.92, 0.92);
+    const lookRate = targetYaw === null ? 3.4 : 4.8;
+    s.lookYaw += Clamp(wantedLookYaw - s.lookYaw, -lookRate * dt, lookRate * dt);
 
     // FIRE/ADVANCE 是离散战术状态，枪托不是电门。短暂离开 FIRE 仍保留 0.35 s
     // 的据枪承诺，再用连续 blend 上肩/放下，距离阈值两侧不会横着甩枪。
@@ -4165,9 +4171,10 @@ export class AiDirector {
     const aimRate = wantedAim ? 5.5 : 4.0;
     s.aimBlend += Clamp(wantedAim - s.aimBlend, -aimRate * dt, aimRate * dt);
     // 抬枪 / 压枪。`s.lookPitch` 持续按「枪口 → 瞄点」跟踪（向上为正），
-    // 这里跟 lookYaw 同一套做法：不据枪时回零，且**限速** ——
+    // 这里跟 lookYaw 同一套做法：不据枪时回零（或遵循非接战程序化左顾右盼俯仰），且**限速** ——
     // 一发打完立刻把枪甩平，画面上就是每开一枪抖一下头。
-    const wantedPitch = (s.target || ambient) && this.time < s.aimUntil ? (s.lookPitch || 0) : 0;
+    const idleGazePitch = !evading && !ambient && targetYaw === null ? Clamp(s.gazePitch || 0, -0.22, 0.30) : 0;
+    const wantedPitch = (s.target || ambient) && this.time < s.aimUntil ? (s.lookPitch || 0) : idleGazePitch;
     s.lookPitchBlend = (s.lookPitchBlend || 0)
       + Clamp(wantedPitch - (s.lookPitchBlend || 0), -3.2 * dt, 3.2 * dt);
 

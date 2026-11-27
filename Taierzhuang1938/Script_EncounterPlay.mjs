@@ -30,6 +30,12 @@ import { SubmitEncounterPrograms, SubmitEncounterActorPrograms } from "./Script_
 import { T } from "./Script_Text.mjs";
 import { DeathTime } from "./Script_PlayerDeath.mjs";
 import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
+import {
+  ResolveEncounterGroupSplineConfig,
+  ResolveScriptedSquadConfig,
+  BuildLiveSquadWaypoints,
+  CreateLiveSquadController,
+} from "./Script_FirstLevelSquadSpline.mjs";
 
 const PAYLOAD_KEY="tengxian1938_encounter_play_session_v1";
 function NextTask() {
@@ -625,7 +631,28 @@ export class EncounterPlay {
     const grenades=combatEnemy
       ?(group?.grenadeInterval>0?2:(group&&["advance","bounds","flank","escort"].includes(group.behavior)&&index%2===0?1:0))
       :0;
-    const route=group&&["guard","suppress"].includes(group.behavior)?null:actor.route|| (group?GroupPath(group,index):null);
+    const member = group?.memberPlans?.[index % (group?.maxAlive || 1)];
+    const splineCfg = group ? ResolveEncounterGroupSplineConfig(group) : ResolveScriptedSquadConfig(actor.groupId || actor.id);
+    const rawRoute = group && ["guard", "suppress"].includes(group.behavior) ? null : actor.route || (group ? GroupPath(group, index) : null);
+    const preserveWaypointIndices = !!(member?.waitSeconds || group?.holdUntil || group?.behavior === "bounds");
+    const memberRole = index === 0 ? (spec.weapon === "Type11" || spec.weapon === "Zb26" ? "mgGunner" : "leader") : "rifleman";
+    const route = rawRoute && rawRoute.length >= 2 && splineCfg && !preserveWaypointIndices
+      ? BuildLiveSquadWaypoints({
+          squadKey: actor.groupId || actor.id,
+          config: splineCfg,
+          memberIndex: index,
+          memberCount: group?.maxAlive || 1,
+          role: memberRole,
+          route: rawRoute,
+        })
+      : rawRoute;
+    const squadCtrl = CreateLiveSquadController({
+      squadKey: actor.groupId || actor.id,
+      config: splineCfg,
+      memberIndex: index,
+      memberCount: group?.maxAlive || 1,
+      role: memberRole,
+    });
     let routeIndex=0;
     if(route&&initial) {
       let nearest=Infinity;
@@ -660,7 +687,6 @@ export class EncounterPlay {
         elapsed:this.host.ai.time,lookYaw:0,lookPitch:0,
       });
     }
-    const member=group?.memberPlans?.[index%(group?.maxAlive||1)];
     const deployment=(group?.deployDelay||0)+(member?.delay||0);
     const prior=initial?Math.max(0,this.plan.time-(group?.lives[index]?.born??this.plan.time)):0;
     const waitUntil=group?.id==="TempleSearch"?(this.templeEnteredAt??Infinity)+(member?.delay||0)
@@ -675,7 +701,7 @@ export class EncounterPlay {
       const gx=end[0]+ox,gz=end[1]+oz,gy=this.host.battlefield.GroundHeight(gx,gz);
       if((ox||oz)&&!this.host.ai.Blocked(gx,gz,gy))holdOffset=[ox,oz];
     }
-    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,engaged:!!actor.firing||["shoot","melee"].includes(actor.pose),
+    this.entries.set(actor.id,{actor,soldier,spec,skin,group,route,routeIndex,squadCtrl,engaged:!!actor.firing||["shoot","melee"].includes(actor.pose),
       routeWaits:member?.waitSeconds||[],waitedIndex:-1,waitUntil,holdOffset,provoked:false,lastHealth:soldier.health,spottedTime:0});
     if(!initial)this.plan.Spawned(actor);
     return true;
@@ -807,7 +833,10 @@ export class EncounterPlay {
       moving=Math.hypot(target[0]-soldier.position.x,target[1]-soldier.position.z)>cfg.routeReachM;
     }
     const guide=!!this.stealth&&entry.actor.id==="liu"&&frame.beat.id==="09a";
-    const speed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):(escortSpeed??group?.speed??2.6);
+    const baseSpeed=guide?Math.max(2.6,Math.hypot(this.host.player.velocity.x,this.host.player.velocity.z)*1.15):(escortSpeed??group?.speed??2.6);
+    const speed=entry.squadCtrl
+      ? baseSpeed * entry.squadCtrl.SpeedScale(this.plan.elapsed, moving && !combat && !guide && !escortTethered)
+      : baseSpeed;
     const suspicionObserver=this.stealth?.state?.suspicion>0 && entry.actor.id===this.stealth.observerId;
     if(suspicionObserver){target=[soldier.position.x,soldier.position.z];moving=false;}
     const {yaw,forceYaw}=EncounterOrderYaw({
@@ -840,14 +869,41 @@ export class EncounterPlay {
         z:canShift?evadeZ:soldier.position.z,
         yaw,forceYaw:false,stance:1,combat:false,moving:canShift,speed:3.2,
         arrivalRadius:0.45,allowCover:false,coverSlackM:0,suppressible:true,tacticalRadiusM:0,fixBayonet:false,
+        gazeYaw:0,gazePitch:0,
       });
       return;
+    }
+    let gazeYaw = 0, gazePitch = 0;
+    if (!suspicionObserver && entry.squadCtrl) {
+      const peers = [];
+      if (entry.actor.groupId) {
+        for (const other of this.entries.values()) {
+          if (other === entry || !other.soldier.alive || other.actor.groupId !== entry.actor.groupId) continue;
+          peers.push({ id: other.actor.id, x: other.soldier.position.x, z: other.soldier.position.z });
+          if (peers.length >= 4) break;
+        }
+      }
+      const stageNum = Number(frame.beat?.stage || 0);
+      const terrainKind = stageNum <= 3 ? "trench" : (stageNum >= 8 && stageNum <= 10 ? "alley" : "open");
+      const g = entry.squadCtrl.StepGaze(cfg.orderEveryS, {
+        x: soldier.position.x,
+        y: soldier.position.y,
+        z: soldier.position.z,
+        yaw: soldier.yaw,
+        speed: soldier.moveSpeed || 0,
+        combat,
+        aiming: (soldier.aimBlend || 0) > 0.15 || !!soldier.target,
+        terrainKind,
+        peers,
+      });
+      gazeYaw = g.gazeYaw;
+      gazePitch = g.gazePitch;
     }
     this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
       stance:allowCover?null:authoredStance,
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
       allowCover,coverSlackM:allowCover?(escortTethered?6.5:8.5):0,suppressible:allowCover,
-      tacticalRadiusM,fixBayonet:isBayonetRush});
+      tacticalRadiusM,fixBayonet:isBayonetRush,gazeYaw,gazePitch});
   }
   NoFireArmed(frame) {
     return !!frame.stealth?.noFire&&this.host.player.position.z>=(frame.stealth.armMinZ??-Infinity);

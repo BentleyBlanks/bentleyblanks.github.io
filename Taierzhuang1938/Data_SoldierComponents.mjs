@@ -60,7 +60,7 @@ export const SOLDIER_COMPONENTS = Object.freeze({
     label: "瞄准与看向（喂给 Actor 的连续量）",
     owner: "Script_Ai（Act）",
     owners: Object.freeze(["Script_Ai.mjs"]),
-    fields: Object.freeze(["aimBlend", "aimUntil", "lookYaw", "lookPitch", "lookPitchBlend", "aimTime", "playerLockAt"]),
+    fields: Object.freeze(["aimBlend", "aimUntil", "lookYaw", "lookPitch", "lookPitchBlend", "gazeYaw", "gazePitch", "aimTime", "playerLockAt"]),
   }),
   sense: Object.freeze({
     label: "感知、目标与记忆",
