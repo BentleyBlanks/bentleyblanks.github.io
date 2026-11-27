@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 from scipy.ndimage import gaussian_filter, map_coordinates
+from scipy.optimize import minimize
 
 from Script_MeasureType89LauncherSteel import (
     RECORD, REGISTERED_LUMA, ContactAoSha256, FitSignedResponse, KnurlFlankResponseIdentity, Photo,
@@ -77,9 +78,7 @@ def TabWarmResponse(tab, photos, evidence):
                                TabWarmIdentity(tab), fields, frameHashes, scale=63500)
 
 
-def KnurlFlankResponse(flank, photo, evidence):
-    folder = evidence / "V59Photo4GripStudy"
-    hashes = {}
+def RegisterFlank(flank, photo, folder, hashes):
     hi, lo = (ReadRegisteredRgb(folder, f"uv{bits}.png", hashes) for bits in ("Hi", "Lo"))
     u, v = np.moveaxis((256 * hi[..., :2] + lo[..., :2]) / 65535, -1, 0)
     atlas = json.loads((RECORD.parents[3] / "_blender/Data_Type89LauncherSteelAtlas.json").read_bytes())
@@ -97,6 +96,13 @@ def KnurlFlankResponse(flank, photo, evidence):
     left, top, right, _ = source["sampleBounds"]
     target = map_coordinates(photo, (top + np.interp(u, arc, rows), left + (right-left-1.01) * v), order=1)
     u = (u - arc[0]) / (arc[-1] - arc[0])
+    return u, v, visible, target, crop
+
+
+def KnurlFlankResponse(flank, photo, evidence):
+    folder = evidence / "V59Photo4GripStudy"
+    hashes = {}
+    u, v, visible, target, crop = RegisterFlank(flank, photo, folder, hashes)
     support = gaussian_filter(visible.astype(float), 4.4)
     selected = visible & (support > .76) & (target > 21) & (target < 242)
     if selected.sum() <= 1800:
@@ -135,10 +141,55 @@ def KnurlFlankResponse(flank, photo, evidence):
                                KnurlFlankResponseIdentity(flank), fields, {folder.name: hashes}, scale=63500)
 
 
+def RegisterFlankPattern(knurl, photo, folder):
+    flank = knurl["flankWear"]
+    hashes = {}
+    levels = [knurl["angularCycles"], knurl["axialCycles"]]
+    u, v, visible, target, crop = RegisterFlank(flank, photo, folder, hashes)
+    support = gaussian_filter(visible.astype(float), 3.35)
+    inside = visible & (support > .84) & (u > .08) & (u < .92) & (v > .08) & (v < .92)
+    if inside.sum() < 1500:
+        raise ValueError("Too few supported visible samples to register the grip pattern")
+    footprint = flank["footprint"]
+    uCycles = 2 * footprint["uHalfSpan"] * levels[0]
+    vCycles = np.diff(footprint["vRange"])[0] * levels[1]
+    x, y = uCycles * (u[inside] - .5), vCycles * (v[inside] - .5)
+    weight = support[inside] * np.sin(np.pi*u[inside])**2 * np.sin(np.pi*v[inside])**2
+
+    def Measure(gray):
+        intensity = np.log(gray + 18)
+        high = intensity - gaussian_filter(intensity * visible, 3.35) / np.maximum(support, .025)
+        samples = high[inside] * weight
+
+        def Fourier(scale):
+            a,b = scale
+            return np.array([np.sum(samples*np.exp(-2j*np.pi*(a*x+sign*b*y)))/weight.sum() for sign in (1, -1)])
+
+        def Cost(scale):
+            return -float(np.sum(abs(Fourier(scale))**2))
+
+        grid = np.linspace(.78, 1.22, 19)
+        seed = min(((a,b) for a in grid for b in grid), key=Cost)
+        optimum = minimize(Cost, seed, bounds=((.76, 1.24), (.76, 1.24)), method="Nelder-Mead",
+                           options={"xatol": .0001, "maxiter": 160})
+        coefficients = Fourier(optimum.x)
+        return {"cyclesScale": optimum.x.round(4).tolist(),
+                "phaseByDiagonal": (np.angle(coefficients)/(2*np.pi)).round(4).tolist(),
+                "powerByDiagonal": (abs(coefficients)**2).round(6).tolist()}
+
+    controls = {name: Measure(ReadRegisteredLuma(folder, name + ".png", hashes)[crop])
+                for name in ("Mixed", "Second", "HeldOut")}
+    return {"photoSha256": flank["source"]["sha256"], "footprint": footprint,
+            "uBySampleRow": flank["source"]["uBySampleRow"], "cyclesPerChart": levels,
+            "responseSha256": flank["surfaceCalibration"]["sha256"], "photo": Measure(target),
+            "controls": controls, "frameSha256": hashes, "sampleCount": int(inside.sum())}
+
+
 def Main():
     options = argparse.ArgumentParser(description=__doc__)
     options.add_argument("--photos", type=Path, required=True)
     options.add_argument("--evidence", type=Path, required=True)
+    options.add_argument("--knurl-pattern-evidence", type=Path, help="V59GripLocal registered pattern captures")
     args = options.parse_args()
     if ContactAoSha256() is None:
         raise ValueError("Rebuild the contact AO before calibrating the material response")
@@ -151,6 +202,10 @@ def Main():
     luma = [image @ REGISTERED_LUMA for image, _ in photos]
     tab["warmCalibration"] = TabWarmResponse(tab, luma, args.evidence)
     flank["surfaceCalibration"] = KnurlFlankResponse(flank, luma[1], args.evidence)
+    if args.knurl_pattern_evidence:
+        flank["patternRegistration"] = RegisterFlankPattern(reference["knurl"], luma[1], args.knurl_pattern_evidence)
+    elif (flank.get("patternRegistration", {}).get("responseSha256") != flank["surfaceCalibration"]["sha256"]):
+        flank.pop("patternRegistration", None)
     SaveReferenceRecord(reference)
     print("Measured tab warm shading and the grip flank material response")
 

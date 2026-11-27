@@ -19,27 +19,27 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 566234,
-      "sha256": "4289777f66415700deac327bb61a99d1d0f8112a57e939dd60afe66eae61c8c9"
+      "bytes": 566072,
+      "sha256": "e8eb9114a822929b3cf52ea0abee63ba9f3e100e2576257b59f25668aa04df38"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 407132,
-      "sha256": "dda4bef4b62df3f84ef7b5b55429738c959a8ca4adc2651847ed9d2f5f88fb5a"
+      "bytes": 396370,
+      "sha256": "ac838afbb861110dad643af06593ff264e59fdb9eac0dc96f3ff5dc15cc7fa03"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 56428,
-      "sha256": "66e8d232d282fd7e74ec8251c1c99f072a753ec7158287961f9c58e4a6c52fa8"
+      "bytes": 56384,
+      "sha256": "72a8f60d803167dd386d984baba1ec29f6ec419f9c6b788390a9e08161d05686"
     }
   ],
-  "totalBytes": 1029794,
+  "totalBytes": 1018826,
   "metrics": {
     "meanSrgb": [
       0.4364,
@@ -48,21 +48,21 @@
     ],
     "luma": 0.4195,
     "lumaStd": 0.108,
-    "sat": 0.0907,
+    "sat": 0.0906,
     "clipLow": 0.0001,
     "clipHigh": 0.0,
     "lowFreq": 0.1034,
     "seam": 0.1228,
-    "interior": 0.0247,
-    "seamRatio": 4.972,
-    "border": 0.742,
-    "swing": 0.0867,
+    "interior": 0.0253,
+    "seamRatio": 4.85,
+    "border": 0.743,
+    "swing": 0.0869,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "c523c3a7394b2bd85e1abec2440dca7d1e02143d8db2146b9d8316b91201af17",
+    "sha256": "f907b97c62ae44218ca5e615db0f0c1da5dc4edabff1f9be72d87ec96e9e4175",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"

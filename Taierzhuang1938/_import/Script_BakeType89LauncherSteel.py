@@ -131,6 +131,37 @@ def CheckSleeveRegistration(calibration, closeup):
         raise ValueError("The sleeve calibration does not match the source photo and projection")
 
 
+def RegisterKnurlFlankPattern(knurl, angular, axial, u, v):
+    flank = knurl["flankWear"]
+    calibration = flank.get("patternRegistration")
+    if calibration is None:
+        return angular, axial
+    if (calibration["photoSha256"] != flank["source"]["sha256"]
+            or calibration["footprint"] != flank["footprint"]
+            or calibration["uBySampleRow"] != flank["source"]["uBySampleRow"]
+            or calibration["cyclesPerChart"] != [knurl["angularCycles"], knurl["axialCycles"]]
+            or calibration["responseSha256"] != flank.get("surfaceCalibration", {}).get("sha256")):
+        raise ValueError("The grip pattern registration must match the side photo and current material response")
+    source = calibration["photo"]
+    measured = tuple(calibration["controls"].values())
+    cycles = np.array(source["cyclesScale"]) / np.median([row["cyclesScale"] for row in measured], axis=0) - 1
+    phase = np.array(source["phaseByDiagonal"]) - np.median([row["phaseByDiagonal"] for row in measured], axis=0)
+    phase = (phase + .5) % 1 - .5
+    angularOffset, axialOffset = np.round(.5 * np.array([phase.sum(), phase[0] - phase[1]]), 8).tolist()
+    angularScale, axialScale = np.round(cycles, 8).tolist()
+    footprint = flank["footprint"]
+    center, halfSpan = footprint["uCenter"], footprint["uHalfSpan"]
+    low, high = footprint["vRange"]
+    mid = (low + high) / 2
+    # Taper the pattern shift into the rest of the rotating surface.
+    weight = np.clip((halfSpan + .038 - abs(u - center)) / .046, 0, 1)
+    weight *= np.clip((v - low + .044) / .061, 0, 1) * np.clip((high + .044 - v) / .061, 0, 1)
+    weight = weight**2 * (3 - 2 * weight)
+    angularCenter, axialCenter = knurl["angularCycles"] * center, knurl["axialCycles"] * mid
+    return (angular + weight * (angularScale * (angular - angularCenter) + angularOffset),
+            axial + weight * (axialScale * (axial - axialCenter) + axialOffset))
+
+
 def ApplyBaseLogGain(base, logGain):
     corrected = LinearToSrgb(SrgbToLinear(np.clip(base, 0, 1)) * np.exp(logGain)[..., None])
     return np.where((logGain != 0)[..., None], corrected, base)
@@ -685,8 +716,10 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         roughnessDelta -= (.026 if name == "Barrel" else .037) * brushing
     if name == "Knurl":
         knurl = reference["knurl"]
+        flank = knurl["flankWear"]
         angular = knurl["angularCycles"] * xx
         axial = knurl["axialCycles"] * vv
+        angular, axial = RegisterKnurlFlankPattern(knurl, angular, axial, xx, vv)
         phaseA, phaseB = angular + axial, angular - axial
         left, right = np.mod(phaseA, 1), np.mod(phaseB, 1)
         diamonds = 2 * np.minimum(np.minimum(left, 1 - left), np.minimum(right, 1 - right))
@@ -704,7 +737,6 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         rows = np.rint(padding + (1 - centerV) * (height - 2 * padding)).astype(np.int32)
         cellWear = chip[rows, columns]
         photoTone, photoWarmth, coverage = PhotographicGrain(knurl["wear"], (xx + .5) % 1 - .5, vv)
-        flank = knurl["flankWear"]
         flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
         photoTone = photoTone * coverage + 1.32 * flankTone * flankCoverage
         photoWarmth = photoWarmth * coverage + flankWarmth * flankCoverage
@@ -1076,7 +1108,22 @@ def BakeKnurl(quadrants, width, height, index, reference):
     # in the original coordinates so the measured diamond pitch stays fixed.
     pad = ATLAS["padding"]
     sourceWidth, sourceHeight = 2 * (width - pad), 2 * (height - pad)
-    maps = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference)
+    maps = list(BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference))
+    knurl = reference["knurl"]
+    flank = knurl["flankWear"]
+    if "patternRegistration" in flank:
+        # The periodic normal filter has a small response outside the shifted
+        # pattern. Fade that halo back to the established surrounding chart.
+        originalFlank = {key: value for key, value in flank.items() if key != "patternRegistration"}
+        originalReference = reference | {"knurl": knurl | {"flankWear": originalFlank}}
+        originalNormal = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, originalReference)[1]
+        u = (np.arange(sourceWidth) - pad) / (sourceWidth - 2 * pad)
+        footprint = flank["footprint"]
+        distance = abs(u - footprint["uCenter"]) - footprint["uHalfSpan"]
+        edge = np.clip((.052 - distance) / .014, 0, 1)[None, :, None]
+        edge = edge**2 * (3 - 2 * edge)
+        delta = maps[1].astype(float) - originalNormal
+        maps[1] = np.rint(originalNormal + edge * delta).astype(np.uint8)
     first, last = ATLAS["knurlSourceV"]
     across = np.clip((np.arange(width) + .5 - pad) / (width - 2 * pad), 0, 1)
     columns = pad + across * (sourceWidth - 2 * pad)

@@ -2549,6 +2549,14 @@ def Main():
         calibration = previous.get(key)
         if calibration and all(calibration.get(field) == value for field, value in identity.items()):
             current[key] = calibration
+    pattern = priorFlank.get("patternRegistration")
+    knurl = record["knurl"]
+    if (pattern and pattern.get("responseSha256") == flank.get("surfaceCalibration", {}).get("sha256")
+            and pattern.get("photoSha256") == flank["source"]["sha256"]
+            and pattern.get("footprint") == flank["footprint"]
+            and pattern.get("uBySampleRow") == flank["source"]["uBySampleRow"]
+            and pattern.get("cyclesPerChart") == [knurl["angularCycles"], knurl["axialCycles"]]):
+        flank["patternRegistration"] = pattern
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

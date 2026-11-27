@@ -6643,6 +6643,61 @@
             "DefaultAlongMinus.png": "2c7d600f05a8b7984bbb7f831510a5eebdda785ec1bfa390079b4e3eaf871734"
           }
         }
+      },
+      "patternRegistration": {
+        "photoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "footprint": {
+          "uCenter": 0.7405,
+          "uHalfSpan": 0.08637,
+          "vRange": [0.39821, 0.75679]
+        },
+        "uBySampleRow": [
+          [0.65413, 0.0],
+          [0.66609, 6.0],
+          [0.67802, 12.0],
+          [0.69007, 18.0],
+          [0.70246, 24.0],
+          [0.71485, 30.0],
+          [0.72793, 36.0],
+          [0.74129, 42.0],
+          [0.75531, 48.0],
+          [0.77049, 54.0],
+          [0.7866, 60.0],
+          [0.80496, 66.0],
+          [0.82687, 72.0]
+        ],
+        "cyclesPerChart": [57, 31],
+        "responseSha256": "332afc4ec5936f9231dfc70d3810e8a013ed94a6f07edfa826f861be45ef350b",
+        "photo": {
+          "cyclesScale": [0.9711, 0.9726],
+          "phaseByDiagonal": [-0.1946, 0.4391],
+          "powerByDiagonal": [0.001808, 0.009606]
+        },
+        "controls": {
+          "Mixed": {
+            "cyclesScale": [0.9965, 1.0027],
+            "phaseByDiagonal": [-0.3943, -0.2367],
+            "powerByDiagonal": [0.009113, 0.025473]
+          },
+          "Second": {
+            "cyclesScale": [1.0027, 1.0032],
+            "phaseByDiagonal": [-0.382, -0.2289],
+            "powerByDiagonal": [0.008519, 0.023608]
+          },
+          "HeldOut": {
+            "cyclesScale": [0.9954, 1.0029],
+            "phaseByDiagonal": [-0.395, -0.238],
+            "powerByDiagonal": [0.008989, 0.024972]
+          }
+        },
+        "frameSha256": {
+          "uvHi.png": "4a1b5d3ba21d4c6b1d75f8d1612b9b82cad5d45293a85abb76b7e9bcf8be3830",
+          "uvLo.png": "c6dc2f11611c7951f47417d6b226c1b605b64e40839cc36afbdccd4699d71e25",
+          "Mixed.png": "9948d066ff5d572b752524341f85f129ac7743c58fe3727d516979982e389f80",
+          "Second.png": "9a6b61e2ebadfe7ee5190ed79c28fd361120da243fcf189bee7597281b1fa08a",
+          "HeldOut.png": "c9dfd99382a91eee161d2d39a46d1893073317638a44a93a1de0e702401af182"
+        },
+        "sampleCount": 3737
       }
     }
   },
