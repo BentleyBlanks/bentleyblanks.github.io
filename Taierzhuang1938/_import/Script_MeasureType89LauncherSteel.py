@@ -164,6 +164,13 @@ def ShoulderReflectanceIdentity(reference):
     }
 
 
+def WheelOxideIdentity(reference):
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return JointSteelIdentity(reference, "Wheel", photoFit=reference["wheelFinish"]) | {
+        "contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest(),
+    }
+
+
 def SleeveJointIdentity(reference):
     previous = json.dumps(reference.get("sleeveReverseFinish"), sort_keys=True, separators=(",", ":"))
     detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
@@ -2693,7 +2700,7 @@ def Main():
         ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity),
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
         ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
-        ("shoulderReflectanceFinish", ShoulderReflectanceIdentity))]
+        ("shoulderReflectanceFinish", ShoulderReflectanceIdentity), ("wheelOxideFinish", WheelOxideIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

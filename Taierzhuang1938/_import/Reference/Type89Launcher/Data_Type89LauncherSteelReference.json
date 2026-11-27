@@ -23400,5 +23400,109 @@
         "uvLo": "01be6a84ce6a7e0e65ae2898719aa92558a9c0b1e616bc36bc501149bf4e87c8"
       }
     }
+  },
+  "wheelOxideFinish": {
+    "frontPhotoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb",
+    "frontFitSha256": "6715f944fd2f4bc9aac19fef2dadbbbf8c297335599a3530bdab244f7059e9e5",
+    "rawSteelSha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8",
+    "atlasSha256": "d0e4227f0fd65b12a075d58f6b43ae04abb8217d5afc9f0666408e679fb45627",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+    "phase": [
+      0.0,
+      0.185,
+      0.23,
+      0.34,
+      0.45,
+      0.56,
+      0.67,
+      0.78,
+      0.86,
+      0.94,
+      1.0
+    ],
+    "fields": {
+      "gain": [
+        0.0,
+        0.0,
+        0.0,
+        0.0273,
+        0.0756,
+        0.1911,
+        0.1932,
+        0.0714,
+        0.0168,
+        0.0,
+        0.0
+      ],
+      "tintRed": [
+        0.0,
+        0.0,
+        0.08056,
+        0.37736,
+        0.41552,
+        0.53424,
+        0.52152,
+        0.37312,
+        0.32224,
+        0.2756,
+        0.0
+      ],
+      "tintBlue": [
+        -0.0,
+        -0.0,
+        -0.124868,
+        -0.584908,
+        -0.644056,
+        -0.828072,
+        -0.808356,
+        -0.578336,
+        -0.499472,
+        -0.42718,
+        -0.0
+      ],
+      "roughness": [
+        0.0,
+        0.0,
+        0.0,
+        0.00325,
+        0.009,
+        0.02275,
+        0.023,
+        0.0085,
+        0.002,
+        0.0,
+        0.0
+      ],
+      "metalness": [
+        -0.0,
+        -0.0,
+        -0.0,
+        -0.00845,
+        -0.0234,
+        -0.05915,
+        -0.0598,
+        -0.0221,
+        -0.0052,
+        -0.0,
+        -0.0
+      ]
+    },
+    "fitRevision": "d71167b8490479562f0c62e6a2ddb01bf52bd7c3",
+    "baselineFrames": {
+      "Default/WheelSquare": "afd9783be8284424027efc9c73be8d3506c579beaa46bf5f5397db6273812a56",
+      "Default/WheelRake": "a8a30610cb14b7aab308e2316dd98a6de2c7966c4001fa51707d91744e4701c0",
+      "Soft/WheelSquare": "1e7f0613f3530afd6ca7ed1eacd73eeaf3c812a8641eabfca0178f4630500970",
+      "Soft/WheelRake": "51208a70b92c542804b19f31c7857fde97a6175e32e81467bb5ac53d58725320",
+      "Low/WheelSquare": "e088333d50d043a18a8675bfbb18d4d610898a96c2f718d0e1096e0bce663dfc",
+      "Low/WheelRake": "ead47ef33bb7199a75eca33526f53bfd81218251bb986941021a50efaa8267c9"
+    },
+    "reservedToothRows": [
+      595,
+      582,
+      574,
+      558,
+      554
+    ]
   }
 }

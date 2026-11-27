@@ -17,7 +17,7 @@ from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
     SaddleJointIdentity, SaddleReflectanceIdentity, ShoulderReflectanceIdentity, SleeveJointIdentity,
     SleeveReverseIdentity, StemJointIdentity,
-    SurfaceBalanceIdentity, TabReflectanceIdentity, WideReflectionIdentity,
+    SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WideReflectionIdentity,
 )
 
 
@@ -1561,6 +1561,20 @@ def ApplyJointMaterialFields(maps, packed, region, fields):
     ApplyPackedSurfaceChannel(packed, maps[2], region, metalness, 2, (0., 1.))
 
 
+def ApplyWheelOxideFinish(maps, packed, reference, finish):
+    if any(finish.get(key) != value for key, value in WheelOxideIdentity(reference).items()):
+        raise ValueError("Wheel finish does not match the photographed rim and contact AO")
+    _, _, width, height = ATLAS["regions"]["Wheel"]
+    u, v = PlanarTexelCenters(width, height)
+    phase = (np.clip(u, 0., 1.) * ATLAS["wheelPatterns"]) % 1.
+    rim = reference["wheelFinish"]["rim"]
+    photoOxide = ReferenceField(rim, phase, v, "oxide") / 100.
+    feather = SmoothRamp((v + .016) / .106) * SmoothRamp((1.016 - v) / .106)
+    weight = feather * (.68 + .42 * photoOxide)
+    fields = {name: np.interp(phase, finish["phase"], values) * weight for name, values in finish["fields"].items()}
+    ApplyJointMaterialFields(maps, packed, "Wheel", fields)
+
+
 def ApplyNeckJointFinish(maps, packed, reference):
     finish = reference["neckJointFinish"]
     if any(finish.get(key) != value for key, value in NeckJointIdentity(reference).items()):
@@ -1864,6 +1878,8 @@ def Bake(legacyOrm=None):
     if shoulderReflectance is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "Shoulder", shoulderReflectance, ShoulderReflectanceIdentity(reference),
                                 includeWear=False)
+    if (wheelOxide := reference.get("wheelOxideFinish")) is not None:
+        ApplyWheelOxideFinish(maps, pixels, reference, wheelOxide)
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
