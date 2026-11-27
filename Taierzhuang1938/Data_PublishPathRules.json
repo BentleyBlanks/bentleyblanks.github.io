@@ -34,6 +34,7 @@
     { "path": "Taierzhuang1938/Scene/**", "format": "webp-lossless", "maxSize": 2048 },
     { "path": "Taierzhuang1938/Animation/**/*.webp", "format": "webp-lossless", "maxSize": 2048 },
     { "path": "Taierzhuang1938/Model/TanketteAdvanceEastTrack/*.glb#image/*", "format": "webp", "maxSize": 2048, "quality": 94 },
+    { "path": "Taierzhuang1938/Model/Type30Hmg/Model_Type30Hmg.glb#image/*", "format": "webp-lossless", "maxSize": 4096 },
     { "path": "Taierzhuang1938/Model/Type94Tankette/Model_Type94Tankette.glb#image/3", "format": "ktx2-bc7", "maxSize": 4096 },
     { "path": "Taierzhuang1938/Model/Type94Tankette/Model_Type94Tankette.glb#image/4", "format": "ktx2-bc7", "maxSize": 4096 },
     { "path": "Taierzhuang1938/Model/Type94Tankette/Model_Type94Tankette.glb#image/5", "format": "ktx2-bc7", "maxSize": 4096 },
