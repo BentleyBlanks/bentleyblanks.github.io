@@ -139,6 +139,11 @@ def SaddleJointIdentity(reference):
     return JointSteelIdentity(reference, "Saddle")
 
 
+def NeckJointIdentity(reference):
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return JointSteelIdentity(reference, "Neck") | {"contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2622,7 +2627,8 @@ def Main():
     priorWideBalance = record.get("barrelPatina", {}).get("wideReflectionBalance")
     multiPhotoFits = [(name, record.pop(name, None), identity) for name, identity in (
         ("reverseReflectionBalance", ReverseReflectionIdentity), ("sleeveReverseFinish", SleeveReverseIdentity),
-        ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity))]
+        ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity),
+        ("neckJointFinish", NeckJointIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

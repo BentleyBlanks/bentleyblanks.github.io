@@ -14,8 +14,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    CollarJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity,
-    WideReflectionIdentity,
+    CollarJointIdentity, NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveReverseIdentity,
+    SurfaceBalanceIdentity, WideReflectionIdentity,
 )
 
 
@@ -1524,18 +1524,50 @@ def ApplySaddleJointFinish(tile, reference):
         tile[1][active] = np.rint(127.5 * (vector + 1)).astype(np.uint8)
 
 
-def ApplyPackedRoughness(packed, original, region, adjustment):
+def ApplyPackedSurfaceChannel(packed, original, region, adjustment, channel, limits):
     # The existing joint-AO identity uses the legacy bake. Apply this UV0
-    # roughness adjustment after validating that bake and restoring authored R.
+    # material adjustment after validating that bake and restoring authored R.
     x, y, width, height = ATLAS["regions"][region]
     active = abs(adjustment) > 1e-8
-    green = original[..., 1].copy()
-    tile = green[y:y + height, x:x + width]
-    tile[active] = np.rint(255 * np.clip(tile[active] / 255 + adjustment[active], .17, .92)).astype(np.uint8)
+    surface = original[..., channel].copy()
+    tile = surface[y:y + height, x:x + width]
+    tile[active] = np.rint(255 * np.clip(tile[active] / 255 + adjustment[active], *limits)).astype(np.uint8)
     size = packed.shape[1], packed.shape[0]
     previous, current = [np.array(Image.fromarray(array).resize(size, Image.Resampling.BOX), dtype=np.int16)
-                         for array in (original[..., 1], green)]
-    packed[..., 1] = np.clip(packed[..., 1] + current - previous, 0, 255).astype(np.uint8)
+                         for array in (original[..., channel], surface)]
+    packed[..., channel] = np.clip(packed[..., channel] + current - previous, 0, 255).astype(np.uint8)
+
+
+def ApplyPackedRoughness(packed, original, region, adjustment):
+    ApplyPackedSurfaceChannel(packed, original, region, adjustment, 1, (.17, .92))
+
+
+def ApplyNeckJointFinish(maps, packed, reference):
+    finish = reference["neckJointFinish"]
+    if any(finish.get(key) != value for key, value in NeckJointIdentity(reference).items()):
+        raise ValueError("Joint neck response does not match the existing photo fit, steel and atlas")
+    detail = finish["detail"]
+    if detail["rearPhotoSha256"] != finish["sourceSha256"]:
+        raise ValueError("Neck wear does not match the registered rear photograph")
+
+    x, y, width, height = ATLAS["regions"]["Neck"]
+    u, v = PlanarTexelCenters(width, height)
+    fields = {}
+    for name, values in finish["fields"].items():
+        samples = np.asarray(values)
+        rows, columns = samples.shape
+        wrapped = np.column_stack((samples, samples[:, 0]))
+        fields[name] = map_coordinates(wrapped, (v * (rows - 1), (u % 1) * columns), order=1, mode="nearest")
+    center = detail["footprint"]["uCenter"]
+    angular = center + (u - center + .5) % 1 - .5
+    for name, values in SampleResponseFields(detail, ("gain", "tintRed", "tintBlue"), angular, v).items():
+        fields[name] += detail["strength"] * values
+    roughness = fields.pop("roughness")
+    metalness = fields.pop("metalness")
+    region = np.s_[y:y + height, x:x + width]
+    ApplyMaterialFields([image[region] for image in maps], fields, None)
+    ApplyPackedRoughness(packed, maps[2], "Neck", roughness)
+    ApplyPackedSurfaceChannel(packed, maps[2], "Neck", metalness, 2, (0., 1.))
 
 
 def ApplyCollarPackedRoughness(packed, original, balance):
@@ -1739,6 +1771,9 @@ def Bake(legacyOrm=None):
         _, _, xy, coverage = SaddleJointCoordinates(saddle, width, height)
         roughness = map_coordinates(np.asarray(saddle["fields"]["roughness"]), xy, order=1, mode="nearest")
         ApplyPackedRoughness(pixels, maps[2], "Saddle", roughness * coverage)
+    neck = reference.get("neckJointFinish")
+    if neck is not None:
+        ApplyNeckJointFinish(maps, pixels, reference)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
         Image.fromarray(image).save(output, method=6, quality=84)
@@ -1807,6 +1842,8 @@ def Bake(legacyOrm=None):
         details["jointCollarDetail"] = collar["detail"]
     if saddle is not None:
         details["jointSaddleDetail"] = saddle["detail"]
+    if neck is not None:
+        details["jointNeckDetail"] = neck["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
