@@ -9,9 +9,10 @@ from scipy.ndimage import gaussian_filter, map_coordinates
 from scipy.optimize import minimize
 
 from Script_MeasureType89LauncherSteel import (
-    RECORD, REGISTERED_LUMA, ContactAoSha256, FitSignedResponse, KnurlFlankResponseIdentity, KnurlGrooveFinishIdentity, Photo,
+    RECORD, REGISTERED_LUMA, ContactAoSha256, FitSignedResponse, GripLightBalanceIdentity, KnurlFlankResponseIdentity,
+    KnurlGrooveFinishIdentity, Photo,
     ReadRegisteredLuma, ReadRegisteredRgb, RegisteredTabFace, ResponseEquations, SaveReferenceRecord,
-    TabWarmIdentity, WriteResponseFields,
+    TabLightBalanceIdentity, TabWarmIdentity, WriteResponseFields,
 )
 
 CHANNELS = ("Gain", "Across", "Along", "Rough", "Metal")
@@ -209,6 +210,10 @@ def Main():
     grooveFinish = flank.get("grooveFinish")
     if grooveFinish and any(grooveFinish.get(key) != value for key, value in KnurlGrooveFinishIdentity(flank).items()):
         flank.pop("grooveFinish")
+    for part, identity in ((tab, TabLightBalanceIdentity(tab)), (flank, GripLightBalanceIdentity(flank))):
+        calibration = part.get("lightBalance")
+        if calibration and any(calibration.get(field) != value for field, value in identity.items()):
+            part.pop("lightBalance")
     SaveReferenceRecord(reference)
     print("Measured tab warm shading and the grip flank material response")
 

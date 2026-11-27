@@ -35,6 +35,10 @@ def TabWarmIdentity(tab):
                                       "contactAoSha256": ContactAoSha256()}
 
 
+def TabLightBalanceIdentity(tab):
+    return TabWarmIdentity(tab) | {"warmSha256": tab.get("warmCalibration", {}).get("sha256")}
+
+
 def KnurlFlankResponseIdentity(flank):
     source = flank["source"]
     return {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
@@ -47,6 +51,14 @@ def KnurlGrooveFinishIdentity(flank):
             "photoPattern": flank.get("patternRegistration", {}).get("photo"),
             "responseSha256": flank.get("surfaceCalibration", {}).get("sha256"),
             "contactAoSha256": ContactAoSha256()}
+
+
+def GripLightBalanceIdentity(flank):
+    finish = json.dumps(flank.get("grooveFinish"), sort_keys=True, separators=(",", ":"))
+    return KnurlFlankResponseIdentity(flank) | {
+        "sourceResponseSha256": flank.get("surfaceCalibration", {}).get("sha256"),
+        "sourceFinishSha256": sha256(finish.encode("utf-8")).hexdigest(),
+    }
 
 
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
@@ -2569,6 +2581,13 @@ def Main():
     grooveFinish = priorFlank.get("grooveFinish")
     if grooveFinish and all(grooveFinish.get(key) == value for key, value in KnurlGrooveFinishIdentity(flank).items()):
         flank["grooveFinish"] = grooveFinish
+    for previous, current, identity in (
+        (prior.get("Tab", {}), tab, TabLightBalanceIdentity(tab)),
+        (priorFlank, flank, GripLightBalanceIdentity(flank)),
+    ):
+        calibration = previous.get("lightBalance")
+        if calibration and all(calibration.get(field) == value for field, value in identity.items()):
+            current["lightBalance"] = calibration
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

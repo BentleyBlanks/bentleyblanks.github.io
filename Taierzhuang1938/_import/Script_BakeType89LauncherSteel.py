@@ -276,7 +276,8 @@ def ApplyTabResponses(tile, tab, visibility=None):
     span = (vv - lo) / np.maximum(hi - lo, 1e-6)
     for key, channels in (("grainCalibration", ("gain",)),
                           ("surfaceCalibration", ("gain", "tilt", "tiltV", "roughness")),
-                          ("warmCalibration", ("gain", "tilt", "tiltV", "roughness", "metalness"))):
+                          ("warmCalibration", ("gain", "tilt", "tiltV", "roughness", "metalness")),
+                          ("lightBalance", ("gain", "tilt", "tiltV", "roughness", "metalness"))):
         calibration = tab.get(key)
         if calibration is None:
             continue
@@ -286,12 +287,16 @@ def ApplyTabResponses(tile, tab, visibility=None):
                 or calibration["outlineUV"] != tab["outlineUV"] or calibration["footprint"] != tab["footprint"]):
             raise ValueError("Tab response data do not match the paired source photographs and projection")
         coverage = None
-        if key == "warmCalibration":
+        if key in ("warmCalibration", "lightBalance"):
             if (calibration.get("contactAoSha256") != Sha256(CONTACT_AO)
                     or calibration.get("surfaceSha256") != tab.get("surfaceCalibration", {}).get("sha256")
                     or calibration.get("grainSha256") != tab.get("grainCalibration", {}).get("sha256")):
-                raise ValueError("Tab warm response must be measured on the current tab finish and contact AO")
+                raise ValueError("Tab light response must be measured on the current tab finish and contact AO")
             coverage = np.clip((visibility - .54) / .32, 0, 1)
+        if key == "lightBalance":
+            if calibration.get("warmSha256") != tab.get("warmCalibration", {}).get("sha256"):
+                raise ValueError("The balanced tab response must use the measured warm finish as its base")
+            coverage = .92 * np.clip((visibility - .56) / .30, 0, 1)
         ApplyResponseFields(tile, calibration, channels, uu, span, coverage)
 
 
@@ -306,9 +311,17 @@ def ApplyKnurlFlankResponse(tile, flank, visibility):
     height, width = tile[0].shape[:2]
     u, v = PlanarTexelCenters(width, height)
     first, last = ATLAS["knurlSourceV"]
-    coverage = .92 * np.clip((visibility - .55) / .27, 0, 1)
-    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness", "metalness"),
-                        u, first + (last - first) * v, coverage)
+    axial = first + (last - first) * v
+    visibilityWeight = np.clip((visibility - .55) / .27, 0, 1)
+    channels = ("gain", "tilt", "tiltV", "roughness", "metalness")
+    ApplyResponseFields(tile, calibration, channels, u, axial, .92 * visibilityWeight)
+    if (balance := flank.get("lightBalance")) is not None:
+        finish = json.dumps(flank.get("grooveFinish"), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        balanceIdentity = expected | {"sourceResponseSha256": calibration["sha256"],
+                                      "sourceFinishSha256": sha256(finish).hexdigest()}
+        if any(balance.get(key) != value for key, value in balanceIdentity.items()):
+            raise ValueError("The balanced grip response must match the measured flank finish")
+        ApplyResponseFields(tile, balance, channels, u, axial, .84 * visibilityWeight)
 
 
 def ApplyKnurlResponse(tile, knurl, calibration):
@@ -1240,7 +1253,7 @@ def BuildAtlas(reference, contactAo=None):
     tab = reference["closeups"]["Tab"]
     flank = reference["knurl"]["flankWear"]
     visibility = None
-    if "warmCalibration" in tab or "surfaceCalibration" in flank:
+    if "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
         contactImage = Image.fromarray(contactAo).resize((size, size), Image.Resampling.BILINEAR)
@@ -1298,7 +1311,7 @@ def BuildAtlas(reference, contactAo=None):
                 if (calibration := neck.get("markCalibration")) is not None:
                     CheckNeckRegistration(neck, calibration)
                     ApplyResponseFields(tile, calibration, ("gain",), *PlanarTexelCenters(width, height))
-            elif name == "Tab" and any(key in tab for key in ("grainCalibration", "surfaceCalibration", "warmCalibration")):
+            elif name == "Tab" and any(key in tab for key in ("grainCalibration", "surfaceCalibration", "warmCalibration", "lightBalance")):
                 outlineVisibility = None if visibility is None else visibility[y:y + height, x:x + width]
                 ApplyTabResponses(tile, tab, outlineVisibility)
             elif name == "CollarRing":
@@ -1387,11 +1400,12 @@ def Bake():
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:
         details["neckMarks"] = calibration
     for key, name in (("grainCalibration", "tabGrain"), ("surfaceCalibration", "tabResponse"),
-                      ("warmCalibration", "tabWarmResponse")):
+                      ("warmCalibration", "tabWarmResponse"), ("lightBalance", "tabLightBalance")):
         if (calibration := reference["closeups"]["Tab"].get(key)) is not None:
             details[name] = calibration
-    if (calibration := reference["knurl"]["flankWear"].get("surfaceCalibration")) is not None:
-        details["knurlFlankResponse"] = calibration
+    for key, name in (("surfaceCalibration", "knurlFlankResponse"), ("lightBalance", "knurlLightBalance")):
+        if (calibration := reference["knurl"]["flankWear"].get(key)) is not None:
+            details[name] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
