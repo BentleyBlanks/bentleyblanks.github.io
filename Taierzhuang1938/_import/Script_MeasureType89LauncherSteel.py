@@ -120,8 +120,8 @@ def SleeveReverseIdentity(reference):
             "horizonSha256": sha256(file).hexdigest(), "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
 
 
-def CollarJointIdentity(reference):
-    front = reference["closeups"]["CollarRing"]
+def JointSteelIdentity(reference, region):
+    front = reference["closeups"][region]
     encoded = json.dumps(front, sort_keys=True, separators=(",", ":")).encode("utf-8")
     source = RECORD.parents[2] / "Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp"
     atlas = RECORD.parents[3] / "_blender/Data_Type89LauncherSteelAtlas.json"
@@ -129,6 +129,14 @@ def CollarJointIdentity(reference):
     return {"frontPhotoSha256": front["source"]["sha256"], "frontFitSha256": sha256(encoded).hexdigest(),
             "rawSteelSha256": sha256(source.read_bytes()).hexdigest(), "atlasSha256": sha256(layout).hexdigest(),
             "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
+
+
+def CollarJointIdentity(reference):
+    return JointSteelIdentity(reference, "CollarRing")
+
+
+def SaddleJointIdentity(reference):
+    return JointSteelIdentity(reference, "Saddle")
 
 
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
@@ -2614,7 +2622,7 @@ def Main():
     priorWideBalance = record.get("barrelPatina", {}).get("wideReflectionBalance")
     multiPhotoFits = [(name, record.pop(name, None), identity) for name, identity in (
         ("reverseReflectionBalance", ReverseReflectionIdentity), ("sleeveReverseFinish", SleeveReverseIdentity),
-        ("collarJointFinish", CollarJointIdentity))]
+        ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

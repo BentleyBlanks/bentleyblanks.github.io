@@ -14,7 +14,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    CollarJointIdentity, ReverseReflectionIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
+    CollarJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity,
+    WideReflectionIdentity,
 )
 
 
@@ -1480,14 +1481,50 @@ def ApplyCollarJointFinish(tile, reference):
     ApplyMaterialFields(tile, fields, coverage)
 
 
-def ApplyCollarPackedRoughness(packed, original, balance):
+def SaddleJointCoordinates(balance, width, height):
+    u, v = PlanarTexelCenters(width, height)
+    horizontal, vertical = balance["u"], balance["v"]
+    featherU, featherV = balance["feather"]
+    coverage = RangeFade(u, (horizontal[0], horizontal[-1]), featherU)
+    coverage *= RangeFade(v, (vertical[0], vertical[-1]), featherV)
+    front = balance["frontGuard"]
+    distance = np.full(u.shape, -np.inf)
+    for x, y, offset in front["edges"]:
+        np.maximum(distance, x * u + y * v + offset, out=distance)
+    coverage *= SmoothRamp(distance / front["feather"])
+    xy = [np.interp(u, horizontal, np.arange(len(horizontal))), np.interp(v, vertical, np.arange(len(vertical)))]
+    return u, v, xy, coverage
+
+
+def ApplySaddleJointFinish(tile, reference):
+    balance = reference["saddleJointFinish"]
+    if any(balance.get(key) != value for key, value in SaddleJointIdentity(reference).items()):
+        raise ValueError("Joint saddle response does not match the existing photo fit, steel and atlas")
+    detail = balance["detail"]
+    if detail["rearPhotoSha256"] != balance["sourceSha256"]:
+        raise ValueError("Saddle texture detail does not match the registered rear photograph")
+    height, width = tile[0].shape[:2]
+    u, v, xy, coverage = SaddleJointCoordinates(balance, width, height)
+    fields = {key: map_coordinates(np.asarray(values), xy, order=1, mode="nearest")
+              for key, values in balance["fields"].items() if key != "roughness"}
+    for key, values in SampleResponseFields(detail, ("gain", "tintRed", "tintBlue"), u, v).items():
+        fields[key] += detail["strength"] * values
+    ApplyMaterialFields(tile, fields, coverage)
+    if (smoothing := balance.get("rearNormalFilter")) is not None:
+        normal = tile[1].astype(float) / 127.5 - 1
+        filtered = gaussian_filter(normal, (*smoothing["sigma"], 0), mode="nearest")
+        opacity = smoothing["strength"] * coverage
+        opacity *= SmoothRamp((v - smoothing["axialStart"]) / smoothing["axialFeather"])
+        active = opacity > 1e-4
+        vector = normal[active] + opacity[active, None] * (filtered[active] - normal[active])
+        vector /= np.linalg.norm(vector, axis=-1, keepdims=True)
+        tile[1][active] = np.rint(127.5 * (vector + 1)).astype(np.uint8)
+
+
+def ApplyPackedRoughness(packed, original, region, adjustment):
     # The existing joint-AO identity uses the legacy bake. Apply this UV0
     # roughness adjustment after validating that bake and restoring authored R.
-    x, y, width, height = ATLAS["regions"]["CollarRing"]
-    u, v = PlanarTexelCenters(width, height)
-    _, xy, coverage = CollarJointCoordinates(balance, u, v)
-    roughness = map_coordinates(np.asarray(balance["fields"]["roughness"]), xy, order=1, mode="nearest")
-    adjustment = roughness * coverage
+    x, y, width, height = ATLAS["regions"][region]
     active = abs(adjustment) > 1e-8
     green = original[..., 1].copy()
     tile = green[y:y + height, x:x + width]
@@ -1496,6 +1533,14 @@ def ApplyCollarPackedRoughness(packed, original, balance):
     previous, current = [np.array(Image.fromarray(array).resize(size, Image.Resampling.BOX), dtype=np.int16)
                          for array in (original[..., 1], green)]
     packed[..., 1] = np.clip(packed[..., 1] + current - previous, 0, 255).astype(np.uint8)
+
+
+def ApplyCollarPackedRoughness(packed, original, balance):
+    _, _, width, height = ATLAS["regions"]["CollarRing"]
+    u, v = PlanarTexelCenters(width, height)
+    _, xy, coverage = CollarJointCoordinates(balance, u, v)
+    roughness = map_coordinates(np.asarray(balance["fields"]["roughness"]), xy, order=1, mode="nearest")
+    ApplyPackedRoughness(packed, original, "CollarRing", roughness * coverage)
 
 
 def BuildAtlas(reference, contactAo=None, seamAo=None):
@@ -1612,6 +1657,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 ApplyBarrelWideReflection(tile, reference, u, v, regionVisibility)
             if name == "Barrel" and reverseBarrelBalance:
                 ApplyBarrelReverseReflection(tile, reference, u, v, regionVisibility)
+        if name == "Saddle" and "saddleJointFinish" in reference:
+            ApplySaddleJointFinish(tile, reference)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1673,6 +1720,12 @@ def Bake(legacyOrm=None):
     pixels[..., 0] = joints
     if (collar := reference.get("collarJointFinish")) is not None:
         ApplyCollarPackedRoughness(pixels, maps[2], collar)
+    saddle = reference.get("saddleJointFinish")
+    if saddle is not None and "roughness" in saddle["fields"]:
+        _, _, width, height = ATLAS["regions"]["Saddle"]
+        _, _, xy, coverage = SaddleJointCoordinates(saddle, width, height)
+        roughness = map_coordinates(np.asarray(saddle["fields"]["roughness"]), xy, order=1, mode="nearest")
+        ApplyPackedRoughness(pixels, maps[2], "Saddle", roughness * coverage)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
         Image.fromarray(image).save(output, method=6, quality=84)
@@ -1736,6 +1789,8 @@ def Bake(legacyOrm=None):
         details["reverseSleeveDetail"] = sleeve["detail"]
     if (collar := reference.get("collarJointFinish")) is not None:
         details["jointCollarDetail"] = collar["detail"]
+    if saddle is not None:
+        details["jointSaddleDetail"] = saddle["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
