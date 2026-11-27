@@ -69,6 +69,13 @@ def GripLightBalanceIdentity(flank):
     }
 
 
+def GripAlbedoBalanceIdentity(flank):
+    return GripLightBalanceIdentity(flank) | {
+        "lightBalanceSha256": flank.get("lightBalance", {}).get("sha256"),
+        "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest(),
+    }
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2599,6 +2606,9 @@ def Main():
     balance = prior.get("Tab", {}).get("steelBalance")
     if balance and all(balance.get(field) == value for field, value in TabSteelBalanceIdentity(tab).items()):
         tab["steelBalance"] = balance
+    albedo = priorFlank.get("albedoBalance")
+    if albedo and all(albedo.get(field) == value for field, value in GripAlbedoBalanceIdentity(flank).items()):
+        flank["albedoBalance"] = albedo
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

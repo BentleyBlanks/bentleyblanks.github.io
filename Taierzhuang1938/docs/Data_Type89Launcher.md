@@ -81,6 +81,7 @@
 - 第 5 张照片的金属环用于校准同框布光，再测拨片的遮暗面与亮棱。用第 4 张近照的机位及检查台中性补光一起约束反光，平衡两张近照在强弱光下的亮度。滚花侧面以第 4 张近照重新测量侧光下的棱面反射和中间调。两处修正沿接触遮蔽衰减，并用未参与拟合的布光复测。 [多灯光采样数据](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 加深肩部箍圈、旋钮根部、拨片底座和环扣、支柱槽、尾套沟槽及驻钣接头的接触遮蔽。用装配网格增加半球采样，并减缓近处遮挡的距离衰减。检查台以默认灯和柔光复核接缝。按七个机位计算，开阔钢面的亮度变化平均约半个灰阶。 [接缝遮蔽记录](../_import/Source/Type89Launcher/Data_Type89LauncherSeamAo.json)
 - 按第 4、5 张馆藏近照测量拨片在不同灯向下的露钢反光与氧化色。粗糙度、金属度和切线法线经过不同布光复测，底色的色彩修正按线性亮度归一，并在深接缝处逐渐衰减。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 握部侧面按第 4 张近照校准近景与远景的钢色。用近远机位共同取到的 UV 区域测量亮度，重新分配底色细纹的对比度并校准中间调。修正在接缝及配准区域边缘衰减。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -110,4 +111,5 @@
 - 滚花侧面槽纹和氧化色的参数保存在 `flankWear.grooveFinish`。用原照及已配准的同机位布光对照帧复核两道斜纹、亮度和同亮度下的色差。正式烘焙会校验这些参数对应的近照、格纹配准、材质响应和接触遮蔽。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 用 `python Taierzhuang1938/_import/Script_MeasureType89LauncherLightBalance.py --photos <ReferencePhotos> --tab-evidence <MetalFinishV62/Evidence/V62TabGuardResponses> --neutral-evidence <MetalFinishV62/Evidence/V62LegacyFillResponses> --photo4-evidence <MetalFinishV62/Evidence/V62LegacyPhoto4Responses> --grip-evidence <MetalFinishV62/Evidence/V62GripResponses>` 重算当前拨片和滚花的多灯光修正。输入包括配准后的照片、基准帧和测得的材质响应。 [采样脚本](../_import/Script_MeasureType89LauncherLightBalance.py)
 - 拨片的两照材质修正保存在 `closeups.Tab.steelBalance` 对应的 16 位采样图中。`Script_BakeType89LauncherSteel.py` 在应用曲面、钢色和金属参数前核对照片投影、前一版材质和两份 AO 的哈希。用于拟合的逐帧响应和验证对照同工程归档。
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV64/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 握部的近远景底色参数及对照帧哈希保存在 `knurl.flankWear.albedoBalance`。烘焙在线性亮度中处理细纹对比度，并核对原照、上一版侧面材质和接触遮蔽。
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV65/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

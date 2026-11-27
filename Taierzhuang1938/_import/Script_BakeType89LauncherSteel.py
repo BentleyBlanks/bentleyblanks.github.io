@@ -319,7 +319,32 @@ def ApplyTabResponses(tile, tab, visibility=None, seamVisibility=None):
         ApplyResponseFields(tile, calibration, channels, uu, span, coverage)
 
 
-def ApplyKnurlFlankResponse(tile, flank, visibility):
+def ApplyKnurlAlbedoBalance(base, u, axial, seamVisibility, balance):
+    def Ramp(value):
+        t = np.clip(value, 0, 1)
+        return t * t * (3 - 2 * t)
+
+    left, right = balance["angularRange"]
+    fadeLeft, fadeRight = balance["angularFeather"]
+    start, end = balance["axialRange"]
+    fadeAxial = balance["axialFeather"]
+    coverage = (Ramp((u - left) / fadeLeft) * Ramp((right - u) / fadeRight)
+                * Ramp((axial - start) / fadeAxial) * Ramp((end - axial) / fadeAxial))
+    coverage *= Ramp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
+
+    linear = SrgbToLinear(base / 255.)
+    luma = linear @ LUMA
+    support = gaussian_filter(luma, balance["sigmaRowsColumns"], mode="nearest")
+    change = balance["contrastStrength"] * coverage * (support - luma)
+    # Rebalance the fine pattern around the same linear energy before applying
+    # the small exposure correction measured from the two view distances.
+    change -= coverage * change.sum() / max(coverage.sum(), 1)
+    adjusted = linear * (1 + change / np.maximum(luma, 1e-8))[..., None]
+    adjusted *= np.exp(balance["logGain"] * coverage)[..., None]
+    base[:] = np.rint(255 * np.clip(LinearToSrgb(adjusted), 0, 1)).astype(np.uint8)
+
+
+def ApplyKnurlFlankResponse(tile, flank, visibility, seamVisibility=None):
     calibration = flank["surfaceCalibration"]
     source = flank["source"]
     expected = {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
@@ -341,6 +366,14 @@ def ApplyKnurlFlankResponse(tile, flank, visibility):
         if any(balance.get(key) != value for key, value in balanceIdentity.items()):
             raise ValueError("The balanced grip response must match the measured flank finish")
         ApplyResponseFields(tile, balance, channels, u, axial, .84 * visibilityWeight)
+    if (albedo := flank.get("albedoBalance")) is not None:
+        if balance is None or seamVisibility is None:
+            raise ValueError("Knurl albedo balance requires the measured flank finish and seam AO")
+        albedoIdentity = balanceIdentity | {"lightBalanceSha256": balance["sha256"],
+                                            "seamAoSha256": Sha256(SEAM_AO)}
+        if any(albedo.get(key) != value for key, value in albedoIdentity.items()):
+            raise ValueError("Knurl albedo balance does not match the measured flank finish and seam AO")
+        ApplyKnurlAlbedoBalance(tile[0], u, axial, seamVisibility, albedo)
 
 
 def ApplyKnurlResponse(tile, knurl, calibration):
@@ -1271,13 +1304,15 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     size = ATLAS["size"]
     tab = reference["closeups"]["Tab"]
     flank = reference["knurl"]["flankWear"]
+    if "albedoBalance" in flank and "surfaceCalibration" not in flank:
+        raise ValueError("Knurl albedo balance requires the registered flank response")
     visibility = seamVisibility = None
     if "warmCalibration" in tab or "lightBalance" in tab or "steelBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
         contactImage = Image.fromarray(contactAo).resize((size, size), Image.Resampling.BILINEAR)
         visibility = np.asarray(contactImage, dtype=float) / 255
-    if "steelBalance" in tab:
+    if "steelBalance" in tab or "albedoBalance" in flank:
         if seamAo is None:
             seamAo, _ = ReadContactAo(SEAM_AO, SEAM_RECORD)
         seam = Image.fromarray(np.minimum(contactAo, seamAo)).resize((size, size), Image.Resampling.BILINEAR)
@@ -1303,7 +1338,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
             if (calibration := knurl.get("responseCalibration")) is not None:
                 ApplyKnurlResponse(tile, knurl, calibration)
             if "surfaceCalibration" in flank:
-                ApplyKnurlFlankResponse(tile, flank, visibility[y:y + height, x:x + width])
+                seam = None if seamVisibility is None else seamVisibility[y:y + height, x:x + width]
+                ApplyKnurlFlankResponse(tile, flank, visibility[y:y + height, x:x + width], seam)
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
         elif name == "Barrel":

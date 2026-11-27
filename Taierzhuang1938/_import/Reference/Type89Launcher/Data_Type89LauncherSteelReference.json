@@ -7137,6 +7137,80 @@
             "DefaultAlongMinus.png": "64dbe93f2a0a55dd1370eb299ac731f2e8e24e1b3e8d299e0c6f192ae5bd2238"
           }
         }
+      },
+      "albedoBalance": {
+        "photoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "sampleBounds": [162, 587, 328, 660],
+        "uBySampleRow": [
+          [0.65413, 0.0],
+          [0.66609, 6.0],
+          [0.67802, 12.0],
+          [0.69007, 18.0],
+          [0.70246, 24.0],
+          [0.71485, 30.0],
+          [0.72793, 36.0],
+          [0.74129, 42.0],
+          [0.75531, 48.0],
+          [0.77049, 54.0],
+          [0.7866, 60.0],
+          [0.80496, 66.0],
+          [0.82687, 72.0]
+        ],
+        "footprint": {
+          "uCenter": 0.7405,
+          "uHalfSpan": 0.08637,
+          "vRange": [0.39821, 0.75679]
+        },
+        "detailSha256": "c7bef6b1bfd55a299139b83dcc5452403fff7b0bf4ea4cd77a419509cbf997ba",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "sourceResponseSha256": "332afc4ec5936f9231dfc70d3810e8a013ed94a6f07edfa826f861be45ef350b",
+        "sourceFinishSha256": "c4fa3a7a466c014e54f3365550021d25d9503901b305d4ae18c15442bca97101",
+        "lightBalanceSha256": "5141cf64228025d67bbc791301954001ec561f6bee566066ff4bb6bef8cedfd1",
+        "seamAoSha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+        "angularRange": [0.54, 0.94],
+        "angularFeather": [0.105, 0.115],
+        "axialRange": [0.32, 0.83],
+        "axialFeather": 0.12,
+        "visibilityFloor": 0.64,
+        "visibilityFade": 0.263,
+        "sigmaRowsColumns": [0.79, 1.2],
+        "contrastStrength": 0.49,
+        "logGain": 0.045,
+        "fitFixtureSha256": "515c12817f0b3cf92ae553c4f7f8580afdeff8da062710429dba40442d04e27b",
+        "frameSha256": {
+          "V65BaselineClose": {
+            "Mixed.png": "6974b7c82f5a744765c14ebbdb8306b9b996b36f094edfdb8fde8423933dbb06",
+            "Independent.png": "546994bd80a5c0f2cc2aaa311163ce4546bc4d6bd47ed2f95e87884461fde67b",
+            "Default.png": "9c28f911e92adfc8da91bf999e14cd3d4b6eeb35ea5833de4647e63e66b87bcf",
+            "uvHi.png": "4a1b5d3ba21d4c6b1d75f8d1612b9b82cad5d45293a85abb76b7e9bcf8be3830",
+            "uvLo.png": "c6dc2f11611c7951f47417d6b226c1b605b64e40839cc36afbdccd4699d71e25",
+            "Data_Lighting.json": "d4db1aea7816449345ee9bb605140665dd6ce0e70afbbe83657b9c38bb7f4bd2"
+          },
+          "V65BaselineWide": {
+            "Mixed.png": "a6b0970240078938c15e5ff95ddead066cc52fe56f8b47c12fab22a24bab0bb9",
+            "Independent.png": "b7e3cf728061c6f8bdbc1bf3ba62cae510833202c570758111bbac5b9218875a",
+            "Default.png": "85edeefac350b5551d7aded12e00528806019c0331ff537c9db06b71d5130b46",
+            "uvHi.png": "2904ebe8f3c1702967a0557029a846d48106eb30019f967a82863e4d4b2b81ea",
+            "uvLo.png": "2c5cefa0750c4fcabdb55e2d0b0d77480c6fd62bac23b342deeadf99002e1c48",
+            "Data_Lighting.json": "d4db1aea7816449345ee9bb605140665dd6ce0e70afbbe83657b9c38bb7f4bd2"
+          },
+          "V65BalancedGainClose": {
+            "Mixed.png": "406d17340b165fa5e5227165bd08d8b80c4b8f1eef904520c47b4ee1cebe4f21",
+            "Independent.png": "d23d17501901f8f65d681d8a1ef468d1c231a162176a6b30e83deb45db2806ce",
+            "Default.png": "2b1b61514a91088ab61c74ac9d498f538e34022331334a65bd7f9f3b526b0e62",
+            "uvHi.png": "4a1b5d3ba21d4c6b1d75f8d1612b9b82cad5d45293a85abb76b7e9bcf8be3830",
+            "uvLo.png": "c6dc2f11611c7951f47417d6b226c1b605b64e40839cc36afbdccd4699d71e25",
+            "Data_Lighting.json": "630ad2fb5bbb1a7fbebe708e792cb440f055d67ae05b7cd5c1c2571edae49628"
+          },
+          "V65BalancedGainWide": {
+            "Mixed.png": "a4fb3271c3fa744388a428c20e72f2256815fc6e76377037de825c42f8cb51b7",
+            "Independent.png": "f2b10be9b498da246e47c1ff3ae321e003edadf68fc3a43663acddbdb3163b70",
+            "Default.png": "386776dedfa59587dfafb2b94cc81bfc6208b4b49f07e1db5d4bcd1fb56a7bcc",
+            "uvHi.png": "2904ebe8f3c1702967a0557029a846d48106eb30019f967a82863e4d4b2b81ea",
+            "uvLo.png": "2c5cefa0750c4fcabdb55e2d0b0d77480c6fd62bac23b342deeadf99002e1c48",
+            "Data_Lighting.json": "630ad2fb5bbb1a7fbebe708e792cb440f055d67ae05b7cd5c1c2571edae49628"
+          }
+        }
       }
     }
   },
