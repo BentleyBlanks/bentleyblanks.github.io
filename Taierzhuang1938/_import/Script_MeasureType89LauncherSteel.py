@@ -15,6 +15,31 @@ from scipy.ndimage import binary_erosion, distance_transform_edt, gaussian_filte
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
+CONTACT_AO = RECORD.parents[2] / "Source/Type89Launcher/Texture_Type89LauncherContactAo.png"
+
+
+def SaveReferenceRecord(record):
+    encoded = json.dumps(record, ensure_ascii=False, indent=2)
+    encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",
+                     lambda match: "[" + ", ".join(value.strip() for value in match[1].split(",")) + "]", encoded)
+    RECORD.write_text(encoded + "\n", encoding="utf-8")
+
+
+def ContactAoSha256():
+    return sha256(CONTACT_AO.read_bytes()).hexdigest() if CONTACT_AO.is_file() else None
+
+
+def TabWarmIdentity(tab):
+    return TabResponseIdentity(tab) | {"surfaceSha256": tab.get("surfaceCalibration", {}).get("sha256"),
+                                      "grainSha256": tab.get("grainCalibration", {}).get("sha256"),
+                                      "contactAoSha256": ContactAoSha256()}
+
+
+def KnurlFlankResponseIdentity(flank):
+    source = flank["source"]
+    return {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
+            "uBySampleRow": source["uBySampleRow"], "footprint": flank["footprint"],
+            "detailSha256": flank["detail"]["sha256"], "contactAoSha256": ContactAoSha256()}
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2493,6 +2518,7 @@ def Main():
     args = options.parse_args()
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
+    priorFlank = record.get("knurl", {}).get("flankWear", {})
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
@@ -2515,10 +2541,15 @@ def Main():
     record["knurl"] = KnurlFrequency(args.photos, record.get("knurl"), evidence=args.grip_response_evidence)
     record["knurl"]["flankWear"] = KnurlFlankWear(args.photos)
     record["shoulder"] = ShoulderFinish(args.photos)
-    encoded = json.dumps(record, ensure_ascii=False, indent=2)
-    encoded = re.sub(r"\[\s*(-?\d+(?:\.\d+)?(?:\s*,\s*-?\d+(?:\.\d+)?)+)\s*\]",
-                     lambda match: "[" + ", ".join(x.strip() for x in match[1].split(",")) + "]", encoded)
-    RECORD.write_text(encoded + "\n", encoding="utf-8")
+    tab, flank = record["closeups"]["Tab"], record["knurl"]["flankWear"]
+    for key, previous, current, identity in (
+        ("warmCalibration", prior.get("Tab", {}), tab, TabWarmIdentity(tab)),
+        ("surfaceCalibration", priorFlank, flank, KnurlFlankResponseIdentity(flank)),
+    ):
+        calibration = previous.get(key)
+        if calibration and all(calibration.get(field) == value for field, value in identity.items()):
+            current[key] = calibration
+    SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)
 

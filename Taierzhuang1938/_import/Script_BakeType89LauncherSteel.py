@@ -157,9 +157,12 @@ def SampleResponseFields(calibration, channels, uu, vv):
             for name, field in zip(channels, np.split(encoded, len(channels), axis=1))}
 
 
-def ApplyResponseFields(tile, calibration, channels, uu, vv):
+def ApplyResponseFields(tile, calibration, channels, uu, vv, coverage=None):
     base, normal, orm = tile
     fields = SampleResponseFields(calibration, channels, uu, vv)
+    if coverage is not None:
+        for field in fields.values():
+            field *= coverage
     gain = fields["gain"]
     base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
     tiltU, tiltV = fields.get("tilt"), fields.get("tiltV")
@@ -173,11 +176,12 @@ def ApplyResponseFields(tile, calibration, channels, uu, vv):
             vector[:, 1] += tiltV[active] * vector[:, 2]
         unit = vector / np.linalg.norm(vector, axis=1, keepdims=True)
         normal[active] = np.rint(127.5 * (unit + 1)).astype(np.uint8)
-    if "roughness" in fields:
-        roughness = fields["roughness"]
-        active = abs(roughness) > 1e-8
-        channel = orm[..., 1]
-        channel[active] = np.rint(255 * np.clip(channel[active] / 255 + roughness[active], .17, .92)).astype(np.uint8)
+    for name, index, limits in (("roughness", 1, (.17, .92)), ("metalness", 2, (0, 1))):
+        if name in fields:
+            adjustment = fields[name]
+            active = abs(adjustment) > 1e-8
+            channel = orm[..., index]
+            channel[active] = np.rint(255 * np.clip(channel[active] / 255 + adjustment[active], *limits)).astype(np.uint8)
 
 
 def ApplyBarrelResponse(tile, closeup, calibration, channels):
@@ -231,7 +235,7 @@ def ApplyNeckChroma(tile, neck, calibration):
     base[:] = np.rint(255 * np.clip(LinearToSrgb(linear), 0, 1)).astype(np.uint8)
 
 
-def ApplyTabResponses(tile, tab):
+def ApplyTabResponses(tile, tab, visibility=None):
     source = tab["source"]
     peer = source["pairedPhoto"]
     height, width = tile[0].shape[:2]
@@ -240,7 +244,8 @@ def ApplyTabResponses(tile, tab):
     lo, hi = (np.interp(uu, anchors, rail) for rail in (lower, upper))
     span = (vv - lo) / np.maximum(hi - lo, 1e-6)
     for key, channels in (("grainCalibration", ("gain",)),
-                          ("surfaceCalibration", ("gain", "tilt", "tiltV", "roughness"))):
+                          ("surfaceCalibration", ("gain", "tilt", "tiltV", "roughness")),
+                          ("warmCalibration", ("gain", "tilt", "tiltV", "roughness", "metalness"))):
         calibration = tab.get(key)
         if calibration is None:
             continue
@@ -249,7 +254,30 @@ def ApplyTabResponses(tile, tab):
                 or calibration["sampleStrips"] != source["sampleStrips"]
                 or calibration["outlineUV"] != tab["outlineUV"] or calibration["footprint"] != tab["footprint"]):
             raise ValueError("Tab response data do not match the paired source photographs and projection")
-        ApplyResponseFields(tile, calibration, channels, uu, span)
+        coverage = None
+        if key == "warmCalibration":
+            if (calibration.get("contactAoSha256") != Sha256(CONTACT_AO)
+                    or calibration.get("surfaceSha256") != tab.get("surfaceCalibration", {}).get("sha256")
+                    or calibration.get("grainSha256") != tab.get("grainCalibration", {}).get("sha256")):
+                raise ValueError("Tab warm response must be measured on the current tab finish and contact AO")
+            coverage = np.clip((visibility - .54) / .32, 0, 1)
+        ApplyResponseFields(tile, calibration, channels, uu, span, coverage)
+
+
+def ApplyKnurlFlankResponse(tile, flank, visibility):
+    calibration = flank["surfaceCalibration"]
+    source = flank["source"]
+    expected = {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
+                "uBySampleRow": source["uBySampleRow"], "footprint": flank["footprint"],
+                "detailSha256": flank["detail"]["sha256"], "contactAoSha256": Sha256(CONTACT_AO)}
+    if any(calibration.get(key) != value for key, value in expected.items()):
+        raise ValueError("Knurl flank response must be measured on the current side wear and contact AO")
+    height, width = tile[0].shape[:2]
+    u, v = PlanarTexelCenters(width, height)
+    first, last = ATLAS["knurlSourceV"]
+    coverage = .92 * np.clip((visibility - .55) / .27, 0, 1)
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness", "metalness"),
+                        u, first + (last - first) * v, coverage)
 
 
 def ApplyKnurlResponse(tile, knurl, calibration):
@@ -1121,7 +1149,7 @@ def BakeShoulder(quadrants, width, height, index, reference):
             for left, right in zip(main, flank)]
 
 
-def BuildAtlas(reference):
+def BuildAtlas(reference, contactAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
     side = min(source.size) // 2
@@ -1132,6 +1160,14 @@ def BuildAtlas(reference):
         quadrants.append(source.crop((x + margin, y + margin, x + side - margin, y + side - margin)))
 
     size = ATLAS["size"]
+    tab = reference["closeups"]["Tab"]
+    flank = reference["knurl"]["flankWear"]
+    visibility = None
+    if "warmCalibration" in tab or "surfaceCalibration" in flank:
+        if contactAo is None:
+            contactAo, _ = ReadContactAo()
+        contactImage = Image.fromarray(contactAo).resize((size, size), Image.Resampling.BILINEAR)
+        visibility = np.asarray(contactImage, dtype=float) / 255
     maps = [np.zeros((size, size, 3), dtype=np.uint8) for _ in range(3)]
     for index, (name, (x, y, width, height)) in enumerate(ATLAS["regions"].items()):
         if name == "Stripe":
@@ -1152,6 +1188,8 @@ def BuildAtlas(reference):
             knurl = reference["knurl"]
             if (calibration := knurl.get("responseCalibration")) is not None:
                 ApplyKnurlResponse(tile, knurl, calibration)
+            if "surfaceCalibration" in flank:
+                ApplyKnurlFlankResponse(tile, flank, visibility[y:y + height, x:x + width])
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
         elif name == "Barrel":
@@ -1183,10 +1221,9 @@ def BuildAtlas(reference):
                 if (calibration := neck.get("markCalibration")) is not None:
                     CheckNeckRegistration(neck, calibration)
                     ApplyResponseFields(tile, calibration, ("gain",), *PlanarTexelCenters(width, height))
-            elif name == "Tab":
-                tab = reference["closeups"]["Tab"]
-                if "grainCalibration" in tab or "surfaceCalibration" in tab:
-                    ApplyTabResponses(tile, tab)
+            elif name == "Tab" and any(key in tab for key in ("grainCalibration", "surfaceCalibration", "warmCalibration")):
+                outlineVisibility = None if visibility is None else visibility[y:y + height, x:x + width]
+                ApplyTabResponses(tile, tab, outlineVisibility)
             elif name == "CollarRing":
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
@@ -1225,7 +1262,7 @@ def ComposeContactAo(orm, visibility):
 def Bake():
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
     visibility, contact = ReadContactAo()
-    maps = BuildAtlas(reference)
+    maps = BuildAtlas(reference, visibility)
     size = ATLAS["size"]
     for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 82)):
         image = Image.fromarray(pixels)
@@ -1272,9 +1309,12 @@ def Bake():
         details["neckChroma"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:
         details["neckMarks"] = calibration
-    for key, name in (("grainCalibration", "tabGrain"), ("surfaceCalibration", "tabResponse")):
+    for key, name in (("grainCalibration", "tabGrain"), ("surfaceCalibration", "tabResponse"),
+                      ("warmCalibration", "tabWarmResponse")):
         if (calibration := reference["closeups"]["Tab"].get(key)) is not None:
             details[name] = calibration
+    if (calibration := reference["knurl"]["flankWear"].get("surfaceCalibration")) is not None:
+        details["knurlFlankResponse"] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

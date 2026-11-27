@@ -19,50 +19,50 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 565338,
-      "sha256": "84be284faabeb858a096acc139ff48cd80e1e03dfa31ee25a799f107698cf41a"
+      "bytes": 566234,
+      "sha256": "4289777f66415700deac327bb61a99d1d0f8112a57e939dd60afe66eae61c8c9"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 403324,
-      "sha256": "bb8a0ab1ee03d4e93aef1694242c8341bf5649a6e32da91188a073660b6d579f"
+      "bytes": 407132,
+      "sha256": "dda4bef4b62df3f84ef7b5b55429738c959a8ca4adc2651847ed9d2f5f88fb5a"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 56216,
-      "sha256": "3afd5fbebfc3e0dd3a1336223000bc326228aacc5e05856c261ef951776c1e27"
+      "bytes": 56428,
+      "sha256": "66e8d232d282fd7e74ec8251c1c99f072a753ec7158287961f9c58e4a6c52fa8"
     }
   ],
-  "totalBytes": 1024878,
+  "totalBytes": 1029794,
   "metrics": {
     "meanSrgb": [
-      0.4361,
-      0.4249,
-      0.3966
+      0.4364,
+      0.4252,
+      0.3968
     ],
-    "luma": 0.4192,
-    "lumaStd": 0.1079,
-    "sat": 0.0906,
-    "clipLow": 0.0002,
+    "luma": 0.4195,
+    "lumaStd": 0.108,
+    "sat": 0.0907,
+    "clipLow": 0.0001,
     "clipHigh": 0.0,
-    "lowFreq": 0.1037,
-    "seam": 0.123,
-    "interior": 0.0248,
-    "seamRatio": 4.964,
-    "border": 0.743,
-    "swing": 0.0857,
+    "lowFreq": 0.1034,
+    "seam": 0.1228,
+    "interior": 0.0247,
+    "seamRatio": 4.972,
+    "border": 0.742,
+    "swing": 0.0867,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "2f2dd791c650bac259c3e9f168de59394dbdec9763a5e162199b34e5ec544793",
+    "sha256": "c523c3a7394b2bd85e1abec2440dca7d1e02143d8db2146b9d8316b91201af17",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -162,6 +162,14 @@
     "tabResponse": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherTabResponse.png",
       "sha256": "79543653e43db10871cacafd5954e7566b2e30ba8dd8711dd8580b8f18cf62ce"
+    },
+    "tabWarmResponse": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherTabWarmResponse.png",
+      "sha256": "0abb05916b759c32bf9930fcc5d5554c6b090d85e5adba3bfe9ef8f1b74a86a3"
+    },
+    "knurlFlankResponse": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherKnurlFlankResponse.png",
+      "sha256": "332afc4ec5936f9231dfc70d3810e8a013ed94a6f07edfa826f861be45ef350b"
     }
   },
   "contactAo": {

@@ -6193,6 +6193,118 @@
             "uvLo.png": "351e89de799ee472e81e216eb116698957759d6c7c5da5c2d47af3685fb1099b"
           }
         }
+      },
+      "warmCalibration": {
+        "photoSha256": "29ae6fccd4af455d5c29e2cee07442eab57fcefd58965f3516f1608d9e871d24",
+        "pairedPhotoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "projection": [
+          [0.27025285843021063, -0.006591860418187142, 1028.448752789885],
+          [-0.011732769701317706, 0.28119255144826527, 475.2094623617538],
+          [
+            -1.4645408783465048e-05,
+            -1.0538823106249734e-05,
+            1.0
+          ]
+        ],
+        "sampleStrips": [
+          [168, 652, 745],
+          [244, 581, 734],
+          [376, 488, 654],
+          [550, 445, 577],
+          [716, 435, 564],
+          [916, 439, 572],
+          [1122, 467, 583],
+          [1269, 449, 532],
+          [1370, 384, 459]
+        ],
+        "outlineUV": [
+          [0.055, 0.5915, 0.9808],
+          [0.12, 0.4348, 0.9911],
+          [0.25, 0.2449, 0.5492],
+          [0.382, 0.1146, 0.4066],
+          [0.51, 0.0328, 0.3716],
+          [0.66, 0.0139, 0.3719],
+          [0.8, 0.007, 0.4302],
+          [0.902, 0.0019, 0.4542],
+          [0.946, 0.0218, 0.3694]
+        ],
+        "footprint": {
+          "uCenter": 0.5005,
+          "uHalfSpan": 0.44549999999999995,
+          "vRange": [0, 1]
+        },
+        "surfaceSha256": "79543653e43db10871cacafd5954e7566b2e30ba8dd8711dd8580b8f18cf62ce",
+        "grainSha256": "53d6f41b2c6bda8d23fc6973c0e0bfd9541f3bc596c06161730b92e527a8a646",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "file": "Texture_Type89LauncherTabWarmResponse.png",
+        "sha256": "0abb05916b759c32bf9930fcc5d5554c6b090d85e5adba3bfe9ef8f1b74a86a3",
+        "scale": 63500,
+        "frameSha256": {
+          "V59TabStudyDefault": {
+            "beauty.png": "694d823e49ecd250f9cdbf74135697c70fb173e476f717a6febd40206b56732d",
+            "uvHi.png": "29e19cdb7f69e276ff8c3d3c0818c88657d331780b30289431abbd979af54c12",
+            "uvLo.png": "351e89de799ee472e81e216eb116698957759d6c7c5da5c2d47af3685fb1099b",
+            "ProbeZero.png": "694d823e49ecd250f9cdbf74135697c70fb173e476f717a6febd40206b56732d",
+            "GainPlus.png": "1c2a90dc3719a39d0a062f69f1414d0fd426504c36d00ccf712a49052a92345d",
+            "GainMinus.png": "097df995f34beee20df8a1abf45c963ff82c5ac5b7993eafc722f038e0183b1c",
+            "RoughPlus.png": "928064d1d52b651a4731e11319d037557cde58c51841947d91dcb7b4e0b27a33",
+            "RoughMinus.png": "649c2e8384cc92b076c0c912e6c1f9ab0d05d8ed4c46f284531bc83bed8597e4",
+            "MetalPlus.png": "9e2332adc7920976e263a564efe3c07248b136727022982082eb668cba630e91",
+            "MetalMinus.png": "ebcbc4e370b46ced4745951ef479393990477ce14a521d472e37fa6fa5939fcc",
+            "AcrossPlus.png": "77e72bd1fa3c1cb686ddbfa4673eadc1d85e476c3c56a85d7e0c02957286cbe1",
+            "AcrossMinus.png": "cafcfb631f3cfcedf587d1ebe343362b6b84b0a42c59856e2e4e020c4ccabf53",
+            "AlongPlus.png": "68b300110f32ad3e0e7a9338ea2cfd65a46c48702140ac212725ccf5eb3c5990",
+            "AlongMinus.png": "7019e401422d13519bec88bf816f2945afce37d4dc378fb969a0c6013751de12"
+          },
+          "V59TabStudyFill": {
+            "beauty.png": "610f230afc9663d989460baef096af5f2a439a1d7cd0ffaadb0b979f632ccce1",
+            "uvHi.png": "29e19cdb7f69e276ff8c3d3c0818c88657d331780b30289431abbd979af54c12",
+            "uvLo.png": "351e89de799ee472e81e216eb116698957759d6c7c5da5c2d47af3685fb1099b",
+            "ProbeZero.png": "610f230afc9663d989460baef096af5f2a439a1d7cd0ffaadb0b979f632ccce1",
+            "GainPlus.png": "fb5e0dfe718b4265b65ec44dd7bc3305296e026e8fdfb40b275c408c2459bbb9",
+            "GainMinus.png": "ace5a39a3687b18a41694fd1798a5f0bb71be6fce709f6fda0fb3cebf2431f53",
+            "RoughPlus.png": "5cb605b9fcb041131f23b4fc0ad9748fd9f0a84263895f59ab35e4853fa0be75",
+            "RoughMinus.png": "248696ba1725a691473942e62c0e5034fb85a9714018a5abf8c76a7e49de7e78",
+            "MetalPlus.png": "592eac21caa39ee53cc9ff643405f6cda4ed24540dc9f6c996e8b15e779e892d",
+            "MetalMinus.png": "bc2795fe0bd5e6886fc6b406440615aa66bce05a119184b6a70635d146d39f81",
+            "AcrossPlus.png": "23a469a70f9be3060339583a269dff44cf36d5ed184c6528de7ef8c6da612819",
+            "AcrossMinus.png": "1a327a12b8b461f465863a849d323c5ed0ee688437e430afb38c71906c76be64",
+            "AlongPlus.png": "35b32fe1d0e5afca565b7a2192057ae046dd56cce86c3fc88a4387a499956ccb",
+            "AlongMinus.png": "a14804a74f2a8212af5f629424f1e31e4fafed3e66e4839559e3cb3be2f7dc26"
+          },
+          "V59TabStudyPhoto4": {
+            "beauty.png": "deae631b5448048e659ef4ee44bee7069c7f6605e6b92d3385cf5221881e2700",
+            "uvHi.png": "2831eb9f78968554170189d2535f455da69fa348b29359dff7066131e7d0a198",
+            "uvLo.png": "c36bcb4860bbf3c42d63a6d05193035346080ce4cbe630651756a61750b72917",
+            "ProbeZero.png": "deae631b5448048e659ef4ee44bee7069c7f6605e6b92d3385cf5221881e2700",
+            "GainPlus.png": "0929453e36d14d1cb276ca7965cdc182cd8c8de02691b19fc11fdccafb95d170",
+            "GainMinus.png": "55fb94938400e7baecd3c50bd123d4081ee305141b778a84fb2d0a5ab11696dc",
+            "RoughPlus.png": "6b772f1c5140856b8d694c5a7ace1e7125cae1d6f90e01c538c877755d1a5b9e",
+            "RoughMinus.png": "e1de705a596b5f9255eb48ba01b8e3c466dee42fd785aebeb891104284979b9d",
+            "MetalPlus.png": "5a9fd15079d0dfe712c69482bb28dc03b6da0cf4db2d5f7bccdba1bf3a2d1475",
+            "MetalMinus.png": "e25a15f24fb9cc15745abe0e8ae514185de57435ebc6cb7e749b11241e98aa31",
+            "AcrossPlus.png": "74f9100589eec8030f5eb8e0ea4156fe43ec2e7ac8019a28d83cbfb960f0f7c7",
+            "AcrossMinus.png": "ab7dc918f90ce342318f5c5c9a825e5dec71a9107a5a5fbb986e4f35ec9f405f",
+            "AlongPlus.png": "7bf9b25302fc14f1a24ae9e7da705d8c963d1186d3dabf810688ff60becff7ac",
+            "AlongMinus.png": "9b108231076e9c26830ce901285a610a2e22aaf364ae29f826c2846be86b3018"
+          },
+          "V59TabStudyMuseum": {
+            "beauty.png": "cbe917184921be78b68a2b5e02ec97b037b389ef3895ac942df04034d7857fcb",
+            "uvHi.png": "29e19cdb7f69e276ff8c3d3c0818c88657d331780b30289431abbd979af54c12",
+            "uvLo.png": "351e89de799ee472e81e216eb116698957759d6c7c5da5c2d47af3685fb1099b",
+            "ProbeZero.png": "cbe917184921be78b68a2b5e02ec97b037b389ef3895ac942df04034d7857fcb",
+            "GainPlus.png": "34210debdd30873c0b6aaa6b9e7869011dc21634a48b8374b0c56748d0aafd2e",
+            "GainMinus.png": "493266089786f136eb4f29efd59dcd01a3bb931319982c85faf4e7b6320d5542",
+            "RoughPlus.png": "af4daeb80e06e452a99d6b2b0c397dbe94af43732411336064ced59f4b76fe3b",
+            "RoughMinus.png": "122c1ef3c0d3f658237ba8f32614f91f7f3e289c0bc4771f00b150a928c5d1a9",
+            "MetalPlus.png": "e9b8cc62be7a3690ef255e332a520b306fa708cbb88b6cbb62db4c4865d3be0e",
+            "MetalMinus.png": "465de7bd26edafe25317f4a2a9448d934bcdee9a3a82119a138e8c5091a00e8b",
+            "AcrossPlus.png": "d00f6ea276f45ecd0e6cb185209d8d308b6555af0a417996cb0aca61b4b68214",
+            "AcrossMinus.png": "b5d0da904374b8b3ffc5c5a311e83ad4de428893a49f121caa9b5df9bb7975ad",
+            "AlongPlus.png": "8b0e1be55a29d1dcc819000bc9e77cc3de273144f1bdc7d49aa5703617eb5fe7",
+            "AlongMinus.png": "8652f609add7ed2b00fdd952ae72ce0f136da030a3d365c218496b18728fecb0"
+          }
+        }
       }
     },
     "TabBack": {
@@ -6452,7 +6564,86 @@
       "uvFrequencies": [
         [0.095, -0.06448],
         [0.10167, 0.06746]
-      ]
+      ],
+      "surfaceCalibration": {
+        "photoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+        "sampleBounds": [162, 587, 328, 660],
+        "uBySampleRow": [
+          [0.65413, 0.0],
+          [0.66609, 6.0],
+          [0.67802, 12.0],
+          [0.69007, 18.0],
+          [0.70246, 24.0],
+          [0.71485, 30.0],
+          [0.72793, 36.0],
+          [0.74129, 42.0],
+          [0.75531, 48.0],
+          [0.77049, 54.0],
+          [0.7866, 60.0],
+          [0.80496, 66.0],
+          [0.82687, 72.0]
+        ],
+        "footprint": {
+          "uCenter": 0.7405,
+          "uHalfSpan": 0.08637,
+          "vRange": [0.39821, 0.75679]
+        },
+        "detailSha256": "c7bef6b1bfd55a299139b83dcc5452403fff7b0bf4ea4cd77a419509cbf997ba",
+        "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+        "file": "Texture_Type89LauncherKnurlFlankResponse.png",
+        "sha256": "332afc4ec5936f9231dfc70d3810e8a013ed94a6f07edfa826f861be45ef350b",
+        "scale": 63500,
+        "frameSha256": {
+          "V59Photo4GripStudy": {
+            "uvHi.png": "4a1b5d3ba21d4c6b1d75f8d1612b9b82cad5d45293a85abb76b7e9bcf8be3830",
+            "uvLo.png": "c6dc2f11611c7951f47417d6b226c1b605b64e40839cc36afbdccd4699d71e25",
+            "Mixed.png": "4eaffefcb0e12ace7cdaf841ac7e673bcf00dc3cdb0154ad4b9791e6fc2c5e69",
+            "Second.png": "c8b376cde66221cde6a6618e7ca5df562fc9461e3998a9e9131f3624c94cf5c7",
+            "Anchored.png": "05beac5b78e4ae00b41cef1dc7a1322c9b618fc9b0bb5bb336148ea55613459f",
+            "Default.png": "e99ecbbf8663325f4b384382284b19c210b564d6a2354cf8f7a175e8fa9763d9",
+            "MixedRoughPlus.png": "124100664f1193227e7c79f46f04ea965cb05c3387ef429b1c759b75745b3622",
+            "SecondRoughPlus.png": "1f92ac2da38e624f6f8e4802562f231af29454036e13767c6b0e63cedc6f5b44",
+            "AnchoredRoughPlus.png": "b531416394f7d43c79e357f75ca2cc726302300d4cbc8d05a7914a20f740a505",
+            "DefaultRoughPlus.png": "a13268bc5992bdb7308f0afb7336c8da98b056c0d2b54e6394d4825f6c1b0a17",
+            "MixedRoughMinus.png": "bb4e0094ccab4b27516f9b32869c291405ce43ed6c06fb5b964aaee15d6cdf4d",
+            "SecondRoughMinus.png": "8f728e27245520b0928221509cf6f6c16c75886702b14c3248fa3b9ad4904655",
+            "AnchoredRoughMinus.png": "ae8b32e56d2287774d2b987068dfede08f915c7738c3d95e2a28025c1fadfdae",
+            "DefaultRoughMinus.png": "9d1ab4ce27962194f2495ac85e61e57bd66dcecf8abfc31aaabda588d1d8a1c6",
+            "MixedBasePlus.png": "d9ec6e07e4ecac4edf8c1e67a4027ce3c304aadb0353b9ada3b9d4b8fafb2fe6",
+            "SecondBasePlus.png": "2811c470037c8e715b0348fb5a0e6c5128d5e6df43315185e3c88a261228e93e",
+            "AnchoredBasePlus.png": "6aa4dadc911af538df13ec904312ffc0bc8de39816726e35987de08c1ab91c9b",
+            "DefaultBasePlus.png": "759c35d862fb202c4cd7cef1a9dc674941d600dedc679c0a8671d31c62a13c13",
+            "MixedBaseMinus.png": "af875fd097c372c1e70f8ae76299ea8286a1ce60b208d57fbd7a20f03da3df99",
+            "SecondBaseMinus.png": "ea476c238c687514bc8c15259a9657be67e0b987df55eaf7e7b448ed0864d16f",
+            "AnchoredBaseMinus.png": "a70271d87f72e166dc6bf390966a8739e2c3160554ef565fda0338fc17816eba",
+            "DefaultBaseMinus.png": "cc939bead12e9e4579f0651a870bc796f02698db9b2aaca7b55bf2f9679929b3",
+            "MixedMetalPlus.png": "9ea9ff2bab85ec6907d82ff32cc4828dc9685c4f0df1f5e8da3350dc23f67b06",
+            "SecondMetalPlus.png": "2f257cd0a18561f5839818cbfa732e291a36ee274c3b0b62e760b5c8db4d39b6",
+            "AnchoredMetalPlus.png": "b0d4ce68c97a533e8fda28125f8fac9812b9b0e49a4c5536d95ba2a45ca43ff8",
+            "DefaultMetalPlus.png": "c6820f18c74a9f4e9531b242e140deee3770d4c42e1ddfdab7326c915c724d96",
+            "MixedMetalMinus.png": "a1231e301492edcccaf3890621f81d1358bd45a14a3754976739df304dca7528",
+            "SecondMetalMinus.png": "a587512c788ba3b334a234ef584009f5b6c7d1c90c51639d5970f5319de854d9",
+            "AnchoredMetalMinus.png": "221d59ab65df8de4cfccecc610bbed02cea4bd0e9f901749b464383f84de747d",
+            "DefaultMetalMinus.png": "6ede47686e7755fb1dda3226c8d042ce140b47f215bb386e41fa89cffd7ed7df",
+            "MixedAcrossPlus.png": "50e5eb0f570a2567e589f0434c548b69db882aded7414cab99f2cf3e7b5d408c",
+            "SecondAcrossPlus.png": "3c933bb3e77263faa0ca0a18914f4037fff93731a5fbe57d1287fed5a83fa467",
+            "AnchoredAcrossPlus.png": "49c818c220db84648c64ea88035777ebecb2b357e11a64ff061dec6e35e4d338",
+            "DefaultAcrossPlus.png": "d7f0a688555d5e42778bbdeb75af1ac0231b40de1e4953bb57d3ff3744734a92",
+            "MixedAcrossMinus.png": "6548e8a0512ccfb911e1e34f279d7c30d46e6d598d232f63b71d3ca5cccdb8f0",
+            "SecondAcrossMinus.png": "725ebd96068ebb128fecaeb553d6d055071f9b2e1a5154e09bd87900b95e41bf",
+            "AnchoredAcrossMinus.png": "c4356e67f7f0f9fdc701a2a34a7b9aca6053b24ec2b1a67ed166483d78b1f392",
+            "DefaultAcrossMinus.png": "178e82eb595fa3b60c424a7a88706468d3e4dbd0bd993e707d802225af2d5f98",
+            "MixedAlongPlus.png": "1ab4461889b7cbb89eabb3b54d933405f75a4671ab39629ee5c8c0422960bc30",
+            "SecondAlongPlus.png": "95a6c1f8e4daf0e5e0d1b2a702740bb520afe08454079bdf89a4ec8f1db81b14",
+            "AnchoredAlongPlus.png": "089fd0407d4fc2bcf14dc765de5d1b3f5105b92903edd5b21f1dcc1a5e3c9492",
+            "DefaultAlongPlus.png": "1bafe16aa92a11b508e56b3f353a223a4ad1f161732c384b6a65660706f9b24c",
+            "MixedAlongMinus.png": "81ab19caa13ba772674cd902a79710f0b966da6689b091541c36fc42211fefa9",
+            "SecondAlongMinus.png": "449b0a7b01b09a765c24f3d812f8c3363faf90afeb04ca3de1a8b6510e27c63f",
+            "AnchoredAlongMinus.png": "33df6a7c591d19e02157b014cd34517da66c50b329495062e4111848eb9b66be",
+            "DefaultAlongMinus.png": "2c7d600f05a8b7984bbb7f831510a5eebdda785ec1bfa390079b4e3eaf871734"
+          }
+        }
+      }
     }
   },
   "ringFinish": {
