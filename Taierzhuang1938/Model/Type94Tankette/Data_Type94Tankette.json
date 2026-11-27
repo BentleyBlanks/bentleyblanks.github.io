@@ -40,9 +40,9 @@
       "kind": "Secondary study, printed pp50-51 inspected; original JACAR scans unchecked; distinguishes surrounding fighting from city assault"
     }
   ],
-  "version": "20261126PhotoV111-c5fc7528",
-  "sha256": "c5fc7528797a78df564ab05a55c032c6f569ef1ae938cc752c837ff88ea6935f",
-  "bytes": 36019708,
+  "version": "20261127MaterialAtlasV112-e5ed0450",
+  "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+  "bytes": 36500340,
   "acceptance": {
     "status": "Photographically calibrated rear folds and verified game asset",
     "strictReferenceMatched": true,
@@ -76,10 +76,10 @@
   "poseNodes": 296,
   "highSourceTriangles": 633816,
   "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV111\\Scene_Type94TanketteHighV111.blend",
-  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV111\\Scene_Type94TanketteGameV111.blend",
+  "gameSourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Scene_Type94TanketteGameMaterialAtlasV112.blend",
   "sourceHighManifest": "Data_ReleaseV111.json",
-  "sourceGameManifest": "Data_ReleaseV111.json",
-  "deliveryManifest": "Data_ReleaseV111.json",
+  "sourceGameManifest": "Data_ReleaseV112.json",
+  "deliveryManifest": "Data_ReleaseV112.json",
   "mechanisms": {
     "driver": "Script_Type94Mechanism.mjs",
     "linksPerSide": 80,
@@ -1443,128 +1443,68 @@
   "pbr": {
     "embeddedImages": [
       {
-        "name": "Texture_Type94GamePaintNormal",
+        "name": "Texture_Type94GamePaintNormalV111",
         "size": [
           4096,
           4096
         ],
-        "bytes": 3756680,
+        "bytes": 4649442,
         "mimeType": "image/webp",
-        "pixelSha256": "b55533b1598d8d5a29cac275fc11e16ae98463ff6f69e9c8641e9819d94c2cb2"
+        "pixelSha256": "edd56d39a18fb07be60e2c0131188d551cc2c941e8aa5fb1b1aa40a9be93d15b"
       },
       {
-        "name": "Texture_Type94GamePaintOrm",
+        "name": "Texture_Type94GamePaintOrmV111",
         "size": [
           4096,
           4096
         ],
-        "bytes": 11648486,
+        "bytes": 10222700,
         "mimeType": "image/webp",
-        "pixelSha256": "cce638e97dd34c8b7c612e09b8d73c17f5d0d5dd2ea187b38ce4004bc211ea3d"
+        "pixelSha256": "83a220d330586e02f2635216c3415b972380682a1473bbf7d59fd07ef16fa066"
       },
       {
-        "name": "Texture_Type94GamePaintBase",
+        "name": "Texture_Type94GamePaintBaseV111",
         "size": [
           4096,
           4096
         ],
-        "bytes": 7006560,
+        "bytes": 6234056,
         "mimeType": "image/webp",
-        "pixelSha256": "fbec247263e5b58bcdb8a0f0ca300eb0a3ca0422a5e9751c1f7e55f2907c7031"
+        "pixelSha256": "13624afe6c199d5b018030e613dd103b36dd7107e3164e815070c500ffcf9a87"
       },
       {
-        "name": "Texture_Type94GameSteelNormal",
+        "name": "Texture_Type94DetailsBaseV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 1212070,
+        "bytes": 1598298,
         "mimeType": "image/webp",
-        "pixelSha256": "28ec36f1377d5733882e63b702bf1c8a333a7272da763ef89b237ea40e709431"
+        "pixelSha256": "27b48a10bad10200efddf08a3aab7f7abc3be8241bbfec73a955af5fec235061"
       },
       {
-        "name": "Texture_Type94GameSteelOrm",
+        "name": "Texture_Type94DetailsNormalV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 1526636,
+        "bytes": 4921696,
         "mimeType": "image/webp",
-        "pixelSha256": "9f8ff5d39fa32948fd70fe40f5978d8e4ce7c08afd990f1d7c55814027025850"
+        "pixelSha256": "36e62fd25f8f517df75788eaa2ea2809da38570499d8f84de2740aa14b3c7f0b"
       },
       {
-        "name": "Texture_Type94GameSteelBase",
+        "name": "Texture_Type94DetailsOrmV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 1038576,
+        "bytes": 3491972,
         "mimeType": "image/webp",
-        "pixelSha256": "b058b15191aaad4bc72e57f8d8f7987175a6cf68a51ed5104906560b7d0dc135"
-      },
-      {
-        "name": "Texture_Type94GameRubberNormal",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 135312,
-        "mimeType": "image/webp",
-        "pixelSha256": "0251df50b5af9920796049ffeac8e1803f1062b9020388d1716ecea6c746da1b"
-      },
-      {
-        "name": "Texture_Type94GameRubberOrm",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 401000,
-        "mimeType": "image/webp",
-        "pixelSha256": "4c007d24a46b43ebed3edf822e4564319678588e138e61cf095780d783a5a214"
-      },
-      {
-        "name": "Texture_Type94GameRubberBase",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 229690,
-        "mimeType": "image/webp",
-        "pixelSha256": "477e6ed2c6fcfcd69584227d720589abc63f100e98abd2e4a71c1d3fa3856941"
-      },
-      {
-        "name": "Texture_Type94GameTrackNormal",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 3107224,
-        "mimeType": "image/webp",
-        "pixelSha256": "6a5d718b7a4f4f5b5734276721e196d9693697d1d2feda51d9878751eb2f383a"
-      },
-      {
-        "name": "Texture_Type94GameTrackOrm",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 3154764,
-        "mimeType": "image/webp",
-        "pixelSha256": "b1a4e17cde40734e6a1ef958eacdbb4a63a7b4cef781a60169b2a6036853f2e1"
-      },
-      {
-        "name": "Texture_Type94GameTrackBase",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 1761890,
-        "mimeType": "image/webp",
-        "pixelSha256": "864574d9d5accb0a124f2263499e8d9cdf12b4c39f6ec575ad8e0655b248c4a2"
+        "pixelSha256": "d95cfd68b51fb3450ca79580e98f840a806ecdc34f2eed73f5dfc5122becab97"
       }
     ],
     "channels": "BaseColor sRGB; tangent normal linear; ORM R=AO G=Roughness B=Metallic linear",
-    "method": "Fresh target UVs, high-source tangent normals and PBR channel projection, local geometry AO for reconstructed pieces, lossless embedded texture packaging.",
+    "method": "V111 baked PBR; V112 same-resolution uncoated atlas and V111 clearcoat.",
     "images": [
       {
         "name": "Texture_Type94GamePaintNormalV111",
@@ -1597,94 +1537,34 @@
         "pixelSha256": "13624afe6c199d5b018030e613dd103b36dd7107e3164e815070c500ffcf9a87"
       },
       {
-        "name": "Texture_Type94GameSteelNormalV111",
+        "name": "Texture_Type94DetailsBaseV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 1272388,
+        "bytes": 1598298,
         "mimeType": "image/webp",
-        "pixelSha256": "a00830a96c0d57feca4310e9f96751ffb386911321bbcd37ead117347eb21283"
+        "pixelSha256": "27b48a10bad10200efddf08a3aab7f7abc3be8241bbfec73a955af5fec235061"
       },
       {
-        "name": "Texture_Type94GameSteelOrmV111",
+        "name": "Texture_Type94DetailsNormalV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 1259360,
+        "bytes": 4921696,
         "mimeType": "image/webp",
-        "pixelSha256": "e2c6d91af2eeef8bf7b3e7979eab18ea46456360bd34687b0ce7e9a1e6bdc6a7"
+        "pixelSha256": "36e62fd25f8f517df75788eaa2ea2809da38570499d8f84de2740aa14b3c7f0b"
       },
       {
-        "name": "Texture_Type94GameSteelBaseV111",
+        "name": "Texture_Type94DetailsOrmV112",
         "size": [
-          2048,
-          2048
+          4096,
+          3072
         ],
-        "bytes": 896494,
+        "bytes": 3491972,
         "mimeType": "image/webp",
-        "pixelSha256": "91a00b49f03441afbc6eb7dd95f78721ca8df28deb0795fd287760357799fc18"
-      },
-      {
-        "name": "Texture_Type94GameRubberNormalV111",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 149692,
-        "mimeType": "image/webp",
-        "pixelSha256": "1df45bf9ae897e8009dcba0c3c18796711ba83336737e5beb7fce6f2ca25077e"
-      },
-      {
-        "name": "Texture_Type94GameRubberOrmV111",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 322114,
-        "mimeType": "image/webp",
-        "pixelSha256": "e0c0a644087529a117cfe01392c02dab95145cef5b37c98095579d0f1142ae24"
-      },
-      {
-        "name": "Texture_Type94GameRubberBaseV111",
-        "size": [
-          1024,
-          1024
-        ],
-        "bytes": 233678,
-        "mimeType": "image/webp",
-        "pixelSha256": "decdbfb7d20308d2310e404851bddd9d40a1e6f594aca4857b6fb07b8d5ef10c"
-      },
-      {
-        "name": "Texture_Type94GameTrackNormalV111",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 3219224,
-        "mimeType": "image/webp",
-        "pixelSha256": "af572301d8e47e696925f7d7378e81e0524d862ab33e16c8acdac39c6d1704ab"
-      },
-      {
-        "name": "Texture_Type94GameTrackOrmV111",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 1767098,
-        "mimeType": "image/webp",
-        "pixelSha256": "9472b7b7a6729cfb7d1c23725b56ef6727d34e3f9d76abe596b43fdd09e02cdc"
-      },
-      {
-        "name": "Texture_Type94GameTrackBaseV111",
-        "size": [
-          2048,
-          2048
-        ],
-        "bytes": 408638,
-        "mimeType": "image/webp",
-        "pixelSha256": "145a706cf6f90b2ce54e08d20867487b0ba6cba0ff8af88a051622f155128001"
+        "pixelSha256": "d95cfd68b51fb3450ca79580e98f840a806ecdc34f2eed73f5dfc5122becab97"
       }
     ]
   },
@@ -1694,9 +1574,9 @@
     "twoDirectionSampledSurfaceMaximumM": 0.0025087681133300066
   },
   "validation": {
-    "sha256": "c5fc7528797a78df564ab05a55c032c6f569ef1ae938cc752c837ff88ea6935f",
+    "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
     "exportChecks": 1172,
-    "browserChecks": 943,
+    "browserChecks": 973,
     "blenderMechanismChecks": 38,
     "roadWheelPoses": 128,
     "beltPhases": 32,
@@ -1727,8 +1607,10 @@
       "verified": true,
       "method": "Canonical oriented position triangles per mesh owner, independent of texture and vertex-index ordering. Position quantization 1e-7 m."
     },
-    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV111\\Acceptance",
-    "passed": true
+    "deliveryEvidenceDirectory": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Acceptance",
+    "passed": true,
+    "geometrySourceVerification": "Data_ReleaseV111.json",
+    "materialAtlasVerification": "Data_ReleaseV112.json"
   },
   "reconstructionScope": [
     "以 2017 库宾卡小诱导轮馆藏橄榄漆照片为主，2014 同车及馆方 1–7 号补充。",
@@ -1742,7 +1624,7 @@
   "activeCameraStudy": "Data_ReferenceViewsV111.json",
   "finalSourceVerification": {
     "high": "Data_ReleaseV111.json",
-    "game": "Data_ReleaseV111.json",
-    "delivery": "Data_ReleaseV111.json"
+    "game": "Data_ReleaseV112.json",
+    "delivery": "Data_ReleaseV112.json"
   }
 }

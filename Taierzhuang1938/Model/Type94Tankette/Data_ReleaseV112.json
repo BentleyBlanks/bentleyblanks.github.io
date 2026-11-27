@@ -1,0 +1,287 @@
+{
+  "schema": "Type94MaterialAtlasReleaseV112",
+  "revision": "MaterialAtlasV112",
+  "baseGeometryAndAppearance": "Data_ReleaseV111.json",
+  "sourceGlb": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\PhotoReconstructionV111\\Exports\\Model_Type94Tankette.glb",
+  "sourceSha256": "c5fc7528797a78df564ab05a55c032c6f569ef1ae938cc752c837ff88ea6935f",
+  "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Scene_Type94TanketteGameMaterialAtlasV112.blend",
+  "sourceBlendSha256": "5f94b5318588a08ff351dce7f09822e792375b7beab960b1fbcc6f1fd4e58520",
+  "output": {
+    "file": "Model/Type94Tankette/Model_Type94Tankette.glb",
+    "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+    "bytes": 36500340,
+    "triangles": 79178,
+    "meshOwners": 240,
+    "images": [
+      {
+        "name": "Texture_Type94GamePaintNormalV111",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 4649442,
+        "mimeType": "image/webp",
+        "pixelSha256": "edd56d39a18fb07be60e2c0131188d551cc2c941e8aa5fb1b1aa40a9be93d15b"
+      },
+      {
+        "name": "Texture_Type94GamePaintOrmV111",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 10222700,
+        "mimeType": "image/webp",
+        "pixelSha256": "83a220d330586e02f2635216c3415b972380682a1473bbf7d59fd07ef16fa066"
+      },
+      {
+        "name": "Texture_Type94GamePaintBaseV111",
+        "size": [
+          4096,
+          4096
+        ],
+        "bytes": 6234056,
+        "mimeType": "image/webp",
+        "pixelSha256": "13624afe6c199d5b018030e613dd103b36dd7107e3164e815070c500ffcf9a87"
+      },
+      {
+        "name": "Texture_Type94DetailsBaseV112",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 1598298,
+        "mimeType": "image/webp",
+        "pixelSha256": "27b48a10bad10200efddf08a3aab7f7abc3be8241bbfec73a955af5fec235061"
+      },
+      {
+        "name": "Texture_Type94DetailsNormalV112",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 4921696,
+        "mimeType": "image/webp",
+        "pixelSha256": "36e62fd25f8f517df75788eaa2ea2809da38570499d8f84de2740aa14b3c7f0b"
+      },
+      {
+        "name": "Texture_Type94DetailsOrmV112",
+        "size": [
+          4096,
+          3072
+        ],
+        "bytes": 3491972,
+        "mimeType": "image/webp",
+        "pixelSha256": "d95cfd68b51fb3450ca79580e98f840a806ecdc34f2eed73f5dfc5122becab97"
+      }
+    ]
+  },
+  "materials": {
+    "before": [
+      "Material_Type94Paint",
+      "Material_Type94Dark",
+      "Material_Type94Steel",
+      "Material_Type94White",
+      "Material_Type94Red",
+      "Material_Type94Rubber",
+      "Material_Type94Track"
+    ],
+    "after": [
+      "Material_Type94Paint",
+      "Material_Type94Details"
+    ]
+  },
+  "atlas": {
+    "size": [
+      4096,
+      3072
+    ],
+    "texturedTiles": {
+      "Material_Type94Steel": [
+        0,
+        0,
+        2048,
+        2048
+      ],
+      "Material_Type94Track": [
+        2048,
+        0,
+        2048,
+        2048
+      ],
+      "Material_Type94Rubber": [
+        0,
+        2048,
+        1024,
+        1024
+      ]
+    },
+    "solidTiles": {
+      "Material_Type94Dark": [
+        1120,
+        2112,
+        64,
+        64
+      ],
+      "Material_Type94White": [
+        1312,
+        2112,
+        64,
+        64
+      ],
+      "Material_Type94Red": [
+        1504,
+        2112,
+        64,
+        64
+      ]
+    },
+    "minSourceUvPaddingPx": {
+      "Material_Type94Steel": 8.0,
+      "Material_Type94Rubber": 8.0,
+      "Material_Type94Track": 8.0
+    }
+  },
+  "verification": {
+    "export": {
+      "beforeSha256": "c5fc7528797a78df564ab05a55c032c6f569ef1ae938cc752c837ff88ea6935f",
+      "afterSha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+      "materialsBefore": 7,
+      "materialsAfter": 2,
+      "imagesBefore": 12,
+      "imagesAfter": 6,
+      "meshOwners": 240,
+      "poseNodes": 296,
+      "triangles": 79178,
+      "allPositionNormalTangentAndIndexBuffersIdentical": true,
+      "allNodePoseHierarchyAndExtrasIdentical": true,
+      "paintTexturesAndClearcoatIdentical": true,
+      "atlasPixelsExact": true,
+      "uncoatedSourceTexelsCopiedAtOriginalResolution": true,
+      "maxRemapErrorPx": 0.0001220703125,
+      "passed": true
+    },
+    "blender": {
+      "sourceBlend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Scene_Type94TanketteGameMaterialAtlasV112.blend",
+      "sourceBlendSha256": "5f94b5318588a08ff351dce7f09822e792375b7beab960b1fbcc6f1fd4e58520",
+      "materialNames": [
+        "Material_Type94Details",
+        "Material_Type94Paint"
+      ],
+      "materialDatablocks": 2,
+      "packedAtlasImages": 3,
+      "geometryAndLocalPosesExact": true,
+      "reexport": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\Type94Tankette\\MaterialAtlasV112\\Acceptance\\Model_Type94TanketteMaterialAtlasBlenderReexportV112.glb",
+      "reexportSha256": "37ac5cc840edcc08080f29c1b1d699423736148e8daf27ac9070cfcfbe085e9e",
+      "reexportTriangles": 79178,
+      "meshOwners": 240,
+      "reopened": true
+    },
+    "browser": {
+      "checks": 973,
+      "sha256": "e5ed0450fe481b35f86fe4b0ca80f642572bdd07ee8437e1e4319e4f718c1f5b",
+      "passed": true
+    },
+    "visual": [
+      {
+        "view": "front",
+        "meanChannelDelta": 0.019878494623655915,
+        "shareChannelsChangedOver3": 0.002036559139784946,
+        "maxChannelDelta": 36
+      },
+      {
+        "view": "gear",
+        "meanChannelDelta": 0.024437096774193548,
+        "shareChannelsChangedOver3": 0.002604301075268817,
+        "maxChannelDelta": 33
+      },
+      {
+        "view": "rear",
+        "meanChannelDelta": 0.01936021505376344,
+        "shareChannelsChangedOver3": 0.0020021505376344086,
+        "maxChannelDelta": 49
+      }
+    ],
+    "localGpuPublication": {
+      "file": "Taierzhuang1938/Model/Type94Tankette/Model_Type94Tankette_Publishf0d7ade852c1db50bca37eca.glb",
+      "sha256": "f0d7ade852c1db50bca37eca1433e9e3ba3a2b7a8929682c2f3689d7e655c1a3",
+      "bytes": 26784044,
+      "images": [
+        {
+          "index": 0,
+          "format": "ktx2-bc7",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "linear",
+          "mipLevels": 12
+        },
+        {
+          "index": 1,
+          "format": "ktx2-bc7",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "linear",
+          "mipLevels": 12
+        },
+        {
+          "index": 2,
+          "format": "ktx2-bc7",
+          "width": 2048,
+          "height": 2048,
+          "colorSpace": "srgb",
+          "mipLevels": 12
+        },
+        {
+          "index": 3,
+          "format": "ktx2-bc7",
+          "width": 4096,
+          "height": 3072,
+          "colorSpace": "srgb",
+          "mipLevels": 13
+        },
+        {
+          "index": 4,
+          "format": "ktx2-bc7",
+          "width": 4096,
+          "height": 3072,
+          "colorSpace": "linear",
+          "mipLevels": 13
+        },
+        {
+          "index": 5,
+          "format": "ktx2-bc7",
+          "width": 4096,
+          "height": 3072,
+          "colorSpace": "linear",
+          "mipLevels": 13
+        }
+      ],
+      "browser": {
+        "materialCount": 2,
+        "samplerCounts": [
+          0,
+          0,
+          1,
+          1,
+          8,
+          7
+        ],
+        "samplerLimit": 16,
+        "atlas": [
+          4096,
+          3072
+        ],
+        "mapColorSpaces": [
+          "srgb",
+          "srgb-linear",
+          "srgb-linear"
+        ],
+        "passed": true
+      },
+      "passed": true
+    }
+  },
+  "notes": [
+    "Coated paint retains its 4096 atlas and clearcoat; the six uncoated materials use one 4096 by 3072 atlas.",
+    "All authored texture tiles are copied at source resolution. The three constant colors and roughness factors use 8-bit flat tiles."
+  ]
+}

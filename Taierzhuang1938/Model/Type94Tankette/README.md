@@ -1,10 +1,20 @@
-# 九四式轻装甲车 · 馆藏照片复原 V111
+# 九四式轻装甲车 · 馆藏照片复原 V111／游戏材质 V112
 
 以 2017 库宾卡同车橄榄漆照片为主，参看 2014 同车照片、馆方 1–7 号和一张 2022 年高角度车尾照。V107 重做前挡泥板、首板上缘、传动罩、主动轮和履带开窗。V111 用照片的共同特征复核轮轴标点和机位，再重塑两侧后挡泥板的下翻末端。游戏 GLB 整车实测 79,178 三角面，重新从高模投射切线空间法线、BaseColor 与包含 AO、粗糙度和金属度的 ORM。[资产合同](Data_Type94Tankette.json) · [交付记录](Data_ReleaseV111.json)
 
 米制、glTF +Y 向上、-Z 车头。现有 `Type94Tankette`、`Prop/type94Tankette` 和 `mechanisms.path` 接入复用同一个模型。炮塔、枪座、十个盖板或门、前后锁闩以及左右轮履沿用原有枢轴和演示行程。[机构模块](Script_Type94Mechanism.mjs)
 
 原图和旧工程保存在原来的 OneDrive 目录。本次输出位于 `Type94Tankette/PhotoReconstructionV111/`，含 `Scene_Type94TanketteHighV111.blend`、`Scene_Type94TanketteGameV111.blend`、`Textures/`、`Exports/` 和 `Acceptance/`。重校机位后，留出的右后履带轮廓在馆方 4 号和高角度补图里的中位投影余差分别约为 3 和 10 像素。馆方 5 号的失焦、挂车遮挡处断面和展厅灯场均记录推定依据。[参考和机位记录](Data_ReferenceViewsV111.json)
+
+## V112 游戏材质图集
+
+游戏低模使用两个材质。漆面使用原 4K PBR 和清漆层。履带、裸钢、橡胶、深色零件和红白标记共用一套 4096 × 3072 的 BaseColor、切线法线和 ORM。纹理分区按原像素与分辨率搬运，纯色件使用独立的 8 位色块。Pages 为这三张图集保留 4096 × 3072 发布尺寸。导出实测 79,178 三角面，位置、法线、切线、索引及运动节点与 V111 逐项核对。[V112 交付记录](Data_ReleaseV112.json)
+
+V112 的可编辑源和贴图位于本车 OneDrive 的 MaterialAtlasV112 子目录。以 V111 封装 GLB 和原游戏源工程为输入，依次用下列入口生成、核验和重建。
+
+- 运行 _import/Script_MergeType94MaterialsV112.py，指定 --input、--output、--textures 和 --report。将报告保存为新版本 Acceptance/Data_AtlasBuildV112.json。
+- 运行 _import/Script_VerifyType94MaterialAtlasV112.py，指定 --before、--after 和 --report，核对实际导出文件。
+- 用 Script_BlenderMcp.mjs 的 --batch 运行 _blender/Script_BuildType94MaterialBlendV112.py，参数数组依次给 V111 游戏 .blend 路径及 V112 输出根目录。重开与导出报告进入新版本 Acceptance 目录。
 
 ## 重建与验收
 
