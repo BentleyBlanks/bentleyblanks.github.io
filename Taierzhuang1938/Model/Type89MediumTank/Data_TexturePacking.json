@@ -1,12 +1,12 @@
 {
   "version": 2,
-  "method": "SurfaceV19 calibrates limited bare-steel Base and ORM green/blue footprints. ORM red and all normal data are exact.",
+  "method": "SurfaceV20 uses a lossless shared clearcoat and specular swatch. The mapped AO red, metallic blue and normal bytes remain exact.",
   "losslessWebpEffort": 3,
-  "beforeBytes": 39492684,
-  "afterBytes": 39506640,
-  "sourceSha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
-  "runtimeSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
-  "geometrySha256": "60756c12992a4f2dfd81407cafb2b6560b68ca6ab4e2a2b746288b05c0258193",
+  "beforeBytes": 39506640,
+  "afterBytes": 39628424,
+  "sourceSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
+  "runtimeSha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
+  "geometrySha256": "d3e004ac425eae710d0c57eecea6af74cb2da13841ef38527e2f40f36367dcb9",
   "images": [
     {
       "index": 0,
@@ -24,7 +24,7 @@
       "index": 1,
       "width": 4096,
       "height": 4096,
-      "sourceBytes": 12026412,
+      "sourceBytes": 12049730,
       "runtimeBytes": 12049730,
       "mime": "image/webp",
       "pixelSha256": "108ac37d7f23acaf0fc3b3ca94c9f41b49ad0622caa55dfefb555e4cb665a223",
@@ -36,10 +36,10 @@
       "index": 2,
       "width": 4096,
       "height": 4096,
-      "sourceBytes": 6135122,
-      "runtimeBytes": 6142620,
+      "sourceBytes": 6142620,
+      "runtimeBytes": 6143666,
       "mime": "image/webp",
-      "pixelSha256": "62d9a1bfdd139c094b0a1408e73d833aed3a7e6b2025a73b55e09bf02a6568e4",
+      "pixelSha256": "c5deb32841110681e8ef3c327bffe5e108bbb255ca46323f2ecbaa5bfb81c30f",
       "channels": 3,
       "unusedAlphaRemoved": true,
       "opacityPreserved": false
@@ -96,7 +96,7 @@
       "index": 7,
       "width": 2048,
       "height": 2048,
-      "sourceBytes": 1527168,
+      "sourceBytes": 1531168,
       "runtimeBytes": 1531168,
       "mime": "image/webp",
       "pixelSha256": "a66971077fa12cc2ce73f67c675e72890847da1a59a18c4789cce832252bff5b",
@@ -108,13 +108,26 @@
       "index": 8,
       "width": 2048,
       "height": 2048,
-      "sourceBytes": 885526,
+      "sourceBytes": 864334,
       "runtimeBytes": 864334,
       "mime": "image/webp",
       "pixelSha256": "10b6b3a56d394bb4685ad9cf4533e1b1a2ce9d5b4f64ecf7d76da79e47775658",
       "channels": 3,
       "unusedAlphaRemoved": true,
       "opacityPreserved": false
+    },
+    {
+      "index": 9,
+      "width": 32,
+      "height": 8,
+      "sourceBytes": 101,
+      "runtimeBytes": 66,
+      "mime": "image/webp",
+      "pixelSha256": "61c93999a229fe874c079dea57fb5ce75dcf9f40a76b80e338fe72175ee8b970",
+      "channels": 4,
+      "unusedAlphaRemoved": false,
+      "opacityPreserved": false,
+      "specularAlphaPreserved": true
     }
   ]
 }

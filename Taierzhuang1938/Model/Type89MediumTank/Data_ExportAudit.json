@@ -2,19 +2,19 @@
   "schema": "Type89RestorationReleaseV55",
   "reviewedOn": "2026-11-27",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV19",
+  "materialRevision": "SurfaceV20",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
-    "bytes": 39506640,
+    "sha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
+    "bytes": 39628424,
     "renderedTriangles": 79997,
     "hardCeiling": 80000,
     "meshInstances": 269,
     "trackInstances": 162,
     "trackTriangles": 33696,
     "triangleCountMethod": "Sum triangle-list indices on every mesh node reachable from the default GLB scene",
-    "materials": 9,
-    "images": 9,
+    "materials": 4,
+    "images": 10,
     "atlasSizes": {
       "Body": [
         4096,
@@ -36,12 +36,13 @@
     "nose": "-Z",
     "units": "metres",
     "trackMudTriangles": 160,
-    "hullMudTriangles": 16
+    "hullMudTriangles": 16,
+    "textureBindings": 10
   },
   "highSource": {
     "blend": "Scene_Type89MediumTankHighPbr.blend",
     "triangles": 1487422,
-    "sha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+    "sha256": "ba04dab5e44892d3e1b7010a59e8ae2d997cb8e7a9e0980b0e1a47944a506c40",
     "referenceSource": "SurfaceV14/Scene_Type89MediumTankHighPbr.blend",
     "referenceSourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
     "changes": {
@@ -116,8 +117,8 @@
   "gameSource": {
     "blend": "Game/Scene_Type89MediumTankGamePbr.blend",
     "triangles": 80109,
-    "sha256": "7ff405ef5729250d1d004fdb94d4d9649fca4963545f6ee3ec462540dd33c555",
-    "bakeSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+    "sha256": "5f89bc553bbc2bdf0876ad211ec6789f68dfbc104875661da332aa86c38afa13",
+    "bakeSourceSha256": "ba04dab5e44892d3e1b7010a59e8ae2d997cb8e7a9e0980b0e1a47944a506c40",
     "exportBeforePackingSha256": "e22d551568fe9d413cc236772ab5f921041c7bacdcb8aaa6d269a9adfd76751e",
     "removedByZeroAreaCleanup": 54,
     "removedOnExplicitTriangulation": 0,
@@ -295,7 +296,7 @@
     "evidenceLocal": "Review/Comparisons, Review/Browser, Review/Data_PhotoAlignment.json, Review/Data_GameMotionReleased.json"
   },
   "referenceArchive": "Data_ReferenceArchive.json",
-  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV19",
+  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV20",
   "photographsAndSourceRemainLocal": true,
   "metalFinish": {
     "pass": true,
@@ -379,5 +380,16 @@
     "proof": "Data_ExposedMetalReview.json",
     "packedAoChannelExact": true,
     "unchangedBufferPayloads": 800
+  },
+  "materialMerge": {
+    "proof": "Data_MaterialMergeReview.json",
+    "baselineRuntimeSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
+    "highMaterials": 5,
+    "gameMaterials": 4,
+    "coatingSwatchPixels": [
+      32,
+      8
+    ],
+    "aoMetallicNormalMapsExact": true
   }
 }

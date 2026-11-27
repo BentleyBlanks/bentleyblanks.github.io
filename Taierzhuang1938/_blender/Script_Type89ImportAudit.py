@@ -222,7 +222,9 @@ if int(geometryVersion.split('GeometryV')[-1])>=44:
             if i!=index and node.get('name','').startswith('Node_'):return
             if 'mesh'in node:
                 for primitive in g['meshes'][node['mesh']]['primitives']:
-                    if suffix and not g['materials'][primitive['material']]['name'].endswith(suffix):continue
+                    material=g['materials'][primitive['material']]
+                    role=primitive.get('extras',{}).get('Type89SurfaceRole',material['name'])
+                    if suffix and not role.endswith(suffix):continue
                     points=[world[i]@Vector(p)for p in Access(primitive['attributes']['POSITION'])];ids=[p[0]for p in Access(primitive['indices'])];base=len(vertices);vertices.extend(points)
                     for k in range(0,len(ids),3):
                         face=tuple(ids[k:k+3])

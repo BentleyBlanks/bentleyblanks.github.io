@@ -30,6 +30,18 @@ const cannon=[];
 const nodesByName=new Map(g.nodes.map(node=>[node.name,node]));
 const optionalAsset=OPTIONAL_VEHICLE_ASSETS.find(asset=>asset.id==='Type89MediumTank');
 const highDerived=contract.budgetPolicy==='HighDerivedGameHardCeiling';
+const mergedMaterials=contract.materialRevision==='SurfaceV20';
+const RoleOf=primitive=>primitive.extras?.Type89SurfaceRole
+  ??g.materials[primitive.material].extras?.Type89Role
+  ??g.materials[primitive.material].name.replace('Material_Type89Game','');
+const partsByRole=new Map();
+for(const mesh of g.meshes)for(const primitive of mesh.primitives){
+  const role=RoleOf(primitive);
+  if(!partsByRole.has(role))partsByRole.set(role,[]);
+  partsByRole.get(role).push(primitive);
+}
+const MaterialFor=role=>g.materials[partsByRole.get(role)?.[0]?.material];
+
 Check(optionalAsset?.campaignEnabled===false&&optionalAsset.scale===1,'Reference tank is an opt-in vehicle at native metric scale');
 Check(optionalAsset?.url.split('?')[0]==='./Model/Type89MediumTank/Model_Type89MediumTank.glb'&&optionalAsset.trackPathUrl.split('?')[0]==='./Model/Type89MediumTank/Data_TrackPath.json','Configured model and motion path use the shipped asset pair');
 Check(MESHES.Type89Tank.file==='Model_Type89Tank.tzm.json','Existing campaign tank keeps its original model');
@@ -110,8 +122,8 @@ function LocalGeometry(name,armorOnly=false,excludeShadow=false){
   function Visit(i,parent,isRoot=false){
     const node=g.nodes[i],matrix=Multiply(parent,isRoot?identity:Matrix(node));
     if(node.mesh!==undefined)for(const primitive of g.meshes[node.mesh].primitives){
-      if(armorOnly&&!g.materials[primitive.material].name.endsWith('Armor'))continue;
-      if(excludeShadow&&g.materials[primitive.material].name.endsWith('Shadow'))continue;
+      if(armorOnly&&!RoleOf(primitive).endsWith('Armor'))continue;
+      if(excludeShadow&&RoleOf(primitive)==='Shadow')continue;
       const positions=ReadAccessor(glb,primitive.attributes.POSITION).data,indices=ReadAccessor(glb,primitive.indices).data,base=vertices.length;
       for(let k=0;k<positions.length;k+=3){const [x,y,z]=positions.slice(k,k+3);vertices.push([matrix[0]*x+matrix[4]*y+matrix[8]*z+matrix[12],matrix[1]*x+matrix[5]*y+matrix[9]*z+matrix[13],matrix[2]*x+matrix[6]*y+matrix[10]*z+matrix[14]]);}
       for(let k=0;k<indices.length;k+=3)faces.push([base+indices[k],base+indices[k+1],base+indices[k+2]]);
@@ -253,7 +265,7 @@ if(geometryRevision>=38){
   Check(!RayHits(visor,[0,-.225,-.10],[0,0,1],.20)&&Number.isFinite(shutterDistance)&&setbackM>.012&&setbackM<.030,'Driver half-port remains a true aperture and its closed shutter sits behind the photographed peeper face',JSON.stringify({setbackM}));
   if(geometryRevision>=39){
     const node=nodesByName.get('Mesh_DriverVisionFlap');
-    Check(g.meshes[node.mesh].primitives.every(p=>!g.materials[p.material].name.endsWith('Shadow')),'Driver visor return walls retain painted armor without the boolean cutter dark material');
+    Check(g.meshes[node.mesh].primitives.every(p=>RoleOf(p)!=='Shadow'),'Driver visor return walls retain painted armor without the boolean cutter dark material');
   }
 }
 Check(!RayHits(turretGeometry,[0,.30,-.80],[0,0,1],.25)&&RayHits(turretGeometry,[.24,.30,-.80],[0,0,1],.25),'Mantlet aperture is cut through armor and its border remains solid');
@@ -360,10 +372,10 @@ async function ImageFor(textureInfo){
   const decoded=await sharp(Buffer.from(glb.bin.subarray(view.byteOffset??0,(view.byteOffset??0)+view.byteLength))).ensureAlpha().raw().toBuffer({resolveWithObject:true});
   imageCache.set(imageIndex,decoded);return decoded;
 }
-function UvSamples(materialIndex){
+function UvSamples(role){
   const output=[];
   for(const mesh of g.meshes)for(const primitive of mesh.primitives){
-    if(primitive.material!==materialIndex)continue;
+    if(RoleOf(primitive)!==role)continue;
     const uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0),indices=ReadAccessor(glb,primitive.indices).data;
     for(let i=0;i<indices.length;i+=3){
       const p=[0,1,2].map(k=>uv.data.slice(indices[i+k]*2,indices[i+k]*2+2));
@@ -374,11 +386,11 @@ function UvSamples(materialIndex){
   return output;
 }
 function Sample(image,uv,channel){const x=Math.min(image.info.width-1,Math.max(0,Math.floor(uv[0]*image.info.width))),y=Math.min(image.info.height-1,Math.max(0,Math.floor(uv[1]*image.info.height)));return image.data[(y*image.info.width+x)*4+channel]/255;}
-function ComponentTexelDensity(name,materialIndex,pixels){
+function ComponentTexelDensity(name,role,pixels){
   const node=nodesByName.get(name);let area=0,uvArea=0;
   if(node?.mesh===undefined)return 0;
   for(const primitive of g.meshes[node.mesh].primitives){
-    if(primitive.material!==materialIndex)continue;
+    if(RoleOf(primitive)!==role)continue;
     const positions=ReadAccessor(glb,primitive.attributes.POSITION).data,uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
     for(let k=0;k<indices.length;k+=3){
       const [a,b,c]=[0,1,2].map(i=>positions.slice(indices[k+i]*3,indices[k+i]*3+3)),[p,q,r]=[0,1,2].map(i=>uv.slice(indices[k+i]*2,indices[k+i]*2+2));
@@ -394,7 +406,7 @@ function PlaneNormalProbe(name,origin,direction,normalImage){
   function Visit(index,parent,isRoot=false){
     const node=g.nodes[index],matrix=Multiply(parent,isRoot?identity:Matrix(node));
     if(node.mesh!==undefined)for(const primitive of g.meshes[node.mesh].primitives){
-      if(!g.materials[primitive.material].name.endsWith('Armor'))continue;
+      if(!RoleOf(primitive).endsWith('Armor'))continue;
       const positions=ReadAccessor(glb,primitive.attributes.POSITION).data,normals=ReadAccessor(glb,primitive.attributes.NORMAL).data,tangents=ReadAccessor(glb,primitive.attributes.TANGENT).data,uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
       for(let k=0;k<indices.length;k+=3){
         const ids=Array.from(indices.slice(k,k+3)),points=ids.map(id=>Transform(matrix,positions.slice(id*3,id*3+3))),[a,b,c]=points,edge1=Sub(b,a),edge2=Sub(c,a),p=Cross(direction,edge2),det=Dot(edge1,p);
@@ -411,10 +423,10 @@ function PlaneNormalProbe(name,origin,direction,normalImage){
   }
   if(rootIndex>=0)Visit(rootIndex,identity,true);return nearest;
 }
-function MappedMisses(materialIndex,base,normal,masked){
+function MappedMisses(role,base,normal,masked){
   let weight=0,black=0,invalidNormal=0,samples=0;
   for(const mesh of g.meshes)for(const primitive of mesh.primitives){
-    if(primitive.material!==materialIndex)continue;
+    if(RoleOf(primitive)!==role)continue;
     const uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
     for(let k=0;k<indices.length;k+=3){
       const p=[0,1,2].map(i=>uv.slice(indices[k+i]*2,indices[k+i]*2+2));
@@ -431,18 +443,18 @@ function MappedMisses(materialIndex,base,normal,masked){
   }
   return {samples,blackFraction:black/weight,invalidNormalFraction:invalidNormal/weight};
 }
-for(const [index,material] of g.materials.entries()){
-  if(material.name.endsWith('Shadow'))continue;
-  const role=material.name.replace('Material_Type89Game',''),pbr=material.pbrMetallicRoughness;
+for(const role of partsByRole.keys()){
+  if(role==='Shadow')continue;
+  const material=MaterialFor(role),pbr=material.pbrMetallicRoughness;
   Check(pbr.baseColorTexture&&material.normalTexture&&pbr.metallicRoughnessTexture&&material.occlusionTexture&&material.occlusionTexture.index===pbr.metallicRoughnessTexture.index,'Complete Base/Normal/ORM with real AO: '+role);
   const [base,normal,orm]=await Promise.all([ImageFor(pbr.baseColorTexture),ImageFor(material.normalTexture),ImageFor(pbr.metallicRoughnessTexture)]);
-  const misses=MappedMisses(index,base,normal,role==='Guard');
+  const misses=MappedMisses(role,base,normal,role==='Guard');
   Check(misses.samples>0&&misses.blackFraction<1e-5,'Actual mapped surfaces contain no opaque-black projection fragments: '+role,JSON.stringify(misses));
   Check(misses.invalidNormalFraction<1e-5,'Actual mapped normals contain no opaque ray-miss vectors: '+role,String(misses.invalidNormalFraction));
   if(role==='Armor'){
     const normalSize=highDerived?4096:8192;
     Check(base.info.width===4096&&normal.info.width===normalSize&&orm.info.width===4096,'Body PBR texture resolutions match the authoring contract');
-    const densities=['Mesh_Hull','Mesh_BowRoundPortCover','Mesh_RoadWheelLeft01'].map(name=>({name,normalPixelsPerM:ComponentTexelDensity(name,index,normal.info.width)}));
+    const densities=['Mesh_Hull','Mesh_BowRoundPortCover','Mesh_RoadWheelLeft01'].map(name=>({name,normalPixelsPerM:ComponentTexelDensity(name,role,normal.info.width)}));
     // V55 stays within the 4K runtime rule. Its shared atlas supplies a
     // maximum 3.7 mm average sampling interval on these three witnesses.
     Check(densities.every(row=>row.normalPixelsPerM>=(highDerived?270:450)),'Actual mapped hull, cover and wheel meet the runtime normal sampling interval',JSON.stringify(densities));
@@ -468,7 +480,7 @@ for(const [index,material] of g.materials.entries()){
     }
     Check(badgeSamples.length===10&&badgeSamples.every(([r,g,b])=>r>.70&&g>.54&&b<.40),'Inner five-point badge survives as geometry and mapped2007 gold colour',JSON.stringify(badgeSamples));
   }
-  const samples=UvSamples(index);let weight=0,white=0,metal=0,rough=0,normalVariation=0;
+  const samples=UvSamples(role);let weight=0,white=0,metal=0,rough=0,normalVariation=0;
   for(const sample of samples){weight+=sample.area;const rgb=[0,1,2].map(channel=>Sample(base,sample.uv,channel));if(rgb.every(value=>value>.99))white+=sample.area;metal+=Sample(orm,sample.uv,2)*sample.area;rough+=Sample(orm,sample.uv,1)*sample.area;normalVariation+=(Math.abs(Sample(normal,sample.uv,0)-.5)+Math.abs(Sample(normal,sample.uv,1)-.5))*sample.area;}
   const values={metal:metal/weight,rough:rough/weight,white:white/weight,normalVariation:normalVariation/weight};
   Check(weight>0&&values.white<.002&&values.normalVariation>.001,'UV surfaces contain mapped detail without blank projection: '+role,JSON.stringify(values));
@@ -478,7 +490,7 @@ for(const [index,material] of g.materials.entries()){
   if(role==='Guard'){
     let clear=0,solid=0,total=0;
     for(const mesh of g.meshes)for(const primitive of mesh.primitives){
-      if(primitive.material!==index)continue;
+      if(RoleOf(primitive)!==role)continue;
       const uv=ReadAccessor(glb,primitive.attributes.TEXCOORD_0).data,indices=ReadAccessor(glb,primitive.indices).data;
       for(let i=0;i<indices.length;i+=3){const p=[0,1,2].map(k=>uv.slice(indices[i+k]*2,indices[i+k]*2+2));for(const a of [.15,.50,.85])for(const seed of [.15,.50,.85]){const b=(1-a)*seed,c=1-a-b,sample=[0,1].map(axis=>p[0][axis]*a+p[1][axis]*b+p[2][axis]*c),alpha=Sample(base,sample,3);total++;if(alpha<.25)clear++;if(alpha>.75)solid++;}}
     }
@@ -502,8 +514,43 @@ for(const [index,material] of g.materials.entries()){
   }
 }
 const layeredSurface=g.nodes.some(node=>node.extras?.microSurface);
-const expectedImages=highDerived?9:(layeredSurface?25:21),expectedMaterials=highDerived||layeredSurface?9:8;
+const coatingImage=mergedMaterials
+  ?await ImageFor(MaterialFor('Armor').extensions.KHR_materials_clearcoat.clearcoatTexture):null;
+const expectedImages=mergedMaterials?10:highDerived?9:(layeredSurface?25:21);
+const expectedMaterials=mergedMaterials?4:highDerived||layeredSurface?9:8;
 Check(imageCache.size===expectedImages&&g.materials.length===expectedMaterials,'Every physical material set is actually decoded',String(imageCache.size));
+function CoatingMatches(role,expected){
+  const selected=partsByRole.get(role)??[];
+  const body=MaterialFor('Armor');
+  // Check every vertex swatch so mixed polygon roles cannot interpolate
+  // across the coating tiles or inherit an unrelated finish.
+  return selected.length>0&&selected.every(part=>{
+    if(g.materials[part.material]!==body||part.attributes.TEXCOORD_1===undefined)return false;
+    const uv=ReadAccessor(glb,part.attributes.TEXCOORD_1).data;
+    const point=uv.slice(0,2);
+    return uv.every((value,index)=>value===point[index%2])&&[0,1,3].every((channel,index)=>
+      Math.abs(Sample(coatingImage,point,channel)-expected[index])<=.5/255+1e-7);
+  });
+}
+if(mergedMaterials){
+  const body=MaterialFor('Armor');
+  const coat=body.extensions.KHR_materials_clearcoat,spec=body.extensions.KHR_materials_specular;
+  const maps=[coat.clearcoatTexture,coat.clearcoatRoughnessTexture,spec.specularTexture];
+  Check(body.name==='Material_Type89GameBody'&&maps.every(info=>info.texCoord===1&&info.index===maps[0].index)
+    &&coat.clearcoatFactor===1&&coat.clearcoatRoughnessFactor===1&&spec.specularFactor===1
+    &&coatingImage.info.width===32&&coatingImage.info.height===8,
+  'One opaque body material uses portable UV1 coating and specular swatches');
+  for(const role of ['Steel','Rubber','Exhaust','Shadow'])
+    Check(CoatingMatches(role,[0,0,1]),'Uncoated surface keeps its original specular profile: '+role);
+  const recess=partsByRole.get('Shadow');
+  const uv=ReadAccessor(glb,recess[0].attributes.TEXCOORD_0).data.slice(0,2);
+  const base=await ImageFor(body.pbrMetallicRoughness.baseColorTexture);
+  const orm=await ImageFor(body.pbrMetallicRoughness.metallicRoughnessTexture);
+  Check(recess.every(part=>ReadAccessor(glb,part.attributes.TEXCOORD_0).data.every((value,index)=>value===uv[index%2]))
+    &&Sample(base,uv,0)<.045&&Sample(base,uv,1)<.06&&Sample(orm,uv,0)===1
+    &&Math.abs(Sample(orm,uv,1)-.98)<.003&&Sample(orm,uv,2)===0,
+  'Former recess material samples the same dark, rough dielectric finish');
+}
 const paintFinish=g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras?.paintFinish;
 if(paintFinish){
   const bytes=fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_PaintFinishProfile.json')),profile=JSON.parse(bytes);
@@ -514,7 +561,7 @@ if(paintFinish){
     Check(Math.abs(coat?.clearcoatRoughnessFactor-settings.coatRoughnessScale)<1e-6&&Math.abs(fine?.scale-settings.fineNormalScale)<1e-6,'Actual paint/cast finish is the declared refined physical material: '+role);
   }
 }
-if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.materialRevision)) {
+if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.materialRevision)) {
   const profileFile = path.join(here,'Model/Type89MediumTank/Data_MetalFinishProfile.json');
   const profileBytes = Buffer.from(fs.readFileSync(profileFile,'utf8').replace(/\r\n/g,'\n'));
   const profile = JSON.parse(profileBytes);
@@ -525,11 +572,16 @@ if (['SurfaceV16', 'SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.m
   'Runtime finish is bound to the reviewed material recipe');
   for (const role of ['Armor','CastArmor','Guard']) {
     const {coatWeight,coatRoughness,specular}=profile.roles[role];
-    const material=g.materials.find(value=>value.extras?.Type89Role===role);
+    const material=MaterialFor(role);
     const coat=material?.extensions?.KHR_materials_clearcoat;
     const level=material?.extensions?.KHR_materials_specular?.specularFactor;
-    Check(coat?.clearcoatFactor===coatWeight&&coat?.clearcoatRoughnessFactor===coatRoughness&&level===specular*2,
-      'The runtime carries the calibrated dielectric finish for '+role);
+    if(mergedMaterials&&role!=='Guard'){
+      Check(CoatingMatches(role,[coatWeight,coatRoughness,specular*2]),
+        'Surface UVs carry the calibrated dielectric finish for '+role);
+    }else{
+      Check(coat?.clearcoatFactor===coatWeight&&coat?.clearcoatRoughnessFactor===coatRoughness&&level===specular*2,
+        'The runtime carries the calibrated dielectric finish for '+role);
+    }
   }
 
 }
@@ -558,7 +610,7 @@ if (contract.materialRevision === 'SurfaceV16') {
   Check(lands.length>=8&&webs.length>=8&&land[0]+.16<web[0]&&land[1]>web[1]+.21,
     'Baked tread lands are smoother and more conductive than their cast webs',JSON.stringify({land,web}));
 }
-if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.materialRevision)) {
+if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19', 'SurfaceV20'].includes(contract.materialRevision)) {
   const recipeFile=path.join(here,'Model/Type89MediumTank/Data_BattleWearProfile.json');
   const recipeBytes=Buffer.from(fs.readFileSync(recipeFile,'utf8').replace(/\r\n/g,'\n'));
   const recipe=JSON.parse(recipeBytes);
@@ -594,7 +646,7 @@ if (['SurfaceV17', 'SurfaceV18', 'SurfaceV19'].includes(contract.materialRevisio
     && trackImage.info.width===2048 && trackImage.info.height===2048,
   'All articulated shoes share unchanged shape and tangents and use four distinct tread atlas tiles');
 }
-if (['SurfaceV18','SurfaceV19'].includes(contract.materialRevision)) {
+if (['SurfaceV18','SurfaceV19','SurfaceV20'].includes(contract.materialRevision)) {
   const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_AmbientOcclusionReview.json'),'utf8'));
   const recorded=g.asset.extras?.Type89AmbientOcclusion;
   Check(recorded?.revision===audit.revision && recorded?.baselineRuntimeSha256===audit.baselineRuntimeSha256
@@ -602,7 +654,7 @@ if (['SurfaceV18','SurfaceV19'].includes(contract.materialRevision)) {
     && g.nodes.find(node=>node.name==='Model_Type89MediumTank')?.extras.surfaceRevision===contract.materialRevision,
   'The game GLB binds the two-distance assembled AO to the Type89 release');
   for (const [group,role] of [['Body','Armor'],['Track','Track'],['Guard','Guard']]) {
-    const material=g.materials.find(value=>value.extras?.Type89Role===role);
+    const material=MaterialFor(role);
     const texture=await ImageFor(material.occlusionTexture);
     const red=Buffer.alloc(texture.info.width*texture.info.height);
     for (let i=0;i<red.length;i++) red[i]=texture.data[i*4];
@@ -612,22 +664,22 @@ if (['SurfaceV18','SurfaceV19'].includes(contract.materialRevision)) {
     'Actual full-strength ORM visibility matches the saved contact bake: '+group);
   }
 }
-if (contract.materialRevision === 'SurfaceV19') {
+if (['SurfaceV19','SurfaceV20'].includes(contract.materialRevision)) {
   const audit=JSON.parse(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalReview.json'),'utf8'));
   const finish=g.asset.extras?.Type89ExposedMetal;
   const recipe=Buffer.from(fs.readFileSync(path.join(here,'Model/Type89MediumTank/Data_ExposedMetalProfile.json'),'utf8').replace(/\r\n/g,'\n'));
-  Check(finish?.revision===contract.materialRevision && finish?.aoChannelExact===true
+  Check(finish?.revision===audit.revision && finish?.aoChannelExact===true
     && finish?.profileSha256===createHash('sha256').update(recipe).digest('hex'),
   'Localized metal correction uses the reviewed mask ramps and retains SurfaceV18 AO');
   for (const [group,role] of [['Body','Armor'],['Track','Track']]) {
-    const material=g.materials.find(material=>material.extras?.Type89Role===role);
+    const material=MaterialFor(role);
     const atlas=await ImageFor(material.pbrMetallicRoughness.metallicRoughnessTexture);
     const metal=Buffer.alloc(atlas.info.width*atlas.info.height);
     for (let i=0;i<metal.length;i++) metal[i]=atlas.data[i*4+2];
     Check(createHash('sha256').update(metal).digest('hex')===audit.maps['Texture_Type89Game'+group+'Orm.png'].metallicSha256,
       'Actual metallic-channel bytes match the calibrated exposure: '+group);
     if (role==='Armor') {
-      const samples=UvSamples(g.materials.indexOf(material));
+      const samples=UvSamples(role);
       const area=samples.reduce((sum,sample)=>sum+sample.area,0);
       const dielectric=samples.filter(sample=>Sample(atlas,sample.uv,2)<.07).reduce((sum,sample)=>sum+sample.area,0);
       Check(dielectric/area>.95,'Intact painted armour remains dielectric beside the exposed steel',

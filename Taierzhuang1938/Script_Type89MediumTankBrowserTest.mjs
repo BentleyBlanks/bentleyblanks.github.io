@@ -46,7 +46,7 @@ try{const path=await fetch(${JSON.stringify(trackPathUrl)}).then(r=>r.json());co
     for(const side of ['Left','Right'])for(const wheel of motion.wheels[side]){const rest=new THREE.Quaternion().fromArray(motion.rest.get(wheel.name).quaternion);const angle=2*Math.acos(Math.min(1,Math.abs(rest.dot(wheel.quaternion))));wheelError=Math.max(wheelError,Math.abs(angle*wheel.userData.radiusM-.037));wheelCount++;}
     Check('All wheel surfaces use the same travelled distance',wheelCount===30&&wheelError<2e-7,{wheelCount,wheelError});
     const surface=motion.nodes.get('Model_Type89MediumTank')?.userData.surfaceRevision;
-    if(['SurfaceV17','SurfaceV18','SurfaceV19'].includes(surface)){
+    if(['SurfaceV17','SurfaceV18','SurfaceV19','SurfaceV20'].includes(surface)){
       motion.Reset();
       const mud=[...motion.nodes.values()].filter(node=>node.userData.battleWearMud);
       const moving=mud.filter(node=>node.parent.name.startsWith('Mesh_TrackLink'));
@@ -109,8 +109,8 @@ try{const path=await fetch(${JSON.stringify(trackPathUrl)}).then(r=>r.json());co
       if(material.name.endsWith('Shadow'))continue;
       Check('Real mapped PBR and correct colour spaces: '+material.name,material.map&&material.normalMap&&material.roughnessMap&&material.metalnessMap&&material.aoMap&&material.map.colorSpace===THREE.SRGBColorSpace&&material.normalMap.colorSpace===THREE.NoColorSpace&&material.roughnessMap.colorSpace===THREE.NoColorSpace);
     }
-    if(['SurfaceV18','SurfaceV19'].includes(surface)){
-      const reviewRoles=new Map([['Armor',4096],['Guard',1024],['Track',2048]]);
+    if(['SurfaceV18','SurfaceV19','SurfaceV20'].includes(surface)){
+      const reviewRoles=new Map([[surface==='SurfaceV20'?'Body':'Armor',4096],['Guard',1024],['Track',2048]]);
       for(const [role,size] of reviewRoles){
         const material=[...materials].find(value=>value.name==='Material_Type89Game'+role);
         const image=material?.aoMap?.image;
@@ -118,6 +118,13 @@ try{const path=await fetch(${JSON.stringify(trackPathUrl)}).then(r=>r.json());co
           image?.width===size&&image?.height===size&&material.aoMapIntensity===1
           &&material.aoMap.colorSpace===THREE.NoColorSpace);
       }
+    }
+    if(surface==='SurfaceV20'){
+      const body=[...materials].find(material=>material.name==='Material_Type89GameBody');
+      Check('Real renderer uses four material slots and loads the shared coating swatch',
+        materials.size===4&&body?.isMeshPhysicalMaterial
+        &&[body.clearcoatMap,body.clearcoatRoughnessMap,body.specularIntensityMap]
+          .every(map=>map?.channel===1&&map.image?.width===32&&map.image?.height===8));
     }
     const glass=[...materials].find(material=>material.name.endsWith('Glass'));Check('Glass survives loading as transmission PBR',glass?.isMeshPhysicalMaterial&&glass.transmission>.8);
     motion.Reset();renderer.render(window.runtime.scene,window.runtime.camera);

@@ -1,0 +1,310 @@
+{
+  "schema": "Type89MaterialMergeV1",
+  "revision": "SurfaceV20",
+  "baselineRuntimeSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
+  "coating": {
+    "Armor": {
+      "uv": [
+        0.125,
+        0.5
+      ],
+      "factors": [
+        0.11,
+        0.42,
+        0.64
+      ],
+      "pixel": [
+        28,
+        107,
+        255,
+        163
+      ]
+    },
+    "CastArmor": {
+      "uv": [
+        0.375,
+        0.5
+      ],
+      "factors": [
+        0.07,
+        0.51,
+        0.6
+      ],
+      "pixel": [
+        18,
+        130,
+        255,
+        153
+      ]
+    },
+    "Exhaust": {
+      "uv": [
+        0.625,
+        0.5
+      ],
+      "factors": [
+        0,
+        0,
+        1
+      ],
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    "Rubber": {
+      "uv": [
+        0.625,
+        0.5
+      ],
+      "factors": [
+        0,
+        0,
+        1
+      ],
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    "Shadow": {
+      "uv": [
+        0.625,
+        0.5
+      ],
+      "factors": [
+        0,
+        0,
+        1
+      ],
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    },
+    "Steel": {
+      "uv": [
+        0.625,
+        0.5
+      ],
+      "factors": [
+        0,
+        0,
+        1
+      ],
+      "pixel": [
+        0,
+        0,
+        255,
+        255
+      ]
+    }
+  },
+  "recess": {
+    "rect": [
+      2110,
+      2667,
+      128,
+      128
+    ],
+    "uv": [
+      0.53076171875,
+      0.666748046875
+    ]
+  },
+  "combinedBodyRoles": [
+    "Armor",
+    "CastArmor",
+    "Exhaust",
+    "Rubber",
+    "Shadow",
+    "Steel"
+  ],
+  "recessBase": [
+    10,
+    13,
+    13
+  ],
+  "recessOrm": [
+    255,
+    250,
+    0
+  ],
+  "sources": {
+    "High": {
+      "before": 10,
+      "after": 5,
+      "activeMaterialNames": [
+        "Material_Type89HighBody",
+        "Material_Type89HighGlass",
+        "Material_Type89HighGuard",
+        "Material_Type89HighMechanical",
+        "Material_Type89HighRunningGear"
+      ],
+      "removedUnusedMaterials": [
+        "Material_Type89ArmorAuthoring",
+        "Material_Type89ExhaustAuthoring",
+        "Material_Type89GlassAuthoring",
+        "Material_Type89GuardAuthoring",
+        "Material_Type89HighArmor",
+        "Material_Type89HighCastArmor",
+        "Material_Type89HighExhaust",
+        "Material_Type89HighRubber",
+        "Material_Type89HighShadow",
+        "Material_Type89HighSoilClod",
+        "Material_Type89HighSteel",
+        "Material_Type89HighTrack",
+        "Material_Type89RubberAuthoring",
+        "Material_Type89ShadowAuthoring",
+        "Material_Type89SteelAuthoring",
+        "Material_Type89TrackAuthoring"
+      ]
+    },
+    "Game": {
+      "before": 9,
+      "after": 4,
+      "activeMaterialNames": [
+        "Material_Type89GameBody",
+        "Material_Type89GameGlass",
+        "Material_Type89GameGuard",
+        "Material_Type89GameTrack"
+      ],
+      "removedUnusedMaterials": [
+        "Material_Type89ArmorAuthoring",
+        "Material_Type89ExhaustAuthoring",
+        "Material_Type89GameArmor",
+        "Material_Type89GameCastArmor",
+        "Material_Type89GameExhaust",
+        "Material_Type89GameRubber",
+        "Material_Type89GameShadow",
+        "Material_Type89GameSteel",
+        "Material_Type89GlassAuthoring",
+        "Material_Type89GuardAuthoring",
+        "Material_Type89RubberAuthoring",
+        "Material_Type89ShadowAuthoring",
+        "Material_Type89SteelAuthoring",
+        "Material_Type89TrackAuthoring"
+      ]
+    }
+  },
+  "runtime": {
+    "nodes": 530,
+    "meshInstances": 269,
+    "renderedTriangles": 79997,
+    "baselineMaterials": 9,
+    "runtimeMaterials": 4,
+    "imageCount": 10,
+    "textureBindings": 10,
+    "baselineTextureBindings": 24,
+    "sha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
+    "bytes": 39628424,
+    "highSourceSha256": "ba04dab5e44892d3e1b7010a59e8ae2d997cb8e7a9e0980b0e1a47944a506c40",
+    "gameSourceSha256": "5f89bc553bbc2bdf0876ad211ec6789f68dfbc104875661da332aa86c38afa13",
+    "originalNonImageBuffersRetained": true,
+    "aoMetallicNormalMapsExact": true,
+    "additionalConstantUvAccessors": 108,
+    "constantUvBuffers": 4
+  },
+  "verification": {
+    "inspectionPairs": 12,
+    "imageDifferences": {
+      "Game_Whole": {
+        "mae": 0.0048,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 2
+      },
+      "Game_Turret": {
+        "mae": 0.0214,
+        "p99": 1.0,
+        "over2Fraction": 0.0,
+        "max": 1
+      },
+      "Game_Gear": {
+        "mae": 0.0116,
+        "p99": 1.0,
+        "over2Fraction": 5e-06,
+        "max": 4
+      },
+      "Game_Rear": {
+        "mae": 0.0144,
+        "p99": 1.0,
+        "over2Fraction": 3e-06,
+        "max": 5
+      },
+      "AO_Whole": {
+        "mae": 0.0001,
+        "p99": 0.0,
+        "over2Fraction": 2e-06,
+        "max": 37
+      },
+      "AO_Turret": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "AO_Gear": {
+        "mae": 0.0002,
+        "p99": 0.0,
+        "over2Fraction": 7e-06,
+        "max": 44
+      },
+      "AO_Rear": {
+        "mae": 0.0001,
+        "p99": 0.0,
+        "over2Fraction": 5e-06,
+        "max": 21
+      },
+      "Metallic_Whole": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "Metallic_Turret": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "Metallic_Gear": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "Metallic_Rear": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "BlenderHigh_Turret": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 0
+      },
+      "BlenderHigh_Gear": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 1
+      },
+      "BlenderHigh_Rear": {
+        "mae": 0.0,
+        "p99": 0.0,
+        "over2Fraction": 0.0,
+        "max": 1
+      }
+    },
+    "localEvidence": "Review/Comparisons, Review/WeaponInspection, Review/Blender"
+  }
+}

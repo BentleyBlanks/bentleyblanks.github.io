@@ -56,7 +56,7 @@
   "primaryPhoto": "https://commons.wikimedia.org/wiki/File:Type_89_Yi-Go_at_Tsuchira.jpg",
   "accessoryState": "2007 exposed cylindrical perforated bow-MG jacket and opening round cover with inner star; pointed removable2025 cover excluded. Rest joints are closed; the2007 review pose opens them with Type89Motion.",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV19",
+  "materialRevision": "SurfaceV20",
   "runtimeTriangleTarget": 80000,
   "runtimeTriangleCeiling": 80000,
   "runtimeRenderedTriangles": 79997,
@@ -68,12 +68,12 @@
   "budgetPolicy": "HighDerivedGameHardCeiling",
   "linksPerSide": 81,
   "castingPitchM": 0.13075591189150385,
-  "materialCount": 9,
-  "activePackedImages": 9,
+  "materialCount": 4,
+  "activePackedImages": 10,
   "status": "AuthorReviewedWithDeclaredInferences",
   "reviewedAt": "2026-11-27",
   "reviewScope": "V6 registered front, left and top finish, neutral inspection, packed GLB and mechanism review",
-  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV19",
+  "sourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV20",
   "highProject": "Scene_Type89MediumTankHighPbr.blend",
   "gameProject": "Game/Scene_Type89MediumTankGamePbr.blend",
   "wheelGroupsPerSide": 15,
@@ -81,7 +81,7 @@
   "materialReview": "Data_BattleWearReview.json",
   "geometryReview": "Data_GeometryReviewV3.json",
   "articulationEvidence": "Data_ArticulationEvidence.json",
-  "runtimeSha256": "ea46f7ccee8710f424249a492ee8f375778c5b9a1b730a0bac59f8dcf64c6ac9",
+  "runtimeSha256": "cae1abff8253823d8109ec6fe76dea62cdd35b75a3563c04bb3067dcb28389ae",
   "userApproved": false,
   "authorization": {
     "optionalAssetIntegration": true,
@@ -90,15 +90,10 @@
   },
   "surfaceContract": {
     "sets": [
-      "Armor",
-      "CastArmor",
-      "Steel",
-      "Track",
-      "Rubber",
-      "Exhaust",
-      "Glass",
+      "Body",
       "Guard",
-      "Shadow"
+      "Glass",
+      "Track"
     ],
     "channels": "sRGB Base; linear OpenGL Normal; ORM R=AO G=roughness B=metallic",
     "atlases": {
@@ -125,13 +120,18 @@
       "V6 anchors are traced in the G55 cameras and projected onto visible rest-pose armour.",
       "Bake the finish, shallow relief and local dirt occlusion over the V16 photographed-material calibration; four shoe-local texture variants and independent physical mud deposits.",
       "SurfaceV18 two-distance contact AO from assembled geometry, with separate receiving UVs for rigid moving groups.",
-      "SurfaceV19 raises only genuinely exposed steel on the painted impact witnesses, the clean tread lands and the exposed steel jackets."
+      "SurfaceV19 raises only genuinely exposed steel on the painted impact witnesses, the clean tread lands and the exposed steel jackets.",
+      "SurfaceV20 consolidates the opaque body using constant per-primitive UV1 swatches for clearcoat and specular intensity."
     ],
     "extensions": [
       "KHR_materials_clearcoat",
       "KHR_materials_transmission",
       "EXT_texture_webp",
       "KHR_materials_specular"
+    ],
+    "coatingSwatchPixels": [
+      32,
+      8
     ]
   },
   "scopeLimitations": [
@@ -141,8 +141,9 @@
   ],
   "exportTriangulationZeroAreaTriangles": 0,
   "exporterOmittedTriangles": 58,
-  "highSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
-  "materialHighSourceSha256": "b3215644f5f0158ed4ce9d0519c49b18e52fb99c80ddf7374215a28acbd1cbf6",
+  "highSourceSha256": "ba04dab5e44892d3e1b7010a59e8ae2d997cb8e7a9e0980b0e1a47944a506c40",
+  "materialHighSourceSha256": "ba04dab5e44892d3e1b7010a59e8ae2d997cb8e7a9e0980b0e1a47944a506c40",
   "materialOcclusionReview": "Data_AmbientOcclusionReview.json",
-  "exposedMetalReview": "Data_ExposedMetalReview.json"
+  "exposedMetalReview": "Data_ExposedMetalReview.json",
+  "materialMergeReview": "Data_MaterialMergeReview.json"
 }
