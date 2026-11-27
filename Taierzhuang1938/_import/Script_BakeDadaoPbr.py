@@ -94,10 +94,10 @@ def PackStrips(tiles, size):
     return np.concatenate([np.pad(tile, padding, mode="edge") for tile in tiles])
 
 
-def Save(tiles, size, path, quality):
+def Save(tiles, size, path, quality, *, lossless=False):
     atlas = PackStrips(tiles, size)
     rgb = np.uint8(np.clip(np.rint(atlas * 255), 0, 255))
-    Image.fromarray(rgb).save(path, "WEBP", quality=quality, method=6)
+    Image.fromarray(rgb).save(path, "WEBP", quality=quality, method=6, lossless=lossless)
     print(f"{path.name} {size} × {size}, {path.stat().st_size:,} bytes")
 
 

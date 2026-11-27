@@ -88,7 +88,7 @@ def MergeUnseen(color, tags, samples, strip):
     steel, linen, cord = samples
     height, width = color.shape[:2]
     cloth, green, red, tan = MaterialRegions(color, tags)
-    # Match the reference palette while using the generated fiber and steel grain on the back and rims.
+    # Match the reference palette while using the generated fiber and steel grain on the narrow rims.
     result = gaussian_filter(color, (2.0, 2.5, 0))
     groups = ((~cloth, steel, .49), (tan, linen, .26), (red, cord, .25), (green, linen, .27))
     for i, (mask, source, blend) in enumerate(groups):
@@ -122,11 +122,16 @@ def Tiles(photo, labels, fit, size, samples, balanced=None):
     if size == BASE_SIZE:
         detail = front - gaussian_filter(front, (.9, .9, 0))
         front = np.clip(front + .32 * detail, 0, 1)
-    yield front, tags, color
-    yield MergeUnseen(color, tags, samples, 1), tags, color
+    yield 0, front, tags, color
     for strip, opposite in ((2, False), (3, True)):
         edge, kind = EdgeProjection(color, tags, visible, opposite)
-        yield MergeUnseen(edge, kind, samples, strip), kind, edge
+        yield strip, MergeUnseen(edge, kind, samples, strip), kind, edge
+
+
+def MirrorRim(tile):
+    # The lower half of the rim chart meets the photographed face at positive X.
+    half = tile[len(tile) // 2:]
+    return np.concatenate((half[::-1], half), axis=0)
 
 
 def BaseTile(color, details):
@@ -198,12 +203,12 @@ def ExportGeometryAo(trace, output):
     Image.fromarray(channels).save(output, optimize=True)
 
 
-def PadDataTile(normal, orm, coverage):
+def PadTiles(tiles, fills, coverage, factor=1):
     # Bleed from the real UV islands before simplifying the unused pixels.
     distance, nearest = distance_transform_edt(~coverage, return_indices=True)
-    weight = (1 - Smoothstep(5, 13, distance))[..., None]
+    weight = (1 - Smoothstep(5 * factor, 13 * factor, distance))[..., None]
     return tuple(fill + weight * (tile[tuple(nearest)] - fill)
-                 for tile, fill in ((normal, (.5, .5, 1)), (orm, (1, .74, .64))))
+                 for tile, fill in zip(tiles, fills))
 
 
 def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_AO):
@@ -234,21 +239,37 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
             raise ValueError("The geometry AO must have the same resolution as ORM")
         geometry = np.asarray(image.convert("LA"))
     occlusion = geometry[..., 0].astype(np.float32) / 255
-    coverage = geometry[..., 1] > 127
-    base = [BaseTile(color, TextileDetails(guide, tags, samples, strip))
-            for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, BASE_SIZE, samples, balanced))]
-    base[1:] = [gaussian_filter(tile, (.69, .69, 0)) for tile in base[1:]]
-    data = []
-    for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, DATA_SIZE, samples)):
-        top = strip * 256 + 20
-        region = np.s_[top:top + 216, 16:1008]
+    regions = [np.s_[strip * 256 + 20:strip * 256 + 236, 16:1008] for strip in range(4)]
+    coverage = [geometry[region][..., 1] > 127 for region in regions]
+    coverage[0] |= coverage[1]
+    for strip in (2, 3):
+        coverage[strip] |= coverage[strip][::-1].copy()
+
+    base = {}
+    factor = BASE_SIZE // DATA_SIZE
+    for strip, color, tags, guide in Tiles(photo, labels, fit, BASE_SIZE, samples, balanced):
+        tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
+        if strip:
+            tile = MirrorRim(gaussian_filter(tile, (.69, .69, 0)))
+        highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
+        base[strip], = PadTiles((tile,), ((.49, .47, .44),), highCoverage, factor)
+
+    data = {}
+    for strip, color, tags, guide in Tiles(photo, labels, fit, DATA_SIZE, samples):
         details = TextileDetails(guide, tags, samples, strip)
-        normal, orm = DataTiles(color, details, occlusion[region])
-        data.append(PadDataTile(normal, orm, coverage[region]))
+        ambient = occlusion[regions[strip]]
+        if strip:
+            color, ambient = MirrorRim(color), MirrorRim(ambient)
+            details = tuple(MirrorRim(detail) for detail in details)
+        layers = DataTiles(color, details, ambient)
+        data[strip] = PadTiles(layers, ((.5, .5, 1), (1, .74, .64)), coverage[strip])
+
+    # Both broad faces use the same input values in the existing UV layout.
+    strips = (0, 0, 2, 3)
     out.mkdir(parents=True, exist_ok=True)
-    Save(base, BASE_SIZE, out / "Texture_DadaoBase.webp", 91)
-    Save([normal for normal, _ in data], DATA_SIZE, out / "Texture_DadaoNormal.webp", 87)
-    Save([orm for _, orm in data], DATA_SIZE, out / "Texture_DadaoOrm.webp", 85)
+    Save([base[strip] for strip in strips], BASE_SIZE, out / "Texture_DadaoBase.webp", 91)
+    Save([data[strip][0] for strip in strips], DATA_SIZE, out / "Texture_DadaoNormal.webp", 87, lossless=True)
+    Save([data[strip][1] for strip in strips], DATA_SIZE, out / "Texture_DadaoOrm.webp", 85, lossless=True)
 
 
 if __name__ == "__main__":
