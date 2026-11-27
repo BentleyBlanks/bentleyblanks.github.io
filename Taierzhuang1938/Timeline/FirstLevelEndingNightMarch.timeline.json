@@ -1,0 +1,262 @@
+{
+  "schema": "tengxian-timeline/2",
+  "id": "FirstLevelEndingNightMarch",
+  "title": "3月14日夜·抬着活着的冬瓜走向滕县",
+  "mode": "cinematic",
+  "inputLock": "all",
+  "allowSkip": true,
+  "hideViewmodel": true,
+  "hideHud": true,
+  "cameraMode": "move",
+  "durationS": 24,
+  "note": "第一关北沙河单村合并版 13e 关尾过场（Unity-style Timeline v2）：优先 Binding 接管场上活着的罗班长、何有田、刘文财、幺娃、冬瓜、老耿、妮儿、田嫂、二丫（不删不重刷、无重影），在独立预览或单段跳关时按 fallbackPrefab 自动补齐；播完或按 Space 跳过后执行 encounter.complete。",
+  "segments": [
+    {
+      "id": "13e",
+      "title": "3月14日夜，抬着活着的冬瓜走向滕县",
+      "start": 0,
+      "end": 24,
+      "durationS": 24,
+      "signals": ["BridgeBlown"]
+    }
+  ],
+  "bindings": [
+    { "slot": "mainCamera", "type": "camera", "onMissing": "error" },
+    {
+      "slot": "luo",
+      "type": "actor",
+      "match": { "id": "luo", "castId": "luo" },
+      "fallbackPrefab": "Cast/luo",
+      "onMissing": "spawnFallback",
+      "init": { "x": -87, "z": 879, "yawDeg": 152, "side": "nra", "kind": "soldier", "castId": "luo", "weapon": "HanYang" }
+    },
+    {
+      "slot": "he",
+      "type": "actor",
+      "match": { "id": "he", "castId": "heyoutian" },
+      "fallbackPrefab": "Cast/heyoutian",
+      "onMissing": "spawnFallback",
+      "init": { "x": -89, "z": 882, "yawDeg": 152, "side": "nra", "kind": "soldier", "castId": "heyoutian", "weapon": "HanYang" }
+    },
+    {
+      "slot": "liu",
+      "type": "actor",
+      "match": { "id": "liu", "castId": "liuwencai" },
+      "fallbackPrefab": "Cast/liuwencai",
+      "onMissing": "spawnFallback",
+      "init": { "x": -91, "z": 877, "yawDeg": 152, "side": "nra", "kind": "soldier", "castId": "liuwencai", "weapon": "HanYang" }
+    },
+    {
+      "slot": "yao",
+      "type": "actor",
+      "match": { "id": "yao", "castId": "yaowa" },
+      "fallbackPrefab": "Cast/yaowa",
+      "onMissing": "spawnFallback",
+      "init": { "x": -85, "z": 877, "yawDeg": 152, "side": "nra", "kind": "soldier", "castId": "yaowa", "weapon": "Zb26" }
+    },
+    {
+      "slot": "geng",
+      "type": "puppet",
+      "match": { "id": "geng", "castId": "geng" },
+      "fallbackPrefab": "Cast/geng",
+      "onMissing": "spawnFallback",
+      "init": { "x": -92.5, "z": 881, "yawDeg": 152, "side": "civ", "kind": "civilian", "castId": "geng", "weapon": null }
+    },
+    {
+      "slot": "nier",
+      "type": "puppet",
+      "match": { "id": "nier", "castId": "nier" },
+      "fallbackPrefab": "Cast/nier",
+      "onMissing": "spawnFallback",
+      "init": { "x": -93.8, "z": 880, "yawDeg": 152, "side": "civ", "kind": "child", "castId": "nier", "weapon": null }
+    },
+    {
+      "slot": "tian",
+      "type": "puppet",
+      "match": { "id": "tian", "castId": "tiansao" },
+      "fallbackPrefab": "Cast/tiansao",
+      "onMissing": "spawnFallback",
+      "init": { "x": -94.2, "z": 883, "yawDeg": 152, "side": "civ", "kind": "civilian", "castId": "tiansao", "weapon": null }
+    },
+    {
+      "slot": "winter",
+      "type": "puppet",
+      "match": { "id": "winter", "castId": "comrade" },
+      "fallbackPrefab": "Cast/comrade",
+      "onMissing": "spawnFallback",
+      "init": { "x": -90, "z": 879, "yawDeg": 152, "side": "nra", "kind": "soldier", "castId": "comrade", "state": "down", "stance": "prone", "lie": "along", "weapon": null }
+    }
+  ],
+  "spawns": [
+    {
+      "slot": "endingStretcher",
+      "type": "puppet",
+      "prefab": "Litter/Stretcher",
+      "init": { "x": -90, "z": 879, "yawDeg": 152, "side": "nra", "kind": "litter", "bearers": 0 }
+    }
+  ],
+  "tracks": [
+    {
+      "id": "EndingCamera",
+      "type": "camera",
+      "clips": [
+        {
+          "id": "13e_1",
+          "t": 0,
+          "dur": 9.5,
+          "keepMove": true,
+          "fov": 48,
+          "from": { "x": -80, "z": 888, "h": 2.1 },
+          "to": { "x": -70, "z": 900, "h": 2.3 },
+          "look": { "actor": "luo", "offset": [0, 1.3, 0] },
+          "lookTo": { "actor": "he", "offset": [0, 1.3, 0] }
+        },
+        {
+          "id": "13e_2",
+          "t": 9.5,
+          "dur": 8.5,
+          "keepMove": true,
+          "fov": 44,
+          "from": { "actor": "geng", "offset": [5.5, 1.7, 4.5] },
+          "to": { "actor": "geng", "offset": [3.5, 1.8, 6.0] },
+          "look": { "actor": "winter", "offset": [0, 0.9, 0] }
+        },
+        {
+          "id": "13e_3",
+          "t": 18,
+          "dur": 6,
+          "keepMove": true,
+          "fov": 52,
+          "from": { "x": -72, "z": 896, "h": 3.4 },
+          "to": { "x": -66, "z": 892, "h": 5.6 },
+          "look": { "x": -55, "z": 945, "h": 2.0 },
+          "lookTo": { "x": -48, "z": 980, "h": 4.0 }
+        }
+      ]
+    },
+    {
+      "id": "Anim_luo",
+      "type": "animation",
+      "target": "luo",
+      "keys": [
+        { "t": 0, "x": -87, "z": 879, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -53, "z": 938, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_he",
+      "type": "animation",
+      "target": "he",
+      "keys": [
+        { "t": 0, "x": -89, "z": 882, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -56, "z": 941, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_liu",
+      "type": "animation",
+      "target": "liu",
+      "keys": [
+        { "t": 0, "x": -91, "z": 877, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -58, "z": 936, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_yao",
+      "type": "animation",
+      "target": "yao",
+      "keys": [
+        { "t": 0, "x": -85, "z": 877, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -51, "z": 936, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_geng",
+      "type": "animation",
+      "target": "geng",
+      "keys": [
+        { "t": 0, "x": -92.5, "z": 881, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -59.5, "z": 940, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_nier",
+      "type": "animation",
+      "target": "nier",
+      "keys": [
+        { "t": 0, "x": -93.8, "z": 880, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -60.8, "z": 939, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_tian",
+      "type": "animation",
+      "target": "tian",
+      "keys": [
+        { "t": 0, "x": -94.2, "z": 883, "move": "cut", "stance": "stand", "aim": false, "yawDeg": 152 },
+        { "t": 24, "x": -61.2, "z": 942, "move": "walk", "stance": "stand", "aim": false }
+      ]
+    },
+    {
+      "id": "Anim_stretcher",
+      "type": "animation",
+      "target": "endingStretcher",
+      "keys": [
+        { "t": 0, "x": -90, "z": 879, "move": "cut", "yawDeg": 152 },
+        { "t": 24, "x": -57, "z": 938, "move": "walk" }
+      ]
+    },
+    {
+      "id": "Anim_winter",
+      "type": "animation",
+      "target": "winter",
+      "keys": [
+        { "t": 0, "x": -90, "z": 879, "move": "cut", "stance": "prone", "state": "down", "lie": "along", "yawDeg": 152 },
+        { "t": 24, "x": -57, "z": 938, "move": "walk", "stance": "prone", "state": "down", "lie": "along" }
+      ]
+    },
+    {
+      "id": "EndingDialogue",
+      "type": "dialogue",
+      "clips": [
+        { "t": 2.0, "dur": 4.2, "actor": "he", "speaker": "何有田", "text": "老人家，跟到我们进城做啥子？鬼子明天就撵到城底下了。" },
+        { "t": 7.0, "dur": 4.2, "actor": "geng", "speaker": "老耿", "text": "村里那几个都是俺街坊……恁们打到哪，俺跟到哪。" },
+        { "t": 12.2, "dur": 4.0, "actor": "winter", "speaker": "冬瓜", "text": "顺儿……到了城里，真有火车往后头送嗦？" },
+        { "t": 17.0, "dur": 2.8, "actor": "player", "speaker": "顺子", "text": "有。" }
+      ]
+    },
+    {
+      "id": "EndingOverlay",
+      "type": "overlay",
+      "clips": [
+        { "t": 0, "dur": 1.2, "fade": 1.2, "kind": "black" },
+        { "t": 0.8, "dur": 3.5, "kind": "caption", "text": "一九三八年三月十四日夜 · 往滕县去" },
+        { "t": 21.5, "dur": 2.5, "fade": 2.0, "kind": "black" }
+      ]
+    },
+    {
+      "id": "EndingEnv",
+      "type": "environment",
+      "clips": [
+        { "t": 0, "hour": 22 }
+      ]
+    },
+    {
+      "id": "EndingAudio",
+      "type": "audio",
+      "clips": [
+        { "t": 0, "music": "firstLevelDusk", "fadeOut": 1.8, "levelScale": 0.65 },
+        { "t": 4.5, "name": "artilleryFar", "x": 110, "z": 620, "volume": 0.35 },
+        { "t": 14.0, "name": "mgBurstFar", "x": 120, "z": 640, "volume": 0.28 }
+      ]
+    },
+    {
+      "id": "EndingSignals",
+      "type": "signal",
+      "markers": [
+        { "t": 0, "action": "world.setSignal", "params": { "id": "BridgeBlown", "on": true }, "onSkip": "apply" },
+        { "t": 23.8, "action": "encounter.complete", "params": {}, "onSkip": "apply" }
+      ]
+    }
+  ]
+}

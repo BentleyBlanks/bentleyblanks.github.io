@@ -2,6 +2,7 @@
 // 主文件里的状态、服务、函数一律从工具箱 ctx 取；名字与签名是测试脚本的契约，改名要同步改测试。
 
 import { FIRST_LEVEL_CAMPAIGN_STAGES } from "./Data_FirstLevelCampaign.mjs";
+import { TIMELINE_V2_CATALOG, FindTimelineV2 } from "./Script_TimelinePlan.mjs";
 import { PhaseContentId } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { LastLitterArrived } from "./Script_MissionSetpieces.mjs";
 import { CHAPTER_RELEASE_SIGNAL } from "./Script_Story.mjs";
@@ -84,6 +85,24 @@ export function MissionDebugApi(ctx) {
       FirstLevelJump: (value) => ctx.JumpFirstLevelStage(value),
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
       FirstLevelMissionRuntime: () => (ctx.sandbox?.id === "firstLevelCampaign" ? ctx.sandbox.runtime : null) || ctx.missionRuntime || null,
+      // Unity-style Timeline v2 统一调试口（开场 / 关中并发 Setpiece / 关尾 / 后续章节共用）
+      Timeline: {
+        Catalog: () => TIMELINE_V2_CATALOG.map((e) => ({ ...e })),
+        State: () => ctx.sandbox?.runtime?.TimelineApi?.().State() || null,
+        Play: (idOrUrl, opts) => {
+          const api = ctx.sandbox?.runtime?.TimelineApi?.();
+          if (!api) return null;
+          const entry = typeof idOrUrl === "string" ? FindTimelineV2(idOrUrl) : null;
+          const target = entry ? `./${entry.file}` : idOrUrl;
+          return api.Play(target, opts);
+        },
+        Seek: (id, t) => ctx.sandbox?.runtime?.TimelineApi?.().Seek(id, t) ?? null,
+        Step: (id, frames) => ctx.sandbox?.runtime?.TimelineApi?.().Step(id, frames) ?? null,
+        Pause: (id, on = true) => ctx.sandbox?.runtime?.TimelineApi?.().Pause(id, on) ?? false,
+        Skip: (id) => ctx.sandbox?.runtime?.TimelineApi?.().Skip(id) ?? false,
+        Stop: (id) => ctx.sandbox?.runtime?.TimelineApi?.().Stop(id) ?? false,
+        SignalGate: (gateId) => ctx.sandbox?.runtime?.TimelineApi?.().SignalGate(gateId) ?? false,
+      },
       P012Progress: () => ctx.p012Debug.State(),
       P012NextProgress: () => ctx.p012Debug.Next(),
       P012CarryView: () => ctx.p012CarryView?.Debug() || null,

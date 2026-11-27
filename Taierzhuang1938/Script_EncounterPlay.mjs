@@ -4,8 +4,9 @@ export { ResolveEncounterStageStart };
 import { MissionAreaGuard } from "./Script_MissionAreaGuard.mjs";
 import { MISSION_AREA_GUARD } from "./Data_Tuning_MissionArea.mjs";
 import { CompileEncounterVariant } from "./Script_EncounterVariants.mjs";
-import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID } from "./Data_FirstLevelCampaign.mjs";
+import { FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL, FIRST_LEVEL_ENDING_TIMELINE_URL } from "./Data_FirstLevelCampaign.mjs";
 import { FirstLevelOpeningTimeline } from "./Script_FirstLevelOpeningTimeline.mjs";
+import { TimelineManager } from "./Script_TimelineDirector.mjs";
 import { VillageStealthRules, VillageStealthAt, StageVillageCompanions } from "./Scenes/FirstLevelEncounter/Script_LevelFlowVillage.mjs";
 import { SampleBeatRoute } from "./Scenes/FirstLevelEncounter/Script_LevelFlowGeometry.mjs";
 import { VillageStealthPlay } from "./Script_VillageStealthPlay.mjs";
@@ -135,7 +136,9 @@ export class EncounterPlay {
       ?ResolveEncounterStageStart(this.variant,options.startStage,{skipOpening})
       :{time:payload?.time||0,opening:false};
     this.pendingOpening=!!(this.isCampaign&&startPlan.opening);
-    this.openingActive=false;
+    this._openingActive=false;
+    this.endingPlaying=false;
+    this.timelineSignals=new Map();
     this.combatStarted=!this.pendingOpening;
     this.plan=new EncounterPlayPlan(this.isCampaign?this.variant.defaultDocument:(payload?.document||this.variant.defaultDocument),startPlan.time,this.variant);
     this.stealth=this.variant.stealthPlan?new VillageStealthPlay(host,new VillageStealthRules(this.variant.timeline)):null;
@@ -157,16 +160,127 @@ export class EncounterPlay {
     this.InstallBlastHook();
     this.view=this.isCampaign?CreateSingleViewportStub(host):new EncounterPlayView(host);
     this.puppets.xbot.view={camera:host.camera,renderer:host.renderer,post:host.post,lightRig:host.ctx.lights};
+    this.timelineResolver={
+      puppets:this.puppets,ai:host.ai,scene:host.scene,library:host.library,battlefield:host.battlefield,groundAt,
+      getPlayer:()=>host.player,
+      getCamera:()=>host.camera,
+      findLiveSoldier:(match,slot)=>{
+        const direct=this.entries.get(match?.id||slot);
+        if(direct?.soldier?.alive)return direct.soldier;
+        if(match?.castId){
+          for(const entry of this.entries.values()){
+            if(entry.soldier?.alive&&(entry.spec?.castId===match.castId||entry.soldier.castId===match.castId))return entry.soldier;
+          }
+        }
+        return null;
+      },
+      findPuppetId:(match,slot)=>{
+        const id=match?.id||slot;
+        if(this.puppets.puppets.has(id))return id;
+        if(match?.castId){
+          for(const [pid,p] of this.puppets.puppets)if(p.unit?.castId===match.castId)return pid;
+        }
+        return null;
+      },
+    };
+    this.timelines=new TimelineManager({
+      host,resolver:this.timelineResolver,groundAt,env:host.ctx.env,
+      encounter:{
+        setTimelineSignals:map=>{this.timelineSignals=new Map(map);this.SyncTimelineScenarioSignals();},
+        setFact:(id,val)=>{if(val)this.plan.facts.add(id);else this.plan.facts.delete(id);},
+        advanceBeat:()=>{},
+        complete:()=>this.FinishCampaign(),
+      },
+      onStateChange:state=>{
+        if(state.hidesHud){
+          this.speech?.Clear();
+          if(this.isCampaign&&this.host.ctx.hudRoot)this.host.ctx.hudRoot.style.display="none";
+        }else if(!this._openingActive&&!this.host.state.menu){
+          if(this.isCampaign&&this.host.ctx.hudRoot)this.host.ctx.hudRoot.style.display="";
+          this.environmentHour=null;
+        }
+        if(this.host.viewmodel){
+          if(state.hidesViewmodel)this.host.viewmodel.root.visible=false;
+          else if(!this._openingActive&&this.combatStarted)this.host.viewmodel.root.visible=true;
+        }
+      },
+    });
     this.opening=this.isCampaign
-      ?new FirstLevelOpeningTimeline({host,puppets:this.puppets,groundAt,onComplete:()=>this.OnOpeningComplete()})
+      ?new FirstLevelOpeningTimeline({host,puppets:this.puppets,groundAt,resolver:this.timelineResolver,
+          prefabs:this.timelines.prefabs,actions:this.timelines.actions,onComplete:()=>this.OnOpeningComplete()})
       :null;
     this.BuildUi();
     this.api={State:()=>this.State(),MissionState:()=>this.MissionState(),Stages:()=>this.Stages(),
       SetLayout:n=>this.view.SetLayout(n),Interact:()=>this.Interact(),
       Actors:()=>this.Actors(),Presentation:()=>this.Presentation(),Tanks:()=>this.tanks?.State()||[],Retry:opts=>this.Retry(opts),
       Begin:p=>this.Begin(p),JumpToStage:v=>this.JumpToStage(v),SkipOpening:()=>this.SkipOpening(),
+      Timelines:()=>this.TimelineApi(),
       Pause:on=>this.Pause(on),Suspend:()=>this.Suspend(),Stop:()=>this.RequestStop(),Dispose:()=>this.Dispose(),Ready:()=>this.readyPromise};
     this.readyPromise=this.Load().catch(error=>{this.error=String(error.stack||error);console.error(error);this.Send("error",{message:String(error.message||error)});});
+  }
+  get openingActive(){return this._openingActive||!!this.timelines?.IsBlockingInput();}
+  set openingActive(value){this._openingActive=!!value;}
+  SyncTimelineScenarioSignals() {
+    const active=new Set(this.sceneSignals||["Stage0105Done"]);
+    for(const [id,on] of this.timelineSignals){if(on)active.add(id);else active.delete(id);}
+    this.sceneSignals=[...active];
+    if(!this.host.battlefield?.RestoreScenario)return;
+    const changed=this.host.battlefield.RestoreScenario({signalled:id=>active.has(id)});
+    if(changed)this.host.ctx.navGrid?.Refresh?.(this.host.battlefield,{spread:true});
+  }
+  TimelineApi() {
+    return {
+      State:()=>({
+        opening:this.opening?.State()||null,
+        manager:this.timelines.State(),
+      }),
+      Play:(docOrUrl,opts)=>this.timelines.Play(docOrUrl,opts),
+      Seek:(id,t)=>{
+        if(id==="FirstLevelOpeningCampaign"&&this.opening)return this.opening.Seek(t);
+        return this.timelines.Get(id)?.Seek(t)||null;
+      },
+      Step:(id,frames)=>this.timelines.Get(id)?.Step(frames)||null,
+      Pause:(id,on=true)=>{
+        if(id==="FirstLevelOpeningCampaign"&&this.opening){this.opening.SetPaused(on);return true;}
+        if(id)return this.timelines.Get(id)?.SetPaused(on)||false;
+        this.timelines.SetPaused(on);return true;
+      },
+      Skip:(id)=>{
+        if(this._openingActive&&(!id||id==="FirstLevelOpeningCampaign"))return this.SkipOpening();
+        return this.timelines.Skip(id||null);
+      },
+      Stop:(id)=>{
+        if(this._openingActive&&(!id||id==="FirstLevelOpeningCampaign")){this.opening.Stop();this._openingActive=false;return true;}
+        return this.timelines.Stop(id||null);
+      },
+      SignalGate:(gateId)=>this.timelines.SignalGate(gateId),
+      RegisterAction:(id,fn,opts)=>this.timelines.RegisterAction(id,fn,opts),
+      RegisterPrefab:(id,fn)=>this.timelines.RegisterPrefab(id,fn),
+    };
+  }
+  FinishCampaign() {
+    if(this.completedHandled||this.disposed)return;
+    this.completedHandled=true;
+    this.endingPlaying=false;
+    this.host.audio.Music(null,{fadeOut:1.5});
+    this.speech.Clear();
+    this.RenderHud();
+    if(this.isCampaign&&this.host.ctx.hudRoot&&!this.host.state.menu)this.host.ctx.hudRoot.style.display="";
+    if(this.host.viewmodel)this.host.viewmodel.root.visible=true;
+    this.onComplete?.(this.MissionState());
+  }
+  PlayEndingTimeline() {
+    if(this.endingPlaying||this.completedHandled||this.disposed)return;
+    this.endingPlaying=true;
+    this.speech.Clear();
+    if(this.isCampaign&&this.host.ctx.hudRoot)this.host.ctx.hudRoot.style.display="none";
+    this.timelines.Play(FIRST_LEVEL_ENDING_TIMELINE_URL,{
+      key:"FirstLevelEndingNightMarch",
+      onComplete:()=>this.FinishCampaign(),
+    }).catch(error=>{
+      console.warn("[EncounterPlay] Ending timeline unavailable; completing campaign:",error);
+      this.FinishCampaign();
+    });
   }
   InstallBlastHook() {
     const ch=this.host.combat?.host;
@@ -212,7 +326,7 @@ export class EncounterPlay {
   ScaleDt(dt){
     if(!this.active||!this.ready||this.paused)return 0;
     if(this.failed)return this.DeathSettled()?0:dt;
-    return this.plan.completed?0:dt;
+    return this.plan.completed&&!this.endingPlaying&&!this.timelines?.HasActive()?0:dt;
   }
   RenderFailure(status,hint){
     if(this.isCampaign){if(!this.failureCard.hidden)this.failureCard.hidden=true;return;}
@@ -258,7 +372,8 @@ export class EncounterPlay {
     const openingLoad=this.opening&&this.pendingOpening
       ?this.opening.Load().catch(error=>{console.warn("[EncounterPlay] Opening timeline unavailable, falling back to 02g",error);this.pendingOpening=false;this.combatStarted=true;})
       :null;
-    await Promise.all([this.puppets.xbot.Load({preloadClips:combatClipFiles}),PreloadDeathLibrary(),sfxWarm,openingLoad,this.puppets.LoadTankette()]);
+    const timelinePreload=this.timelines.PreloadDependencies([FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL,FIRST_LEVEL_ENDING_TIMELINE_URL]);
+    await Promise.all([this.puppets.xbot.Load({preloadClips:combatClipFiles}),PreloadDeathLibrary(),sfxWarm,openingLoad,timelinePreload,this.puppets.LoadTankette()]);
     if(this.disposed)return;
     if(!this.puppets.xbot.ready)throw new Error("Character library could not load");
     this.castTexturesReady??=PrepareCastTextures(this.puppets.xbot.kits,(done,total)=>
@@ -418,13 +533,15 @@ export class EncounterPlay {
   SetPaused(on) {
     if(!this.active||!this.ready||this.starting)return false;
     this.paused=!!on;
-    if(this.openingActive)this.opening?.SetPaused(this.paused);
+    if(this._openingActive)this.opening?.SetPaused(this.paused);
+    this.timelines?.SetPaused(this.paused);
     return this.paused;
   }
   Pause(on=!this.paused) {
     if(!this.active||!this.ready||this.starting)return false;
     this.paused=!!on;this.host.state.running=!this.paused;
-    if(this.openingActive)this.opening?.SetPaused(this.paused);
+    if(this._openingActive)this.opening?.SetPaused(this.paused);
+    this.timelines?.SetPaused(this.paused);
     this.host.audio.SetPaused(this.paused);
     if(this.paused){this.host.ctx.ReleasePointerLock();this.host.audio.ctx?.suspend();}
     else{this.host.ctx.menu?.Close();this.host.state.menu=false;this.host.audio.ctx?.resume();}
@@ -432,6 +549,9 @@ export class EncounterPlay {
   }
   Suspend() {
     this.opening?.Stop();
+    this.timelines?.Stop();
+    this.timelineSignals.clear();
+    this.endingPlaying=false;
     this.tanks?.Reset();
     this.artillery?.Reset();
     this.RestoreBlastHook();
@@ -763,9 +883,9 @@ export class EncounterPlay {
   }
   Order(entry,frame) {
     const {soldier,group,route}=entry;
+    if(!soldier.alive||soldier.HasTag?.("timelineControlled"))return;
     const cfg=this.plan.config;
     const reachM=this.stealth&&entry.actor.id==="liu"&&["09a","09b"].includes(frame.beat.id)?0.18:cfg.routeReachM;
-    if(!soldier.alive)return;
     const current=frame.actors.find(a=>a.id===entry.actor.id);
     if(group?.id==="TempleSearch"&&this.templeEnteredAt===null&&!this.stealth?.state?.alarm&&!entry.provoked) {
       this.host.ai.DirectActor(soldier,{x:soldier.position.x,z:soldier.position.z,stance:1,combat:false,moving:false});
@@ -925,10 +1045,12 @@ export class EncounterPlay {
   }
   Update(dt) {
     if(!this.active||this.paused||!this.ready||this.disposed)return;
-    if(this.openingActive){
+    if(this._openingActive){
       this.opening.Update(dt);
       return;
     }
+    this.timelines?.Update(dt);
+    if(this.timelines?.IsBlockingInput())return;
     if(!this.combatStarted)return;
     if(this.failed){this.RenderHud();return;}
     const {player,state}=this.host,cfg=this.plan.config;
@@ -963,13 +1085,16 @@ export class EncounterPlay {
     const escorted=[...this.puppets.puppets.values()].filter(p=>/^stretcher\d+$/.test(p.id)&&p.z>=cfg.escortExitZ).length;
     const facts=[];for(const [fact,p] of this.pendingActions)if(!p.alive){facts.push(fact);this.pendingActions.delete(fact);}
     if(!stealth.alarm)this.plan.Step(dt,[player.position.x,player.position.z],alive,{departed,escorted,facts,partyArrived:this.PartyAtEndpoint()});
-    if(this.isCampaign&&this.plan.completed&&!this.completedHandled){
-      this.completedHandled=true;
-      this.host.audio.Music(null,{fadeOut:1.5});
-      this.speech.Clear();
-      this.RenderHud();
-      this.onComplete?.(this.MissionState());
-      return;
+    if(this.isCampaign&&this.plan.completed&&!this.completedHandled&&!this.endingPlaying){
+      if(this.timelines?.Get("FirstLevelBridgeDemolition")?.active){
+        // Wait for the concurrent 13d bridge demolition setpiece to finish before cutting to 13e.
+      } else if(this.variant.id===FIRST_LEVEL_CAMPAIGN_VARIANT_ID&&this.variant.cinematics?.includes("13e")){
+        this.PlayEndingTimeline();
+        return;
+      } else {
+        this.FinishCampaign();
+        return;
+      }
     }
     const frame=this.plan.Frame();
     this.SyncEnvironment(frame);
@@ -997,6 +1122,7 @@ export class EncounterPlay {
       }
     }
     const signals=EncounterSceneSignals(frame,this.plan.facts,this.variant);signals.add("Stage0105Done");
+    for(const [id,on] of this.timelineSignals){if(on)signals.add(id);else signals.delete(id);}
     this.sceneSignals=[...signals];
     const signalKey=[...signals].join(",");
     if(this.signalKey!==signalKey){
@@ -1049,7 +1175,8 @@ export class EncounterPlay {
     }
   }
   ApplyCamera(camera) {
-    if(this.openingActive)return this.opening.ApplyCamera(camera);
+    if(this._openingActive)return this.opening.ApplyCamera(camera);
+    if(this.timelines?.ApplyCamera(camera))return true;
     return false;
   }
   SetPlayerPuppetVisible(visible){for(const human of this.playerPuppet?.humans||[]){
@@ -1093,15 +1220,20 @@ export class EncounterPlay {
       if(!projectile)return false;this.host.state.bundles--;this.pendingActions.set(id+"Destroyed",projectile);
     }
     if(action==="bandageWinter"){if(this.host.player.bandages<=0)return false;this.host.player.bandages--;}
+    if(action==="detonateRailBridge"){
+      this.timelines?.Play(FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL,{key:"FirstLevelBridgeDemolition"}).catch(()=>{});
+    }
     this.plan.Interact();
     return true;
   }
   OnKey(detail) {
-    if(this.openingActive){
+    if(this._openingActive){
       if(detail.code==="Escape")return undefined;
       if(detail.code==="Space"&&detail.down&&!detail.repeat){this.SkipOpening();return true;}
       return true;
     }
+    const tlHandled=this.timelines?.OnKey(detail);
+    if(tlHandled!==undefined)return tlHandled;
     if(detail.code==="KeyR" && detail.down && !detail.repeat && this.failed)return this.Retry();
     if(this.stealth?.CapturesInput() && detail.down && !["Escape","KeyO"].includes(detail.code))return true;
     if(!this.isCampaign&&detail.code==="KeyO"&&this.view.count===2) {
@@ -1179,6 +1311,7 @@ export class EncounterPlay {
       stage:stageObj?.id||stageId,stageNumber:stageIndex+1,stageTitle:stageObj?.title||"",
       beat:this.openingActive||this.pendingOpening?(this.opening?.State().keyframe||"01-1"):this.plan.beat.id,
       opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,
+      timelines:this.timelines?.State()||null,
       time:this.openingActive?(this.opening?.State().t||0):this.plan.time,
       elapsed:this.plan.elapsed,waiting:this.plan.waiting,completed:this.plan.completed,failed:this.failed,
       objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],artillery:this.artillery?.State()||[],
@@ -1186,7 +1319,7 @@ export class EncounterPlay {
       missionArea:this.areaGuard?.State()??null,
     };
   }
-  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),missionArea:this.areaGuard?.State()??null,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],artillery:this.artillery?.State()||[],signals:this.sceneSignals||[]};}
+  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,timelines:this.timelines?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),missionArea:this.areaGuard?.State()??null,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],artillery:this.artillery?.State()||[],signals:this.sceneSignals||[]};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.openingActive || !this.combatStarted || this.failed || !!this.stealth?.CapturesInput()
       || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
@@ -1239,7 +1372,8 @@ export class EncounterPlay {
   }
   Retry({force=false}={}) {
     if(!this.active || !this.ready || this.starting || this.disposed || (!this.failed&&!force))return false;
-    if(this.openingActive){this.opening.Stop();this.openingActive=false;this.pendingOpening=false;}
+    if(this._openingActive){this.opening.Stop();this._openingActive=false;this.pendingOpening=false;}
+    this.timelines?.Stop();this.timelineSignals.clear();this.endingPlaying=false;
     const plan=new EncounterPlayPlan(this.plan.document,this.checkpointTime??this.plan.beat.start,this.variant);
     const {player,state,combat,battlefield,vfx,ctx}=this.host;
     this.host.audio.ResetSession();
@@ -1293,6 +1427,7 @@ export class EncounterPlay {
     if(this.previousMissionCoverRules!==undefined)this.host.ai.missionCoverRules=this.previousMissionCoverRules;
     if(this.previousMissionReactions!==undefined)this.host.ai.missionReactions=this.previousMissionReactions;
     this.opening?.Dispose();
+    this.timelines?.Dispose();
     this.tanks?.Dispose();
     this.RestoreBlastHook();
     this.host.audio.Music(null,{fadeOut:0});this.host.audio.Dispose();this.view.Dispose();

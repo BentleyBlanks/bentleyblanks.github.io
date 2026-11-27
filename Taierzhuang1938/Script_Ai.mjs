@@ -616,6 +616,23 @@ export class Soldier extends SoldierFieldAccessors {
   get alive() { return this.state !== STATE.DEAD; }
 
   /**
+   * Timeline v2 接管实兵时的姿态写入接口（Script_Ai 为 locomotion / aiming 主人，避免跨模块裸写）。
+   */
+  ApplyTimelinePose({ x, y, z, yaw, stance = 0, crouchBlend = 0, proneBlend = 0, moveSpeed = 0, aimBlend = 0 } = {}) {
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+      this.position.set(x, y, z);
+      this.body?.Teleport?.(x, y, z);
+    }
+    this.velocity?.set?.(0, 0, 0);
+    if (Number.isFinite(yaw)) this.yaw = yaw;
+    this.stance = stance;
+    this.crouchBlend = crouchBlend;
+    this.proneBlend = proneBlend;
+    this.moveSpeed = moveSpeed;
+    this.aimBlend = aimBlend;
+  }
+
+  /**
    * @param {THREE.Vector3|null} direction 中弹方向
    * @param {{limbs:string[], kind?:string, point?:THREE.Vector3}|null} sever
    *   TakeHit 里 `gore.Resolve` 的结论。非空表示这一下要卸肢：`actor.Ragdoll`
@@ -1771,6 +1788,11 @@ export class AiDirector {
         profiler?.E("ai/corpse");
         continue;
       }
+      if (s.HasTag("timelineControlled")) {
+        // Timeline 接管期间暂停 AI 思考与自动覆盖，仅保留物理胶囊跟随（由 TimelineDirector 写入位置与动画）。
+        if (s.body?.Teleport) s.body.Teleport(s.position.x, s.position.y, s.position.z);
+        continue;
+      }
       // 「想」分帧轮转：每帧只有六分之一的人重新决策。
       // 木桩兵（s.dummy，见 Soldier 构造器）不想：Act 照走 —— 重力、贴地、
       // 姿态动画、守点纪律都要，只是永远不会有目标、不会开火。
@@ -1803,7 +1825,7 @@ export class AiDirector {
 
   /** 剧本或别的系统钉住位置的人：软分离不挪他（见 `CROWD`）。 */
   CrowdPinned(s) {
-    return !!(s.meleeCombat || s.weaponRangeTargetId || s.p012CarriedCasualty || s.p012OnMovingTrain
+    return !!(s.HasTag("timelineControlled") || s.meleeCombat || s.weaponRangeTargetId || s.p012CarriedCasualty || s.p012OnMovingTrain
       || s.missionCarriageAction || s.missionAmbushClip || s.missionDormant || s.carryRole || s.crowdPinned
       || (s.missionTrainPassenger && !s.missionTrainReady)
       || s.actor?.pendingGrenadeThrow || s.vaultT >= 0);

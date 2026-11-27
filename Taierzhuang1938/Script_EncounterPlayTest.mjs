@@ -16,7 +16,8 @@ import {EncounterDialogueLines,EncounterSpeechAnchor} from "./Script_EncounterPl
 import {CompileEncounterVariant} from "./Script_EncounterVariants.mjs";
 import {CompileEncounters} from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
 import {YawForwardXZ,CompassDirection,YawCompass,RelativeDirection,NormalizeDialogueText,MergePlayEntities,BuildPlayObjectiveGuide,PlayDialogueHistory} from "./AdvancedTools/Script_LevelFlowPlayGuideModel.mjs";
-import {FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_OPENING_CONFIG_URL, FIRST_LEVEL_OPENING_SEQUENCES, FIRST_LEVEL_OPENING_TIMELINE_URL} from "./Data_FirstLevelCampaign.mjs";
+import {FIRST_LEVEL_CAMPAIGN_STAGES, FIRST_LEVEL_CAMPAIGN_VARIANT_ID, FIRST_LEVEL_OPENING_SEQUENCES, FIRST_LEVEL_OPENING_TIMELINE_URL, FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL, FIRST_LEVEL_ENDING_TIMELINE_URL} from "./Data_FirstLevelCampaign.mjs";
+import {TIMELINE_V2_SCHEMA, ValidateTimelineAsset} from "./Script_TimelineAsset.mjs";
 import {Vector3,PerspectiveCamera} from "./vendor/three/build/three.module.js";
 for(const beat of FLOW_TIMELINE.filter(beat=>EncounterCanPlay(beat.start,"L1_Original"))){
  const plan=new EncounterPlayPlan(DEFAULT_ENCOUNTER_DOCUMENT,beat.start,"L1_Original");
@@ -203,12 +204,16 @@ assert.equal(surface(0,0),0);assert.equal(surface(0,5),1);assert.equal(surface(0
  assert.equal(ResolveEncounterStageStart(merged,"08a").opening,false);
  assert.equal(ResolveEncounterStageStart(merged,null,{skipOpening:true}).opening,false);
  const openingTimeline=JSON.parse(fs.readFileSync(new URL(FIRST_LEVEL_OPENING_TIMELINE_URL,import.meta.url)));
- const openingConfig=JSON.parse(fs.readFileSync(new URL(FIRST_LEVEL_OPENING_CONFIG_URL,import.meta.url)));
- const timelineKeyframes=new Set((openingTimeline.sequences||[]).map(s=>s.keyframe));
- const configKeyframes=new Set((openingConfig.keyframes||[]).map(k=>k.id));
+ assert.equal(openingTimeline.schema,TIMELINE_V2_SCHEMA,"Campaign opening uses self-contained Timeline v2");
+ assert.equal(ValidateTimelineAsset(openingTimeline).ok,true,"Campaign opening v2 passes validation");
+ const timelineSegments=new Set((openingTimeline.segments||[]).map(s=>s.id));
  for(const id of FIRST_LEVEL_OPENING_SEQUENCES){
-  assert.ok(timelineKeyframes.has(id),"Opening timeline includes sequence "+id);
-  assert.ok(configKeyframes.has(id),"Opening keyframe config includes "+id);
+  assert.ok(timelineSegments.has(id),"Opening timeline v2 includes segment "+id);
+ }
+ for(const url of [FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL,FIRST_LEVEL_ENDING_TIMELINE_URL]){
+  const doc=JSON.parse(fs.readFileSync(new URL(url,import.meta.url)));
+  assert.equal(doc.schema,TIMELINE_V2_SCHEMA,"Campaign timeline uses v2 schema: "+url);
+  assert.equal(ValidateTimelineAsset(doc).ok,true,"Campaign timeline passes validation: "+url);
  }
  // Formal XBot-skinned / minimalRig soldiers must never fall back to legacy Lugou ActorCrowd
  // (which only loads TengxianNra02 under minimalRig, turning distant IJA soldiers into NRA models

@@ -3,8 +3,9 @@
 
 export const FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID = "FirstLevelP012Whitebox";
 export const FIRST_LEVEL_CAMPAIGN_VARIANT_ID = "L1_BeishaheMerged";
-export const FIRST_LEVEL_OPENING_TIMELINE_URL = "./Timeline/FirstLevelOpening.timeline.json";
-export const FIRST_LEVEL_OPENING_CONFIG_URL = "./Blockout/FirstLevel0105.json";
+export const FIRST_LEVEL_OPENING_TIMELINE_URL = "./Timeline/FirstLevelOpeningCampaign.timeline.json";
+export const FIRST_LEVEL_BRIDGE_DEMO_TIMELINE_URL = "./Timeline/FirstLevelBridgeDemolition.timeline.json";
+export const FIRST_LEVEL_ENDING_TIMELINE_URL = "./Timeline/FirstLevelEndingNightMarch.timeline.json";
 export const FIRST_LEVEL_OPENING_SEQUENCES = Object.freeze([
   "01-1", "01-2", "01-3", "01-4", "02-1", "02-2",
 ]);

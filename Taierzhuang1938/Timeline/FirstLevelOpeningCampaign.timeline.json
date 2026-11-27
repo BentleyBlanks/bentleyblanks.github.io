@@ -1,0 +1,7520 @@
+{
+  "schema": "tengxian-timeline/2",
+  "id": "FirstLevelOpeningCampaign",
+  "title": "第一关开场",
+  "mode": "cinematic",
+  "inputLock": "all",
+  "allowSkip": true,
+  "hideViewmodel": true,
+  "hideHud": true,
+  "cameraMode": "move",
+  "durationS": 158.96,
+  "note": "Self-contained Unity-style Timeline v2 compiled from FirstLevelOpening (01-1, 01-2, 01-3, 01-4, 02-1, 02-2). Zero Blockout config dependency.",
+  "voice": "./Blockout/FirstLevel0105.voice.json",
+  "faceTracks": "./Audio/Blockout0105/Data_Blockout0105FaceTracks.json",
+  "segments": [
+    {
+      "id": "01-1",
+      "title": "近炮、绑绷带",
+      "start": 0,
+      "end": 13.84,
+      "durationS": 13.84,
+      "player": {
+        "x": 66.5,
+        "z": 64.2,
+        "yawDeg": -149,
+        "pitchDeg": -12,
+        "stance": "crouch"
+      }
+    },
+    {
+      "id": "01-2",
+      "title": "传令兵报信，幺娃替顺子去",
+      "start": 13.84,
+      "end": 39.46,
+      "durationS": 25.62,
+      "player": {
+        "x": 66.5,
+        "z": 64.2,
+        "yawDeg": 94.9,
+        "pitchDeg": -3,
+        "stance": "crouch"
+      }
+    },
+    {
+      "id": "01-3",
+      "title": "最后两个人：今天就跑",
+      "start": 39.46,
+      "end": 74.56,
+      "durationS": 35.1,
+      "player": {
+        "x": 66.8,
+        "z": 64.2,
+        "yawDeg": 132,
+        "pitchDeg": -8,
+        "stance": "crouch"
+      }
+    },
+    {
+      "id": "01-4",
+      "title": "塌洞后醒来：一睁眼就是鬼子",
+      "start": 74.56,
+      "end": 87.96,
+      "durationS": 13.4,
+      "player": {
+        "x": 63.3,
+        "z": 63.8,
+        "yawDeg": 88.6,
+        "pitchDeg": -2,
+        "stance": "prone"
+      },
+      "signals": [
+        "DugoutCollapsed"
+      ]
+    },
+    {
+      "id": "02-1",
+      "title": "审冬瓜、新兵见血",
+      "start": 87.96,
+      "end": 144.36,
+      "durationS": 56.4,
+      "player": {
+        "x": 63.3,
+        "z": 63.8,
+        "yawDeg": 104.5,
+        "pitchDeg": 2,
+        "stance": "prone"
+      },
+      "signals": [
+        "DugoutCollapsed"
+      ]
+    },
+    {
+      "id": "02-2",
+      "title": "反冲：南沿上一排枪，白刃",
+      "start": 144.36,
+      "end": 158.96,
+      "durationS": 14.6,
+      "player": {
+        "x": 63.3,
+        "z": 63.8,
+        "yawDeg": 113.1,
+        "pitchDeg": 6,
+        "stance": "prone"
+      },
+      "signals": [
+        "DugoutCollapsed"
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "slot": "mainCamera",
+      "type": "camera",
+      "onMissing": "error"
+    },
+    {
+      "slot": "Donggua",
+      "type": "actor",
+      "match": {
+        "castId": "comrade",
+        "id": "Donggua"
+      },
+      "fallbackPrefab": "Cast/comrade",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 67.1,
+        "z": 65.2,
+        "yawDeg": 31,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "冬瓜",
+        "castId": "comrade"
+      }
+    },
+    {
+      "slot": "Luo",
+      "type": "actor",
+      "match": {
+        "castId": "luo",
+        "id": "Luo"
+      },
+      "fallbackPrefab": "Cast/luo",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 63.5,
+        "z": 64.5,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "name": "罗班长",
+        "castId": "luo"
+      }
+    },
+    {
+      "slot": "Yaowa",
+      "type": "actor",
+      "match": {
+        "castId": "yaowa",
+        "id": "Yaowa"
+      },
+      "fallbackPrefab": "Cast/yaowa",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 64.9,
+        "z": 63.1,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "幺娃",
+        "castId": "yaowa"
+      }
+    },
+    {
+      "slot": "LiuWencai",
+      "type": "actor",
+      "match": {
+        "castId": "liuwencai",
+        "id": "LiuWencai"
+      },
+      "fallbackPrefab": "Cast/liuwencai",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 68.5,
+        "z": 63.2,
+        "yawDeg": 116.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "刘文财",
+        "castId": "liuwencai"
+      }
+    },
+    {
+      "slot": "HeYoutian",
+      "type": "actor",
+      "match": {
+        "castId": "heyoutian",
+        "id": "HeYoutian"
+      },
+      "fallbackPrefab": "Cast/heyoutian",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 69.1,
+        "z": 65.7,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "何有田",
+        "castId": "heyoutian"
+      }
+    },
+    {
+      "slot": "Runner",
+      "type": "actor",
+      "match": {
+        "castId": "runner",
+        "id": "Runner"
+      },
+      "fallbackPrefab": "Cast/runner",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 61.4,
+        "z": 64.8,
+        "yawDeg": -90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "传令兵",
+        "castId": "runner"
+      }
+    },
+    {
+      "slot": "IjaYi",
+      "type": "actor",
+      "match": {
+        "castId": "ijaB",
+        "id": "IjaYi"
+      },
+      "fallbackPrefab": "Cast/ijaB",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 60.19,
+        "z": 64.38,
+        "yawDeg": -86,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": true,
+        "name": "乙",
+        "castId": "ijaB"
+      }
+    },
+    {
+      "slot": "IjaJia",
+      "type": "actor",
+      "match": {
+        "castId": "ijaA",
+        "id": "IjaJia"
+      },
+      "fallbackPrefab": "Cast/ijaA",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 52.98,
+        "z": 64.43,
+        "yawDeg": 94.9,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "name": "甲",
+        "castId": "ijaA"
+      }
+    },
+    {
+      "slot": "IjaDing",
+      "type": "actor",
+      "match": {
+        "castId": "ijaD",
+        "id": "IjaDing"
+      },
+      "fallbackPrefab": "Cast/ijaD",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 46.07,
+        "z": 66.17,
+        "yawDeg": 92.2,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": true,
+        "name": "丁",
+        "castId": "ijaD"
+      }
+    },
+    {
+      "slot": "IjaMgGunner",
+      "type": "actor",
+      "match": {
+        "castId": "ijaC",
+        "id": "IjaMgGunner"
+      },
+      "fallbackPrefab": "Cast/ijaC",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 56,
+        "z": 61.6,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": true,
+        "name": "支沟机枪",
+        "castId": "ijaC",
+        "weapon": "Type11",
+        "arc": {
+          "halfDeg": 5,
+          "rangeM": 38.5,
+          "yawDeg": 99.2
+        }
+      }
+    },
+    {
+      "slot": "Interpreter",
+      "type": "actor",
+      "match": {
+        "castId": "interpreter",
+        "id": "Interpreter"
+      },
+      "fallbackPrefab": "Cast/interpreter",
+      "onMissing": "spawnFallback",
+      "init": {
+        "x": 56.2,
+        "z": 60.4,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "castId": "interpreter",
+        "weapon": "Type38"
+      }
+    }
+  ],
+  "spawns": [
+    {
+      "slot": "RetreatNra1",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": -39.75,
+        "z": 5.93,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      }
+    },
+    {
+      "slot": "RetreatNra2",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": -30.37,
+        "z": 8.06,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      }
+    },
+    {
+      "slot": "RetreatNra3",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": -19.76,
+        "z": 3.96,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      }
+    },
+    {
+      "slot": "RetreatNra4",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": -10.94,
+        "z": -1.18,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      }
+    },
+    {
+      "slot": "IjaMgLoader",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 57.3,
+        "z": 61.4,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "name": "副射手"
+      }
+    },
+    {
+      "slot": "IjaBing",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 57.8,
+        "z": 60.3,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "BodyNra3",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 54,
+        "z": 65.6,
+        "yawDeg": 70,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      }
+    },
+    {
+      "slot": "IjaWu",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60.2,
+        "z": 60,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "CorpseLip1",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 55.4,
+        "z": 61.8,
+        "yawDeg": 0,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      }
+    },
+    {
+      "slot": "CorpseLip2",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 56.6,
+        "z": 61.9,
+        "yawDeg": 20,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      }
+    },
+    {
+      "slot": "BodyNra1",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 59.6,
+        "z": 65.6,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      }
+    },
+    {
+      "slot": "BodyNra2",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 60.9,
+        "z": 63.8,
+        "yawDeg": 100,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      }
+    },
+    {
+      "slot": "IjaColumn1",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "IjaColumn2",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "IjaColumn3",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "IjaColumn4",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "IjaColumn5",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "IjaOfficer",
+      "type": "puppet",
+      "prefab": "Soldier/ija",
+      "init": {
+        "x": 51,
+        "z": 61.9,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      }
+    },
+    {
+      "slot": "CounterNra1",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 57.4,
+        "z": 70.3,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    },
+    {
+      "slot": "CounterNra2",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 52.6,
+        "z": 70.3,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    },
+    {
+      "slot": "CounterNra3",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 54.4,
+        "z": 70.2,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    },
+    {
+      "slot": "CounterNra4",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 59,
+        "z": 70.4,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    },
+    {
+      "slot": "CounterNra5",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 50.8,
+        "z": 70.7,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    },
+    {
+      "slot": "CounterNra6",
+      "type": "puppet",
+      "prefab": "Soldier/nra",
+      "init": {
+        "x": 61,
+        "z": 70.4,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "id": "CameraMain",
+      "type": "camera",
+      "clips": [
+        {
+          "t": 0,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -149,
+            "pitchDeg": -14
+          },
+          "id": "01-1_1"
+        },
+        {
+          "t": 3.5,
+          "dur": 1,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -149,
+            "pitchDeg": -14,
+            "toYawDeg": -151,
+            "toPitchDeg": -32
+          },
+          "id": "01-1_2"
+        },
+        {
+          "t": 6.25,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -151,
+            "pitchDeg": -32,
+            "toYawDeg": -149,
+            "toPitchDeg": -14
+          },
+          "id": "01-1_3"
+        },
+        {
+          "t": 7.45,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -149,
+            "pitchDeg": -14,
+            "toYawDeg": -151,
+            "toPitchDeg": -32
+          },
+          "id": "01-1_4"
+        },
+        {
+          "t": 8.4,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -151,
+            "pitchDeg": -32,
+            "toYawDeg": -120,
+            "toPitchDeg": -8
+          },
+          "id": "01-1_5"
+        },
+        {
+          "t": 9.5,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -120,
+            "pitchDeg": -8,
+            "toYawDeg": -63,
+            "toPitchDeg": -8
+          },
+          "id": "01-1_6"
+        },
+        {
+          "t": 10.65,
+          "dur": 1.3,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -63,
+            "pitchDeg": -8,
+            "toYawDeg": 75,
+            "toPitchDeg": -4
+          },
+          "id": "01-1_7"
+        },
+        {
+          "t": 13.84,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 75,
+            "pitchDeg": -4
+          },
+          "id": "01-2_1"
+        },
+        {
+          "t": 14.84,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 75,
+            "pitchDeg": -4,
+            "toYawDeg": 96,
+            "toPitchDeg": -2
+          },
+          "id": "01-2_2"
+        },
+        {
+          "t": 22.64,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 96,
+            "pitchDeg": -2,
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "01-2_3"
+        },
+        {
+          "t": 30.34,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "01-2_4"
+        },
+        {
+          "t": 31.94,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "01-2_5"
+        },
+        {
+          "t": 32.79,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
+          },
+          "id": "01-2_6"
+        },
+        {
+          "t": 34.34,
+          "dur": 1,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Yaowa",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            },
+            "toYawDeg": -149,
+            "toPitchDeg": -30
+          },
+          "id": "01-2_7"
+        },
+        {
+          "t": 35.74,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": -149,
+            "pitchDeg": -30,
+            "toYawDeg": 95,
+            "toPitchDeg": 0
+          },
+          "id": "01-2_8"
+        },
+        {
+          "t": 37.44,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 95,
+            "pitchDeg": 0,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            }
+          },
+          "id": "01-2_9"
+        },
+        {
+          "t": 39.46,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            }
+          },
+          "id": "01-3_1"
+        },
+        {
+          "t": 40.61,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.5,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            }
+          },
+          "id": "01-3_2"
+        },
+        {
+          "t": 45.76,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                1.5,
+                0
+              ]
+            },
+            "toYawDeg": 160,
+            "toPitchDeg": -50
+          },
+          "id": "01-3_3"
+        },
+        {
+          "t": 47.9,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 160,
+            "pitchDeg": -50,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
+          },
+          "id": "01-3_4"
+        },
+        {
+          "t": 50.93,
+          "dur": 0.45,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": 94.5,
+            "toPitchDeg": 0
+          },
+          "id": "01-3_5"
+        },
+        {
+          "t": 51.56,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "yawDeg": 94.5,
+            "pitchDeg": 0,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
+          },
+          "id": "01-3_6"
+        },
+        {
+          "t": 68.46,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 66.5,
+            "z": 64.2,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toLook": {
+              "x": 62,
+              "z": 64.6,
+              "h": 1.4
+            }
+          },
+          "id": "01-3_7"
+        },
+        {
+          "t": 69.16,
+          "dur": 1.9,
+          "keepMove": true,
+          "from": {
+            "x": 66.5,
+            "z": 64.2,
+            "h": 1.05
+          },
+          "look": {
+            "x": 62,
+            "z": 64.6,
+            "h": 1.4
+          },
+          "to": {
+            "x": 65.2,
+            "z": 64,
+            "h": 1.3
+          },
+          "ease": "linear",
+          "id": "01-3_8"
+        },
+        {
+          "t": 74.56,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 88.6,
+            "pitchDeg": -2
+          },
+          "id": "01-4_1"
+        },
+        {
+          "t": 75.71,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 88.6,
+            "pitchDeg": -2,
+            "toYawDeg": 74,
+            "toPitchDeg": 14
+          },
+          "id": "01-4_2"
+        },
+        {
+          "t": 78.86,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 74,
+            "pitchDeg": 14,
+            "toYawDeg": 96,
+            "toPitchDeg": 4
+          },
+          "id": "01-4_3"
+        },
+        {
+          "t": 82.06,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 96,
+            "pitchDeg": 4,
+            "toLook": {
+              "actor": "IjaYi",
+              "offset": [
+                0,
+                1.2,
+                0
+              ]
+            }
+          },
+          "id": "01-4_4"
+        },
+        {
+          "t": 84.76,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "look": {
+              "actor": "IjaYi",
+              "offset": [
+                0,
+                1.2,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaMgGunner",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            }
+          },
+          "id": "01-4_5"
+        },
+        {
+          "t": 86.06,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "look": {
+              "actor": "IjaMgGunner",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
+          },
+          "id": "01-4_6"
+        },
+        {
+          "t": 87.96,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "look": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            }
+          },
+          "id": "02-1_1"
+        },
+        {
+          "t": 89.06,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "look": {
+              "actor": "IjaWu",
+              "offset": [
+                0,
+                1.3,
+                0
+              ]
+            },
+            "toYawDeg": 122,
+            "toPitchDeg": 8
+          },
+          "id": "02-1_2"
+        },
+        {
+          "t": 92.36,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 63.3,
+            "z": 63.8,
+            "stance": "prone",
+            "yawDeg": 122,
+            "pitchDeg": 8,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.6,
+                0
+              ]
+            }
+          },
+          "id": "02-1_3"
+        },
+        {
+          "t": 94.24,
+          "dur": 0.9,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.6,
+              0
+            ]
+          },
+          "lookTo": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.4,
+              0
+            ]
+          },
+          "shake": 0.1,
+          "id": "02-1_4"
+        },
+        {
+          "t": 95.14,
+          "dur": 0.8,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.4,
+              0
+            ]
+          },
+          "to": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
+          },
+          "lookTo": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "id": "02-1_5"
+        },
+        {
+          "t": 95.94,
+          "dur": 0.4,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "lookTo": {
+            "actor": "IjaJia",
+            "offset": [
+              0.9,
+              0.9,
+              1.2
+            ]
+          },
+          "ease": "linear",
+          "shake": 0.5,
+          "id": "02-1_6"
+        },
+        {
+          "t": 96.34,
+          "dur": 1.2,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.56
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0.9,
+              0.9,
+              1.2
+            ]
+          },
+          "to": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.5
+          },
+          "lookTo": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "shake": 0.3,
+          "id": "02-1_7"
+        },
+        {
+          "t": 98.06,
+          "dur": 0.4,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.5
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "to": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "id": "02-1_8"
+        },
+        {
+          "t": 98.56,
+          "dur": 0.6,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "IjaJia",
+            "offset": [
+              0,
+              1.3,
+              0
+            ]
+          },
+          "lookTo": {
+            "actor": "IjaYi",
+            "offset": [
+              0,
+              1,
+              0
+            ]
+          },
+          "id": "02-1_9"
+        },
+        {
+          "t": 99.76,
+          "dur": 5,
+          "keepMove": true,
+          "from": {
+            "x": 63.3,
+            "z": 63.8,
+            "h": 0.32
+          },
+          "look": {
+            "actor": "IjaYi",
+            "offset": [
+              0,
+              1,
+              0
+            ]
+          },
+          "to": {
+            "x": 56,
+            "z": 64.9,
+            "h": 0.4
+          },
+          "lookTo": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.9,
+              0
+            ]
+          },
+          "ease": "linear",
+          "id": "02-1_10"
+        },
+        {
+          "t": 104.76,
+          "dur": 0.8,
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 0.4
+          },
+          "look": {
+            "actor": "Donggua",
+            "offset": [
+              0,
+              0.9,
+              0
+            ]
+          },
+          "to": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
+          },
+          "id": "02-1_11"
+        },
+        {
+          "t": 105.56,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": -85,
+            "toPitchDeg": -4
+          },
+          "id": "02-1_12"
+        },
+        {
+          "t": 108.16,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "yawDeg": -85,
+            "pitchDeg": -4,
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
+          },
+          "id": "02-1_13"
+        },
+        {
+          "t": 111.96,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toYawDeg": -8,
+            "toPitchDeg": 24
+          },
+          "id": "02-1_14"
+        },
+        {
+          "t": 113.91,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "yawDeg": -8,
+            "pitchDeg": 24,
+            "toLook": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "02-1_15"
+        },
+        {
+          "t": 123.36,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.4,
+                0
+              ]
+            }
+          },
+          "id": "02-1_16"
+        },
+        {
+          "t": 127.76,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.4,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            }
+          },
+          "id": "02-1_17"
+        },
+        {
+          "t": 131.51,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            }
+          },
+          "id": "02-1_18"
+        },
+        {
+          "t": 132.71,
+          "dur": 0.55,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Luo",
+              "offset": [
+                0,
+                0.9,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            }
+          },
+          "id": "02-1_19"
+        },
+        {
+          "t": 141.06,
+          "dur": 0.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "Donggua",
+              "offset": [
+                0,
+                0.8,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "02-1_20"
+        },
+        {
+          "t": 141.86,
+          "dur": 1.5,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaJia",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "02-1_21"
+        },
+        {
+          "t": 144.36,
+          "dur": 0,
+          "keepMove": true,
+          "eye": {
+            "x": 56,
+            "z": 64.9,
+            "stance": "crouch",
+            "look": {
+              "actor": "IjaDing",
+              "offset": [
+                0,
+                1.45,
+                0
+              ]
+            }
+          },
+          "id": "02-2_1"
+        },
+        {
+          "t": 146.26,
+          "dur": 0.8,
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
+          },
+          "look": {
+            "actor": "IjaDing",
+            "offset": [
+              0,
+              1.45,
+              0
+            ]
+          },
+          "lookTo": {
+            "x": 52.6,
+            "z": 69.5,
+            "h": 1.4
+          },
+          "id": "02-2_2"
+        },
+        {
+          "t": 147.66,
+          "dur": 0.5,
+          "keepMove": true,
+          "from": {
+            "x": 56,
+            "z": 64.9,
+            "h": 1.05
+          },
+          "look": {
+            "x": 52.6,
+            "z": 69.5,
+            "h": 1.4
+          },
+          "to": {
+            "x": 56.35,
+            "z": 64.5,
+            "h": 0.6
+          },
+          "lookTo": {
+            "x": 57.6,
+            "z": 68.6,
+            "h": 1.3
+          },
+          "shake": 0.45,
+          "id": "02-2_3"
+        },
+        {
+          "t": 148.21,
+          "dur": 0.6,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "look": {
+              "x": 57.6,
+              "z": 68.6,
+              "h": 1.3
+            },
+            "toYawDeg": -120,
+            "toPitchDeg": 12
+          },
+          "id": "02-2_4"
+        },
+        {
+          "t": 150.46,
+          "dur": 0.8,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "yawDeg": -120,
+            "pitchDeg": 12,
+            "toYawDeg": -104,
+            "toPitchDeg": 6
+          },
+          "id": "02-2_5"
+        },
+        {
+          "t": 153.76,
+          "dur": 0.9,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "yawDeg": -104,
+            "pitchDeg": 6,
+            "toLook": {
+              "actor": "LiuWencai",
+              "offset": [
+                0,
+                1.1,
+                0
+              ]
+            }
+          },
+          "id": "02-2_6"
+        },
+        {
+          "t": 155.76,
+          "dur": 1.2,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "look": {
+              "actor": "LiuWencai",
+              "offset": [
+                0,
+                1.1,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "Interpreter",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            }
+          },
+          "id": "02-2_7"
+        },
+        {
+          "t": 157.26,
+          "dur": 0.7,
+          "keepMove": true,
+          "eye": {
+            "x": 56.35,
+            "z": 64.5,
+            "stance": "prone",
+            "h": 0.6,
+            "look": {
+              "actor": "Interpreter",
+              "offset": [
+                0,
+                0.3,
+                0
+              ]
+            },
+            "toLook": {
+              "actor": "HeYoutian",
+              "offset": [
+                0,
+                1,
+                0
+              ]
+            }
+          },
+          "id": "02-2_8"
+        }
+      ]
+    },
+    {
+      "id": "Anim_Donggua",
+      "type": "animation",
+      "target": "Donggua",
+      "base": {
+        "id": "Donggua",
+        "x": 67.1,
+        "z": 65.2,
+        "yawDeg": 31,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "冬瓜",
+        "castId": "comrade"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "x": 67.1,
+          "z": 65.2,
+          "move": "cut",
+          "yawDeg": 31,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvSitOfferArm",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "clipHold": true,
+          "faceTo": "player"
+        },
+        {
+          "t": 13.84,
+          "x": 67.1,
+          "z": 65.2,
+          "move": "cut",
+          "yawDeg": 31,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "WoundedSitRifleIdle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 35.14,
+          "x": 67.1,
+          "z": 65.2,
+          "move": "cut",
+          "clip": null
+        },
+        {
+          "t": 36.44,
+          "x": 65.5,
+          "z": 65.6,
+          "move": "walk",
+          "stance": "crouch",
+          "faceTo": {
+            "x": 66.3,
+            "z": 64.6
+          }
+        },
+        {
+          "t": 36.49,
+          "clip": "PvSitStuffPack"
+        },
+        {
+          "t": 39.46,
+          "x": 65.5,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": -48,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvSitStuffPack",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 66.3,
+            "z": 64.6
+          }
+        },
+        {
+          "t": 47.9,
+          "clip": "PvSitGrabHand",
+          "clipHold": true,
+          "faceTo": "player"
+        },
+        {
+          "t": 48.3,
+          "talking": true
+        },
+        {
+          "t": 57.3,
+          "clip": "WoundedSitRifleIdle"
+        },
+        {
+          "t": 68.41,
+          "talking": false
+        },
+        {
+          "t": 68.46,
+          "stance": "stand",
+          "faceTo": {
+            "x": 63,
+            "z": 64.5
+          }
+        },
+        {
+          "t": 68.96,
+          "x": 65.5,
+          "z": 65.6,
+          "move": "cut"
+        },
+        {
+          "t": 70.41,
+          "x": 64,
+          "z": 65.1,
+          "move": "run"
+        },
+        {
+          "t": 70.71,
+          "clip": "BlastSlamBuried",
+          "clipHold": true
+        },
+        {
+          "t": 70.86,
+          "x": 63.2,
+          "z": 64.9,
+          "move": "run"
+        },
+        {
+          "t": 74.56,
+          "x": 63.6,
+          "z": 65.5,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "x": 63,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": 0,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 92.24,
+          "clip": "CaptiveDraggedFromDirt",
+          "state": "alive"
+        },
+        {
+          "t": 92.84,
+          "x": 63,
+          "z": 65.6,
+          "move": "cut"
+        },
+        {
+          "t": 96.04,
+          "x": 57.5,
+          "z": 65.3,
+          "move": "drag"
+        },
+        {
+          "t": 96.14,
+          "stance": "crouch",
+          "clip": "CaptiveKneelMud",
+          "yawDeg": -60
+        },
+        {
+          "t": 108.06,
+          "talking": true
+        },
+        {
+          "t": 111.36,
+          "clip": "PvCaptiveButtHit",
+          "clipHold": true,
+          "talking": false
+        },
+        {
+          "t": 123.66,
+          "clip": "CaptiveKneelMud"
+        },
+        {
+          "t": 128.14,
+          "clip": "CaptiveStabbedCurl",
+          "clipHold": true,
+          "yawDeg": 0
+        },
+        {
+          "t": 130.65,
+          "clip": "PvCaptiveButtHit",
+          "clipHold": true
+        },
+        {
+          "t": 135.26,
+          "clip": "CaptiveStabbedCurl",
+          "clipFrom": 2.45,
+          "clipHold": true
+        },
+        {
+          "t": 136.56,
+          "state": "down",
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 57.5,
+          "z": 65.3,
+          "move": "cut",
+          "yawDeg": 0,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.86,
+          "x": 57.49,
+          "z": 65.15,
+          "move": "cut",
+          "yawDeg": 90
+        }
+      ]
+    },
+    {
+      "id": "Anim_Luo",
+      "type": "animation",
+      "target": "Luo",
+      "base": {
+        "id": "Luo",
+        "x": 63.5,
+        "z": 64.5,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "name": "罗班长",
+        "castId": "luo"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "x": 63.5,
+          "z": 64.5,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 13.84,
+          "x": 63.5,
+          "z": 64.5,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 16.74,
+          "x": 63.5,
+          "z": 64.5,
+          "move": "cut",
+          "faceTo": "Runner"
+        },
+        {
+          "t": 17.44,
+          "x": 64.1,
+          "z": 65.1,
+          "move": "walk",
+          "faceTo": "Runner"
+        },
+        {
+          "t": 22.74,
+          "clip": "PvStandTalkSlung"
+        },
+        {
+          "t": 25.89,
+          "faceTo": {
+            "x": 66.5,
+            "z": 64.2
+          },
+          "clip": "PvStandPointL",
+          "clipHold": true
+        },
+        {
+          "t": 30.34,
+          "faceTo": "Yaowa",
+          "clip": null
+        },
+        {
+          "t": 31.94,
+          "faceTo": {
+            "x": 66.5,
+            "z": 64.2
+          }
+        },
+        {
+          "t": 32.74,
+          "faceTo": "Yaowa",
+          "clip": "PvStandWaveOnL"
+        },
+        {
+          "t": 34.34,
+          "clip": null
+        },
+        {
+          "t": 36.14,
+          "x": 64.1,
+          "z": 65.1,
+          "move": "cut"
+        },
+        {
+          "t": 39.46,
+          "x": 53.8,
+          "z": 65.3,
+          "move": "run",
+          "path": [
+            {
+              "x": 62.4,
+              "z": 64.6
+            }
+          ],
+          "yawDeg": -90
+        },
+        {
+          "t": 39.46,
+          "x": 53.8,
+          "z": 65.3,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvStandBeckonL",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": "player"
+        },
+        {
+          "t": 45.6,
+          "clip": null
+        },
+        {
+          "t": 45.9,
+          "x": 53.8,
+          "z": 65.3,
+          "move": "cut"
+        },
+        {
+          "t": 51.4,
+          "x": 34,
+          "z": 66.3,
+          "move": "run"
+        },
+        {
+          "t": 51.45,
+          "visible": false
+        },
+        {
+          "t": 74.56,
+          "x": 26.08,
+          "z": 74.56,
+          "move": "cut",
+          "yawDeg": 160,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.16,
+          "yawDeg": -85.82
+        },
+        {
+          "t": 76.56,
+          "clip": "PvClimbOutTrench",
+          "stance": "stand"
+        },
+        {
+          "t": 79.06,
+          "x": 26.88,
+          "z": 74.31,
+          "move": "cut",
+          "clip": null,
+          "stance": "crouch"
+        },
+        {
+          "t": 87.76,
+          "x": 38.6,
+          "z": 73,
+          "move": "walk"
+        },
+        {
+          "t": 87.86,
+          "stance": "prone",
+          "yawDeg": -88
+        },
+        {
+          "t": 87.96,
+          "x": 38.6,
+          "z": 73,
+          "move": "cut",
+          "yawDeg": -88,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 131.36,
+          "x": 56.6,
+          "z": 69.5,
+          "move": "crawl",
+          "faceTo": {
+            "x": 56.6,
+            "z": 64.9
+          }
+        },
+        {
+          "t": 131.46,
+          "stance": "crouch"
+        },
+        {
+          "t": 132.36,
+          "stance": "prone"
+        },
+        {
+          "t": 132.76,
+          "x": 56.6,
+          "z": 69.5,
+          "move": "cut"
+        },
+        {
+          "t": 143.86,
+          "x": 62,
+          "z": 69.4,
+          "move": "crawl",
+          "faceTo": {
+            "x": 61.5,
+            "z": 64.9
+          }
+        },
+        {
+          "t": 144.36,
+          "x": 62,
+          "z": 69.4,
+          "move": "cut",
+          "yawDeg": -86,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 61.5,
+            "z": 64.9
+          }
+        },
+        {
+          "t": 146.46,
+          "stance": "stand"
+        },
+        {
+          "t": 146.66,
+          "clip": "PvStandPointL",
+          "clipHold": true
+        },
+        {
+          "t": 148.66,
+          "x": 62,
+          "z": 69.4,
+          "move": "cut",
+          "clip": null
+        },
+        {
+          "t": 149.36,
+          "x": 62.3,
+          "z": 66.1,
+          "move": "run"
+        },
+        {
+          "t": 149.38,
+          "stance": "crouch"
+        },
+        {
+          "t": 149.81,
+          "stance": "stand",
+          "faceTo": {
+            "x": 60.5,
+            "z": 65.46
+          }
+        },
+        {
+          "t": 150.56,
+          "x": 62.3,
+          "z": 66.1,
+          "move": "cut"
+        },
+        {
+          "t": 151.21,
+          "x": 61.1,
+          "z": 64.86,
+          "move": "run",
+          "faceTo": {
+            "x": 60.5,
+            "z": 65.46
+          }
+        },
+        {
+          "t": 151.22,
+          "clip": "LuoDadaoChopRear",
+          "faceTo": {
+            "x": 60.5,
+            "z": 65.46
+          }
+        },
+        {
+          "t": 152.66,
+          "x": 61.1,
+          "z": 64.86,
+          "move": "cut",
+          "clip": null
+        },
+        {
+          "t": 154.96,
+          "x": 58.95,
+          "z": 64.46,
+          "move": "walk",
+          "yawDeg": -86,
+          "aim": true
+        }
+      ]
+    },
+    {
+      "id": "Anim_Yaowa",
+      "type": "animation",
+      "target": "Yaowa",
+      "base": {
+        "id": "Yaowa",
+        "x": 64.9,
+        "z": 63.1,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "幺娃",
+        "castId": "yaowa"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "x": 64.9,
+          "z": 63.1,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvCrouchRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 63,
+            "z": 64.5
+          }
+        },
+        {
+          "t": 13.84,
+          "x": 64.9,
+          "z": 63.1,
+          "move": "cut",
+          "yawDeg": 122.7,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvCrouchRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 63,
+            "z": 64.5
+          }
+        },
+        {
+          "t": 30.04,
+          "stance": "stand",
+          "faceTo": "Luo",
+          "clip": "PvStandTalkSlung"
+        },
+        {
+          "t": 32.99,
+          "x": 64.9,
+          "z": 63.1,
+          "move": "cut",
+          "clip": null
+        },
+        {
+          "t": 39.46,
+          "x": 40,
+          "z": 66.6,
+          "move": "run",
+          "path": [
+            {
+              "x": 62.4,
+              "z": 64.4
+            },
+            {
+              "x": 50,
+              "z": 65.32
+            }
+          ]
+        },
+        {
+          "t": 39.46,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_LiuWencai",
+      "type": "animation",
+      "target": "LiuWencai",
+      "base": {
+        "id": "LiuWencai",
+        "x": 68.5,
+        "z": 63.2,
+        "yawDeg": 116.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "刘文财",
+        "castId": "liuwencai"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "x": 68.5,
+          "z": 63.2,
+          "move": "cut",
+          "yawDeg": 116.6,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvCrouchRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 8.69,
+          "clip": "LiuDivideAmmoToss"
+        },
+        {
+          "t": 12.69,
+          "clip": "PvCrouchRestRifle"
+        },
+        {
+          "t": 13.84,
+          "x": 68.5,
+          "z": 63.2,
+          "move": "cut",
+          "yawDeg": 104.6,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvCrouchRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 33.66,
+          "clip": "LiuBoxUpGo"
+        },
+        {
+          "t": 36.06,
+          "x": 68.5,
+          "z": 63.2,
+          "move": "cut",
+          "stance": "stand"
+        },
+        {
+          "t": 39.06,
+          "x": 59,
+          "z": 64.8,
+          "move": "run",
+          "path": [
+            {
+              "x": 63,
+              "z": 64.6
+            }
+          ]
+        },
+        {
+          "t": 39.46,
+          "x": 59,
+          "z": 64.8,
+          "move": "cut",
+          "yawDeg": 93,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 48.46,
+          "x": 28,
+          "z": 66.8,
+          "move": "run",
+          "yawDeg": 93
+        },
+        {
+          "t": 48.51,
+          "visible": false
+        },
+        {
+          "t": 74.56,
+          "x": 25.58,
+          "z": 76.19,
+          "move": "cut",
+          "yawDeg": 160,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.96,
+          "yawDeg": -75.99
+        },
+        {
+          "t": 77.36,
+          "clip": "PvClimbOutTrench",
+          "stance": "stand"
+        },
+        {
+          "t": 79.86,
+          "x": 26.38,
+          "z": 75.94,
+          "move": "cut",
+          "clip": null,
+          "stance": "crouch"
+        },
+        {
+          "t": 87.76,
+          "x": 36.9,
+          "z": 73.1,
+          "move": "walk"
+        },
+        {
+          "t": 87.86,
+          "stance": "prone",
+          "yawDeg": -88
+        },
+        {
+          "t": 87.96,
+          "x": 36.9,
+          "z": 73.1,
+          "move": "cut",
+          "yawDeg": -88,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 143.86,
+          "x": 55.4,
+          "z": 69.7,
+          "move": "crawl",
+          "faceTo": {
+            "x": 55.4,
+            "z": 64.9
+          }
+        },
+        {
+          "t": 144.36,
+          "x": 55.4,
+          "z": 69.7,
+          "move": "cut",
+          "yawDeg": -54.1,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 55.4,
+            "z": 65
+          }
+        },
+        {
+          "t": 146.71,
+          "stance": "crouch",
+          "aim": true
+        },
+        {
+          "t": 150.96,
+          "faceTo": "IjaYi"
+        },
+        {
+          "t": 153.66,
+          "faceTo": {
+            "x": 56.35,
+            "z": 64.5
+          }
+        }
+      ]
+    },
+    {
+      "id": "Anim_HeYoutian",
+      "type": "animation",
+      "target": "HeYoutian",
+      "base": {
+        "id": "HeYoutian",
+        "x": 69.1,
+        "z": 65.7,
+        "yawDeg": 90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "何有田",
+        "castId": "heyoutian"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "x": 69.1,
+          "z": 65.7,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvSitRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 13.84,
+          "x": 69.1,
+          "z": 65.7,
+          "move": "cut",
+          "yawDeg": 77.9,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvSitRestRifle",
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 33.74,
+          "x": 69.1,
+          "z": 65.7,
+          "move": "cut",
+          "stance": "stand",
+          "clip": null
+        },
+        {
+          "t": 39.44,
+          "x": 47.06,
+          "z": 65.91,
+          "move": "run",
+          "path": [
+            {
+              "x": 63,
+              "z": 64.6
+            }
+          ]
+        },
+        {
+          "t": 39.46,
+          "x": 47.06,
+          "z": 65.91,
+          "move": "cut",
+          "yawDeg": 93,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 53.37,
+          "x": 28,
+          "z": 66.8,
+          "move": "walk",
+          "yawDeg": 93
+        },
+        {
+          "t": 53.42,
+          "visible": false
+        },
+        {
+          "t": 74.56,
+          "x": 23.03,
+          "z": 65.93,
+          "move": "cut",
+          "yawDeg": -82.5,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "x": 23.03,
+          "z": 65.93,
+          "move": "cut",
+          "yawDeg": -82.5,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 56,
+            "z": 61.6
+          }
+        },
+        {
+          "t": 144.36,
+          "x": 23.03,
+          "z": 65.93,
+          "move": "cut",
+          "yawDeg": -127.9,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 56,
+            "z": 61.6
+          }
+        },
+        {
+          "t": 148.51,
+          "x": 23.03,
+          "z": 65.93,
+          "move": "cut",
+          "stance": "stand",
+          "aim": false
+        },
+        {
+          "t": 157.96,
+          "x": 55.5,
+          "z": 63.75,
+          "move": "run",
+          "path": [
+            {
+              "x": 33.85,
+              "z": 65.94
+            },
+            {
+              "x": 47.82,
+              "z": 65.06
+            },
+            {
+              "x": 52.8,
+              "z": 64.9
+            },
+            {
+              "x": 54.6,
+              "z": 64.3
+            }
+          ],
+          "faceTo": {
+            "x": 56.35,
+            "z": 64.5
+          }
+        },
+        {
+          "t": 158.01,
+          "stance": "crouch"
+        }
+      ]
+    },
+    {
+      "id": "Anim_Runner",
+      "type": "animation",
+      "target": "Runner",
+      "base": {
+        "id": "Runner",
+        "x": 61.4,
+        "z": 64.8,
+        "yawDeg": -90,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "name": "传令兵",
+        "castId": "runner"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 13.84,
+          "x": 44,
+          "z": 65.7,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 14.24,
+          "x": 44,
+          "z": 65.7,
+          "move": "cut"
+        },
+        {
+          "t": 17.84,
+          "x": 61.4,
+          "z": 64.8,
+          "move": "run",
+          "stance": "crouch",
+          "clip": "MessengerReport",
+          "faceTo": "Luo"
+        },
+        {
+          "t": 32.46,
+          "stance": "stand",
+          "clip": null
+        },
+        {
+          "t": 32.86,
+          "x": 61.4,
+          "z": 64.8,
+          "move": "cut"
+        },
+        {
+          "t": 39.36,
+          "x": 38,
+          "z": 66.7,
+          "move": "run",
+          "path": [
+            {
+              "x": 52,
+              "z": 65.7
+            }
+          ]
+        },
+        {
+          "t": 39.46,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_RetreatNra1",
+      "type": "animation",
+      "target": "RetreatNra1",
+      "base": {
+        "id": "RetreatNra1",
+        "x": -39.75,
+        "z": 5.93,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 39.46,
+          "x": -39.75,
+          "z": 5.93,
+          "move": "cut",
+          "yawDeg": -80,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_RetreatNra2",
+      "type": "animation",
+      "target": "RetreatNra2",
+      "base": {
+        "id": "RetreatNra2",
+        "x": -30.37,
+        "z": 8.06,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 39.46,
+          "x": -30.37,
+          "z": 8.06,
+          "move": "cut",
+          "yawDeg": -80,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_RetreatNra3",
+      "type": "animation",
+      "target": "RetreatNra3",
+      "base": {
+        "id": "RetreatNra3",
+        "x": -19.76,
+        "z": 3.96,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 39.46,
+          "x": -19.76,
+          "z": 3.96,
+          "move": "cut",
+          "yawDeg": -80,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_RetreatNra4",
+      "type": "animation",
+      "target": "RetreatNra4",
+      "base": {
+        "id": "RetreatNra4",
+        "x": -10.94,
+        "z": -1.18,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 39.46,
+          "x": -10.94,
+          "z": -1.18,
+          "move": "cut",
+          "yawDeg": -80,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 74.56,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaYi",
+      "type": "animation",
+      "target": "IjaYi",
+      "base": {
+        "id": "IjaYi",
+        "x": 60.19,
+        "z": 64.38,
+        "yawDeg": -86,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": true,
+        "name": "乙",
+        "castId": "ijaB"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 58.8,
+          "z": 60.2,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.36,
+          "x": 58.8,
+          "z": 61.7,
+          "move": "run"
+        },
+        {
+          "t": 76.46,
+          "x": 58.8,
+          "z": 63.4,
+          "move": "cut",
+          "stance": "stand",
+          "clip": "IjaDropInKneel"
+        },
+        {
+          "t": 78.21,
+          "x": 58.86,
+          "z": 63.76,
+          "move": "cut",
+          "yawDeg": -115.78,
+          "clip": null,
+          "aim": true
+        },
+        {
+          "t": 79.41,
+          "x": 55.56,
+          "z": 65.94,
+          "move": "run"
+        },
+        {
+          "t": 79.46,
+          "clip": "IjaWalkStabProne",
+          "yawDeg": 90
+        },
+        {
+          "t": 81.13,
+          "x": 53.91,
+          "z": 65.88,
+          "move": "cut",
+          "clip": null,
+          "yawDeg": 90
+        },
+        {
+          "t": 82.91,
+          "x": 59.54,
+          "z": 63.46,
+          "move": "run"
+        },
+        {
+          "t": 82.96,
+          "clip": "IjaWalkStabProne",
+          "yawDeg": -90
+        },
+        {
+          "t": 84.63,
+          "x": 61.19,
+          "z": 63.52,
+          "move": "cut",
+          "clip": null,
+          "yawDeg": -90
+        },
+        {
+          "t": 85.76,
+          "x": 61.4,
+          "z": 64,
+          "move": "walk",
+          "yawDeg": -90
+        },
+        {
+          "t": 87.96,
+          "x": 61.4,
+          "z": 64,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 92.24,
+          "aim": false,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 92.84,
+          "x": 62.4,
+          "z": 65.3,
+          "move": "walk"
+        },
+        {
+          "t": 96.04,
+          "x": 58.4,
+          "z": 65.2,
+          "move": "drag"
+        },
+        {
+          "t": 97.46,
+          "x": 58.4,
+          "z": 65.2,
+          "move": "cut",
+          "faceTo": {
+            "x": 63.3,
+            "z": 63.8
+          }
+        },
+        {
+          "t": 99.06,
+          "x": 62.35,
+          "z": 63.8,
+          "move": "run",
+          "faceTo": {
+            "x": 63.3,
+            "z": 63.8
+          }
+        },
+        {
+          "t": 99.11,
+          "clip": "PvKneelHaulBody"
+        },
+        {
+          "t": 99.71,
+          "clip": "VilIjaDragByArm"
+        },
+        {
+          "t": 99.76,
+          "x": 62.35,
+          "z": 63.8,
+          "move": "cut"
+        },
+        {
+          "t": 104.76,
+          "x": 55.1,
+          "z": 65.1,
+          "move": "drag"
+        },
+        {
+          "t": 104.81,
+          "clip": "PvKneelHaulBody",
+          "faceTo": {
+            "x": 56,
+            "z": 64.9
+          }
+        },
+        {
+          "t": 105.56,
+          "clip": null
+        },
+        {
+          "t": 106.56,
+          "x": 54.8,
+          "z": 64.3,
+          "move": "walk",
+          "faceTo": {
+            "x": 56.8,
+            "z": 65.2
+          }
+        },
+        {
+          "t": 112.16,
+          "stance": "crouch",
+          "aim": true,
+          "faceTo": {
+            "x": 23,
+            "z": 66
+          }
+        },
+        {
+          "t": 113.96,
+          "stance": "stand"
+        },
+        {
+          "t": 121.96,
+          "x": 54.8,
+          "z": 64.3,
+          "move": "cut"
+        },
+        {
+          "t": 124.36,
+          "x": 52.3,
+          "z": 65.7,
+          "move": "walk",
+          "path": [
+            {
+              "x": 53.6,
+              "z": 64.5
+            }
+          ],
+          "aim": true,
+          "yawDeg": 90
+        },
+        {
+          "t": 138.6,
+          "faceTo": "IjaDing",
+          "clip": "PvStandTalkLowRifle",
+          "aim": false
+        },
+        {
+          "t": 141.13,
+          "clip": null,
+          "aim": true,
+          "yawDeg": 90
+        },
+        {
+          "t": 144.36,
+          "x": 52.3,
+          "z": 65.7,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 149.16,
+          "faceTo": "CounterNra3"
+        },
+        {
+          "t": 149.61,
+          "clip": "BayonetClearWood"
+        },
+        {
+          "t": 151.16,
+          "clip": "ShotCollapse",
+          "clipHold": true,
+          "yawDeg": -100.3
+        },
+        {
+          "t": 152.16,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaJia",
+      "type": "animation",
+      "target": "IjaJia",
+      "base": {
+        "id": "IjaJia",
+        "x": 52.98,
+        "z": 64.43,
+        "yawDeg": 94.9,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "name": "甲",
+        "castId": "ijaA"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 56.8,
+          "z": 60.2,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.06,
+          "x": 56.8,
+          "z": 61.75,
+          "move": "run"
+        },
+        {
+          "t": 76.16,
+          "x": 56.8,
+          "z": 63.35,
+          "move": "cut",
+          "stance": "stand",
+          "clip": "IjaDropInPoint"
+        },
+        {
+          "t": 77.46,
+          "x": 56.8,
+          "z": 63.45,
+          "move": "cut",
+          "clip": "PvIjaSignalSplit",
+          "yawDeg": 90
+        },
+        {
+          "t": 79.46,
+          "clip": null,
+          "aim": true
+        },
+        {
+          "t": 87.16,
+          "x": 58.6,
+          "z": 64.4,
+          "move": "walk",
+          "yawDeg": -90
+        },
+        {
+          "t": 87.96,
+          "x": 58.6,
+          "z": 64.4,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 88.96,
+          "clip": "PvStandHaltL",
+          "clipHold": true,
+          "faceTo": "IjaWu"
+        },
+        {
+          "t": 92.14,
+          "clip": null
+        },
+        {
+          "t": 92.64,
+          "x": 58.6,
+          "z": 64.4,
+          "move": "cut",
+          "aim": false
+        },
+        {
+          "t": 94.54,
+          "clip": "IjaFoundLook"
+        },
+        {
+          "t": 94.64,
+          "x": 62.5,
+          "z": 63,
+          "move": "walk",
+          "faceTo": {
+            "x": 63.3,
+            "z": 63.8
+          }
+        },
+        {
+          "t": 95.36,
+          "clip": "IjaSlapForehand"
+        },
+        {
+          "t": 96.84,
+          "clip": "PvStandTalkLowRifle"
+        },
+        {
+          "t": 97.91,
+          "faceTo": "IjaYi",
+          "clip": "PvStandPointL",
+          "clipHold": true
+        },
+        {
+          "t": 98.86,
+          "faceTo": "Interpreter",
+          "clip": "PvStandTalkLowRifle"
+        },
+        {
+          "t": 102.06,
+          "clip": null
+        },
+        {
+          "t": 102.11,
+          "x": 62.5,
+          "z": 63,
+          "move": "cut"
+        },
+        {
+          "t": 104.56,
+          "x": 59.3,
+          "z": 64.3,
+          "move": "walk",
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 112.16,
+          "stance": "crouch",
+          "aim": true,
+          "faceTo": {
+            "x": 23,
+            "z": 66
+          }
+        },
+        {
+          "t": 113.86,
+          "stance": "stand",
+          "aim": false,
+          "faceTo": "IjaDing",
+          "clip": "PvStandTalkLowRifle"
+        },
+        {
+          "t": 122.46,
+          "clip": null,
+          "faceTo": "IjaDing"
+        },
+        {
+          "t": 122.86,
+          "x": 59.3,
+          "z": 64.3,
+          "move": "cut"
+        },
+        {
+          "t": 125.16,
+          "x": 59,
+          "z": 65.4,
+          "move": "walk",
+          "faceTo": "IjaDing"
+        },
+        {
+          "t": 125.24,
+          "clip": "IjaSlapRecruit",
+          "faceTo": "IjaDing"
+        },
+        {
+          "t": 128.34,
+          "clip": null,
+          "aim": false,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 132.85,
+          "clip": "PvStandTalkLowRifle"
+        },
+        {
+          "t": 135.26,
+          "clip": null
+        },
+        {
+          "t": 141.03,
+          "faceTo": {
+            "x": 56,
+            "z": 64.9
+          },
+          "clip": "PvStandPointL",
+          "clipHold": true
+        },
+        {
+          "t": 144.36,
+          "x": 59,
+          "z": 65.4,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvStandPointL",
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": {
+            "x": 56,
+            "z": 64.9
+          },
+          "clipFrom": 1.5,
+          "clipHold": true
+        },
+        {
+          "t": 146.26,
+          "clip": null,
+          "aim": true,
+          "faceTo": {
+            "x": 23,
+            "z": 66
+          }
+        },
+        {
+          "t": 147.81,
+          "stance": "stand",
+          "clip": "IjaShotStaggerAway",
+          "yawDeg": 90.95
+        },
+        {
+          "t": 149.91,
+          "clip": "IjaGrenadeBitePin"
+        },
+        {
+          "t": 151.66,
+          "x": 60.41,
+          "z": 65.46,
+          "move": "cut",
+          "clip": "IjaParriedChoppedFall",
+          "clipHold": true,
+          "yawDeg": 90.95
+        },
+        {
+          "t": 154.06,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaDing",
+      "type": "animation",
+      "target": "IjaDing",
+      "base": {
+        "id": "IjaDing",
+        "x": 46.07,
+        "z": 66.17,
+        "yawDeg": 92.2,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": true,
+        "name": "丁",
+        "castId": "ijaD"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 55,
+          "z": 60.3,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.66,
+          "x": 55,
+          "z": 61.95,
+          "move": "run"
+        },
+        {
+          "t": 76.76,
+          "x": 55,
+          "z": 63.55,
+          "move": "cut",
+          "stance": "stand",
+          "clip": "IjaDropInStand"
+        },
+        {
+          "t": 78.46,
+          "x": 55.06,
+          "z": 63.81,
+          "move": "cut",
+          "yawDeg": -90,
+          "clip": null,
+          "aim": true
+        },
+        {
+          "t": 80.76,
+          "x": 52.5,
+          "z": 65.6,
+          "move": "walk",
+          "yawDeg": 90
+        },
+        {
+          "t": 87.96,
+          "x": 52.5,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 112.16,
+          "stance": "crouch"
+        },
+        {
+          "t": 116.32,
+          "stance": "stand",
+          "aim": false,
+          "faceTo": "IjaJia",
+          "clip": "PvStandTalkLowRifle"
+        },
+        {
+          "t": 122.26,
+          "x": 52.5,
+          "z": 65.6,
+          "move": "cut"
+        },
+        {
+          "t": 124.26,
+          "x": 58.7,
+          "z": 66,
+          "move": "run",
+          "faceTo": "Donggua",
+          "clip": null,
+          "aim": true,
+          "path": [
+            {
+              "x": 55.6,
+              "z": 66.3
+            },
+            {
+              "x": 57.4,
+              "z": 66.45
+            }
+          ]
+        },
+        {
+          "t": 125.24,
+          "clip": "IjaRecruitSlapped"
+        },
+        {
+          "t": 128.14,
+          "clip": "IjaRecruitChargeThrust",
+          "x": 58.2,
+          "z": 65.9,
+          "move": "cut",
+          "yawDeg": 49.4
+        },
+        {
+          "t": 130.65,
+          "clip": "PvIjaBayonetRaiseThreat",
+          "clipHold": true,
+          "x": 58.5,
+          "z": 66.23,
+          "move": "cut",
+          "yawDeg": 49.4
+        },
+        {
+          "t": 135.26,
+          "clip": "IjaRecruitChargeThrust",
+          "clipFrom": 2.45,
+          "clipHold": true,
+          "x": 58.2,
+          "z": 65.9,
+          "move": "cut",
+          "yawDeg": 49.4
+        },
+        {
+          "t": 141.41,
+          "x": 58.41,
+          "z": 66.27,
+          "move": "cut",
+          "clip": null,
+          "yawDeg": 49.4
+        },
+        {
+          "t": 143.66,
+          "x": 55.1,
+          "z": 65.95,
+          "move": "walk",
+          "path": [
+            {
+              "x": 56.4,
+              "z": 66.6
+            }
+          ],
+          "yawDeg": -40.6
+        },
+        {
+          "t": 143.71,
+          "clip": "PvIjaBayonetRaiseThreat",
+          "clipHold": true
+        },
+        {
+          "t": 144.36,
+          "x": 55.1,
+          "z": 65.95,
+          "move": "cut",
+          "yawDeg": -40.6,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": "PvIjaBayonetRaiseThreat",
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "clipFrom": 0.6,
+          "clipHold": true
+        },
+        {
+          "t": 147.61,
+          "clip": "ShotCollapse",
+          "clipHold": true,
+          "yawDeg": -40.6
+        },
+        {
+          "t": 149.31,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaMgGunner",
+      "type": "animation",
+      "target": "IjaMgGunner",
+      "base": {
+        "id": "IjaMgGunner",
+        "x": 56,
+        "z": 61.6,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": true,
+        "name": "支沟机枪",
+        "castId": "ijaC",
+        "weapon": "Type11",
+        "arc": {
+          "halfDeg": 5,
+          "rangeM": 38.5,
+          "yawDeg": 99.2
+        }
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 54,
+          "z": 59.8,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type11",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 77.76,
+          "x": 54,
+          "z": 59.8,
+          "move": "cut"
+        },
+        {
+          "t": 79.76,
+          "x": 56,
+          "z": 61.6,
+          "move": "walk",
+          "yawDeg": 90,
+          "clip": "IjaHeaveCorpseLip"
+        },
+        {
+          "t": 82.56,
+          "stance": "prone",
+          "clip": "IjaProneLmgOnCorpse"
+        },
+        {
+          "t": 84.56,
+          "clip": null,
+          "aim": true
+        },
+        {
+          "t": 87.96,
+          "x": 56,
+          "z": 61.6,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "prone",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type11",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 56,
+          "z": 61.6,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "prone",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type11",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.39,
+          "clip": "IjaLmgGunnerShotOnGun",
+          "clipHold": true
+        },
+        {
+          "t": 149.41,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaMgLoader",
+      "type": "animation",
+      "target": "IjaMgLoader",
+      "base": {
+        "id": "IjaMgLoader",
+        "x": 57.3,
+        "z": 61.4,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "name": "副射手"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 55.3,
+          "z": 59.7,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 77.76,
+          "x": 55.3,
+          "z": 59.7,
+          "move": "cut"
+        },
+        {
+          "t": 79.76,
+          "x": 57.3,
+          "z": 61.4,
+          "move": "walk",
+          "yawDeg": 90
+        },
+        {
+          "t": 82.76,
+          "stance": "prone"
+        },
+        {
+          "t": 87.96,
+          "x": 57.3,
+          "z": 61.4,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 57.3,
+          "z": 61.4,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.51,
+          "clip": "PvBlastThrownBack",
+          "clipHold": true,
+          "stance": "stand",
+          "yawDeg": 92
+        }
+      ]
+    },
+    {
+      "id": "Anim_Interpreter",
+      "type": "animation",
+      "target": "Interpreter",
+      "base": {
+        "id": "Interpreter",
+        "x": 56.2,
+        "z": 60.4,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "castId": "interpreter",
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 56.2,
+          "z": 60.4,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.56,
+          "visible": true,
+          "x": 56.2,
+          "z": 60.4,
+          "move": "cut"
+        },
+        {
+          "t": 78.16,
+          "x": 56,
+          "z": 63.7,
+          "move": "walk",
+          "stance": "crouch",
+          "faceTo": "IjaJia"
+        },
+        {
+          "t": 84.76,
+          "x": 56,
+          "z": 63.7,
+          "move": "cut"
+        },
+        {
+          "t": 87.36,
+          "x": 57.4,
+          "z": 63.9,
+          "move": "walk",
+          "stance": "crouch",
+          "yawDeg": -90
+        },
+        {
+          "t": 87.96,
+          "x": 57.4,
+          "z": 63.9,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 99.02,
+          "faceTo": "IjaJia",
+          "clip": "InterpreterCrouchAsk"
+        },
+        {
+          "t": 104.91,
+          "x": 57.45,
+          "z": 64.2,
+          "move": "cut",
+          "faceTo": "Donggua",
+          "clip": "InterpreterGrabCollar",
+          "clipHold": true
+        },
+        {
+          "t": 111.36,
+          "clip": "InterpreterCrouchAsk"
+        },
+        {
+          "t": 112.21,
+          "stance": "prone",
+          "clip": null
+        },
+        {
+          "t": 113.96,
+          "stance": "crouch"
+        },
+        {
+          "t": 144.36,
+          "x": 57.45,
+          "z": 64.2,
+          "move": "cut",
+          "yawDeg": -60,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 147.36,
+          "yawDeg": -135
+        },
+        {
+          "t": 148.71,
+          "stance": "stand",
+          "clip": "InterpreterFlee"
+        },
+        {
+          "t": 150.31,
+          "x": 56.42,
+          "z": 63.35,
+          "move": "cut",
+          "clip": null,
+          "yawDeg": 44.9,
+          "stance": "prone"
+        },
+        {
+          "t": 156.56,
+          "x": 54.3,
+          "z": 63.5,
+          "move": "crawl"
+        },
+        {
+          "t": 157.01,
+          "state": "down"
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaBing",
+      "type": "animation",
+      "target": "IjaBing",
+      "base": {
+        "id": "IjaBing",
+        "x": 57.8,
+        "z": 60.3,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 57.8,
+          "z": 60.3,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.36,
+          "stance": "stand",
+          "aim": true,
+          "x": 57.8,
+          "z": 60.3,
+          "move": "cut"
+        },
+        {
+          "t": 76.76,
+          "x": 57.65,
+          "z": 61.65,
+          "move": "run",
+          "stance": "crouch"
+        },
+        {
+          "t": 77.87,
+          "x": 57.6,
+          "z": 63.4,
+          "move": "walk",
+          "stance": "crouch"
+        },
+        {
+          "t": 77.91,
+          "stance": "stand"
+        },
+        {
+          "t": 79.11,
+          "x": 53.6,
+          "z": 65,
+          "move": "run",
+          "yawDeg": 90
+        },
+        {
+          "t": 79.16,
+          "clip": "VilIjaHelmetGrenadeLob",
+          "yawDeg": 90
+        },
+        {
+          "t": 81.46,
+          "stance": "crouch",
+          "aim": true,
+          "clip": null,
+          "yawDeg": 90
+        },
+        {
+          "t": 85.06,
+          "x": 50.5,
+          "z": 65.3,
+          "move": "walk",
+          "yawDeg": 90
+        },
+        {
+          "t": 87.96,
+          "x": 50.5,
+          "z": 65.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 50.5,
+          "z": 65.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "crouch",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 148.36,
+          "faceTo": {
+            "x": 57.6,
+            "z": 66.4
+          }
+        },
+        {
+          "t": 149.61,
+          "stance": "stand",
+          "aim": false,
+          "faceTo": "CounterNra2"
+        },
+        {
+          "t": 149.66,
+          "clip": "VilIjaBayonetThrust"
+        },
+        {
+          "t": 150.66,
+          "clip": "PvIjaLungeParriedFall",
+          "clipHold": true
+        },
+        {
+          "t": 152.46,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_BodyNra3",
+      "type": "animation",
+      "target": "BodyNra3",
+      "base": {
+        "id": "BodyNra3",
+        "x": 54,
+        "z": 65.6,
+        "yawDeg": 70,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 54,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": 70,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "x": 54,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": 70,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 54,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": 70,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaWu",
+      "type": "animation",
+      "target": "IjaWu",
+      "base": {
+        "id": "IjaWu",
+        "x": 60.2,
+        "z": 60,
+        "yawDeg": 180,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "crouch",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60.2,
+          "z": 60,
+          "move": "cut",
+          "yawDeg": 180,
+          "stance": "crouch",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.56,
+          "stance": "stand",
+          "aim": true,
+          "x": 60.2,
+          "z": 60,
+          "move": "cut"
+        },
+        {
+          "t": 77.06,
+          "x": 59.6,
+          "z": 61.6,
+          "move": "run",
+          "stance": "crouch"
+        },
+        {
+          "t": 78.22,
+          "x": 59.1,
+          "z": 63.4,
+          "move": "walk",
+          "stance": "crouch"
+        },
+        {
+          "t": 78.26,
+          "stance": "stand"
+        },
+        {
+          "t": 78.86,
+          "x": 58.4,
+          "z": 65.2,
+          "move": "run",
+          "yawDeg": -90
+        },
+        {
+          "t": 78.91,
+          "faceTo": "BodyNra1"
+        },
+        {
+          "t": 80.16,
+          "clip": "VilIjaBayonetThrust"
+        },
+        {
+          "t": 81.96,
+          "x": 58.4,
+          "z": 65.2,
+          "move": "cut"
+        },
+        {
+          "t": 84.96,
+          "x": 61.9,
+          "z": 65.4,
+          "move": "walk",
+          "clip": null,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 87.96,
+          "x": 61.9,
+          "z": 65.4,
+          "move": "cut",
+          "yawDeg": -90,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 88.56,
+          "clip": "PvIjaBayonetRaiseThreat",
+          "clipHold": true,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 92.24,
+          "clip": null,
+          "aim": false
+        },
+        {
+          "t": 92.84,
+          "x": 62.6,
+          "z": 66,
+          "move": "walk",
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 96.04,
+          "x": 57.9,
+          "z": 66.1,
+          "move": "drag"
+        },
+        {
+          "t": 110.94,
+          "clip": "PvIjaButtStrikeFace",
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 112.16,
+          "stance": "crouch",
+          "clip": null,
+          "aim": true,
+          "faceTo": {
+            "x": 23,
+            "z": 66
+          }
+        },
+        {
+          "t": 113.96,
+          "stance": "stand",
+          "aim": false
+        },
+        {
+          "t": 121.26,
+          "x": 57.9,
+          "z": 66.1,
+          "move": "cut"
+        },
+        {
+          "t": 122.76,
+          "x": 59.9,
+          "z": 66.1,
+          "move": "walk",
+          "aim": true,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 144.36,
+          "x": 59.9,
+          "z": 66.1,
+          "move": "cut",
+          "yawDeg": 80,
+          "stance": "stand",
+          "aim": true,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false,
+          "faceTo": "Donggua"
+        },
+        {
+          "t": 146.86,
+          "faceTo": {
+            "x": 59.5,
+            "z": 69.5
+          }
+        },
+        {
+          "t": 149.56,
+          "faceTo": "CounterNra4"
+        },
+        {
+          "t": 149.66,
+          "clip": "VilIjaBayonetThrust"
+        },
+        {
+          "t": 150.76,
+          "clip": "PvIjaLungeParriedFall",
+          "clipHold": true
+        },
+        {
+          "t": 152.56,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CorpseLip1",
+      "type": "animation",
+      "target": "CorpseLip1",
+      "base": {
+        "id": "CorpseLip1",
+        "x": 55.4,
+        "z": 61.8,
+        "yawDeg": 0,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 55.4,
+          "z": 61.8,
+          "move": "cut",
+          "yawDeg": 0,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "x": 55.4,
+          "z": 61.8,
+          "move": "cut",
+          "yawDeg": 0,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 55.4,
+          "z": 61.8,
+          "move": "cut",
+          "yawDeg": 0,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        }
+      ]
+    },
+    {
+      "id": "Anim_CorpseLip2",
+      "type": "animation",
+      "target": "CorpseLip2",
+      "base": {
+        "id": "CorpseLip2",
+        "x": 56.6,
+        "z": 61.9,
+        "yawDeg": 20,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 56.6,
+          "z": 61.9,
+          "move": "cut",
+          "yawDeg": 20,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "x": 56.6,
+          "z": 61.9,
+          "move": "cut",
+          "yawDeg": 20,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 144.36,
+          "x": 56.6,
+          "z": 61.9,
+          "move": "cut",
+          "yawDeg": 20,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        }
+      ]
+    },
+    {
+      "id": "Anim_BodyNra1",
+      "type": "animation",
+      "target": "BodyNra1",
+      "base": {
+        "id": "BodyNra1",
+        "x": 59.6,
+        "z": 65.6,
+        "yawDeg": -80,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 59.6,
+          "z": 65.6,
+          "move": "cut",
+          "yawDeg": -80,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_BodyNra2",
+      "type": "animation",
+      "target": "BodyNra2",
+      "base": {
+        "id": "BodyNra2",
+        "x": 60.9,
+        "z": 63.8,
+        "yawDeg": 100,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "down",
+        "aim": false,
+        "weapon": "HanYang"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60.9,
+          "z": 63.8,
+          "move": "cut",
+          "yawDeg": 100,
+          "stance": "prone",
+          "aim": false,
+          "state": "down",
+          "visible": true,
+          "clip": null,
+          "weapon": "HanYang",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaColumn1",
+      "type": "animation",
+      "target": "IjaColumn1",
+      "base": {
+        "id": "IjaColumn1",
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.16,
+          "visible": true,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut"
+        },
+        {
+          "t": 83.16,
+          "x": 36,
+          "z": 61.9,
+          "move": "run",
+          "path": [
+            {
+              "x": 56,
+              "z": 61.9
+            }
+          ]
+        },
+        {
+          "t": 83.26,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaColumn2",
+      "type": "animation",
+      "target": "IjaColumn2",
+      "base": {
+        "id": "IjaColumn2",
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.51,
+          "visible": true,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut"
+        },
+        {
+          "t": 83.51,
+          "x": 36,
+          "z": 61.9,
+          "move": "run",
+          "path": [
+            {
+              "x": 56,
+              "z": 61.9
+            }
+          ]
+        },
+        {
+          "t": 83.61,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaColumn3",
+      "type": "animation",
+      "target": "IjaColumn3",
+      "base": {
+        "id": "IjaColumn3",
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.86,
+          "visible": true,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut"
+        },
+        {
+          "t": 83.86,
+          "x": 36,
+          "z": 61.9,
+          "move": "run",
+          "path": [
+            {
+              "x": 56,
+              "z": 61.9
+            }
+          ]
+        },
+        {
+          "t": 83.96,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaColumn4",
+      "type": "animation",
+      "target": "IjaColumn4",
+      "base": {
+        "id": "IjaColumn4",
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 77.21,
+          "visible": true,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut"
+        },
+        {
+          "t": 84.21,
+          "x": 36,
+          "z": 61.9,
+          "move": "run",
+          "path": [
+            {
+              "x": 56,
+              "z": 61.9
+            }
+          ]
+        },
+        {
+          "t": 84.31,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaColumn5",
+      "type": "animation",
+      "target": "IjaColumn5",
+      "base": {
+        "id": "IjaColumn5",
+        "x": 60,
+        "z": 61.3,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 77.56,
+          "visible": true,
+          "x": 60,
+          "z": 61.3,
+          "move": "cut"
+        },
+        {
+          "t": 84.56,
+          "x": 36,
+          "z": 61.9,
+          "move": "run",
+          "path": [
+            {
+              "x": 56,
+              "z": 61.9
+            }
+          ]
+        },
+        {
+          "t": 84.66,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_IjaOfficer",
+      "type": "animation",
+      "target": "IjaOfficer",
+      "base": {
+        "id": "IjaOfficer",
+        "x": 51,
+        "z": 61.9,
+        "yawDeg": 90,
+        "side": "ija",
+        "kind": "soldier",
+        "stance": "stand",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Type38"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 74.56,
+          "x": 51,
+          "z": 61.9,
+          "move": "cut",
+          "yawDeg": 90,
+          "stance": "stand",
+          "aim": false,
+          "state": "alive",
+          "visible": false,
+          "clip": null,
+          "weapon": "Type38",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 76.36,
+          "visible": true,
+          "clip": "PvStandPointL",
+          "clipHold": true
+        },
+        {
+          "t": 80.56,
+          "clip": null
+        },
+        {
+          "t": 80.76,
+          "x": 51,
+          "z": 61.9,
+          "move": "cut"
+        },
+        {
+          "t": 83.56,
+          "x": 47.5,
+          "z": 58,
+          "move": "walk"
+        },
+        {
+          "t": 83.66,
+          "visible": false
+        },
+        {
+          "t": 87.96,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "visible": false,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra1",
+      "type": "animation",
+      "target": "CounterNra1",
+      "base": {
+        "id": "CounterNra1",
+        "x": 57.4,
+        "z": 70.3,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 57.4,
+          "z": 70.3,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 146.76,
+          "stance": "crouch"
+        },
+        {
+          "t": 148.71,
+          "x": 57.4,
+          "z": 70.3,
+          "move": "cut"
+        },
+        {
+          "t": 149.56,
+          "x": 57.6,
+          "z": 66.4,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": {
+            "x": 50.5,
+            "z": 65.3
+          }
+        },
+        {
+          "t": 149.57,
+          "clip": "ShotCollapse",
+          "clipHold": true,
+          "yawDeg": 90
+        },
+        {
+          "t": 151.16,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra2",
+      "type": "animation",
+      "target": "CounterNra2",
+      "base": {
+        "id": "CounterNra2",
+        "x": 52.6,
+        "z": 70.3,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 52.6,
+          "z": 70.3,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.06,
+          "stance": "crouch"
+        },
+        {
+          "t": 148.76,
+          "x": 52.6,
+          "z": 70.3,
+          "move": "cut"
+        },
+        {
+          "t": 149.81,
+          "x": 51.6,
+          "z": 66,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": "IjaBing"
+        },
+        {
+          "t": 149.86,
+          "clip": "VilStabbedFall",
+          "clipHold": true
+        },
+        {
+          "t": 151.86,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra3",
+      "type": "animation",
+      "target": "CounterNra3",
+      "base": {
+        "id": "CounterNra3",
+        "x": 54.4,
+        "z": 70.2,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 54.4,
+          "z": 70.2,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.26,
+          "stance": "crouch"
+        },
+        {
+          "t": 148.56,
+          "x": 54.4,
+          "z": 70.2,
+          "move": "cut"
+        },
+        {
+          "t": 149.66,
+          "x": 53.4,
+          "z": 65.9,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": "IjaYi"
+        },
+        {
+          "t": 149.71,
+          "clip": "VilStabbedFall",
+          "clipHold": true
+        },
+        {
+          "t": 151.71,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra4",
+      "type": "animation",
+      "target": "CounterNra4",
+      "base": {
+        "id": "CounterNra4",
+        "x": 59,
+        "z": 70.4,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 59,
+          "z": 70.4,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 146.86,
+          "stance": "crouch"
+        },
+        {
+          "t": 148.81,
+          "x": 59,
+          "z": 70.4,
+          "move": "cut"
+        },
+        {
+          "t": 149.71,
+          "x": 58.8,
+          "z": 66.3,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": "IjaWu"
+        },
+        {
+          "t": 149.76,
+          "clip": "VilStabbedFall",
+          "clipHold": true,
+          "faceTo": "IjaWu"
+        },
+        {
+          "t": 151.76,
+          "state": "down",
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra5",
+      "type": "animation",
+      "target": "CounterNra5",
+      "base": {
+        "id": "CounterNra5",
+        "x": 50.8,
+        "z": 70.7,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 50.8,
+          "z": 70.7,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 146.96,
+          "stance": "crouch"
+        },
+        {
+          "t": 149.36,
+          "x": 50.8,
+          "z": 70.7,
+          "move": "cut"
+        },
+        {
+          "t": 150.51,
+          "x": 50.8,
+          "z": 66.6,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": "IjaBing"
+        },
+        {
+          "t": 150.56,
+          "clip": "DadaoAmbush",
+          "faceTo": "IjaBing"
+        },
+        {
+          "t": 151.46,
+          "clip": null
+        },
+        {
+          "t": 155.26,
+          "x": 50.8,
+          "z": 66.6,
+          "move": "cut"
+        },
+        {
+          "t": 156.56,
+          "x": 53.45,
+          "z": 63.75,
+          "move": "run",
+          "path": [
+            {
+              "x": 52.6,
+              "z": 64.6
+            }
+          ],
+          "faceTo": "Interpreter"
+        },
+        {
+          "t": 156.61,
+          "clip": "DadaoAmbush",
+          "faceTo": "Interpreter"
+        },
+        {
+          "t": 157.56,
+          "clip": null
+        }
+      ]
+    },
+    {
+      "id": "Anim_CounterNra6",
+      "type": "animation",
+      "target": "CounterNra6",
+      "base": {
+        "id": "CounterNra6",
+        "x": 61,
+        "z": 70.4,
+        "yawDeg": 3.6,
+        "side": "nra",
+        "kind": "soldier",
+        "stance": "prone",
+        "state": "alive",
+        "aim": false,
+        "weapon": "Dadao"
+      },
+      "keys": [
+        {
+          "t": 0,
+          "visible": false,
+          "clip": null
+        },
+        {
+          "t": 144.36,
+          "x": 61,
+          "z": 70.4,
+          "move": "cut",
+          "yawDeg": 3.6,
+          "stance": "prone",
+          "aim": false,
+          "state": "alive",
+          "visible": true,
+          "clip": null,
+          "weapon": "Dadao",
+          "lie": null,
+          "ride": null,
+          "carryRole": null,
+          "woundedWalk": false,
+          "dragSolo": false
+        },
+        {
+          "t": 147.36,
+          "stance": "crouch"
+        },
+        {
+          "t": 149.36,
+          "x": 61,
+          "z": 70.4,
+          "move": "cut"
+        },
+        {
+          "t": 150.31,
+          "x": 60.9,
+          "z": 66.2,
+          "move": "run",
+          "stance": "stand",
+          "faceTo": "IjaWu"
+        },
+        {
+          "t": 150.36,
+          "clip": "DadaoAmbush",
+          "faceTo": "IjaWu"
+        },
+        {
+          "t": 151.36,
+          "clip": null,
+          "faceTo": {
+            "x": 61,
+            "z": 63
+          }
+        }
+      ]
+    },
+    {
+      "id": "DialogueMain",
+      "type": "dialogue",
+      "clips": [
+        {
+          "t": 1.7,
+          "line": "CaveWake.02",
+          "actor": "Donggua"
+        },
+        {
+          "t": 6.2,
+          "line": "CaveWake.03",
+          "actor": "Donggua"
+        },
+        {
+          "t": 14.64,
+          "line": "RunnerOrder.01",
+          "actor": "Runner"
+        },
+        {
+          "t": 18.14,
+          "line": "RunnerOrder.02",
+          "actor": "Runner"
+        },
+        {
+          "t": 22.86,
+          "line": "RunnerOrder.03",
+          "actor": "Luo"
+        },
+        {
+          "t": 26.64,
+          "line": "RunnerOrder.04",
+          "actor": "Luo"
+        },
+        {
+          "t": 30.47,
+          "line": "RunnerOrder.05",
+          "actor": "Yaowa"
+        },
+        {
+          "t": 40.66,
+          "line": "LastTwoRun.01",
+          "actor": "Luo"
+        },
+        {
+          "t": 45.8,
+          "line": "LastTwoRun.02"
+        },
+        {
+          "t": 48.4,
+          "line": "LastTwoRun.03",
+          "actor": "Donggua"
+        },
+        {
+          "t": 51.23,
+          "line": "LastTwoRun.04"
+        },
+        {
+          "t": 52.2,
+          "line": "LastTwoRun.05",
+          "actor": "Donggua"
+        },
+        {
+          "t": 59.15,
+          "line": "LastTwoRun.06",
+          "actor": "Donggua"
+        },
+        {
+          "t": 61.35,
+          "line": "LastTwoRun.07"
+        },
+        {
+          "t": 65.23,
+          "line": "LastTwoRun.08",
+          "actor": "Donggua"
+        },
+        {
+          "t": 89.16,
+          "line": "Interrogation.01",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 96.94,
+          "line": "Interrogation.04",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 99.02,
+          "line": "AskDonggua.01",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 102.26,
+          "line": "AskDonggua.02",
+          "actor": "Interpreter"
+        },
+        {
+          "t": 104.91,
+          "line": "AskDonggua.03",
+          "actor": "Interpreter"
+        },
+        {
+          "t": 108.26,
+          "line": "AskDonggua.04",
+          "actor": "Donggua"
+        },
+        {
+          "t": 113.96,
+          "line": "BloodingJia.01",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 116.77,
+          "line": "BloodingDingHai.01",
+          "actor": "IjaDing"
+        },
+        {
+          "t": 118.4,
+          "line": "BloodingJia.02",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 121.68,
+          "line": "BloodingDingLate.01",
+          "actor": "IjaDing"
+        },
+        {
+          "t": 126.16,
+          "line": "BloodingDingSlapped.01",
+          "actor": "IjaDing"
+        },
+        {
+          "t": 129.14,
+          "line": "BloodingDingYell.01",
+          "actor": "IjaDing"
+        },
+        {
+          "t": 130.4,
+          "line": "BloodingDonggua.01",
+          "actor": "Donggua"
+        },
+        {
+          "t": 132.95,
+          "line": "BloodingJia.03",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 134.63,
+          "line": "BloodingDingLate.01",
+          "actor": "IjaDing"
+        },
+        {
+          "t": 136.61,
+          "line": "BloodingDonggua.02",
+          "actor": "Donggua"
+        },
+        {
+          "t": 138.75,
+          "line": "BloodingJeer.01",
+          "actor": "IjaYi"
+        },
+        {
+          "t": 141.23,
+          "line": "BloodingJia.04",
+          "actor": "IjaJia"
+        },
+        {
+          "t": 146.96,
+          "line": "Counter.01",
+          "actor": "Luo"
+        },
+        {
+          "t": 147.86,
+          "line": "Counter.02",
+          "actor": "IjaWu"
+        },
+        {
+          "t": 148.66,
+          "line": "Counter.03",
+          "actor": "Luo"
+        },
+        {
+          "t": 151.31,
+          "line": "Counter.04",
+          "actor": "Luo"
+        },
+        {
+          "t": 153.96,
+          "line": "Counter.05",
+          "actor": "LiuWencai"
+        }
+      ]
+    },
+    {
+      "id": "AudioSfx",
+      "type": "audio",
+      "clips": [
+        {
+          "t": 0.15,
+          "name": "artilleryNear"
+        },
+        {
+          "t": 0.3,
+          "name": "dirtFall",
+          "x": 66.5,
+          "z": 64.5
+        },
+        {
+          "t": 8.4,
+          "name": "artilleryFar"
+        },
+        {
+          "t": 15.04,
+          "name": "rifleShot",
+          "x": 30,
+          "z": 66
+        },
+        {
+          "t": 15.44,
+          "name": "mgBurstFar",
+          "x": 37,
+          "z": -3
+        },
+        {
+          "t": 16.24,
+          "name": "artilleryNear",
+          "volume": 0.7
+        },
+        {
+          "t": 69.16,
+          "name": "shellIncoming",
+          "x": 60.5,
+          "z": 64.7
+        },
+        {
+          "t": 70.66,
+          "name": "shellBlast",
+          "x": 60.5,
+          "z": 64.7
+        },
+        {
+          "t": 71.06,
+          "name": "tinnitus"
+        },
+        {
+          "t": 74.56,
+          "name": "tinnitus"
+        },
+        {
+          "t": 75.56,
+          "name": "whistleShort",
+          "x": 56.8,
+          "z": 59.5
+        },
+        {
+          "t": 80.17,
+          "name": "stab",
+          "x": 54,
+          "z": 65.6
+        },
+        {
+          "t": 80.66,
+          "name": "stab",
+          "x": 59.6,
+          "z": 65.6
+        },
+        {
+          "t": 81.96,
+          "name": "grenadeBlast",
+          "x": 39.5,
+          "z": 66
+        },
+        {
+          "t": 83.67,
+          "name": "stab",
+          "x": 60.9,
+          "z": 63.8
+        },
+        {
+          "t": 83.56,
+          "name": "mortarPop",
+          "x": 72,
+          "z": 52,
+          "volume": 0.6
+        },
+        {
+          "t": 84.76,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 85.66,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 86.96,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 89.96,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 92.56,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 95.16,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 95.94,
+          "name": "slap",
+          "x": 63.3,
+          "z": 63.8
+        },
+        {
+          "t": 97.76,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 100.36,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 102.96,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 105.56,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 108.16,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 110.76,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 111.36,
+          "name": "slap",
+          "x": 57.5,
+          "z": 65.3
+        },
+        {
+          "t": 111.96,
+          "name": "rifleVolley",
+          "x": 30,
+          "z": 66,
+          "volume": 0.7
+        },
+        {
+          "t": 112.36,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 112.56,
+          "name": "rifleShot",
+          "x": 50.5,
+          "z": 65.3
+        },
+        {
+          "t": 112.86,
+          "name": "rifleShot",
+          "x": 58.4,
+          "z": 65.2
+        },
+        {
+          "t": 113.36,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 115.96,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 118.56,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 121.16,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 123.76,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 125.66,
+          "name": "slap",
+          "x": 58.7,
+          "z": 66
+        },
+        {
+          "t": 126.36,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 128.96,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 130.35,
+          "name": "stab",
+          "x": 57.5,
+          "z": 65.3
+        },
+        {
+          "t": 131.55,
+          "name": "dirtFall",
+          "x": 56.6,
+          "z": 68.6,
+          "volume": 0.35
+        },
+        {
+          "t": 131.56,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 134.16,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 135.56,
+          "name": "stab",
+          "x": 57.5,
+          "z": 65.3
+        },
+        {
+          "t": 136.76,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 139.36,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 144.56,
+          "name": "rifleShot",
+          "x": 23.03,
+          "z": 65.93
+        },
+        {
+          "t": 144.86,
+          "name": "mgBurstNear",
+          "x": 56,
+          "z": 61.6
+        },
+        {
+          "t": 147.31,
+          "name": "rifleVolley",
+          "x": 53.8,
+          "z": 69.12
+        },
+        {
+          "t": 148.21,
+          "name": "rifleShot",
+          "x": 56.7,
+          "z": 64.6
+        },
+        {
+          "t": 149.56,
+          "name": "rifleShot",
+          "x": 50.5,
+          "z": 65.3
+        },
+        {
+          "t": 150.01,
+          "name": "stab",
+          "x": 53.4,
+          "z": 65.9
+        },
+        {
+          "t": 150.11,
+          "name": "stab",
+          "x": 51.6,
+          "z": 66
+        },
+        {
+          "t": 150.11,
+          "name": "stab",
+          "x": 58.8,
+          "z": 66.3
+        },
+        {
+          "t": 151.16,
+          "name": "rifleShot",
+          "x": 55.3,
+          "z": 69.2
+        },
+        {
+          "t": 152.62,
+          "name": "rifleShot",
+          "x": 55.3,
+          "z": 69.2
+        }
+      ]
+    },
+    {
+      "id": "VfxMain",
+      "type": "vfx",
+      "clips": [
+        {
+          "t": 0.3,
+          "type": "smoke",
+          "x": 67.4,
+          "z": 64.8,
+          "kind": "SmokeDust",
+          "dur": 3.5,
+          "smokeKind": "SmokeDust"
+        },
+        {
+          "t": 70.66,
+          "type": "explosion",
+          "x": 60.2,
+          "z": 63.9,
+          "kind": "shell",
+          "radius": 5
+        },
+        {
+          "t": 81.96,
+          "type": "explosion",
+          "x": 39.5,
+          "z": 66,
+          "kind": "grenade",
+          "radius": 4
+        },
+        {
+          "t": 84.76,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 6,
+          "interval": 0.11
+        },
+        {
+          "t": 85.06,
+          "type": "explosion",
+          "x": 24.4,
+          "z": 66.6,
+          "kind": "grenade",
+          "radius": 0.8
+        },
+        {
+          "t": 85.66,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 85.86,
+          "type": "explosion",
+          "x": 56.4,
+          "z": 62.5,
+          "kind": "grenade",
+          "radius": 0.8
+        },
+        {
+          "t": 86.56,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 86.96,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 89.96,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 91.56,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 92.56,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 95.16,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 96.76,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 97.76,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 100.36,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 101.96,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 102.96,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 105.56,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 107.16,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 108.16,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 110.76,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 112.06,
+          "type": "explosion",
+          "x": 56.4,
+          "z": 62.5,
+          "kind": "grenade",
+          "radius": 0.8
+        },
+        {
+          "t": 112.16,
+          "type": "explosion",
+          "x": 58.6,
+          "z": 62.7,
+          "kind": "grenade",
+          "radius": 0.8
+        },
+        {
+          "t": 112.36,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 9,
+          "interval": 0.1
+        },
+        {
+          "t": 112.36,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 112.56,
+          "type": "muzzle",
+          "actor": "IjaBing"
+        },
+        {
+          "t": 112.86,
+          "type": "muzzle",
+          "actor": "IjaYi"
+        },
+        {
+          "t": 113.36,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 115.96,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 117.56,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 118.56,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 121.16,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 122.76,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 123.76,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 126.36,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 127.96,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 128.96,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 131.56,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 133.16,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 134.16,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 136.76,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 138.36,
+          "type": "muzzle",
+          "actor": "Squad1"
+        },
+        {
+          "t": 139.36,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 144.56,
+          "type": "muzzle",
+          "actor": "HeYoutian"
+        },
+        {
+          "t": 144.86,
+          "type": "muzzle",
+          "actor": "IjaMgGunner",
+          "count": 5,
+          "interval": 0.11
+        },
+        {
+          "t": 145.26,
+          "type": "explosion",
+          "x": 56.4,
+          "z": 62.5,
+          "kind": "grenade",
+          "radius": 0.8
+        },
+        {
+          "t": 147.31,
+          "type": "muzzle",
+          "actor": "LiuWencai"
+        },
+        {
+          "t": 147.38,
+          "type": "muzzle",
+          "actor": "Squad2"
+        },
+        {
+          "t": 147.48,
+          "type": "muzzle",
+          "actor": "Squad3"
+        },
+        {
+          "t": 148.21,
+          "type": "muzzle",
+          "actor": "IjaWu"
+        },
+        {
+          "t": 148.21,
+          "type": "muzzle",
+          "actor": "LiuWencai"
+        },
+        {
+          "t": 148.41,
+          "type": "muzzle",
+          "actor": "Squad3"
+        },
+        {
+          "t": 149.56,
+          "type": "muzzle",
+          "actor": "IjaBing"
+        },
+        {
+          "t": 151.16,
+          "type": "muzzle",
+          "actor": "LiuWencai"
+        },
+        {
+          "t": 152.62,
+          "type": "muzzle",
+          "actor": "LiuWencai"
+        }
+      ]
+    },
+    {
+      "id": "OverlayMain",
+      "type": "overlay",
+      "clips": [
+        {
+          "t": 0,
+          "dur": 1.5,
+          "fade": 0.5,
+          "kind": "black"
+        },
+        {
+          "t": 0.15,
+          "dur": 1,
+          "kind": "shake",
+          "strength": 0.6
+        },
+        {
+          "t": 1.3,
+          "dur": 0.25,
+          "kind": "flash",
+          "strength": 0.35
+        },
+        {
+          "t": 4,
+          "dur": 2.8,
+          "kind": "caption",
+          "text": "（顺子扯一截新绷带缠上去，新缠的这圈是白的）"
+        },
+        {
+          "t": 8.4,
+          "dur": 0.22,
+          "kind": "flash",
+          "strength": 0.28
+        },
+        {
+          "t": 9.3,
+          "dur": 0.22,
+          "kind": "flash",
+          "strength": 0.28
+        },
+        {
+          "t": 10.3,
+          "dur": 0.22,
+          "kind": "flash",
+          "strength": 0.28
+        },
+        {
+          "t": 11.95,
+          "dur": 0.22,
+          "kind": "flash",
+          "strength": 0.28
+        },
+        {
+          "t": 34.54,
+          "dur": 1.6,
+          "kind": "caption",
+          "text": "（顺子这才把结拉紧）"
+        },
+        {
+          "t": 37.64,
+          "dur": 2.4,
+          "kind": "caption",
+          "text": "（冬瓜单手塞背包，塞不进去，顺子帮他捆好）"
+        },
+        {
+          "t": 46.8,
+          "dur": 2.2,
+          "kind": "caption",
+          "text": "（包口露出一件老百姓的短褂）"
+        },
+        {
+          "t": 70.66,
+          "dur": 0.4,
+          "kind": "flash",
+          "strength": 1
+        },
+        {
+          "t": 70.66,
+          "dur": 0.8,
+          "kind": "shake",
+          "strength": 1
+        },
+        {
+          "t": 70.96,
+          "dur": 3.6,
+          "fade": 0.15,
+          "kind": "black"
+        },
+        {
+          "t": 71.66,
+          "dur": 2.6,
+          "kind": "caption",
+          "text": "（耳鸣）"
+        },
+        {
+          "t": 74.56,
+          "dur": 2,
+          "fade": 1.2,
+          "kind": "black"
+        },
+        {
+          "t": 74.96,
+          "dur": 3,
+          "kind": "caption",
+          "text": "（腰以下动不了，全程只能转头）"
+        },
+        {
+          "t": 88.26,
+          "dur": 1.8,
+          "kind": "caption",
+          "text": "（塌土里有人在咳）"
+        },
+        {
+          "t": 92.74,
+          "dur": 2.2,
+          "kind": "caption",
+          "text": "（闭眼装死，只留一条缝）"
+        },
+        {
+          "t": 95.94,
+          "dur": 0.45,
+          "kind": "shake",
+          "strength": 0.6
+        },
+        {
+          "t": 96.24,
+          "dur": 2,
+          "kind": "caption",
+          "text": "（左边发晕，眼睛被扇开了）"
+        },
+        {
+          "t": 130.55,
+          "dur": 2.4,
+          "kind": "caption",
+          "text": "（正扎在那圈白绷带上，白的一下子红了）"
+        },
+        {
+          "t": 131.75,
+          "dur": 2,
+          "kind": "caption",
+          "text": "（南沿上滚下来几块土，土垄上冒了一下钢盔）"
+        },
+        {
+          "t": 145.96,
+          "dur": 1.3,
+          "kind": "caption",
+          "text": "（后沟的枪声忽然停了）"
+        },
+        {
+          "t": 148.26,
+          "dur": 2.2,
+          "kind": "caption",
+          "text": "（丁扑倒在面前，刺刀尖扎进脸边的泥里）"
+        },
+        {
+          "t": 152.16,
+          "dur": 2.4,
+          "kind": "caption",
+          "text": "（那颗没磕响的手榴弹滚到脸前，停住了）"
+        },
+        {
+          "t": 155.36,
+          "dur": 2,
+          "kind": "caption",
+          "text": "（沟里一下子静了）"
+        }
+      ]
+    },
+    {
+      "id": "Signals",
+      "type": "signal",
+      "markers": [
+        {
+          "t": 0,
+          "action": "world.setSignal",
+          "params": {
+            "id": "Stage0105Done",
+            "on": true
+          },
+          "onSkip": "apply"
+        },
+        {
+          "t": 0,
+          "action": "player.spawn",
+          "params": {
+            "x": 66.5,
+            "z": 64.2,
+            "yawDeg": -149,
+            "stance": "crouch"
+          },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 13.84,
+          "action": "player.spawn",
+          "params": {
+            "x": 66.5,
+            "z": 64.2,
+            "yawDeg": 94.9,
+            "stance": "crouch"
+          },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 39.46,
+          "action": "player.spawn",
+          "params": {
+            "x": 66.8,
+            "z": 64.2,
+            "yawDeg": 132,
+            "stance": "crouch"
+          },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 70.86,
+          "action": "world.setSignal",
+          "params": {
+            "id": "DugoutCollapsed",
+            "on": true
+          },
+          "onSkip": "apply"
+        },
+        {
+          "t": 74.56,
+          "action": "world.setSignal",
+          "params": {
+            "id": "DugoutCollapsed",
+            "on": true
+          },
+          "onSkip": "apply"
+        },
+        {
+          "t": 74.56,
+          "action": "player.spawn",
+          "params": {
+            "x": 63.3,
+            "z": 63.8,
+            "yawDeg": 88.6,
+            "stance": "prone"
+          },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 87.96,
+          "action": "world.setSignal",
+          "params": {
+            "id": "DugoutCollapsed",
+            "on": true
+          },
+          "onSkip": "apply"
+        },
+        {
+          "t": 87.96,
+          "action": "player.spawn",
+          "params": {
+            "x": 63.3,
+            "z": 63.8,
+            "yawDeg": 104.5,
+            "stance": "prone"
+          },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 144.36,
+          "action": "world.setSignal",
+          "params": {
+            "id": "DugoutCollapsed",
+            "on": true
+          },
+          "onSkip": "apply"
+        },
+        {
+          "t": 144.36,
+          "action": "player.spawn",
+          "params": {
+            "x": 63.3,
+            "z": 63.8,
+            "yawDeg": 113.1,
+            "stance": "prone"
+          },
+          "onSkip": "ignore"
+        }
+      ]
+    }
+  ]
+}

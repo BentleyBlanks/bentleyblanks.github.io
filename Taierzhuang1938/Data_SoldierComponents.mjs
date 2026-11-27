@@ -111,7 +111,7 @@ export const SOLDIER_COMPONENTS = Object.freeze({
   scripted: Object.freeze({
     label: "关卡与测试场挂的开关",
     owner: "关卡编排（Script_FirstLevel*）与测试场",
-    owners: Object.freeze(["Script_FirstLevel*.mjs", "Script_Mission*.mjs", "Script_Opening*.mjs", "Script_SquadMarchAi.mjs", "Script_Ai.mjs", "Script_WeaponRangeRuntime.mjs", "Script_Main.mjs"]),
+    owners: Object.freeze(["Script_FirstLevel*.mjs", "Script_Mission*.mjs", "Script_Opening*.mjs", "Script_SquadMarchAi.mjs", "Script_Ai.mjs", "Script_WeaponRangeRuntime.mjs", "Script_Main.mjs", "Script_Timeline*.mjs"]),
     fields: Object.freeze([
       "missionFireSuppressOnly", "missionOpenUntil",
       "ambientFirePoints", "ambientFirePoint", "ambientAim", "ambientUntil", "ambientPickAt", "ambientShots", "ambientBlockedId", "ambientBlockedUntil",
@@ -242,4 +242,5 @@ export const SOLDIER_TAGS = Object.freeze([
   Object.freeze({ tag: "untargetable", field: "missionUntargetable", label: "任务里暂时不可被瞄" }),
   Object.freeze({ tag: "meleeDormant", field: "meleeDormant", label: "白刃遭遇触发前不动" }),
   Object.freeze({ tag: "wounded", field: "wounded", label: "伤员" }),
+  Object.freeze({ tag: "timelineControlled", field: "timelineControlled", label: "Timeline 过场接管：AI 暂停思考与覆写动画，由 TimelineDirector 直接驱动" }),
 ]);

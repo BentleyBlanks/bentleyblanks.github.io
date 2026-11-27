@@ -611,6 +611,13 @@ export function LayoutFromSceneDoc(doc) {
     ...(gate.signal ? { signal: gate.signal } : {}),
     ...(gate.appearSignal ? { appearSignal: gate.appearSignal } : {}),
   }));
+  // 可被 Timeline 动态绑定的场景物件（bindId）：跳过静态合批，单独挂入 FirstLevelWhiteboxField.bindables。
+  const bindables = (doc.bindables || []).map(item => ({
+    ...Placed(item),
+    bindId: item.bindId,
+    ...(item.signal ? { signal: item.signal } : {}),
+    ...(item.appearSignal ? { appearSignal: item.appearSignal } : {}),
+  }));
   // 场景壕沟的构件（护壁、踏板、射击位、杂物，Data_TrenchDetails 每段开关）：白盒、正式都摆成体块，杂物在正式场景换模型
   const trenchPlan = doc.trenchPlan || null;
   const trenchDressing = trenchPlan ? SceneTrenchDressing(trenchPlan, sampler, blocks, doc.bounds) : { blocks: [], stats: null };
@@ -681,6 +688,7 @@ export function LayoutFromSceneDoc(doc) {
     semanticSurfaces: { ...(MISSION_LAYOUT.semanticSurfaces || {}) },
     blocks,
     gates,
+    bindables,
     hideOpenGates: true,
     walkableSurfaces: [],
     scenario: null,

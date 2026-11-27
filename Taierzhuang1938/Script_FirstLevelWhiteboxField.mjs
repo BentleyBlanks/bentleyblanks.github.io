@@ -185,6 +185,7 @@ export class FirstLevelWhiteboxField {
     this.waterBodies = [];
     this.trainOffsetM = 0; this.trainMeshes = []; this.trainColliders = [];
     this.gates = new Map();
+    this.bindables = new Map();
     this.scenarioMeshes = [];
     this.scenarioColliders = [];
     this.scenarioState = null;
@@ -195,6 +196,7 @@ export class FirstLevelWhiteboxField {
       structures: 0,
       whiteBoxes: 0,
       dynamicGates: 0,
+      bindables: 0,
     };
   }
 
@@ -776,6 +778,112 @@ export class FirstLevelWhiteboxField {
     }
   }
 
+  /**
+   * 建可被 Timeline 动态绑定的场景物件（Scene_*.json 写了 bindId）：
+   * 跳过 BuildSink 静态合批，独立挂入 scene 并登记进 this.bindables，遵守 MotionVector 动态速度契约。
+   */
+  BuildBindables() {
+    for (const spec of this.layout.bindables || []) {
+      const bindId = spec.bindId || spec.id;
+      const hidden = spec.visual === false;
+      let mesh = null, material = null;
+      if (!hidden) {
+        const look = this.looks ? this.looks.LookOf(spec) : null;
+        material = look ? this.looks.Material(look)
+          : this.layout.semanticColors?.[spec.semantic]
+            ? MakeSemanticMaterial(`FirstLevelWhitebox_Bind_${spec.semantic}_${spec.id}`, this.layout.semanticColors[spec.semantic])
+            : MakeWhiteMaterial(`FirstLevelWhitebox_Bind_${spec.id}`);
+        const geometry = look ? this.looks.BoxGeometry(spec, look, (x, z) => this.TerrainHeight(x, z), { place: false })
+          : MakeBox(spec.w, spec.h, spec.d, 1, spec.id);
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        MarkDynamicPrepass(mesh);
+        mesh.position.set(spec.x, spec.y, spec.z);
+        mesh.rotation.set(0, spec.ry || 0, 0);
+        mesh.name = `FirstLevelWhitebox_Bindable_${bindId}`;
+        this.scene.add(mesh);
+        this.meshes.push(mesh);
+      }
+      const collider = spec.solid !== false ? ColliderRecord(spec) : null;
+      if (collider) this.colliders.push(collider);
+      const entry = {
+        id: spec.id,
+        bindId,
+        spec,
+        mesh,
+        material,
+        collider,
+        basePos: { x: spec.x, y: spec.y, z: spec.z },
+        baseRy: spec.ry || 0,
+        visible: !hidden,
+        solidActive: !!collider,
+      };
+      this.bindables.set(bindId, entry);
+      this.stats.bindables += 1;
+    }
+  }
+
+  GetBindable(bindId) {
+    return this.bindables.get(bindId) || null;
+  }
+
+  SetBindableTransform(bindId, pose = {}) {
+    const entry = this.bindables.get(bindId);
+    if (!entry) return false;
+    const x = Number.isFinite(pose.x) ? pose.x : entry.basePos.x;
+    const y = Number.isFinite(pose.y) ? pose.y : entry.basePos.y;
+    const z = Number.isFinite(pose.z) ? pose.z : entry.basePos.z;
+    const rx = Number.isFinite(pose.rx) ? pose.rx : 0;
+    const ry = Number.isFinite(pose.ry) ? pose.ry : entry.baseRy;
+    const rz = Number.isFinite(pose.rz) ? pose.rz : 0;
+    const sx = Number.isFinite(pose.sx) ? pose.sx : 1;
+    const sy = Number.isFinite(pose.sy) ? pose.sy : 1;
+    const sz = Number.isFinite(pose.sz) ? pose.sz : 1;
+    if (entry.mesh) {
+      entry.mesh.position.set(x, y, z);
+      entry.mesh.rotation.set(rx, ry, rz);
+      entry.mesh.scale.set(sx, sy, sz);
+      if (pose.visible !== undefined) entry.mesh.visible = !!pose.visible;
+    }
+    if (entry.collider && entry.solidActive) {
+      const c = entry.collider;
+      const hx = (entry.spec.w * 0.5) * Math.abs(sx);
+      const hy = (entry.spec.h * 0.5) * Math.abs(sy);
+      const hz = (entry.spec.d * 0.5) * Math.abs(sz);
+      const cos = Math.abs(Math.cos(ry)), sin = Math.abs(Math.sin(ry));
+      const ex = hx * cos + hz * sin, ez = hx * sin + hz * cos;
+      this._GridRemove(c);
+      c.c[0] = x; c.c[1] = y; c.c[2] = z;
+      c.h[0] = hx; c.h[1] = hy; c.h[2] = hz;
+      c.ry = ry; c.cos = Math.cos(ry); c.sin = Math.sin(ry);
+      c.min[0] = x - ex; c.min[1] = y - hy; c.min[2] = z - ez;
+      c.max[0] = x + ex; c.max[1] = y + hy; c.max[2] = z + ez;
+      this.physics?.MoveSolid?.(c);
+      this._GridInsert(c);
+      this.physics?.RefreshStaticQueries?.();
+    }
+    return true;
+  }
+
+  SetBindableVisible(bindId, visible) {
+    const entry = this.bindables.get(bindId);
+    if (!entry) return false;
+    entry.visible = !!visible;
+    if (entry.mesh) entry.mesh.visible = entry.visible;
+    return true;
+  }
+
+  ResetBindable(bindId) {
+    const entry = this.bindables.get(bindId);
+    if (!entry) return false;
+    return this.SetBindableTransform(bindId, {
+      x: entry.basePos.x, y: entry.basePos.y, z: entry.basePos.z,
+      rx: 0, ry: entry.baseRy, rz: 0, sx: 1, sy: 1, sz: 1,
+      visible: entry.spec.visual !== false,
+    });
+  }
+
   *BuildSteps() {
     yield { label: T("p012.whitebox.build.ground"), progress: 0.24 };
     this.BuildWhiteBoxes();
@@ -783,6 +891,7 @@ export class FirstLevelWhiteboxField {
     SetInteriorVolumes(BuildInteriorVolumes(this.layout, (x, z) => this.TerrainHeight(x, z)));
     yield { label: T("p012.whitebox.build.blocks"), progress: 0.62 };
     this.BuildGates();
+    this.BuildBindables();
     this.SetScenarioState(this.layout.scenario?.states[0]);
     this.BuildScenarioWarm();
     this.BuildLegend();
@@ -1353,6 +1462,7 @@ export class FirstLevelWhiteboxField {
     this.covers = [];
     this.grid.clear();
     this.gates.clear();
+    this.bindables.clear();
     this.scenarioMeshes = []; this.scenarioColliders = []; this.scenarioState = null;
     this.objectives.length = 0;
   }

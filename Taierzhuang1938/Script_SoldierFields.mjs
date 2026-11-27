@@ -4,7 +4,7 @@
 // V8 能把它内联进调用处，热路径上的读写只多一次取址；循环里用变量当键会慢五倍。
 
 /** 标签 → soldier.tags 里的位（Data_SoldierComponents.SOLDIER_TAGS 的顺序）。 */
-export const SOLDIER_TAG_BITS = Object.freeze({ dummy: 1, towel: 2, unarmed: 4, noncombatant: 8, essential: 16, untargetable: 32, meleeDormant: 64, wounded: 128 });
+export const SOLDIER_TAG_BITS = Object.freeze({ dummy: 1, towel: 2, unarmed: 4, noncombatant: 8, essential: 16, untargetable: 32, meleeDormant: 64, wounded: 128, timelineControlled: 256 });
 
 export class SoldierFieldAccessors {
   // vitals：生命与状态
@@ -628,6 +628,8 @@ export class SoldierFieldAccessors {
   set meleeDormant(value) { this.tags = value ? this.tags | 64 : this.tags & ~64; }
   get wounded() { return (this.tags & 128) !== 0; }
   set wounded(value) { this.tags = value ? this.tags | 128 : this.tags & ~128; }
+  get timelineControlled() { return (this.tags & 256) !== 0; }
+  set timelineControlled(value) { this.tags = value ? this.tags | 256 : this.tags & ~256; }
   /** 有没有这个标签（名字见 Data_SoldierComponents.SOLDIER_TAGS）。 */
   HasTag(tag) { return (this.tags & SOLDIER_TAG_BITS[tag]) !== 0; }
   SetTag(tag, on) {

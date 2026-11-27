@@ -415,6 +415,8 @@ export const testDefs = {
   ExternalPropAssetTest: { file: "Script_ExternalPropAssetTest.mjs", desc: "外部构件 GLB 节点、尺度与面数预算（纯 Node）" },
   TimelineTest: { file: "Script_TimelineTest.mjs", desc: "Timeline 过场：登记表里每份文件都在且核对无错（关键帧 / 单位 / 台词 id）、主时间轴段首尾相接与落段、镜头轨不越界、拷贝来源在（纯 Node，毫秒级）" },
   TimelineBrowserTest: { file: "Script_TimelineBrowserTest.mjs", timeoutMs: 600000, desc: "Timeline 面板实机：白盒页开机打开、各轨格数对得上、Seek 走预演播放器（同一秒机位一样）、逐帧 / 下一镜、播放 / 暂停 / 跨段接播、按钮与点轨道、文件改了重读、关掉后还回本关预演" },
+  TimelineDirectorTest: { file: "Script_TimelineDirectorTest.mjs", desc: "Unity 风格 Timeline v2（纯 Node）：自包含校验/编译、func(t) 确定性求值、动作白名单与跳过策略、动态 bindId/实兵接管/缺失兜底绑定、多导演并发（不锁操作 setpiece + 锁控 cinematic）" },
+  TimelineDirectorBrowserTest: { file: "Script_TimelineDirectorBrowserTest.mjs", timeoutMs: 600000, desc: "Timeline v2 真浏览器实机：零 Blockout/FirstLevel0105.json 请求、确定性 Seek、跳过衔接 02g 实玩战斗、13d 炸桥不锁操作并发、13e 夜行军实兵接管" },
   MissionHooksTest: { file: "Script_MissionHooksTest.mjs", desc: "任务流程引擎钩子：剧本派发、LEVEL_CUES 自动构建、具名同伴 Locate 与剧本指令、脚本检查点倒带、钉关原语（纯 Node，毫秒级）" },
   MissionSetpiecesTest: { file: "Script_MissionSetpiecesTest.mjs", desc: "章节摆点：序章与第一关 Setup 不抛、台词节拍与信号名对得上、第一关对接项、后送队队列控制器、装配层接线（纯 Node，毫秒级）" },
   PhysicsTest: { file: "Script_PhysicsTest.mjs", desc: "真浏览器撞墙：碰撞扫掠" },
@@ -788,7 +790,7 @@ export const browserTests = new Set([
   'ProneCrawlTest', 'ActorLocomotionTest', 'BackRifleRunTest', 'RifleShoulderMarchTest', 'MeleeAnimationTest', 'DadaoSwingTest', 'FpsDadaoProjectionTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "HitReactionBrowserTest", "NeckDeathBrowserTest", "JapaneseSoldierYiBrowserTest", "JapaneseSoldierCBrowserTest",
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest", "RifleSlingClothBrowserTest", "EditorBlockoutPlayBrowserTest", "FirstPersonLightingBrowserTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "TimelineBrowserTest", "EnvironmentBrowserTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "AiAimedAtBrowserTest", "AiGrenadeEvadeBrowserTest", "EditorBlockoutMapTest", "EditorBlockoutBrowserTest", "EditorBlockoutFlyBrowserTest", "EditorBlockoutTouchBrowserTest", "EditorBlockoutPrevizRuntimeBrowserTest", "EditorBlockoutFirstLevel0105KeepInBrowserTest", "EditorBlockoutMapEditBrowserTest", "EditorBlockoutBlanketClothBrowserTest", "RifleSlingClothBrowserTest", "EditorBlockoutPlayBrowserTest", "FirstPersonLightingBrowserTest", "SceneEditorBrowserTest", "SceneFormalBrowserTest", "TimelineBrowserTest", "TimelineDirectorBrowserTest", "EnvironmentBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPaperTest", "BootInteractionTest", "BootStallTest", "BootTest", "ColliderTest",
   "DamageTest", "DeathViewTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsSleeveTest", "FpsHandContactTest", "FpsReloadMechanicsTest", "FpsReloadClearanceTest", "HanYangReloadClearanceTest", "FpsGripEditorTest",
@@ -820,6 +822,7 @@ export const tier0Fast = [
   "EncounterVariantsTest",
   "HairGroomTest",
   "TimelineTest",
+  "TimelineDirectorTest",
   "FlareSurfaceTest",
   "FlareShadowBoundsTest",
   "FlareShadowInstancesTest",
@@ -981,7 +984,7 @@ export const domains = {
   singleBlanket: { label: "Rigged thin cotton sheet", tests: ["SingleBlanketAssetTest", "BlanketClothTest", "EditorBlockoutBlanketClothBrowserTest", "TextureStandardsTest", "AssetStandardsTest"] },
   clothRange: { label: "独立布料测试场与双面吸血", tests: ["ClothRangeTest", "ClothBloodTest", "ClothBloodAsyncTest", "ClothRangeBrowserTest", "ClothBloodBrowserTest", "BlanketClothTest", "ModelFacingTest", "AssetStandardsTest", "MotionVectorContractTest", "ModuleGraphTest", "TextTest"] },
   historyCodex: {label:"Historical codex",tests:["HistoryCodexBrowserTest","HistoryLedgerCheck","MenuStartupTest","ModuleGraphTest","TextTest","TextureStandardsTest"]},
-  levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterTankTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "EncounterWeaponPickupBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
+  levelFlow: { label: "第一关遭遇编排与试玩", tests: ["EncounterPlayTest", "EncounterTankTest", "EncounterVariantsTest", "EncounterLibraryTest", "EncounterLibraryBrowserTest", "EncounterPlayBrowserTest", "EncounterWeaponStallBrowserTest", "EncounterInputBrowserTest", "EncounterWeaponPickupBrowserTest", "TimelineDirectorTest", "TimelineDirectorBrowserTest", "VillageStealthPlayTest", "VillageStealthPlayBrowserTest", "LevelFlowTest", "LevelFlowVillageTest", "LevelFlowBeishaheBrowserTest", "LevelFlowAmbushTest", "LevelFlowFrontDefenseTest", "LevelFlowCodexTest", "LevelFlowChatBrowserTest", "LevelFlowBrowserTest", "LevelFlowDebugBrowserTest", "LevelFlowTouchBrowserTest", "ModuleGraphTest"] },
   advancedTools: { label: "高级工具拆分：控制中心 / 独立工具宿主 / 拆分边界 / 线上剔除", tests: ["CameraProfileTest", "AdvancedToolsTest", "AdvancedToolsBrowserTest", "PropLibraryBrowserTest", "AssetStandardsTest", "AssetStandardsSaveTest", "AssetStandardsBrowserTest", "DevToolsIsolationTest", "ToolsHomeTest", "ModuleGraphTest", "TextTest"], tier2Tests: ["ToolStudioParityBrowserTest"] },  graphicsProfile: { label: "画质档与白盒材质", tests: ["CameraProfileTest", "GraphicsProfileTest", "WhiteboxMaterialTest", "WhiteboxShaderWarmTest", "SamplerBudgetTest"] },
   allyGait: {label:"First-level crouch and carry locomotion",tests:["AllyGaitTest","AllyGaitBrowserTest","ActorLocomotionTest","FirstLevelP012ActorTest","FirstLevelMissionTest","AllyGaitMissionTest","ModuleGraphTest"]},
   breakableTrees: {label:"Destructible tree scenery",tests:["BreakableTreesTest","BreakableTreesBrowserTest","ModelFacingTest","AssetStandardsTest"]},
@@ -1087,7 +1090,7 @@ export const domains = {
   cutscene: {
     label: "过场/Timeline/剧本派发/车厢生活动作",
     // LEVEL_CUES 的构建在 Script_Story 与组装层里，碰剧本的改动要连着 MissionHooksTest 一起跑（毫秒级）。
-    tests: ["FirstLevelP012ShellShotTest", "TimelineTest", "TimelineBrowserTest", "ActorPoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
+    tests: ["FirstLevelP012ShellShotTest", "TimelineTest", "TimelineBrowserTest", "TimelineDirectorTest", "TimelineDirectorBrowserTest", "ActorPoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   render: {
     label: "渲染与合批自动契约",
@@ -1126,7 +1129,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterTank|EncounterArtillery|EncounterVariants|EncounterFarmland|BeishaheDem|BeishaheGeography|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|FirstLevelSquadSpline|ArchivedP012Split|SceneSurface/ },
+  { domain: "levelFlow", pattern: /LevelFlow|EncounterCodex|EncounterPlay|EncounterTank|EncounterArtillery|EncounterVariants|EncounterFarmland|BeishaheDem|BeishaheGeography|SceneInherit|VillageStealthPlay|FirstLevelEncounter|FirstLevelMerged|FirstLevelCampaign|FirstLevelOpeningTimeline|TimelineAsset|TimelineActions|TimelineBindings|TimelineDirector|FirstLevelBridgeDemolition|FirstLevelEndingNightMarch|FirstLevelOpeningCampaign|FirstLevelSquadSpline|ArchivedP012Split|SceneSurface/ },
   { domain: "advancedTools", pattern: /AssetStandards|AssetPipeline|AdvancedTools|DevToolsSplit|Tool_Studio|ToolStudio|ControlCenter|Script_PublishPrune|Script_PublishScope|Script_StampImportMaps|Script_BuildBrowserBundle/ },  {domain:'oldGengCharacter',pattern:/OldGeng/i},
   {domain:'yaowaCharacter',pattern:/Yaowa/i},
   {domain:'liuWencaiCharacter',pattern:/LiuWencai/i},

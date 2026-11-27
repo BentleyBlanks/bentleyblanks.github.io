@@ -1387,6 +1387,30 @@ export class BlockoutPuppets {
     return true;
   }
 
+  /** 单独销毁一个木偶（多实例 Timeline 各自回收自己生成的 Prefab，不误伤别的正在播的实例）。 */
+  Remove(id) {
+    const puppet = this.puppets.get(id);
+    if (!puppet) return false;
+    this._Destroy(puppet);
+    this.puppets.delete(id);
+    return true;
+  }
+
+  /** 单独释放一个木偶的外部驱动（临时 Spawn 的回收，已有的清除 drive 交还）。 */
+  ReleaseDriveFor(id) {
+    const puppet = this.puppets.get(id);
+    if (!puppet) return false;
+    if (puppet.temp) return this.Remove(id);
+    puppet.drive = null;
+    for (const human of puppet.humans) {
+      if (human.openingInstalled === true) { human.soldier.openingStoryboardPose = null; human.soldier.openingStoryboardTravel = null; }
+      if (human.throwing) { try { human.actor.ClearImportedAnimation(); } catch (error) { /* */ } human.throwing = false; }
+      const facial = human.actor.characterRig?.facial;
+      if (facial && human.facialBound) { facial.source = null; human.facialBound = false; }
+    }
+    return true;
+  }
+
   /** 预演结束：临时加的人回收，被驱动的人交还（位置由随后的 Apply 摆回关键帧布设）。 */
   ReleaseDrive() {
     for (const [id, puppet] of this.puppets) {

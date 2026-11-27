@@ -49,9 +49,6 @@
   "meleeCombat": [
    "Script_MeleeLabRuntime.mjs"
   ],
-  "meleeDormant": [
-   "Script_MeleeLabRuntime.mjs"
-  ],
   "meleeTraining": [
    "Script_MeleeLabRuntime.mjs"
   ],

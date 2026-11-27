@@ -1,0 +1,68 @@
+{
+  "schema": "tengxian-timeline/2",
+  "id": "FirstLevelBridgeDemolition",
+  "title": "北沙河铁路桥爆破（13d 并发演出）",
+  "mode": "setpiece",
+  "inputLock": "none",
+  "allowSkip": false,
+  "hideViewmodel": false,
+  "hideHud": false,
+  "durationS": 5.2,
+  "note": "不锁玩家操作、不抢相机的并发 Setpiece Timeline：玩家按 F 点火后与实玩战斗同步执行，依次触发引线火花、北头两孔钢梁连环起爆、跨关卡共用近爆反馈（combat.blastFeedback）与场景断桥信号（BridgeBlown）。",
+  "bindings": [],
+  "spawns": [],
+  "tracks": [
+    {
+      "id": "BridgeAudio",
+      "type": "audio",
+      "clips": [
+        { "t": 0.1, "name": "whistleShort", "x": -80, "z": 866, "volume": 0.9 },
+        { "t": 1.65, "name": "shellBlast", "x": -80, "z": 844, "volume": 1.0 },
+        { "t": 2.05, "name": "artilleryNear", "x": -80, "z": 834, "volume": 1.0 },
+        { "t": 2.45, "name": "dirtFall", "x": -80, "z": 842, "volume": 0.9 }
+      ]
+    },
+    {
+      "id": "BridgeVfx",
+      "type": "vfx",
+      "clips": [
+        { "t": 0.4, "type": "impact", "x": -80, "z": 850, "surface": "metal" },
+        { "t": 1.0, "type": "impact", "x": -80, "z": 846, "surface": "metal" },
+        { "t": 1.65, "type": "explosion", "x": -80, "z": 844, "h": 1.2, "radius": 11, "kind": "bomb" },
+        { "t": 2.05, "type": "explosion", "x": -80, "z": 834, "h": 1.2, "radius": 12, "kind": "bomb" },
+        { "t": 1.7, "type": "smoke", "smokeKind": "SmokeBlack", "x": -80, "z": 842, "dur": 3.5, "scale": 1.6, "prewarm": true },
+        { "t": 2.1, "type": "smoke", "smokeKind": "SmokeDust", "x": -80, "z": 834, "dur": 3.0, "scale": 1.4, "prewarm": true }
+      ]
+    },
+    {
+      "id": "BridgeSignals",
+      "type": "signal",
+      "markers": [
+        {
+          "t": 1.65,
+          "action": "combat.blastFeedback",
+          "params": { "x": -80, "z": 844, "h": 1.2, "radius": 45, "intensity": 0.9, "kind": "bomb" },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 1.75,
+          "action": "world.setSignal",
+          "params": { "id": "BridgeBlown", "on": true },
+          "onSkip": "apply"
+        },
+        {
+          "t": 2.05,
+          "action": "combat.blastFeedback",
+          "params": { "x": -80, "z": 834, "h": 1.2, "radius": 50, "intensity": 1.0, "kind": "bomb" },
+          "onSkip": "ignore"
+        },
+        {
+          "t": 2.1,
+          "action": "encounter.setFact",
+          "params": { "id": "railBridgeBlown", "value": true },
+          "onSkip": "apply"
+        }
+      ]
+    }
+  ]
+}

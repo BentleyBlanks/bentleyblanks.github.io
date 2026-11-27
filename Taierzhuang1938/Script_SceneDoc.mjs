@@ -26,7 +26,7 @@ export const SCENE_LIMITS = Object.freeze({ maxObjects: 30000, idMax: 96, groupM
 /** 物件顶层认的字段；其余写进 meta（原样带过去，给预演 / 测试读）。 */
 export const SCENE_OBJECT_KEYS = Object.freeze([
   "id", "asset", "material", "pos", "yawDeg", "size", "solid", "visual", "noClimb", "standOn", "tag", "cover",
-  "hideOn", "showOn", "layer", "group", "params", "meta",
+  "hideOn", "showOn", "bindId", "layer", "group", "params", "meta",
 ]);
 
 const IsObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -78,6 +78,7 @@ function ObjectIssues(obj, at, errors, ids) {
   if (obj.cover !== undefined && !(IsObject(obj.cover) && Finite(obj.cover.faceX) && Finite(obj.cover.faceZ))) errors.push(`${at}.cover 要是 { faceX, faceZ }`);
   if (obj.hideOn !== undefined && !NonEmpty(obj.hideOn)) errors.push(`${at}.hideOn 要是信号名`);
   if (obj.showOn !== undefined && !NonEmpty(obj.showOn)) errors.push(`${at}.showOn 要是信号名`);
+  if (obj.bindId !== undefined && !NonEmpty(obj.bindId)) errors.push(`${at}.bindId 要是非空绑定槽位名`);
   if ((asset.layer || undefined) !== obj.layer) errors.push(asset.layer ? `${at}.layer 要是 ${JSON.stringify(asset.layer)}` : `${at}.layer 只给远景资产写`);
   if (obj.group !== undefined && !(typeof obj.group === "string" && obj.group.length <= SCENE_LIMITS.groupMax)) errors.push(`${at}.group 要是至多 ${SCENE_LIMITS.groupMax} 字的字符串`);
   if (obj.params !== undefined && !IsObject(obj.params)) errors.push(`${at}.params 要是对象`);
@@ -315,6 +316,7 @@ export function SceneObjectToBlock(obj) {
     ...(obj.tag ? { tag: obj.tag } : {}),
     ...(obj.noClimb === true ? { noClimb: true } : {}),
     ...(obj.standOn === true ? { standOn: true } : {}),
+    ...(obj.bindId ? { bindId: obj.bindId } : {}),
     ...(obj.cover ? { cover: { ...obj.cover } } : {}),
     ...(obj.meta || {}),
   };
@@ -349,6 +351,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
   const future = new Set(futureSignals);
   const blocks = [];
   const gates = [];
+  const bindables = [];
   const shapes = [];
   const groundAt = heights ? GridSampler(scene.terrain, heights) : null;
   const compiledAirWalls = CompileSceneAirWalls(scene.airWalls, { groundAt });
@@ -368,7 +371,8 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
     const block = SceneObjectToBlock(obj);
     const appear = obj.showOn && !prior.has(obj.showOn) ? { appearSignal: obj.showOn } : {};
     const hide = obj.hideOn && !future.has(obj.hideOn) ? { signal: obj.hideOn } : {};
-    if (hide.signal || appear.appearSignal) gates.push({ ...block, ...hide, ...appear });
+    if (obj.bindId) bindables.push({ ...block, ...hide, ...appear });
+    else if (hide.signal || appear.appearSignal) gates.push({ ...block, ...hide, ...appear });
     else blocks.push(block);
   }
   const bd = scene.backdrop;
@@ -409,6 +413,7 @@ export function BlockoutDocFromScene(scene, heights, { level, region = null, spa
       x + rx >= area.minX && x - rx <= area.maxX && z + rz >= area.minZ && z - rz <= area.maxZ) } : {}),
     blocks,
     ...(gates.length ? { gates } : {}),
+    ...(bindables.length ? { bindables } : {}),
     ...(paint.length ? { paint: paint.map(p => ({ ...p })) } : {}),
     ...(vehicleTracks.length ? { vehicleTracks: vehicleTracks.map(t => structuredClone(t)) } : {}),
     ...(withBackdrop ? { backdrop: { far: bd.far, ground: { ...bd.ground }, ...(bd.haze ? { haze: { ...bd.haze } } : {}),

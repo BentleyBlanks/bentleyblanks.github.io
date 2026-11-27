@@ -40,6 +40,36 @@ export const TIMELINES = Object.freeze([
 ]);
 export const DEFAULT_TIMELINE_ID = TIMELINES[0].id;
 
+/**
+ * Unity-style Timeline v2（schema tengxian-timeline/2）登记表：
+ * 自包含中间文件，不依赖 Blockout/*.json 或旧预演播放器，统一由 Script_TimelineDirector 驱动。
+ */
+export const TIMELINE_V2_CATALOG = Object.freeze([
+  Object.freeze({
+    id: "FirstLevelOpeningCampaign",
+    title: "第一关开场（01–02f）",
+    level: "FirstLevelMerged",
+    mode: "cinematic",
+    file: "Timeline/FirstLevelOpeningCampaign.timeline.json",
+  }),
+  Object.freeze({
+    id: "FirstLevelBridgeDemolition",
+    title: "北沙河铁路桥爆破（13d 并发演出）",
+    level: "FirstLevelMerged",
+    mode: "setpiece",
+    file: "Timeline/FirstLevelBridgeDemolition.timeline.json",
+  }),
+  Object.freeze({
+    id: "FirstLevelEndingNightMarch",
+    title: "3月14日夜·走向滕县（13e 关尾过场）",
+    level: "FirstLevelMerged",
+    mode: "cinematic",
+    file: "Timeline/FirstLevelEndingNightMarch.timeline.json",
+  }),
+]);
+
+export function FindTimelineV2(id) { return TIMELINE_V2_CATALOG.find((entry) => entry.id === id) || null; }
+
 export function FindTimeline(id) { return TIMELINES.find((entry) => entry.id === id) || null; }
 
 /** 这一关里写了 ownsPreviz 的 Timeline（它们的段是本关那几个关键帧预演的原件）。 */
