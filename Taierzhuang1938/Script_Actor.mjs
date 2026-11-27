@@ -4297,11 +4297,10 @@ export class ActorFactory {
         () => lib.Plain("DadaoBlade", { color: 0x929aa2, roughness: 0.34, metalness: 0.95 })),
       grip: this.Material("grip",
         () => lib.Plain("DadaoGrip", { color: 0x8f7c61, roughness: 0.78, metalness: 0 })),
-      // CGMOL 主式样保留原 UV，并使用从已购 4K 源图压制的专用 1K PBR。
-      // roughness / metalness 都由 ORM 逐像素给出；这里的 1 是通道乘数。
+      // 大刀的专用 ORM 逐像素给出遮蔽、粗糙度和金属度。
       dadao: this.Material("dadao",
         () => lib.Get("DadaoPbr", {
-          roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1,
+          roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1, aoIntensity: 1,
         })),
       grenade: this.Material("grenade", () => lib.Get("GrenadePbr", {
         roughness: 1, metalness: 1, normalScale: 0.85,

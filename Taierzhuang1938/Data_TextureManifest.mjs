@@ -508,7 +508,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   {
     id: "Dadao", kind: "material", tier: "boot",
     toneClass: null,
-    toneReason: "刀身、卷护手、缠布柄和红线尾环共用的 UV 图集，ORM 红通道记录接触遮蔽与布料缝线阴影",
+    toneReason: "刀身、卷护手、缠布柄和红线尾环共用的 UV 图集，ORM 红通道记录接触遮蔽、钢面凹纹和布料搭接暗部",
     sizeReason: "2K 基色保留钢面氧化斑、布纹与红线细节，供第一人称近观。法线与 ORM 为 1K。",
     metersPerTile: null,
     bake: "_import/Script_BakeYangYunfengDadaoPbr.py",

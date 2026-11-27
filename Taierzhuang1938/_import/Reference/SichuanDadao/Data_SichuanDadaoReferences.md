@@ -19,6 +19,6 @@
 - 游戏加载 `Model/Model_Dadao.tzm.json`。使用 `python Taierzhuang1938/_import/Script_TraceYangYunfengDadao.py <Reference_YangYunfengWhiteWiderTogether15.png>` 提取可见轮廓到 `Data_YangYunfengDadaoFit.json`。`Script_BuildYangYunfengDadao.py` 按现有游戏挂点定位模型。使用 `BuildAll.py -- --only Dadao` 导出，成品 9,724 三角，预算上限为线上旧版 9,010 三角的 1.2 倍。
 - 可见面使用原照投影。各面依据照片的布带搭接叠加 OpenAI Image API 纤维样片的织纹和粗糙度变化，窄面与背面沿用钢面样片。纤维样片以 `gpt-image-2` 生成，参数为 `high`、2048 × 1024。[钢面提示词](Prompt_YangYunfengSteel03Surface.txt) · [纤维提示词](Prompt_YangYunfengTextiles.txt)
 - 运行 `python Taierzhuang1938/_import/Script_BakeYangYunfengDadaoPbr.py <Reference_YangYunfengWhiteWiderTogether15.png>` 烘焙 2K 基色、1K OpenGL 法线和 1K ORM。`Texture_YangYunfengDiffuseFit.png` 记录同机位实渲校准值。运行 `python Taierzhuang1938/_import/Script_BakePbrTexture.py --audit --name Dadao` 登记成品。
-- `Texture_YangYunfengGeometryAo.png` 保存现有网格的接触遮蔽。重算时在 BlenderMCP 会话中从 `_blender/Script_BakeYangYunfengDadaoAo.py` 调用 `BakeAo` 写入 NPZ，再给烘焙命令加 `--raycast <NPZ 路径>`。烘焙脚本将网格接触遮蔽和布带搭接、纱线的细部遮蔽写入 ORM 红通道。
+- `Texture_YangYunfengGeometryAo.png` 保存现有网格的接触遮蔽，Alpha 通道记录 UV 岛覆盖。重算时在 BlenderMCP 会话中从 `_blender/Script_BakeYangYunfengDadaoAo.py` 调用 `BakeAo` 写入 NPZ，再给烘焙命令加 `--raycast <NPZ 路径>`。烘焙脚本将网格接触遮蔽、布带搭接暗部和钢面槽线及局部点蚀的暗部写入 ORM 红通道。钢面细节用相邻亮边夹住的凹纹估算，模型以全强度采样该通道。法线和 ORM 在 UV 岛外留出采样边距，远离网格的像素用中性值压缩。
 - `Scene_YangYunfengDadaoWider15.blend`、同机位对照、纯白背景三视图和原始纤维样片留在素材库的 `Blender/Taierzhuang1938/SichuanDadao/YangYunfengModel`。参考图在同级 `YangYunfengPhotoReference`。源工程包含独立部件、对照相机和打包贴图。
 - `Scene_YangYunfengDadaoSurface.blend` 保存最新版材质。同目录 `SurfaceReview` 有检视台同机位的新旧对照。

@@ -24,19 +24,19 @@
       "file": "Texture_DadaoNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 35742,
-      "sha256": "f8101a4b8391993cb645d9954ec20e2ab12a6228e50549d37178c578dbb9600d"
+      "bytes": 15676,
+      "sha256": "f31134ed6e6f172899970a83ec4858f3b81cc7dc5db9415a47a41d733cb98a85"
     },
     {
       "channel": "Orm",
       "file": "Texture_DadaoOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 62104,
-      "sha256": "0df825d3d022671a851e6c8971bde9db9ec2277ec19a9c76a1e1a741a4e44e8b"
+      "bytes": 45802,
+      "sha256": "c296693729070757da8db39d6de8a1c46edebaafd125a15bfc98bfc2268dbb16"
     }
   ],
-  "totalBytes": 624656,
+  "totalBytes": 588288,
   "metrics": {
     "meanSrgb": [
       0.6512,

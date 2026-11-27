@@ -136,12 +136,30 @@ def BaseTile(color, details):
     return np.clip(adjusted, 0, 1)
 
 
+def Valley(field, axis, distance):
+    index = np.arange(field.shape[axis])
+    left = np.take(field, np.maximum(index - distance, 0), axis=axis)
+    right = np.take(field, np.minimum(index + distance, len(index) - 1), axis=axis)
+    return np.minimum(left, right) - field
+
+
+def SteelCavities(luma):
+    # A recess is darker than both shoulders. Broad patina stays in the base color.
+    band = gaussian_filter(luma, (.64, 3.2))
+    groove = np.maximum(Valley(band, 0, 3), .68 * Valley(band, 0, 6))
+    detail = gaussian_filter(luma, .52)
+    pits = np.minimum(Valley(detail, 0, 2), Valley(detail, 1, 2))
+    return Smoothstep(.009, .049, groove), Smoothstep(.010, .063, pits)
+
+
 def DataTiles(color, details, geometryAo):
     textile, fibers, folds = details
     luma = color @ LUMA
     haze = gaussian_filter(luma, (3.0, 6.0))
     fine = gaussian_filter(luma, .55) - haze
-    relief = np.where(textile, .42 * fine + 1.35 * folds + .96 * fibers, .51 * fine)
+    groove, pits = SteelCavities(luma)
+    steelRelief = .51 * fine - .08 * groove - .06 * pits
+    relief = np.where(textile, .42 * fine + 1.35 * folds + .96 * fibers, steelRelief)
     dy, dx = np.gradient(relief)
     direction = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
     normal = .5 + .5 * direction / np.linalg.norm(direction, axis=2, keepdims=True)
@@ -151,8 +169,9 @@ def DataTiles(color, details, geometryAo):
     metal = np.where(textile, 0, .91 - .24 * age)
     lapShade = Smoothstep(.010, .073, -folds)
     yarnShade = Smoothstep(.008, .085, -fibers)
-    clothAo = 1 - .32 * lapShade - .07 * yarnShade
-    occlusion = geometryAo * np.where(textile, clothAo, 1)
+    clothAo = 1 - .44 * lapShade - .09 * yarnShade
+    steelAo = 1 - .48 * groove - .25 * pits
+    occlusion = np.maximum(.16, geometryAo ** 1.58 * np.where(textile, clothAo, steelAo))
     return normal, np.stack((occlusion, rough, metal), axis=2)
 
 
@@ -166,6 +185,8 @@ def ExportGeometryAo(trace, output):
         top = strip * 256 + 20
         region = np.s_[top:top + 216, 16:1008]
         mask = coverage[region]
+        if not mask.any():
+            raise ValueError(f"The Blender occlusion bake has no surface samples in UV strip {strip}")
         strength = 1 - values[region]
         support = gaussian_filter(mask.astype(np.float32), .70)
         smoothed = gaussian_filter(strength * mask, .70) / np.maximum(support, .00001)
@@ -173,7 +194,16 @@ def ExportGeometryAo(trace, output):
         shaded = (.40 * strength + .60 * smoothed)[tuple(nearest)]
         result[region] -= np.where(distance <= 4, shaded, 0)
     output.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(np.uint8(np.round(result * 255))).save(output, optimize=True)
+    channels = np.stack((np.uint8(np.round(result * 255)), np.uint8(coverage) * 255), axis=-1)
+    Image.fromarray(channels).save(output, optimize=True)
+
+
+def PadDataTile(normal, orm, coverage):
+    # Bleed from the real UV islands before simplifying the unused pixels.
+    distance, nearest = distance_transform_edt(~coverage, return_indices=True)
+    weight = (1 - Smoothstep(5, 13, distance))[..., None]
+    return tuple(fill + weight * (tile[tuple(nearest)] - fill)
+                 for tile, fill in ((normal, (.5, .5, 1)), (orm, (1, .74, .64))))
 
 
 def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_AO):
@@ -202,15 +232,19 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
     with Image.open(aoSource) as image:
         if image.size != (DATA_SIZE, DATA_SIZE):
             raise ValueError("The geometry AO must have the same resolution as ORM")
-        occlusion = np.asarray(image.convert("L"), dtype=np.float32) / 255
+        geometry = np.asarray(image.convert("LA"))
+    occlusion = geometry[..., 0].astype(np.float32) / 255
+    coverage = geometry[..., 1] > 127
     base = [BaseTile(color, TextileDetails(guide, tags, samples, strip))
             for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, BASE_SIZE, samples, balanced))]
     base[1:] = [gaussian_filter(tile, (.69, .69, 0)) for tile in base[1:]]
     data = []
     for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, DATA_SIZE, samples)):
         top = strip * 256 + 20
+        region = np.s_[top:top + 216, 16:1008]
         details = TextileDetails(guide, tags, samples, strip)
-        data.append(DataTiles(color, details, occlusion[top:top + 216, 16:1008]))
+        normal, orm = DataTiles(color, details, occlusion[region])
+        data.append(PadDataTile(normal, orm, coverage[region]))
     out.mkdir(parents=True, exist_ok=True)
     Save(base, BASE_SIZE, out / "Texture_DadaoBase.webp", 91)
     Save([normal for normal, _ in data], DATA_SIZE, out / "Texture_DadaoNormal.webp", 87)

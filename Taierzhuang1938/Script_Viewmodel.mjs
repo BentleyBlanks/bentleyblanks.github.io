@@ -351,7 +351,7 @@ function BuildMaterials(library) {
     blade: library.Plain("VmDadaoBlade", { color: 0x929aa2, roughness: 0.30, metalness: 0.96 }),
     grip: library.Plain("VmDadaoGrip", { color: 0x8f7c61, roughness: 0.76, metalness: 0 }),
     dadao: SafeMaterial(library, "DadaoPbr",
-      { repeat: 1, roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 },
+      { repeat: 1, roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1, aoIntensity: 1 },
       { color: 0x77736f, roughness: 0.58, metalness: 0.72 }),
     zb26Steel: SafeMaterial(library, "Zb26VeteranSteel", {
       ...zb26Finish,
