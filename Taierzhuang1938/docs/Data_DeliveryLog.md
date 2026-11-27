@@ -126,6 +126,8 @@
 
 ## 条目
 
+- **川军大刀布带过渡（2026-11-27）**。消除窄侧和正反布边之间的纵向明暗差，使布柄和红线沿现有搭接走向绕过中线。左窄侧抽样中线相对两旁的基色亮度差由 22.66 降至 0.35（0–255）。 [材质重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
+
 - **川军大刀布柄窄侧（2026-11-27）**。重烘布柄和尾环窄侧及邻接布边，从对应布料内部取色并沿窄侧铺连续纤维。检视台在两处窄侧角度和斜视角复测，照片高光形成的银白条与重复亮斑已去除。 [材质重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
 
 - **川军大刀正反面统一（2026-11-27）**。背面按确认过的正面同步钢面氧化、槽线、布柄与尾环纹理，正反面法线和 ORM 对应区域逐像素一致。窄侧把同一纹理镜像接到两面。同光照渲染中，正反面 RGB 平均绝对差从 20.28 降至 1.45（0–255）。 [材质重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)

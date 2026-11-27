@@ -93,16 +93,20 @@ def MergeUnseen(color, tags, samples, strip):
     cloth, green, red, tan = MaterialRegions(color, tags)
     # Match the reference palette while using the generated fiber and steel grain on the narrow rims.
     result = gaussian_filter(color, (2.0, 2.5, 0))
-    groups = ((~cloth, steel, .49), (tan, linen, .26), (red, cord, .25), (green, linen, .27))
-    for i, (mask, source, blend) in enumerate(groups):
+    groups = ((~cloth, steel), (tan, linen), (red, cord), (green, linen))
+    for i, (mask, source) in enumerate(groups):
         if not np.any(mask):
             continue
         position = (.5, (.19, .44, .68, .82)[strip])
         field = TextileSample(source, width, height, position, continuous=True) if i else Sample(source, (width, height), position)
+        if i:
+            weave = field - gaussian_filter(field, (2.2, 2.2, 0))
+            result[mask] = color[mask] + .45 * weave[mask]
+            continue
         center = np.median(field.reshape(-1, 3), axis=0)
         observed = np.median(color[mask], axis=0)
         synthetic = observed + .77 * (field - center)
-        result[mask] += (synthetic[mask] - result[mask]) * blend
+        result[mask] += .49 * (synthetic[mask] - result[mask])
     return np.clip(result, 0, 1)
 
 
@@ -132,9 +136,20 @@ def CleanClothEdges(fabric, tags, visible, factor):
         # beside the rim. Both need the same diffuse fabric at the join.
         top, bottom = np.argmax(valid, axis=0), height - 1 - np.argmax(valid[::-1], axis=0)
         distance = np.maximum(0, np.minimum(y - top, bottom - y))
-        weight = 1 - Smoothstep(1.5 * factor, 9.5 * factor, distance)
+        span = np.maximum(1, bottom - top + 1)
+        start = np.minimum(13 * factor, .20 * span)
+        end = np.minimum(28 * factor, .43 * span)
+        weight = 1 - Smoothstep(start, end, distance)
+        # Lift the longitudinal shading inherited from the flat projection while
+        # keeping the high-frequency texture of the individual wrapping layers.
+        sigma = (1.55 * factor, 1.3 * factor)
+        support = gaussian_filter(valid.astype(np.float32), sigma)
+        low = gaussian_filter(fabric * valid[..., None], (*sigma, 0)) / np.maximum(support[..., None], .0001)
+        fine = np.clip(fabric - low, -.055, .045)
+        detail = Smoothstep(2 * factor, 9 * factor, distance)
         rimColors[layer] = np.broadcast_to(tones, fabric.shape)[layer]
-        finish[layer] += weight[layer, None] * (rimColors[layer] - finish[layer])
+        matte = rimColors[layer] + .65 * detail[layer, None] * fine[layer]
+        finish[layer] += weight[layer, None] * (matte - finish[layer])
     return finish, rimColors
 
 
@@ -174,6 +189,24 @@ def MirrorRim(tile):
 
 def MatchRimMetal(tile, textile):
     return np.where(textile[..., None], tile, MirrorRim(tile))
+
+
+def WrapRimCloth(color, guide, tags, coverage, factor):
+    cloth, green, red, _ = MaterialRegions(guide, tags)
+    h, w = tags.shape
+    y, x = np.indices((h, w), dtype=np.float32)
+    cross = y - (h - 1) / 2
+    halfWidth = np.maximum(1, np.max(np.abs(cross) * coverage, axis=0))
+    arc = np.clip(cross / halfWidth, -1, 1)
+    # Continue the existing wrap bands across the rounded rim. The shift tapers
+    # to zero at both UV joins so the band's ends meet the broad-face texture.
+    shift = (1 - arc * arc) ** 2 * (5.2 + 3.0 * arc) * factor
+    layer = cloth.astype(np.uint8) + green + 2 * red
+    sample = np.clip(np.rint(x + shift).astype(int), 0, w - 1)
+    sameLayer = layer[y.astype(int), sample] == layer
+    wrapX = x + np.where(cloth & sameLayer, shift, 0).astype(np.float32)
+    return tuple(cv2.remap(tile, wrapX, y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+                 for tile in (color, guide))
 
 
 def BaseTile(color, details):
@@ -290,18 +323,22 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
     base = {}
     factor = BASE_SIZE // DATA_SIZE
     for strip, color, tags, guide in Tiles(photo, labels, fit, BASE_SIZE, samples, balanced):
+        highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
+        if strip:
+            color, guide = WrapRimCloth(color, guide, tags, highCoverage, factor)
         tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
         if strip:
             tile = MatchRimMetal(gaussian_filter(tile, (.69, .69, 0)), tags >= 3)
-        highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
         base[strip], = PadTiles((tile,), ((.49, .47, .44),), highCoverage, factor)
 
     data = {}
     for strip, color, tags, guide in Tiles(photo, labels, fit, DATA_SIZE, samples):
-        details = TextileDetails(guide, tags, samples, strip)
         ambient = occlusion[regions[strip]]
         if strip:
-            color, ambient = MatchRimMetal(color, tags >= 3), MirrorRim(ambient)
+            color, guide = WrapRimCloth(color, guide, tags, coverage[strip], 1)
+            color = MatchRimMetal(color, tags >= 3)
+            ambient = np.where(tags >= 3, ambient, MirrorRim(ambient))
+        details = TextileDetails(guide, tags, samples, strip)
         layers = DataTiles(color, details, ambient)
         data[strip] = PadTiles(layers, ((.5, .5, 1), (1, .74, .64)), coverage[strip])
 
