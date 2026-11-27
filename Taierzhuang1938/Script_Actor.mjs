@@ -4309,7 +4309,8 @@ export class ActorFactory {
       type89LauncherSteel: this.Material("type89LauncherSteel", () => {
         const authored = lib.baked?.has("Type89LauncherSteel");
         const material = lib.Get(authored ? "Type89LauncherSteel" : "Steel",
-          { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 });
+          { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1,
+            aoIntensity: authored ? 1 : undefined });
         return authored ? AttachType89LauncherSleeveHorizon(material) : material;
       }),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",

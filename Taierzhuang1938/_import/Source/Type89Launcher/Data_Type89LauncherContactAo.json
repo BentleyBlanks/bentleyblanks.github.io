@@ -1,0 +1,126 @@
+{
+  "file": "Texture_Type89LauncherContactAo.png",
+  "sha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+  "pixelSha256": "eaba4f1c6324b465d63db7ee36d326fcdd7f645b0822aac4290d59b3c7209a8a",
+  "modelSha256": "a601b9f00dba1fa2015b4176a0cd44441b0620a1e976e6d8278a416684a6de05",
+  "atlasSha256": "af764892e8cebcd49f47086a9ab159040739f2c69b2d616fd0dbba76adfc3209",
+  "size": 1024,
+  "triangles": 9924,
+  "rays": 40,
+  "charts": {
+    "Barrel": {
+      "samples": 288810,
+      "overlap": 690,
+      "contact": 174,
+      "visibilityP05": 1.0
+    },
+    "Stem": {
+      "samples": 108644,
+      "overlap": 0,
+      "contact": 17305,
+      "visibilityP05": 0.3571
+    },
+    "Collar": {
+      "samples": 17256,
+      "overlap": 14832,
+      "contact": 2017,
+      "visibilityP05": 0.7398
+    },
+    "Knurl": {
+      "samples": 53040,
+      "overlap": 816,
+      "contact": 10270,
+      "visibilityP05": 0.7337
+    },
+    "Sleeve": {
+      "samples": 50960,
+      "overlap": 35152,
+      "contact": 19154,
+      "visibilityP05": 0.5307
+    },
+    "Saddle": {
+      "samples": 142116,
+      "overlap": 0,
+      "contact": 12233,
+      "visibilityP05": 0.8443
+    },
+    "Tab": {
+      "samples": 15637,
+      "overlap": 1399,
+      "contact": 8668,
+      "visibilityP05": 0.3785
+    },
+    "SaddleBack": {
+      "samples": 22456,
+      "overlap": 0,
+      "contact": 1599,
+      "visibilityP05": 0.7212
+    },
+    "Edge": {
+      "samples": 7888,
+      "overlap": 5905,
+      "contact": 2620,
+      "visibilityP05": 0.6573
+    },
+    "Neck": {
+      "samples": 43920,
+      "overlap": 30472,
+      "contact": 10496,
+      "visibilityP05": 0.6232
+    },
+    "Recess": {
+      "samples": 803,
+      "overlap": 160,
+      "contact": 273,
+      "visibilityP05": 0.6972
+    },
+    "SaddleRim": {
+      "samples": 2704,
+      "overlap": 0,
+      "contact": 0,
+      "visibilityP05": 1.0
+    },
+    "Stripe": {
+      "samples": 920,
+      "overlap": 0,
+      "contact": 0,
+      "visibilityP05": 1.0
+    },
+    "Channel": {
+      "samples": 4176,
+      "overlap": 0,
+      "contact": 2606,
+      "visibilityP05": 0.5569
+    },
+    "TabBack": {
+      "samples": 9377,
+      "overlap": 0,
+      "contact": 5249,
+      "visibilityP05": 0.446
+    },
+    "RearEye": {
+      "samples": 13456,
+      "overlap": 16,
+      "contact": 8575,
+      "visibilityP05": 0.4431
+    },
+    "Wheel": {
+      "samples": 6032,
+      "overlap": 6032,
+      "contact": 2561,
+      "visibilityP05": 0.8672
+    },
+    "CollarRing": {
+      "samples": 17680,
+      "overlap": 272,
+      "contact": 1564,
+      "visibilityP05": 0.8861
+    },
+    "Shoulder": {
+      "samples": 10912,
+      "overlap": 528,
+      "contact": 5530,
+      "visibilityP05": 0.2697
+    }
+  }
+}

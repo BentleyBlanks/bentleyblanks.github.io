@@ -338,6 +338,14 @@ def SurfaceMaterial(textureDir):
             links.new(texture.outputs["Color"], separate.inputs["Color"])
             links.new(separate.outputs["Green"], shader.inputs["Roughness"])
             links.new(separate.outputs["Blue"], shader.inputs["Metallic"])
+            group = bpy.data.node_groups.get("glTF Material Output")
+            if group is None:
+                from io_scene_gltf2.blender.com.material_helpers import create_settings_group
+
+                group = create_settings_group("glTF Material Output")
+            output = nodes.new("ShaderNodeGroup")
+            output.node_tree = group
+            links.new(separate.outputs["Red"], output.inputs["Occlusion"])
     return material
 
 

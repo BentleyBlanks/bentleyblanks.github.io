@@ -1,5 +1,6 @@
 """Bake the museum-referenced steel finish into one color, normal and ORM atlas."""
 
+from hashlib import sha256
 import json
 from pathlib import Path
 import subprocess
@@ -15,8 +16,11 @@ from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeig
 HERE = Path(__file__).resolve().parent
 STEM = "Type89LauncherSteel"
 SOURCE = HERE / "Source/Type89Launcher/Texture_Type89LauncherSteelSource.webp"
+CONTACT_AO = SOURCE.with_name("Texture_Type89LauncherContactAo.png")
+CONTACT_RECORD = CONTACT_AO.with_name("Data_Type89LauncherContactAo.json")
 REFERENCE = HERE / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
-ATLAS = json.loads((HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json").read_text(encoding="utf-8"))
+ATLAS_FILE = HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json"
+ATLAS = json.loads(ATLAS_FILE.read_text(encoding="utf-8"))
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 LUMA_NEUTRAL_WARMTH = np.array([.48, -.101, -.414])
 
@@ -1195,20 +1199,49 @@ def BuildAtlas(reference):
     return maps
 
 
+def ReadContactAo():
+    record = json.loads(CONTACT_RECORD.read_bytes())
+    model = HERE.parent / "Model/Model_Type89Launcher.tzm.json"
+    expected = {"file": CONTACT_AO.name, "sha256": Sha256(CONTACT_AO),
+                "modelSha256": Sha256(model), "atlasSha256": Sha256(ATLAS_FILE)}
+    if any(record.get(field) != value for field, value in expected.items()):
+        raise ValueError("Rebake the contact AO from the current launcher mesh and UV atlas")
+    with Image.open(CONTACT_AO) as image:
+        pixels = np.array(image.convert("L"))
+    if (pixels.shape != (record["size"], record["size"])
+            or sha256(pixels.tobytes()).hexdigest() != record["pixelSha256"]):
+        raise ValueError("The launcher contact AO does not match its linear bake")
+    return pixels, record
+
+
+def ComposeContactAo(orm, visibility):
+    surface = np.array(orm.convert("RGB"))
+    if surface.shape[:2] != visibility.shape:
+        raise ValueError("Contact AO and ORM must use the same steel atlas dimensions")
+    surface[..., 0] = (surface[..., 0].astype(np.uint16) * visibility + 127) // 255
+    return Image.fromarray(surface)
+
+
 def Bake():
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+    visibility, contact = ReadContactAo()
     maps = BuildAtlas(reference)
     size = ATLAS["size"]
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 85)):
+    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 82)):
         image = Image.fromarray(pixels)
         if outputSize != size:
             image = image.resize((outputSize, outputSize), Image.Resampling.BOX)
-        image.save(HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp", method=6, quality=quality)
+        output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
+        if channel == "Orm":
+            image = ComposeContactAo(image, visibility)
+        image.save(output, method=6, quality=quality)
     subprocess.run([sys.executable, str(HERE / "Script_BakePbrTexture.py"), "--audit", "--name", STEM], check=True)
     recordPath = HERE / "TextureBakes" / f"Texture_{STEM}.json"
     record = json.loads(recordPath.read_text(encoding="utf-8"))
     record["source"] = {"path": SOURCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(SOURCE)}
     record["reference"] = {"path": REFERENCE.relative_to(HERE.parent).as_posix(), "sha256": Sha256(REFERENCE)}
+    record["contactAo"] = {"path": CONTACT_AO.relative_to(HERE.parent).as_posix(), "sha256": contact["sha256"],
+                           "record": CONTACT_RECORD.relative_to(HERE.parent).as_posix()}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
                "sleeveDetail": reference["closeups"]["Sleeve"]["detail"],
