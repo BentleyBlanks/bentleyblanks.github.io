@@ -634,7 +634,7 @@ export class LevelFlowPlayGuide {
     this.follow = true;
     this.showRoutes = true;
     this.showLandmarks = true;
-    this.showAirWalls = true;
+    this.showAirWalls = false;
 
     this.mapData = null;
     this.mapView = null;
