@@ -14,7 +14,7 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    ReverseReflectionIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
+    CollarJointIdentity, ReverseReflectionIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
 )
 
 
@@ -1439,6 +1439,65 @@ def ApplySleeveReverseFinish(tile, reference):
     ApplyMaterialFields(tile, fields, coverage)
 
 
+def CollarJointCoordinates(balance, u, v):
+    center = balance["center"]
+    u = center + (u - center + .5) % 1 - .5
+    angles, stations = balance["angles"], balance["stations"]
+    coverage = RangeFade(u, (angles[0], angles[-1]), balance["angularFeather"])
+    coverage *= RangeFade(v, (stations[0], stations[-1]), balance["axialFeather"])
+    xy = [np.interp(u, angles, np.arange(len(angles))), np.interp(v, stations, np.arange(len(stations)))]
+    return u, xy, coverage
+
+
+def ApplyCollarJointFinish(tile, reference):
+    balance = reference["collarJointFinish"]
+    if any(balance.get(key) != value for key, value in CollarJointIdentity(reference).items()):
+        raise ValueError("Joint collar response does not match the existing photo fit, steel and atlas")
+    detail = balance["detail"]
+    if (detail["frontPhotoSha256"], detail["rearPhotoSha256"]) != (balance["frontPhotoSha256"], balance["sourceSha256"]):
+        raise ValueError("Collar surface detail does not match the registered photographs")
+    height, width = tile[0].shape[:2]
+    u, v = PlanarTexelCenters(width, height)
+    seed = balance["seed"]
+    center = seed["center"]
+    angle = center + (u - center + .5) % 1 - .5
+    coverage = RangeFade(angle, (seed["angle"][0], seed["angle"][-1]), seed["angularFeather"])
+    coverage *= RangeFade(v, (seed["axial"][0], seed["axial"][-1]), seed["axialFeather"])
+    count = len(seed["angle"])
+    coarse = {key: np.interp(angle, seed["angle"], row[:count]) + np.interp(v, seed["axial"], row[count:])
+              for key, row in zip(("gain", "tilt"), seed["coefficients"])}
+    ApplyMaterialFields(tile, coarse, coverage)
+
+    angle, xy, coverage = CollarJointCoordinates(balance, u, v)
+    fields = {key: map_coordinates(np.asarray(balance["fields"][key]), xy, order=1, mode="nearest")
+              for key in ("gain", "tilt", "tiltV")}
+    for key, values in SampleResponseFields(detail, ("gain", "tintRed", "tintBlue"), angle, v).items():
+        adjustment = detail["strength"] * values
+        if key in fields:
+            fields[key] += adjustment
+        else:
+            fields[key] = adjustment
+    ApplyMaterialFields(tile, fields, coverage)
+
+
+def ApplyCollarPackedRoughness(packed, original, balance):
+    # The existing joint-AO identity uses the legacy bake. Apply this UV0
+    # roughness adjustment after validating that bake and restoring authored R.
+    x, y, width, height = ATLAS["regions"]["CollarRing"]
+    u, v = PlanarTexelCenters(width, height)
+    _, xy, coverage = CollarJointCoordinates(balance, u, v)
+    roughness = map_coordinates(np.asarray(balance["fields"]["roughness"]), xy, order=1, mode="nearest")
+    adjustment = roughness * coverage
+    active = abs(adjustment) > 1e-8
+    green = original[..., 1].copy()
+    tile = green[y:y + height, x:x + width]
+    tile[active] = np.rint(255 * np.clip(tile[active] / 255 + adjustment[active], .17, .92)).astype(np.uint8)
+    size = packed.shape[1], packed.shape[0]
+    previous, current = [np.array(Image.fromarray(array).resize(size, Image.Resampling.BOX), dtype=np.int16)
+                         for array in (original[..., 1], green)]
+    packed[..., 1] = np.clip(packed[..., 1] + current - previous, 0, 255).astype(np.uint8)
+
+
 def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -1537,6 +1596,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
                     ApplyCollarResponse(tile, collar, calibration)
+                if "collarJointFinish" in reference:
+                    ApplyCollarJointFinish(tile, reference)
             elif name == "Sleeve" and "sleeveReverseFinish" in reference:
                 ApplySleeveReverseFinish(tile, reference)
         if name in surfaceBalances or (name == "Barrel" and (wideBarrelBalance or reverseBarrelBalance)):
@@ -1610,6 +1671,8 @@ def Bake(legacyOrm=None):
     if sha256(pixels[..., 0].tobytes()).hexdigest() != jointRecord["legacyRedSha256"]:
         raise ValueError("Rebake the joint AO from the current steel finish's legacy ORM")
     pixels[..., 0] = joints
+    if (collar := reference.get("collarJointFinish")) is not None:
+        ApplyCollarPackedRoughness(pixels, maps[2], collar)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
         Image.fromarray(image).save(output, method=6, quality=84)
@@ -1671,6 +1734,8 @@ def Bake(legacyOrm=None):
         details["reverseBarrelDetail"] = reverse["detail"]
     if (sleeve := reference.get("sleeveReverseFinish")) is not None:
         details["reverseSleeveDetail"] = sleeve["detail"]
+    if (collar := reference.get("collarJointFinish")) is not None:
+        details["jointCollarDetail"] = collar["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
