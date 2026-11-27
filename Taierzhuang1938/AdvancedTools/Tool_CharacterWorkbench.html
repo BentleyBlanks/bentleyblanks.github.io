@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>角色制作管线 · 血战滕县</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../Icon_TabSeal32.png">
+  <link rel="stylesheet" href="../Style_Interface.css">
+  <link rel="stylesheet" href="../Style_Editor.css">
+  <style>
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #080907; }
+    main { width: min(480px, calc(100% - 48px)); padding: 24px; box-sizing: border-box;
+      border: 1px solid var(--ed-edge); background: var(--ed-panel); color: var(--ed-text); }
+    h1 { margin: 0; font-size: 20px; }
+    p { line-height: 1.6; }
+    a { color: var(--ed-gold-text); }
+  </style>
+</head>
+<body class="edThemedSurface">
+  <main>
+    <h1>角色制作管线</h1>
+    <p id="launchStatus" role="status">正在连接本地角色制作工作台…</p>
+    <a href="./ControlCenter.html">返回控制中心</a>
+  </main>
+  <script type="module">
+    const status = document.getElementById("launchStatus");
+    try {
+      const response = await fetch("/__character-workbench/open", { method: "POST", cache: "no-store" });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.url) {
+        throw new Error(result?.error || "请重新打开新版高级工具控制中心后重试。");
+      }
+      location.replace(result.url);
+    } catch (error) {
+      status.textContent = error.message;
+    }
+  </script>
+</body>
+</html>

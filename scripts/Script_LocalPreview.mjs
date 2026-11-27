@@ -36,6 +36,7 @@ import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
+import { setTimeout as Delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 // 敌军 AI 编辑器的「保存到源码」（docs/Data_EnemyAi.md §14.3）。改写器是纯 Node、
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
@@ -540,6 +541,7 @@ function CreateServer(rootDir, context) {
     }
     if (route.startsWith("/__encounter/codex/")) { await handleEncounterCodex(request, response); return; }
     if (route.startsWith("/__model-workbench/")) { await handleModelWorkbench(request, response); return; }
+    if (route === "/__character-workbench/open") { await OpenCharacterWorkbench(request, response); return; }
     if (route.startsWith("/__textures/")) { await HandleTextureImportRequest(request, response, rootDir); return; }
     if (route === "/__motion-workbench") {
       response.writeHead(302, { Location: "/__motion-workbench/", "Cache-Control": "no-store" });
@@ -821,6 +823,80 @@ function IsSameOrigin(request) {
   const origin = request.headers.origin;
   if (origin === undefined) return true;
   try { return new URL(origin).host === request.headers.host; } catch { return false; }
+}
+
+const CHARACTER_WORKBENCH_URL = "http://127.0.0.1:8743/";
+const CHARACTER_WORKBENCH_SCRIPT = "Script_CharacterReview.py";
+let characterWorkbenchStartup;
+
+async function CharacterWorkbenchReady() {
+  let page;
+  try {
+    page = await fetch(CHARACTER_WORKBENCH_URL, { redirect: "manual", signal: AbortSignal.timeout(1500) });
+  } catch (error) {
+    if (error.cause?.code === "ECONNREFUSED") return false;
+    throw new Error("角色制作端口 8743 无法连接，请检查本地服务。");
+  }
+  if (page.ok && (await page.text()).includes("/Script_CharacterReview.mjs")) return true;
+  throw new Error("端口 8743 已被其他服务占用。");
+}
+
+async function StartCharacterWorkbench() {
+  if (await CharacterWorkbenchReady()) return;
+  const workbenchDir = [process.env.OneDriveConsumer, process.env.OneDrive, path.join(os.homedir(), "OneDrive")]
+    .filter(Boolean)
+    .map(dir => path.join(dir, "Sync", "饮河", "FPS", "角色", "Tripo", "CharacterWorkbench"))
+    .find(dir => fs.existsSync(path.join(dir, CHARACTER_WORKBENCH_SCRIPT)));
+  if (!workbenchDir) throw new Error("未找到 OneDrive 中的角色制作工作台，请确认角色工具目录已同步。");
+
+  // 由 Python 自己定时退出，预览服重启时仍可复用已打开的角色工作台。
+  const launch = [
+    "import _thread, runpy, sys, threading",
+    "expiry = threading.Timer(int(sys.argv.pop()), _thread.interrupt_main)",
+    "expiry.daemon = True",
+    "expiry.start()",
+    "try:",
+    `    runpy.run_path('${CHARACTER_WORKBENCH_SCRIPT}', run_name='__main__')`,
+    "except KeyboardInterrupt:",
+    "    pass",
+  ].join("\n");
+  const child = spawn("python", ["-B", "-c", launch, String(DEFAULT_TEST_TTL_MS / 1000)], {
+    cwd: workbenchDir, detached: true, windowsHide: true, stdio: "ignore",
+  });
+  let spawnError;
+  child.once("error", error => { spawnError = error; });
+  let ready = false;
+  try {
+    const deadline = Date.now() + 10000;
+    while (Date.now() < deadline) {
+      await Delay(200);
+      ready = await CharacterWorkbenchReady();
+      if (ready) return;
+      if (spawnError) throw new Error("无法运行 Python，请检查 Python 是否已安装并加入 PATH。");
+      if (child.exitCode !== null || child.signalCode !== null) {
+        throw new Error("角色制作服务启动后退出，请检查 Python 和角色工具依赖。");
+      }
+    }
+    throw new Error("角色制作服务启动超时，请刷新后重试。");
+  } finally {
+    if (!ready && child.pid && child.exitCode === null && child.signalCode === null) child.kill();
+    child.unref();
+  }
+}
+
+async function OpenCharacterWorkbench(request, response) {
+  if (request.method !== "POST") { SendJson(response, 405, { error: "只收 POST" }); return; }
+  if (!IsLocalPage(request) || request.headers.origin !== `http://${request.headers.host}`) {
+    SendJson(response, 403, { error: "请从本机高级工具控制中心打开角色制作管线。" });
+    return;
+  }
+  try {
+    characterWorkbenchStartup ??= StartCharacterWorkbench().finally(() => { characterWorkbenchStartup = undefined; });
+    await characterWorkbenchStartup;
+    SendJson(response, 200, { url: CHARACTER_WORKBENCH_URL });
+  } catch (error) {
+    SendJson(response, 503, { error: error.message });
+  }
 }
 
 /** 盘上原始字节的 sha1；文件不存在是 null。 */

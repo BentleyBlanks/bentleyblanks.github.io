@@ -4,7 +4,7 @@
 //   1. 目录表 Data_AdvancedTools 与 Data_DevTools 对账，分别检查独立窗口、摄影棚、游戏内入口；
 //   2. 搬走的页面都在 AdvancedTools/，旧位置不留跳转壳；
 //   3. 独立窗口入口类解析出的仍是 AdvancedTools/<页面>；
-//   4. 控制中心卡片：19 张（游戏菜单 16 + 只在控制中心的构件库预览、资产规范与限制、模型制作工作台）、六组、地址与「游戏内」标注都对；
+//   4. 控制中心卡片：六组、地址与「游戏内」标注都对；
 //   5. 启动器：--dry-run 的计划、--shortcut-dir 生成的 .lnk（目标 node、参数本脚本、工作目录仓库根）、
 //      没有预览服时真起一份（端口以输出为准）并能 ping 出本仓库根目录。
 //
@@ -161,13 +161,16 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
   Check("标题是 AdvancedTool ControlCenter", CONTROL_CENTER_TITLE === "AdvancedTool ControlCenter");
   const standaloneIds = STANDALONE_TOOLS.map((tool) => tool.id);
   const gameMenuCards = cards.filter((card) => !standaloneIds.includes(card.id));
-  Check("卡片 20 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 20 && new Set(cards.map((card) => card.group)).size === 6
+  Check("卡片 21 张、六组、游戏工具顺序同 TOOL_MENUS", cards.length === 21 && new Set(cards.map((card) => card.group)).size === 6
     && JSON.stringify(gameMenuCards.map((card) => card.id)) === JSON.stringify(menuIds));
   Check("游戏工具文案取 TOOL_INFO 的 label / hint", gameMenuCards.every((card) => card.label === TOOL_INFO[card.id].label && card.hint === TOOL_INFO[card.id].hint));
   Check("测试场景启动器是控制中心关卡组的独立窗口卡片", cards.some((card) => card.id === "testScenes" && card.group === "level"
     && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/TestScenes.html")));
   Check("模型制作工作台是控制中心的独立资产工具", cards.some((card) => card.id === "modelWorkbench" && card.group === "assets"
     && card.kind === "window" && new URL(card.href).pathname.endsWith("/AdvancedTools/Tool_ModelWorkbench.html")));
+  Check("角色制作管线是控制中心角色组的独立工具", cards.some((card) => card.id === "characterWorkbench"
+    && card.group === "character" && card.kind === "window" && card.target === "TengxianCharacterWorkbench"
+    && card.href === new URL("./Tool_CharacterWorkbench.html", page).href));
   const assets = cards.filter((card) => card.group === "assets").map((card) => card.id);
   Check("构件库预览、资产规范是控制中心资产组前两张独立窗口卡片", assets[0] === "props" && assets[1] === "assetStandards" && assets.at(-1) === "modelWorkbench"
     && cards.some((card) => card.id === "props" && card.kind === "window" && card.target === "TengxianPropLibrary"
@@ -294,6 +297,11 @@ const Run = (args) => execFileSync(process.execPath, [launcher, ...args], { enco
       Check("静态入口限制在当前仓库内", (await fetch(`http://127.0.0.1:${port}/%2e%2e%2f${path.basename(REPO_ROOT)}Leak/Example.txt`)).status === 403);
       const page = await fetch(ControlCenterUrl(port));
       Check("控制中心页能取到", page.ok && /AdvancedTool ControlCenter/.test(await page.text()));
+      const characterOpen = new URL("/__character-workbench/open", ControlCenterUrl(port));
+      Check("角色制作启动只接受本机同源 POST",
+        (await fetch(characterOpen)).status === 405
+        && (await fetch(characterOpen, { method: "POST" })).status === 403
+        && (await fetch(characterOpen, { method: "POST", headers: { Origin: "https://example.com" } })).status === 403);
     }
   } finally {
     if (process.platform === "win32") {
