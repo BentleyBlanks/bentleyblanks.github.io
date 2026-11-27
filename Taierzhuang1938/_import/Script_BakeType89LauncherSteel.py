@@ -179,6 +179,16 @@ def ApplySaddleResponse(tile, saddle, calibration):
     ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *PlanarTexelCenters(width, height))
 
 
+def ApplyStemResponse(tile, stem, calibration):
+    source = stem["source"]
+    if (calibration["photoSha256"] != source["sha256"] or calibration["sampleBounds"] != source["sampleBounds"]
+            or calibration["lowerSampleEdge"] != source["lowerSampleEdge"]
+            or calibration["footprint"] != stem["footprint"]):
+        raise ValueError("The stem response does not match the source photo and projection")
+    height, width = tile[0].shape[:2]
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *PlanarTexelCenters(width, height))
+
+
 def CheckNeckRegistration(neck, calibration):
     trace = neck["stampTrace"]
     projection = [trace["imageCenter"], trace["imageRadius"], *trace["imageYForVRange"]]
@@ -1083,6 +1093,10 @@ def BuildAtlas(reference):
                 saddle = reference["closeups"]["Saddle"]
                 if (calibration := saddle.get("responseCalibration")) is not None:
                     ApplySaddleResponse(tile, saddle, calibration)
+            elif name == "Stem":
+                stem = reference["closeups"]["Stem"]
+                if (calibration := stem.get("responseCalibration")) is not None:
+                    ApplyStemResponse(tile, stem, calibration)
             elif name == "Neck":
                 neck = reference["closeups"]["Neck"]
                 if (calibration := neck.get("chromaCalibration")) is not None:
@@ -1132,6 +1146,8 @@ def Bake():
             details[name] = calibration
     if (calibration := reference["closeups"]["Saddle"].get("responseCalibration")) is not None:
         details["saddleResponse"] = calibration
+    if (calibration := reference["closeups"]["Stem"].get("responseCalibration")) is not None:
+        details["stemResponse"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("chromaCalibration")) is not None:
         details["neckChroma"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:

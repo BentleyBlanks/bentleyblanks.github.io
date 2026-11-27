@@ -25,6 +25,7 @@ COLLAR_DETAIL = RECORD.with_name("Texture_Type89LauncherCollarDetail.png")
 SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 SADDLE_RESPONSE = RECORD.with_name("Texture_Type89LauncherSaddleResponse.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
+STEM_RESPONSE = RECORD.with_name("Texture_Type89LauncherStemResponse.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 NECK_CHROMA = RECORD.with_name("Texture_Type89LauncherNeckChroma.png")
 NECK_MARKS = RECORD.with_name("Texture_Type89LauncherNeckMarks.png")
@@ -1087,7 +1088,90 @@ def StemDetail(image, source):
     return SaveDetailPlate(tone, warmth, confidence, x - left, y - top, STEM_DETAIL, halfSize=False)
 
 
-def StemFinish(folder):
+def StemResponseIdentity(stem):
+    source = stem["source"]
+    return {"photoSha256": source["sha256"], "sampleBounds": source["sampleBounds"],
+            "lowerSampleEdge": source["lowerSampleEdge"], "footprint": stem["footprint"]}
+
+
+def FitStemResponse(photo, stem, evidence, *, refine):
+    if refine:
+        names = ("V55StemResolveDefault", "V55StemResolveFill", "V55StemResolveSoft")
+        axes = (("Across", .16, (.42, .40), .054), ("Along", .16, (.40, .40), .054),
+                ("Rough", .14, (.37, .38), .056), ("Base", .31, (.36, .45), .069))
+        lightWeights = np.array([.32, .58, .10])
+        residualCeiling = [.26, .24, .17]
+    else:
+        names = ("V55StemFreshDefault", "V55StemFreshFill", "V55StemSoftBRDF")
+        axes = (("Across", .16, (.72, .88), .049), ("Along", .16, (.69, .59), .051),
+                ("Rough", .14, (.59, .66), .051), ("Base", .31, (.59, .53), .067))
+        lightWeights = np.array([.38, .45, .17])
+        residualCeiling = [.42, .38, .26]
+    folders = [evidence / name for name in names]
+    frames = [ReadRegisteredFrame(folder) for folder in folders]
+    u, v = frames[0][:2]
+    if any(not (np.array_equal(u, row[0]) and np.array_equal(v, row[1])) for row in frames[1:]):
+        raise ValueError("The stem response views must use the same registered camera")
+
+    source = stem["source"]
+    left, top, right, _ = source["sampleBounds"]
+    rail = np.asarray(source["lowerSampleEdge"])
+    x = left + (right - left) * v
+    y = top + (1 - u) * (np.interp(x, rail[:, 0], rail[:, 1]) - top)
+    target = SampleBilinear(photo, x, y)
+    render = np.stack([row[3] @ REGISTERED_LUMA for row in frames], axis=-1)
+    visible = np.logical_and.reduce([row[2] for row in frames])
+    interior = binary_erosion(visible & (u > .07) & (u < .93) & (v > .08) & (v < .92), iterations=3)
+    selected = interior & (target > 33) & (target < 232) & np.all(render > 25, axis=-1)
+    if selected.sum() < 7500:
+        raise ValueError("The response frames do not cover the photographed stem surface")
+    hashes = {folder.name: row[-1] for row, folder in zip(frames, folders)}
+
+    def Read(name):
+        return np.column_stack([ReadRegisteredLuma(folder, name + ".png", hashes[folder.name])[selected]
+                                for folder in folders])
+
+    if np.max(abs(Read("ProbeZero") - render[selected])) > .3:
+        raise ValueError("The zero-response views do not reproduce the initial stem finish")
+    baseline = np.log(render[selected] + 17)
+    residual = np.clip(np.log(target[selected, None] + 17) - baseline, -.40, residualCeiling)
+    basis = [np.log(Read(axis + side) + 17) - baseline
+             for axis, *_ in axes for side in ("Plus", "Minus")]
+    shape = (51, 131)
+    bins = np.rint(u[selected] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(v[selected] * (shape[1] - 1)).astype(int)
+
+    def Smooth(signal):
+        field = np.bincount(bins, weights=signal, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(field, (1.17, 1.26))
+
+    support = Smooth(np.ones(selected.sum()))
+
+    def Average(values):
+        return Smooth(np.sum(lightWeights * values, axis=1)) / np.maximum(support, .32)
+
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    fit = FitSignedResponse(pull, response, axes, 9)
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    coverage = np.clip(np.minimum(uu, 1 - uu) / .125, 0, 1) * np.clip(np.minimum(vv, 1 - vv) / .13, 0, 1)
+    coverage *= np.clip(support / .8, 0, 1)
+    fields = {axis: gaussian_filter((fit[..., 2*i] - fit[..., 2*i+1]) * step, (.64, .70)) * coverage
+              for i, (axis, step, _, _) in enumerate(axes)}
+    return fields, hashes
+
+
+def StemResponseCalibration(image, stem, evidence):
+    photo = image @ REGISTERED_LUMA
+    initial, studyHashes = FitStemResponse(photo, stem, evidence, refine=False)
+    remaining, resolveHashes = FitStemResponse(photo, stem, evidence, refine=True)
+    limits = {"Across": (-.19, .18), "Along": (-.145, .163), "Rough": (-.141, .137), "Base": (-.233, .245)}
+    fields = [np.clip(initial[name] + .88 * remaining[name], *limits[name])
+              for name in ("Base", "Across", "Along", "Rough")]
+    return WriteResponseFields(STEM_RESPONSE, StemResponseIdentity(stem), fields,
+                               {**studyHashes, **resolveHashes})
+
+
+def StemFinish(folder, previous=None, *, responseEvidence=None):
     image, source = Photo(folder, 4)
     # Registration in the inspection scene puts the lower side of the rubbed
     # rectangle at the smaller U. Stay above the stamped strip to its right.
@@ -1105,6 +1189,11 @@ def StemFinish(folder):
     edge = np.clip((xs - 184) / 22, 0, 1) * np.clip((674 - xs) / 20, 0, 1)
     field["rubbedCoverage"] = np.rint(100 * exposed * edge).astype(int).tolist()
     field["detail"] = StemDetail(image, source)
+    if responseEvidence is not None:
+        field["responseCalibration"] = StemResponseCalibration(image, field, responseEvidence)
+    elif previous and (calibration := previous.get("responseCalibration")):
+        if all(calibration.get(key) == value for key, value in StemResponseIdentity(field).items()):
+            field["responseCalibration"] = calibration
     return field
 
 
@@ -2127,6 +2216,7 @@ def Main():
     options.add_argument("--saddle-response-evidence", type=Path, help="V52 Evidence directory with saddle material response captures")
     options.add_argument("--neck-chroma-evidence", type=Path, help="V53 Evidence directory with the neck color response captures")
     options.add_argument("--neck-mark-evidence", type=Path, help="V54 Evidence directory with the neck mark response captures")
+    options.add_argument("--stem-response-evidence", type=Path, help="V55 Evidence directory with stem material response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -2142,7 +2232,8 @@ def Main():
                           responseEvidence=args.sleeve_response_evidence, horizonEvidence=args.sleeve_horizon_evidence)
     record["barrelPatina"] = OverallBarrelPatina(args.photos, record["footprint"])
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
-                          "Stem": StemFinish(args.photos), "Sleeve": sleeve,
+                          "Stem": StemFinish(args.photos, prior.get("Stem"), responseEvidence=args.stem_response_evidence),
+                          "Sleeve": sleeve,
                           "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
                           "Neck": NeckFinish(args.photos, prior.get("Neck"), chromaEvidence=args.neck_chroma_evidence,
                                              markEvidence=args.neck_mark_evidence),
