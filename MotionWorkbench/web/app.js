@@ -1677,55 +1677,172 @@ function replaceTask(updated) {
   renderAll();
 }
 
+const DEFAULT_SLOTS = ["04:00", "06:00", "08:00", "12:00", "14:00", "16:00"];
+
+function parseSlotMinutes(slot) {
+  const [hh, mm] = String(slot || "").split(":").map(Number);
+  return Number.isFinite(hh) && Number.isFinite(mm) ? hh * 60 + mm : 360;
+}
+
+function getNearestUpcomingSlot(sch) {
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const triggered = sch?.lastTriggeredSlots || {};
+  const base = Array.isArray(sch?.cascadeSlots) && sch.cascadeSlots.length ? sch.cascadeSlots : DEFAULT_SLOTS;
+  const set = new Set(base.filter((s) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(s || ""))));
+  if (sch?.runTime && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(sch.runTime)) set.add(sch.runTime);
+  const slots = [...set].sort((a, b) => parseSlotMinutes(a) - parseSlotMinutes(b));
+  for (const s of slots) {
+    if (parseSlotMinutes(s) > nowMin && triggered[s] !== today) return s;
+  }
+  return slots[0] || "04:00";
+}
+
+function pickEarliestPendingSlot(pendingItems, fallbackSlot) {
+  if (!pendingItems.length) return fallbackSlot;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  let bestSlot = pendingItems[0].scheduledTime || fallbackSlot;
+  let bestDelta = Infinity;
+  for (const it of pendingItems) {
+    const s = it.scheduledTime || fallbackSlot;
+    let delta = parseSlotMinutes(s) - nowMin;
+    if (delta <= 0) delta += 1440;
+    if (delta < bestDelta) {
+      bestDelta = delta;
+      bestSlot = s;
+    }
+  }
+  return bestSlot;
+}
+
+function animateFlyToSchedule(fromEl, labelText) {
+  const targetEl = $("#btnSchedule");
+  if (!targetEl) return;
+
+  const pulseTarget = () => {
+    targetEl.classList.remove("mwSchPulse");
+    void targetEl.offsetWidth;
+    targetEl.classList.add("mwSchPulse");
+    const badge = $("#schCountBadge");
+    if (badge && !badge.classList.contains("hidden")) {
+      badge.classList.remove("mwSchBadgePop");
+      void badge.offsetWidth;
+      badge.classList.add("mwSchBadgePop");
+    }
+    setTimeout(() => {
+      targetEl.classList.remove("mwSchPulse");
+      badge?.classList.remove("mwSchBadgePop");
+    }, 680);
+  };
+
+  if (!fromEl || typeof fromEl.getBoundingClientRect !== "function") {
+    pulseTarget();
+    return;
+  }
+
+  const from = fromEl.getBoundingClientRect();
+  const to = targetEl.getBoundingClientRect();
+  if (!from.width || !to.width) {
+    pulseTarget();
+    return;
+  }
+
+  const startX = from.left + from.width / 2;
+  const startY = from.top + from.height / 2;
+  const endX = to.left + to.width / 2;
+  const endY = to.top + to.height / 2;
+  const midX = (startX + endX) / 2 - 42;
+  const midY = Math.min(startY, endY) - 44;
+
+  const chip = document.createElement("div");
+  chip.className = "mwFlyToken";
+  chip.textContent = labelText || "⏱ 已入队";
+  chip.style.left = `${startX}px`;
+  chip.style.top = `${startY}px`;
+  document.body.appendChild(chip);
+
+  const dxMid = midX - startX;
+  const dyMid = midY - startY;
+  const dxEnd = endX - startX;
+  const dyEnd = endY - startY;
+
+  const anim = chip.animate(
+    [
+      { transform: "translate(-50%, -50%) scale(0.92)", opacity: 0.95 },
+      { transform: `translate(calc(-50% + ${dxMid}px), calc(-50% + ${dyMid}px)) scale(1.06)`, opacity: 1, offset: 0.45 },
+      { transform: `translate(calc(-50% + ${dxEnd}px), calc(-50% + ${dyEnd}px)) scale(0.55)`, opacity: 0.15 },
+    ],
+    { duration: 540, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "forwards" }
+  );
+  setTimeout(pulseTarget, 440);
+  anim.onfinish = () => chip.remove();
+}
+
 function renderScheduleUI() {
   const sch = appState.schedule;
   if (!sch) return;
-  const runTime = sch.runTime || "06:00";
+  const nearestSlot = getNearestUpcomingSlot(sch);
+  const runTime = sch.runTime || nearestSlot;
   const items = sch.items || [];
   const pendingItems = items.filter((x) => x.status === "pending" || x.status === "running");
   const pendingCount = pendingItems.length;
+  const nextPendingSlot = pickEarliestPendingSlot(pendingItems, nearestSlot);
   const cur = currentTask();
 
   const btnSch = $("#btnSchedule");
   if (btnSch) btnSch.classList.toggle("hasQueue", pendingCount > 0 || Boolean(sch.runningBatch));
   const btnLbl = $("#schBtnLabel");
-  if (btnLbl) btnLbl.textContent = sch.runningBatch ? "定时运行中" : pendingCount > 0 ? `已排 ${runTime}` : `定时 ${runTime}`;
+  if (btnLbl) {
+    btnLbl.textContent = sch.runningBatch
+      ? "定时运行中"
+      : pendingCount > 0
+      ? `已排 ${nextPendingSlot}`
+      : `定时 ${nearestSlot}`;
+  }
   const badge = $("#schCountBadge");
   if (badge) {
     badge.textContent = String(pendingCount);
     badge.classList.toggle("hidden", pendingCount === 0);
   }
 
-  // Stage 03 / Stage 04 inspector buttons: clearly show whether the current task is ALREADY in the queue!
+  // Stage 03 / Stage 04 inspector buttons: always show nearest upcoming slot, or queued slot if already added
   const curH3Item = cur ? pendingItems.find((x) => x.taskId === cur.id && x.kind === "stage3_h3") : null;
   const curMocapItem = cur ? pendingItems.find((x) => x.taskId === cur.id && x.kind === "stage4_mocap") : null;
   const s3q = $("#btnStage3QueueSch");
   if (s3q) {
     s3q.classList.toggle("isQueued", Boolean(curH3Item));
     s3q.textContent = curH3Item
-      ? `✓ 已排入 ${curH3Item.scheduledTime || runTime} 队列 · 查看`
-      : `⏱ 加入 ${runTime} 定时队列（H3）`;
+      ? `✓ 已排入 ${curH3Item.scheduledTime || nearestSlot} 队列 · 查看`
+      : `⏱ 加入 ${nearestSlot} 定时队列（H3）`;
   }
   const s4q = $("#btnStage4QueueSch");
   if (s4q) {
     s4q.classList.toggle("isQueued", Boolean(curMocapItem));
     s4q.textContent = curMocapItem
-      ? `✓ 已排入 ${curMocapItem.scheduledTime || runTime} 队列 · 查看`
-      : `⏱ 加入 ${runTime} 定时队列（提骨）`;
+      ? `✓ 已排入 ${curMocapItem.scheduledTime || nearestSlot} 队列 · 查看`
+      : `⏱ 加入 ${nearestSlot} 定时队列（提骨）`;
   }
 
   if ($("#schEnabled")) $("#schEnabled").checked = Boolean(sch.enabled);
   if ($("#schAutoStop")) $("#schAutoStop").checked = sch.autoStopAfterBatch !== false;
   if ($("#schAutoDefer")) $("#schAutoDefer").checked = sch.autoDeferToAfternoon !== false;
-  if ($("#schRunTime") && document.activeElement !== $("#schRunTime")) $("#schRunTime").value = runTime;
-  $$(".mwSchPreset").forEach((b) => b.classList.toggle("active", b.dataset.time === runTime));
+  if ($("#schRunTime") && document.activeElement !== $("#schRunTime")) $("#schRunTime").value = nearestSlot;
+  const activeSlotForHighlight = pendingCount > 0 ? nextPendingSlot : nearestSlot;
+  $$(".mwSchPreset").forEach((b) => b.classList.toggle("active", b.dataset.time === activeSlotForHighlight));
 
   const heroTime = $("#schHeroTime");
   if (heroTime) {
-    const nextSlot = pendingItems[0]?.scheduledTime || runTime;
-    heroTime.textContent = sch.runningBatch ? "执行中" : sch.enabled ? nextSlot : "已暂停";
+    heroTime.textContent = sch.runningBatch ? "执行中" : sch.enabled ? activeSlotForHighlight : "已暂停";
   }
-  if ($("#schNextRunText")) $("#schNextRunText").textContent = sch.nextRunText || "—";
+  if ($("#schNextRunText")) {
+    const serverTxt = sch.nextRunText || "";
+    $("#schNextRunText").textContent =
+      pendingCount === 0 && sch.enabled
+        ? `下次最近档位：${nearestSlot}（队列当前为空，入队即自动排入此档）`
+        : serverTxt || "—";
+  }
   if ($("#schQueueTitle")) $("#schQueueTitle").textContent = `排队任务 (${pendingCount} 待执行 / 共 ${items.length})`;
 
   const runBtn = $("#btnSchRunNow");
@@ -1738,7 +1855,7 @@ function renderScheduleUI() {
   if (!listEl) return;
   listEl.innerHTML = "";
   if (!items.length) {
-    listEl.innerHTML = `<div class="mwSchEmpty">暂无排队任务<br>可在 03/04 阶段点「加入 ${escapeHtml(runTime)} 错峰队列」，或点上方快捷批量入队</div>`;
+    listEl.innerHTML = `<div class="mwSchEmpty">暂无排队任务<br>可在 03/04 阶段点「加入 ${escapeHtml(nearestSlot)} 定时队列」，或点上方快捷批量入队</div>`;
     return;
   }
   for (const it of items) {
@@ -2478,10 +2595,18 @@ $$(".mwSchPreset").forEach((b) => {
   b.onclick = () => saveScheduleConfig({ runTime: b.dataset.time, enabled: true });
 });
 
-$("#btnStage3QueueSch").onclick = async () => {
+$("#btnStage3QueueSch").onclick = async (ev) => {
   const task = currentTask();
   if (!task) return;
+  const existing = (appState.schedule?.items || []).find(
+    (x) => x.taskId === task.id && x.kind === "stage3_h3" && (x.status === "pending" || x.status === "running")
+  );
+  if (existing) {
+    setScheduleDrawer(true);
+    return;
+  }
   try {
+    const targetSlot = getNearestUpcomingSlot(appState.schedule);
     const res = await api("/api/schedule/items", {
       method: "POST",
       body: JSON.stringify({
@@ -2489,53 +2614,83 @@ $("#btnStage3QueueSch").onclick = async () => {
         kind: "stage3_h3",
         resolution: task.storyboard?.qualityPreset || "720p",
         duration: task.durationSec || 6,
+        scheduledTime: targetSlot,
       }),
     });
     appState.schedule = res.schedule;
     renderAll();
-    setScheduleDrawer(true);
-    toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（MiniMax-H3）` : "该动作已在定时队列中");
+    if (res.addedCount > 0) {
+      animateFlyToSchedule(ev.currentTarget, `⏱ ${task.beatCode} → ${targetSlot}`);
+      toast(`已排入最近 ${targetSlot} 队列（MiniMax-H3）`);
+    } else {
+      setScheduleDrawer(true);
+      toast("该动作已在定时队列中");
+    }
   } catch (err) {
     toast(err.message, 4000);
   }
 };
-$("#btnStage4QueueSch").onclick = async () => {
+$("#btnStage4QueueSch").onclick = async (ev) => {
   const task = currentTask();
   if (!task) return;
+  const existing = (appState.schedule?.items || []).find(
+    (x) => x.taskId === task.id && x.kind === "stage4_mocap" && (x.status === "pending" || x.status === "running")
+  );
+  if (existing) {
+    setScheduleDrawer(true);
+    return;
+  }
   try {
     const preset = task.stage4?.precisionPreset === "high_a100" ? "high_a100" : "standard_l4";
+    const targetSlot = getNearestUpcomingSlot(appState.schedule);
     const res = await api("/api/schedule/items", {
       method: "POST",
       body: JSON.stringify({
         taskId: task.id,
         kind: "stage4_mocap",
         precisionPreset: preset,
+        scheduledTime: targetSlot,
       }),
     });
     appState.schedule = res.schedule;
     renderAll();
-    setScheduleDrawer(true);
-    toast(res.addedCount > 0 ? `已加入 ${res.schedule.runTime} 错峰队列（Colab 提骨）` : "该动作已在定时队列中");
+    if (res.addedCount > 0) {
+      animateFlyToSchedule(ev.currentTarget, `⏱ ${task.beatCode} → ${targetSlot}`);
+      toast(`已排入最近 ${targetSlot} 队列（Colab 提骨）`);
+    } else {
+      setScheduleDrawer(true);
+      toast("该动作已在定时队列中");
+    }
   } catch (err) {
     toast(err.message, 4000);
   }
 };
 $("#btnSchAddAllH3").onclick = async () => {
   try {
-    const res = await api("/api/schedule/items", { method: "POST", body: JSON.stringify({ batchMode: "all_pending_h3" }) });
+    const targetSlot = getNearestUpcomingSlot(appState.schedule);
+    const res = await api("/api/schedule/items", {
+      method: "POST",
+      body: JSON.stringify({ batchMode: "all_pending_h3", scheduledTime: targetSlot }),
+    });
     appState.schedule = res.schedule;
-    renderScheduleUI();
-    toast(res.addedCount > 0 ? `已批量加入 ${res.addedCount} 个待出片任务` : "没有新的待出片任务（需先有分镜图且尚无成片）");
+    renderAll();
+    if (res.addedCount > 0) animateFlyToSchedule(null);
+    toast(res.addedCount > 0 ? `已批量排入 ${targetSlot} 队列（${res.addedCount} 个待出片任务）` : "没有新的待出片任务（需先有分镜图且尚无成片）");
   } catch (err) {
     toast(err.message, 4000);
   }
 };
 $("#btnSchAddAllMocap").onclick = async () => {
   try {
-    const res = await api("/api/schedule/items", { method: "POST", body: JSON.stringify({ batchMode: "all_pending_mocap" }) });
+    const targetSlot = getNearestUpcomingSlot(appState.schedule);
+    const res = await api("/api/schedule/items", {
+      method: "POST",
+      body: JSON.stringify({ batchMode: "all_pending_mocap", scheduledTime: targetSlot }),
+    });
     appState.schedule = res.schedule;
-    renderScheduleUI();
-    toast(res.addedCount > 0 ? `已批量加入 ${res.addedCount} 个待提骨任务` : "没有新的待提骨任务（需先有成片视频且尚未提骨）");
+    renderAll();
+    if (res.addedCount > 0) animateFlyToSchedule(null);
+    toast(res.addedCount > 0 ? `已批量排入 ${targetSlot} 队列（${res.addedCount} 个待提骨任务）` : "没有新的待提骨任务（需先有成片视频且尚未提骨）");
   } catch (err) {
     toast(err.message, 4000);
   }

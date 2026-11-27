@@ -213,17 +213,57 @@ function parseHHMMToMinutes(str, fallbackMin = 360) {
   return hh * 60 + mm;
 }
 
+function getOrderedScheduleSlots(sch) {
+  const base = Array.isArray(sch?.cascadeSlots) && sch.cascadeSlots.length
+    ? sch.cascadeSlots
+    : CASCADE_SCHEDULE_SLOTS;
+  const set = new Set(base.filter((s) => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(String(s || ""))));
+  if (sch?.runTime && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(sch.runTime)) {
+    set.add(sch.runTime);
+  }
+  return [...set].sort((a, b) => parseHHMMToMinutes(a) - parseHHMMToMinutes(b));
+}
+
+function getNearestUpcomingSlot(sch, now = new Date()) {
+  const slots = getOrderedScheduleSlots(sch);
+  if (!slots.length) return sch?.runTime || "06:00";
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const today = localDateKey(now);
+  const triggeredSlots = sch?.lastTriggeredSlots || {};
+  for (const slot of slots) {
+    const slotMin = parseHHMMToMinutes(slot, -1);
+    if (slotMin > nowMin && triggeredSlots[slot] !== today) {
+      return slot;
+    }
+  }
+  // All today's slots have passed -> wrap to tomorrow's earliest slot (04:00)
+  return slots[0];
+}
+
 function computeNextRunText(sch) {
   if (!sch.enabled) return "已暂停自动触发（仍可手动点「立即执行队列」）";
   const pendingItems = (sch.items || []).filter((x) => x.status === "pending");
   if (sch.runningBatch) return "正在执行错峰队列…";
-  if (!pendingItems.length) return `已开启每日 ${sch.runTime} 错峰自动触发（队列当前为空）`;
   const now = new Date();
   const today = localDateKey(now);
   const triggeredSlots = sch.lastTriggeredSlots || {};
+  if (!pendingItems.length) {
+    const nearest = getNearestUpcomingSlot(sch, now);
+    const [hh, mm] = String(nearest).split(":").map(Number);
+    const target = new Date(now);
+    target.setHours(Number.isFinite(hh) ? hh : 4, Number.isFinite(mm) ? mm : 0, 0, 0);
+    if (target.getTime() <= now.getTime() || triggeredSlots[nearest] === today) {
+      target.setDate(target.getDate() + 1);
+    }
+    const diffMin = Math.max(1, Math.round((target.getTime() - now.getTime()) / 60000));
+    const dh = Math.floor(diffMin / 60);
+    const dm = diffMin % 60;
+    const isToday = target.getDate() === now.getDate();
+    return `最近档位：${isToday ? "今天" : "明天"} ${nearest}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，队列当前为空）`;
+  }
   const slotMap = new Map();
   for (const it of pendingItems) {
-    const slot = it.scheduledTime || sch.runTime || "06:00";
+    const slot = it.scheduledTime || getNearestUpcomingSlot(sch, now);
     slotMap.set(slot, (slotMap.get(slot) || 0) + 1);
   }
 
@@ -246,12 +286,14 @@ function computeNextRunText(sch) {
   const dm = diffMin % 60;
   const isToday = best.target.getDate() === now.getDate();
   const hasDeferred = pendingItems.some((x) => (x.scheduledTime || sch.runTime) === best.slot && x.deferredFrom);
-  return `下次触发：${isToday ? "今天" : "明天"} ${best.slot}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，待跑 ${best.cnt} 项${hasDeferred ? " · 含早间延后" : ""}）`;
+  return `下次触发：${isToday ? "今天" : "明天"} ${best.slot}（约 ${dh > 0 ? `${dh} 小时 ` : ""}${dm} 分钟后，待跑 ${best.cnt} 项${hasDeferred ? " · 含顺延" : ""}）`;
 }
 
 function hydrateScheduleForClient() {
+  const nearestSlot = getNearestUpcomingSlot(state.schedule);
   return {
     ...state.schedule,
+    nearestSlot,
     nextRunText: computeNextRunText(state.schedule),
     pendingCount: (state.schedule.items || []).filter((x) => x.status === "pending").length,
     serverTime: localTimeHHMM(),
@@ -1194,6 +1236,7 @@ async function handleApi(req, res, urlObj) {
         (x) => x.taskId === task.id && x.kind === kind && (x.status === "pending" || x.status === "running")
       );
       if (dup) return;
+      const targetSlot = opts.scheduledTime || getNearestUpcomingSlot(state.schedule);
       const item = {
         id: `sch_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
         taskId: task.id,
@@ -1204,9 +1247,9 @@ async function handleApi(req, res, urlObj) {
         duration: Number(opts.duration || task.durationSec || 6),
         precisionPreset: opts.precisionPreset || task.stage4?.precisionPreset || "standard_l4",
         fallbackToModal: Boolean(opts.fallbackToModal),
-        scheduledTime: opts.scheduledTime || state.schedule.runTime || "06:00",
+        scheduledTime: targetSlot,
         status: "pending",
-        message: `等待 ${opts.scheduledTime || state.schedule.runTime || "06:00"} 错峰自动启动`,
+        message: `等待 ${targetSlot} 错峰自动启动`,
         createdAt: Date.now(),
         startedAt: null,
         finishedAt: null,
