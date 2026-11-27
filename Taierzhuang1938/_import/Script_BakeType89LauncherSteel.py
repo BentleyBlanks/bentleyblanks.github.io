@@ -199,8 +199,12 @@ def SampleResponseFields(calibration, channels, uu, vv):
 
 
 def ApplyResponseFields(tile, calibration, channels, uu, vv, coverage=None):
-    base, normal, orm = tile
     fields = SampleResponseFields(calibration, channels, uu, vv)
+    ApplyMaterialFields(tile, fields, coverage)
+
+
+def ApplyMaterialFields(tile, fields, coverage):
+    base, normal, orm = tile
     if coverage is not None:
         for field in fields.values():
             field *= coverage
@@ -319,18 +323,19 @@ def ApplyTabResponses(tile, tab, visibility=None, seamVisibility=None):
         ApplyResponseFields(tile, calibration, channels, uu, span, coverage)
 
 
-def ApplyKnurlAlbedoBalance(base, u, axial, seamVisibility, balance):
-    def Ramp(value):
-        t = np.clip(value, 0, 1)
-        return t * t * (3 - 2 * t)
+def SmoothRamp(value):
+    t = np.clip(value, 0, 1)
+    return t * t * (3 - 2 * t)
 
+
+def ApplyKnurlAlbedoBalance(base, u, axial, seamVisibility, balance):
     left, right = balance["angularRange"]
     fadeLeft, fadeRight = balance["angularFeather"]
     start, end = balance["axialRange"]
     fadeAxial = balance["axialFeather"]
-    coverage = (Ramp((u - left) / fadeLeft) * Ramp((right - u) / fadeRight)
-                * Ramp((axial - start) / fadeAxial) * Ramp((end - axial) / fadeAxial))
-    coverage *= Ramp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
+    coverage = (SmoothRamp((u - left) / fadeLeft) * SmoothRamp((right - u) / fadeRight)
+                * SmoothRamp((axial - start) / fadeAxial) * SmoothRamp((end - axial) / fadeAxial))
+    coverage *= SmoothRamp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
 
     linear = SrgbToLinear(base / 255.)
     luma = linear @ LUMA
@@ -1291,6 +1296,48 @@ def BakeShoulder(quadrants, width, height, index, reference):
             for left, right in zip(main, flank)]
 
 
+def ApplyShoulderReflection(tile, shoulder, seamVisibility):
+    balance = shoulder["reflectionBalance"]
+    source = shoulder["source"]
+    expected = {"photoSha256": source["sha256"], "photoRails": source["photoRails"], "viewCenter": source["viewCenter"],
+                "footprint": shoulder["footprint"], "fineUvOffset": shoulder["fineUvOffset"],
+                "detailSha256": shoulder["detail"]["sha256"],
+                "contactAoSha256": Sha256(CONTACT_AO), "seamAoSha256": Sha256(SEAM_AO)}
+    if any(balance.get(key) != value for key, value in expected.items()):
+        raise ValueError("Shoulder reflection balance does not match the photographed flank and seam AO")
+
+    height, width = tile[0].shape[:2]
+    layout = ATLAS["shoulderFlank"]
+    split = layout["splitX"]
+    fraction, packedV = PlanarTexelCenters(width - split, height)
+    uStart, uEnd = layout["uRange"]
+    sourceV, storedV = np.asarray(layout["flankV"]).T
+    v = np.interp(packedV, storedV, sourceV)
+    u = uStart + (uEnd - uStart) * fraction
+    footprint = shoulder["footprint"]
+    lower = footprint["uCenter"] - footprint["uHalfSpan"]
+    upper = footprint["uCenter"] + footprint["uHalfSpan"]
+    bottom, top = footprint["vRange"]
+    u = (u - lower) / (upper - lower)
+    v = (v - bottom) / (top - bottom)
+
+    positions = np.asarray(balance["angularKnots"])
+    coefficients = np.asarray(balance["coefficients"])
+    clipped = np.clip(u, 0, 1)
+    segment = np.clip(np.searchsorted(positions, clipped, side="right") - 1, 0, len(positions) - 2)
+    t = SmoothRamp((clipped - positions[segment]) / (positions[segment + 1] - positions[segment]))
+    weights = np.eye(len(positions))
+    blend = weights[segment] * (1 - t[..., None]) + weights[segment + 1] * t[..., None]
+    amounts = (blend @ coefficients) * np.asarray(balance["responseSteps"])
+    fields = dict(zip(("gain", "tilt", "tiltV", "tintRed", "tintBlue"), np.moveaxis(amounts, -1, 0)))
+    featherU, featherV = balance["footprintFeather"]
+    margin = balance["footprintMargin"]
+    coverage = (SmoothRamp((np.minimum(u, 1 - u) - margin) / featherU)
+                * SmoothRamp((np.minimum(v, 1 - v) - margin) / featherV)
+                * SmoothRamp((seamVisibility[:, split:] - balance["visibilityFloor"]) / balance["visibilityFade"]))
+    ApplyMaterialFields([pixels[:, split:] for pixels in tile], fields, coverage)
+
+
 def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -1304,15 +1351,17 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     size = ATLAS["size"]
     tab = reference["closeups"]["Tab"]
     flank = reference["knurl"]["flankWear"]
+    shoulder = reference["shoulder"]["Flank"]
     if "albedoBalance" in flank and "surfaceCalibration" not in flank:
         raise ValueError("Knurl albedo balance requires the registered flank response")
     visibility = seamVisibility = None
-    if "warmCalibration" in tab or "lightBalance" in tab or "steelBalance" in tab or "surfaceCalibration" in flank:
+    needsSeamVisibility = "steelBalance" in tab or "albedoBalance" in flank or "reflectionBalance" in shoulder
+    if needsSeamVisibility or "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
         contactImage = Image.fromarray(contactAo).resize((size, size), Image.Resampling.BILINEAR)
         visibility = np.asarray(contactImage, dtype=float) / 255
-    if "steelBalance" in tab or "albedoBalance" in flank:
+    if needsSeamVisibility:
         if seamAo is None:
             seamAo, _ = ReadContactAo(SEAM_AO, SEAM_RECORD)
         seam = Image.fromarray(np.minimum(contactAo, seamAo)).resize((size, size), Image.Resampling.BILINEAR)
@@ -1342,6 +1391,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 ApplyKnurlFlankResponse(tile, flank, visibility[y:y + height, x:x + width], seam)
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
+            if "reflectionBalance" in shoulder:
+                ApplyShoulderReflection(tile, shoulder, seamVisibility[y:y + height, x:x + width])
         elif name == "Barrel":
             oldTile = BakeRegion(name, quadrants, (width, height), index, reference)
             denseTile = BakeRegion(name, quadrants, (width, height), index, reference,

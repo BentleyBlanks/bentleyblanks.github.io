@@ -76,6 +76,14 @@ def GripAlbedoBalanceIdentity(flank):
     }
 
 
+def ShoulderReflectionIdentity(flank):
+    source = flank["source"]
+    return {"photoSha256": source["sha256"], "photoRails": source["photoRails"], "viewCenter": source["viewCenter"],
+            "footprint": flank["footprint"], "fineUvOffset": flank["fineUvOffset"],
+            "detailSha256": flank["detail"]["sha256"], "contactAoSha256": ContactAoSha256(),
+            "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2555,6 +2563,7 @@ def Main():
     record = json.loads(RECORD.read_text(encoding="utf-8"))
     prior = record.get("closeups", {})
     priorFlank = record.get("knurl", {}).get("flankWear", {})
+    priorShoulderBalance = record.get("shoulder", {}).get("Flank", {}).get("reflectionBalance")
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
@@ -2577,6 +2586,10 @@ def Main():
     record["knurl"] = KnurlFrequency(args.photos, record.get("knurl"), evidence=args.grip_response_evidence)
     record["knurl"]["flankWear"] = KnurlFlankWear(args.photos)
     record["shoulder"] = ShoulderFinish(args.photos)
+    shoulder = record["shoulder"]["Flank"]
+    if priorShoulderBalance and all(priorShoulderBalance.get(key) == value
+                                   for key, value in ShoulderReflectionIdentity(shoulder).items()):
+        shoulder["reflectionBalance"] = priorShoulderBalance
     tab, flank = record["closeups"]["Tab"], record["knurl"]["flankWear"]
     for key, previous, current, identity in (
         ("warmCalibration", prior.get("Tab", {}), tab, TabWarmIdentity(tab)),
