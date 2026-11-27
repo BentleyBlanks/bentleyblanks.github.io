@@ -9,7 +9,7 @@ import bpy
 from mathutils import Matrix
 
 from AssetBudgets import SPECIAL_TRIANGLE_TARGETS
-from TzmCore import AUTHORED_NORMAL_LAYER, Node
+from TzmCore import AUTHORED_AO_UV_LAYER, AUTHORED_NORMAL_LAYER, Node
 
 
 TRIANGLE_LIMIT = SPECIAL_TRIANGLE_TARGETS["Type89Launcher"]
@@ -26,6 +26,8 @@ MATERIAL = "type89LauncherSteel"
 BLENDER_TO_GAME = Matrix.Rotation(-pi / 2, 4, "X")
 
 ATLAS = json.loads(Path(__file__).with_name("Data_Type89LauncherSteelAtlas.json").read_text(encoding="utf-8"))
+CONTACT_ATLAS = json.loads(Path(__file__).with_name("Data_Type89LauncherContactAtlas.json").read_text(encoding="utf-8"))
+QUAD_UV = ((0, 0), (1, 0), (1, 1), (0, 1))
 
 
 def NativePoint(point):
@@ -33,9 +35,9 @@ def NativePoint(point):
     return (x * LENGTH, -(FRONT + along * LENGTH), y * LENGTH)
 
 
-def RectUv(rect, u, v):
+def RectUv(rect, u, v, layout=ATLAS):
     x, y, width, height = rect
-    size, padding = ATLAS["size"], ATLAS["padding"]
+    size, padding = layout["size"], layout["padding"]
     return ((x + padding + u * (width - 2 * padding)) / size,
             (size - y - height + padding + v * (height - 2 * padding)) / size)
 
@@ -49,6 +51,18 @@ def AtlasUv(tile, u, v):
         first, last = sampling["activeV"]
         v = (v - first) / (last - first)
     return RectUv(ATLAS["regions"][tile], u, v)
+
+
+def ContactUv(tile, u, v):
+    return RectUv(CONTACT_ATLAS["regions"][tile], u, v, CONTACT_ATLAS)
+
+
+def ContactQuad(tile, u0, u1, v0, v1):
+    return [ContactUv(tile, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
+
+
+def ContactCap(name, end, coords):
+    return [ContactUv(f"{name}Cap{end}", u, v) for u, v in coords]
 
 
 def RemapUv(value, knots):
@@ -75,14 +89,17 @@ def ShoulderUvs(u0, u1, v0, v1):
     return [RectUv(rect, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))]
 
 
-def MeshObject(collection, name, vertices, faces, uvFaces, smooth=None):
+def MeshObject(collection, name, vertices, faces, uvFaces, contactFaces, smooth=None):
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([NativePoint(p) for p in vertices], [], faces)
     uv = mesh.uv_layers.new(name="SteelAtlas")
-    for polygon, uvs in zip(mesh.polygons, uvFaces):
+    contact = mesh.uv_layers.new(name=AUTHORED_AO_UV_LAYER)
+    for polygon, uvs, contactUvs in zip(mesh.polygons, uvFaces, contactFaces, strict=True):
         polygon.use_smooth = smooth is None or smooth[polygon.index]
-        for index, coordinate in zip(polygon.loop_indices, uvs):
+        for index, coordinate, contactCoordinate in zip(polygon.loop_indices, uvs, contactUvs, strict=True):
             uv.data[index].uv = coordinate
+            contact.data[index].uv = contactCoordinate
+    mesh.uv_layers.active = uv
     raw = bmesh.new()
     raw.from_mesh(mesh)
     bmesh.ops.recalc_face_normals(raw, faces=list(raw.faces))
@@ -117,11 +134,17 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
         localBands = [i for i, region in bandTiles.items() if region == localChart]
         localStart = steps[min(localBands)]
         localLength = steps[max(localBands) + 1] - localStart
-    faces, uvFaces, smooth = [], [], []
+    faces, uvFaces, contactFaces, smooth = [], [], [], []
     for ring in range(len(profile) - 1):
         bandRegion = (bandTiles or {}).get(ring, tile)
         start, length = (localStart, localLength) if bandRegion == localChart else (0, steps[-1])
         v0, v1 = ((steps[i] - start) / length for i in (ring, ring + 1))
+        contactTile, first, last = name, 0, len(steps) - 1
+        if paintBand is not None:
+            contactTile, first, last = next(band for band in
+                (("TubeFront", 0, 5), ("Barrel", 5, 9), ("TubeRear", 9, len(steps) - 1))
+                if band[1] <= ring < band[2])
+        contactV0, contactV1 = ((steps[i] - steps[first]) / (steps[last] - steps[first]) for i in (ring, ring + 1))
         for i, angle in enumerate(angles):
             j = (i + 1) % count
             stopAngle = angles[j] if j else 2 * pi
@@ -139,14 +162,17 @@ def Revolve(collection, name, profile, *, sides=40, center=(0, 0), tile="Barrel"
                 uvFaces.append(ShoulderUvs(u0, u1, v0, v1))
             else:
                 uvFaces.append([AtlasUv(band, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
+            contactFaces.append(ContactQuad(contactTile, angle / (2 * pi), stopAngle / (2 * pi), contactV0, contactV1))
             smooth.append(not toothed)
     endTile = {"Shoulder": "Collar"}.get(tile, "Edge" if toothed else tile)
-    for ring, capTile in ((0, (bandTiles or {}).get(0, endTile)), (len(profile) - 1, endTile)):
+    for end, (ring, capTile) in enumerate(((0, (bandTiles or {}).get(0, endTile)), (len(profile) - 1, endTile))):
         order = list(range(count)) if ring else list(reversed(range(count)))
         faces.append(tuple(ring * count + i for i in order))
-        uvFaces.append([AtlasUv(capTile, 0.5 + 0.47 * cos(angles[i]), 0.5 + 0.47 * sin(angles[i])) for i in order])
+        coords = [(0.5 + 0.47 * cos(angles[i]), 0.5 + 0.47 * sin(angles[i])) for i in order]
+        uvFaces.append([AtlasUv(capTile, u, v) for u, v in coords])
+        contactFaces.append(ContactCap(name, end, coords))
         smooth.append(False)
-    return MeshObject(collection, name, vertices, faces, uvFaces, smooth)
+    return MeshObject(collection, name, vertices, faces, uvFaces, contactFaces, smooth)
 
 
 def Stem(collection):
@@ -157,7 +183,7 @@ def Stem(collection):
                (-.013, -.023), (-.021, -.016), (-.025, -.003)]
     sections = [(.421, .79), (.442, .97), (.480, 1), (.703, 1), (.742, 1.02), (.761, .94)]
     vertices = [(x * scale, y * scale, along) for along, scale in sections for x, y in outline]
-    faces, uvFaces, smooth = [], [], []
+    faces, uvFaces, contactFaces, smooth = [], [], [], []
     count = len(outline)
     for ring in range(len(sections) - 1):
         v0, v1 = ((sections[i][0] - sections[0][0]) / (sections[-1][0] - sections[0][0]) for i in (ring, ring + 1))
@@ -167,12 +193,15 @@ def Stem(collection):
             u0, u1 = (0, 1) if tile == "Channel" else (i / count, (i + 1) / count)
             faces.append((ring * count + i, ring * count + j, (ring + 1) * count + j, (ring + 1) * count + i))
             uvFaces.append([AtlasUv(tile, u, v) for u, v in ((u0, v0), (u1, v0), (u1, v1), (u0, v1))])
+            contactFaces.append(ContactQuad("Stem", i / count, (i + 1) / count, v0, v1))
             smooth.append(i >= 7)
-    for ring in (0, len(sections) - 1):
+    for end, ring in enumerate((0, len(sections) - 1)):
         faces.append(tuple(ring * count + i for i in range(count)))
-        uvFaces.append([AtlasUv("Collar", x / .052 + .5, y / .052 + .5) for x, y in outline])
+        coords = [(x / .052 + .5, y / .052 + .5) for x, y in outline]
+        uvFaces.append([AtlasUv("Collar", u, v) for u, v in coords])
+        contactFaces.append(ContactCap("FlutedSteelStem", end, coords))
         smooth.append(False)
-    return MeshObject(collection, "FlutedSteelStem", vertices, faces, uvFaces, smooth)
+    return MeshObject(collection, "FlutedSteelStem", vertices, faces, uvFaces, contactFaces, smooth)
 
 
 def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017, backTile=None):
@@ -187,7 +216,10 @@ def FlatPart(collection, name, outline, x0, x1, tile="Tab", bevel=.0017, backTil
     uvFaces = [[AtlasUv(backTile or tile, u, v) for u, v in reversed(coords)],
                [AtlasUv(tile, u, v) for u, v in coords]]
     uvFaces.extend([AtlasUv(tile, (i + u) / count, v) for u, v in ((0, .4), (1, .4), (1, .6), (0, .6))] for i in range(count))
-    obj = MeshObject(collection, name, vertices, faces, uvFaces, [False] * len(faces))
+    contactFaces = [[ContactUv(f"{name}Back", u, v) for u, v in reversed(coords)],
+                    [ContactUv(f"{name}Front", u, v) for u, v in coords]]
+    contactFaces.extend(ContactQuad(f"{name}Edge", i / count, (i + 1) / count, 0, 1) for i in range(count))
+    obj = MeshObject(collection, name, vertices, faces, uvFaces, contactFaces, [False] * len(faces))
     modifier = obj.modifiers.new("ForgedEdgeRounds", "BEVEL")
     modifier.width = bevel * LENGTH
     modifier.segments = 2
@@ -204,16 +236,17 @@ def OvalLoop(collection, name, center, height, length, wire, tile="Edge", crossS
             a = 2 * pi * j / crossSegments
             radial = wire * cos(a)
             vertices.append((cx + wire * sin(a), cy + (height + radial) * cos(t), along + (length + radial) * sin(t)))
-    faces, uvFaces = [], []
+    faces, uvFaces, contactFaces = [], [], []
     for i in range(sides):
         k = (i + 1) % sides
         for j in range(crossSegments):
             n = (j + 1) % crossSegments
             faces.append((i * crossSegments + j, i * crossSegments + n,
                           k * crossSegments + n, k * crossSegments + j))
-            uvFaces.append([AtlasUv(tile, (j + u) / crossSegments, (i + v) / sides)
-                            for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))])
-    return MeshObject(collection, name, vertices, faces, uvFaces)
+            coords = [((j + u) / crossSegments, (i + v) / sides) for u, v in QUAD_UV]
+            uvFaces.append([AtlasUv(tile, u, v) for u, v in coords])
+            contactFaces.append([ContactUv(name, u, v) for u, v in coords])
+    return MeshObject(collection, name, vertices, faces, uvFaces, contactFaces)
 
 
 def Saddle(collection):
@@ -238,7 +271,7 @@ def Saddle(collection):
     # Align the furthest shoe edge to the retained prop span.
     correction = max(p[2] for p in vertices) - 1
     vertices = [(x, y, along - correction) for x, y, along in vertices]
-    faces, uvFaces = [], []
+    faces, uvFaces, contactFaces = [], [], []
     for ring in range(len(rings) - 1):
         tile = "Saddle" if ring < 3 else "SaddleRim" if ring < 6 else "SaddleBack"
         for i in range(sides):
@@ -246,14 +279,18 @@ def Saddle(collection):
             face = (ring * sides + i, ring * sides + j, (ring + 1) * sides + j, (ring + 1) * sides + i)
             faces.append(face)
             if 3 <= ring <= 5:
-                uvFaces.append([AtlasUv(tile, (i + u) / sides, (ring - 3 + v) / 3) for u, v in ((0, 0), (1, 0), (1, 1), (0, 1))])
+                coords = [((i + u) / sides, (ring - 3 + v) / 3) for u, v in QUAD_UV]
             else:
-                uvFaces.append([AtlasUv(tile, vertices[index][0] / .32 + .5, vertices[index][1] / .149 + .5) for index in face])
+                coords = [(vertices[index][0] / .32 + .5, vertices[index][1] / .149 + .5) for index in face]
+            uvFaces.append([AtlasUv(tile, u, v) for u, v in coords])
+            contactFaces.append([ContactUv(tile, u, v) for u, v in coords])
     for ring, tile in ((0, "Saddle"), (len(rings) - 1, "SaddleBack")):
         face = tuple(ring * sides + i for i in range(sides))
         faces.append(face)
-        uvFaces.append([AtlasUv(tile, vertices[i][0] / .32 + .5, vertices[i][1] / .149 + .5) for i in face])
-    return MeshObject(collection, "CurvedBaseShoe", vertices, faces, uvFaces)
+        coords = [(vertices[i][0] / .32 + .5, vertices[i][1] / .149 + .5) for i in face]
+        uvFaces.append([AtlasUv(tile, u, v) for u, v in coords])
+        contactFaces.append([ContactUv(tile, u, v) for u, v in coords])
+    return MeshObject(collection, "CurvedBaseShoe", vertices, faces, uvFaces, contactFaces)
 
 
 def BuildExterior():
@@ -324,7 +361,7 @@ def SurfaceMaterial(textureDir):
         texture = nodes.new("ShaderNodeTexImage")
         texture.label = f"Steel {channel}"
         file = Path(textureDir) / f"Texture_Type89LauncherSteel{channel}.webp"
-        texture.image = bpy.data.images.load(str(file), check_existing=True)
+        texture.image = bpy.data.images.load(str(file), check_existing=False)
         texture.image.colorspace_settings.name = colorSpace
         texture.image.pack()
         if channel == "Base":
@@ -345,7 +382,15 @@ def SurfaceMaterial(textureDir):
                 group = create_settings_group("glTF Material Output")
             output = nodes.new("ShaderNodeGroup")
             output.node_tree = group
-            links.new(separate.outputs["Red"], output.inputs["Occlusion"])
+            aoUv = nodes.new("ShaderNodeUVMap")
+            aoUv.uv_map = AUTHORED_AO_UV_LAYER
+            aoTexture = nodes.new("ShaderNodeTexImage")
+            aoTexture.label = "Joint AO (UV1)"
+            aoTexture.image = texture.image
+            aoChannels = nodes.new("ShaderNodeSeparateColor")
+            links.new(aoUv.outputs["UV"], aoTexture.inputs["Vector"])
+            links.new(aoTexture.outputs["Color"], aoChannels.inputs["Color"])
+            links.new(aoChannels.outputs["Red"], output.inputs["Occlusion"])
     return material
 
 

@@ -59,6 +59,8 @@ function DecodeMesh(block) {
   const qpos = TypedFrom(block.pos, Uint16Array);
   const qnrm = TypedFrom(block.nrm, Int8Array);
   const quv = TypedFrom(block.uv, Uint16Array);
+  const qaoUv = block.uv1 == null ? null : TypedFrom(block.uv1, Uint16Array);
+  if (qaoUv && qaoUv.length !== count * 2) throw new Error("Invalid TZM contact UV count");
   const index = TypedFrom(block.idx, block.idxBits === 32 ? Uint32Array : Uint16Array);
 
   const positions = new Float32Array(count * 3);
@@ -82,7 +84,8 @@ function DecodeMesh(block) {
     uvs[i * 2] = umx + quv[i * 2] * usx;
     uvs[i * 2 + 1] = umy + quv[i * 2 + 1] * usy;
   }
-  return { positions, normals, uvs, index: Array.from(index), material: block.material };
+  const aoUvs = qaoUv && Float32Array.from(qaoUv, value => value / 65535);
+  return { positions, normals, uvs, aoUvs, index: Array.from(index), material: block.material };
 }
 
 /** 位置里混进 NaN 的后果是整块几何的包围球变 NaN，视锥剔除随之全表失灵。 */
@@ -155,6 +158,7 @@ function MergeChunks(chunks) {
   const positions = new Float32Array(vertexCount * 3);
   const normals = new Float32Array(vertexCount * 3);
   const uvs = new Float32Array(vertexCount * 2);
+  const aoUvs = new Float32Array(vertexCount * 2);
   // 顶点数过 65535 就必须换 32 位索引，否则索引静默回绕成另一块几何
   const index = vertexCount > 65535 ? new Uint32Array(indexCount) : new Uint16Array(indexCount);
   let vOffset = 0;
@@ -163,6 +167,7 @@ function MergeChunks(chunks) {
     positions.set(chunk.positions, vOffset * 3);
     normals.set(chunk.normals, vOffset * 3);
     uvs.set(chunk.uvs, vOffset * 2);
+    aoUvs.set(chunk.aoUvs ?? chunk.uvs, vOffset * 2);
     for (let i = 0; i < chunk.index.length; i += 1) index[iOffset + i] = chunk.index[i] + vOffset;
     vOffset += chunk.positions.length / 3;
     iOffset += chunk.index.length;
@@ -171,9 +176,8 @@ function MergeChunks(chunks) {
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
   geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-  // 同一张 ORM 喂 aoMap，而 three 的 aoMap 读的是 uv1 —— 不补这一份
-  // 环境光遮蔽整张贴图就当没有（这是材质库那边既定的打包约定）
-  geometry.setAttribute("uv1", new THREE.BufferAttribute(uvs.slice(), 2));
+  // Older TZM blocks use their primary UVs for both channels.
+  geometry.setAttribute("uv1", new THREE.BufferAttribute(aoUvs, 2));
   geometry.setIndex(new THREE.BufferAttribute(index, 1));
   geometry.computeBoundingSphere();
   geometry.computeBoundingBox();
@@ -192,7 +196,7 @@ function ChunkTransformed(chunk, matrix) {
     v.set(normals[i], normals[i + 1], normals[i + 2]).applyMatrix3(TMP_NORMAL).normalize();
     normals[i] = v.x; normals[i + 1] = v.y; normals[i + 2] = v.z;
   }
-  return { positions, normals, uvs: chunk.uvs, index: chunk.index, material: chunk.material };
+  return { ...chunk, positions, normals };
 }
 
 /**

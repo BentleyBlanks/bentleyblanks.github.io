@@ -85,11 +85,12 @@
 - 肩部侧面的氧化钢与高光按第 4 张近照校准。在同一布光下从两个机位实测材质响应，联合拟合底色与切线法线。第三机位、独立灯向和接缝 AO 分别复核。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 筒身钢面与驻钣凸面分别按第 7 张近照和第 1 张馆藏照片校准底色与切线法线。拟合使用校准灯、斜视、默认灯和柔光的响应，并约束亮斑的亮度。刻印及深接缝有独立的衰减，另从反向斜视复测。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 以第 1 张馆藏照测量整段筒身亮带的横向轮廓，从三个光照及机位响应联合校准底色和切线法线。拟合约束默认灯的中间调，用柔光和第 7 张刻印近照独立复测。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+- 单独展开第二套接缝 UV，在轮齿、旋钮底座、两侧拨片支架、尾套沟槽和驻钣接头上各自烘焙遮蔽。独立 UV 消除钢材重叠处的暗缝丢失。原钢面底色和法线逐文件一致。游戏和检查台以 ORM 红通道读取这份遮蔽，三张贴图合计 1,046,648 字节。 [接缝烘焙记录](../_import/Source/Type89Launcher/Data_Type89LauncherJointAo.json)
 
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
-- 在 BlenderMCP 中打开对应工程，运行 `_blender/Script_BakeType89LauncherContactAo.py` 的 `Main()` 重烘接缝遮蔽。脚本读取装配网格和钢材 UV，测量表面半球的可见度，并将结果延伸到图集边距。复用 UV 取较浅的结果，避免开阔表面出现其他零件的暗痕。`Main(calibration=True)` 可重建照片拟合使用的原始接触遮蔽。两份遮蔽按较深值合入 ORM 红通道，合入前核对模型和 UV 图集内容，兼容原 Windows 烘焙记录。 [几何烘焙脚本](../_blender/Script_BakeType89LauncherContactAo.py)
+- 在 BlenderMCP 中打开带 `ContactAo` UV 层的工程重烘接缝。先以 `Script_BakeType89LauncherSteel.py --legacy-orm <基准图.png>` 烘出 UV0 基准，再用 `Script_BakeType89LauncherContactAo.py` 的 `Main(legacyOrm=<基准图.png>)` 逐面追踪装配遮挡，把现有细纹遮蔽和各接触面的几何遮蔽写入独立图集。运行钢材烘焙脚本合入 ORM 红通道。粗糙度和金属度读取 UV0，遮蔽读取 UV1，三通道共用原 ORM 采样器。原 `Main()` 与 `Main(calibration=True)` 分别重建照片拟合使用的两张 UV0 遮蔽图。 [几何烘焙脚本](../_blender/Script_BakeType89LauncherContactAo.py) [接缝 UV 图集](../_blender/Data_Type89LauncherContactAtlas.json)
 - OpenAI Images API 的 `gpt-image-2` 用四块馆藏钢材裁样生成 2K 源图。原始 PNG 与 Blender 工程一起保存在 OneDrive。用 `Script_MeasureType89LauncherSteel.py --photos <ReferencePhotos>` 和 NumPy、Pillow、SciPy 重算馆藏采样。仓库内无损源图可经 `python Taierzhuang1938/_import/Script_BakeType89LauncherSteel.py` 重烘。输出为 2048² 底色、2048² 切线法线与 1024² ORM。 [生成提示词](../_import/Prompts/Texture_Type89LauncherSteel.txt) [烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 重新推导筒身亮度修正时，为采样命令加 `--barrel-evidence <MetalFinishV38/Evidence>`。三组控制帧的 SHA-256 与原照投影记录在 `registeredCalibration` 中。只重算照片采样时，匹配同一照片和投影的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)
 - 重新推导外套筒底色时加 `--sleeve-evidence <MetalFinishV39/Evidence>`。记录包含两组配准帧哈希、原照哈希和表面采样范围。只重算照片采样时，原照、采样线和采样范围一致的修正随记录保留。 [采样脚本](../_import/Script_MeasureType89LauncherSteel.py)

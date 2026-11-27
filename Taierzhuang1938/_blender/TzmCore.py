@@ -80,6 +80,7 @@ MATERIAL_NAMES = {
 # 空的才是正常状态 —— 有内容说明某个建模原语的绕向写反了。
 FLIPPED = []
 AUTHORED_NORMAL_LAYER = "TzmAuthoredNormal"
+AUTHORED_AO_UV_LAYER = "ContactAo"
 
 
 # ---------------------------------------------------------------------------
@@ -547,7 +548,7 @@ class Node:
 # ---------------------------------------------------------------------------
 
 def _ExtractLoops(bm, tile):
-    """三角化并吐出 (position, normal, uv) 三元组序列。
+    """Triangulate and collect positions, normals and authored UVs."""
 
     光滑法线只由**相邻的 smooth 面**加权累加：直接拿 vert.normal 的话，
     圆柱端盖（flat）会把侧壁（smooth）的法线往轴向拽，柱面边缘出现一圈死光。
@@ -573,6 +574,7 @@ def _ExtractLoops(bm, tile):
             acc += f.normal * max(weight, 1e-9)
 
     source_uv = bm.loops.layers.uv.active if tile is None else None
+    ao_uv = bm.loops.layers.uv.get(AUTHORED_AO_UV_LAYER) if source_uv is not None else None
     authored_normal = bm.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
     if tile is None and source_uv is None:
         raise ValueError("sourceUv 网格没有活动 UV 层")
@@ -618,13 +620,14 @@ def _ExtractLoops(bm, tile):
                 uv = (co.x * inv_tile, co.z * inv_tile)
             else:
                 uv = (co.x * inv_tile, co.y * inv_tile)
-            face_out.append(((co.x, co.y, co.z), (n.x, n.y, n.z), uv))
+            uv1 = tuple(loop[ao_uv].uv) if ao_uv is not None else None
+            face_out.append(((co.x, co.y, co.z), (n.x, n.y, n.z), uv, uv1))
         averaged = Vector((0.0, 0.0, 0.0))
-        for _position, normal, _uv in face_out:
+        for _position, normal, _uv, _uv1 in face_out:
             averaged += Vector(normal)
         if averaged.length < 1e-8 or averaged.normalized().dot(fn) <= 0.05:
-            face_out = [(position, (fn.x, fn.y, fn.z), uv)
-                        for position, _normal, uv in face_out]
+            face_out = [(position, (fn.x, fn.y, fn.z), uv, uv1)
+                        for position, _normal, uv, uv1 in face_out]
         out.extend(face_out)
     return out
 
@@ -633,11 +636,13 @@ def _BuildMesh(loops):
     """去重成索引网格。键量化到 0.1 mm / 0.01 法线 / 0.001 UV —— 太严了
     去不掉重，太松了会把两个不同硬边的角焊在一起。"""
     lookup = {}
-    positions, normals, uvs, indices = [], [], [], []
-    for p, n, uv in loops:
+    positions, normals, uvs, ao_uvs, indices = [], [], [], [], []
+    for p, n, uv, uv1 in loops:
         key = (round(p[0], 5), round(p[1], 5), round(p[2], 5),
                round(n[0], 3), round(n[1], 3), round(n[2], 3),
                round(uv[0], 4), round(uv[1], 4))
+        if uv1 is not None:
+            key += tuple(round(value, 5) for value in uv1)
         idx = lookup.get(key)
         if idx is None:
             idx = len(positions) // 3
@@ -645,15 +650,19 @@ def _BuildMesh(loops):
             positions.extend(p)
             normals.extend(n)
             uvs.extend(uv)
+            if uv1 is not None:
+                ao_uvs.extend(uv1)
         indices.append(idx)
-    return positions, normals, uvs, indices
+    if ao_uvs and len(ao_uvs) != len(uvs):
+        raise ValueError("A TZM block with contact UVs must assign them to every corner")
+    return positions, normals, uvs, ao_uvs, indices
 
 
 def _B64(fmt, values):
     return base64.b64encode(struct.pack("<%d%s" % (len(values), fmt), *values)).decode("ascii")
 
 
-def _Quantize(positions, normals, uvs, indices):
+def _Quantize(positions, normals, uvs, ao_uvs, indices):
     """位置 / UV 量化成 uint16，法线量化成 int8。
 
     为什么值得量化：一个士兵约 1000 顶点，明文十进制 JSON 要 70 KB 上下，
@@ -678,6 +687,9 @@ def _Quantize(positions, normals, uvs, indices):
             quv.append(max(0, min(65535, int(round((uvs[i * 2 + a] - umin[a]) / uscale[a])))))
 
     qnrm = [max(-127, min(127, int(round(v * 127.0)))) for v in normals]
+    if any(not 0.0 <= value <= 1.0 for value in ao_uvs):
+        raise ValueError("Contact UVs must be in the unit square")
+    qao = [round(value * 65535.0) for value in ao_uvs]
 
     # 浮点空间里仍有面积的极细三角，经过 uint16 位置量化后也可能塌成线；
     # 用最终整数坐标复查一次并直接剔除，保证浏览器拿到的索引没有零面积面。
@@ -709,13 +721,15 @@ def _Quantize(positions, normals, uvs, indices):
             replacement = len(qpos) // 3
             qpos.extend(qpos[source * 3:source * 3 + 3])
             quv.extend(quv[source * 2:source * 2 + 2])
+            if qao:
+                qao.extend(qao[source * 2:source * 2 + 2])
             qnrm.extend(max(-127, min(127, int(round(face_normal[axis] * 127.0))))
                         for axis in range(3))
             kept_indices.append(replacement)
 
     count = len(qpos) // 3
     wide = count > 65535
-    return {
+    block = {
         "count": count,
         "posMin": [round(v, 6) for v in pmin],
         "posScale": [pscale[i] for i in range(3)],
@@ -728,6 +742,9 @@ def _Quantize(positions, normals, uvs, indices):
         "idxCount": len(kept_indices),
         "idx": _B64("I" if wide else "H", kept_indices),
     }
+    if qao:
+        block["uv1"] = _B64("H", qao)
+    return block
 
 
 # ---------------------------------------------------------------------------
@@ -918,7 +935,7 @@ def WriteTzm(root, path, name, notes="", audit=True):
                 bm.free()
             if not loops:
                 continue
-            positions, normals, uvs, indices = _BuildMesh(loops)
+            positions, normals, uvs, ao_uvs, indices = _BuildMesh(loops)
             if not indices:
                 continue
             world = worlds[nodeIndex]
@@ -927,7 +944,7 @@ def WriteTzm(root, path, name, notes="", audit=True):
                 for a in range(3):
                     bounds_min[a] = min(bounds_min[a], p[a])
                     bounds_max[a] = max(bounds_max[a], p[a])
-            block = _Quantize(positions, normals, uvs, indices)
+            block = _Quantize(positions, normals, uvs, ao_uvs, indices)
             block["material"] = material
             total_tris += block["idxCount"] // 3
             mesh_ids.append(len(meshes))

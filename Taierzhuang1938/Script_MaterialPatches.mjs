@@ -272,17 +272,29 @@ export function PatchKeysOf(material) {
  *     判定，不等就不折叠），所以 uv 变换矩阵与通道号一定相同；
  *   · `aoMap` 同理。r152 起 aoMap 走的是 `texture.channel`（缺省 0 = `uv`），
  *     **不再硬绑 uv1**，与 roughnessMap 落在同一套 `vRoughnessMapUv` 上；
+ *     材质显式选用 `aoUv1` 时，以第二套 UV 再读同一采样器的红通道。
  *   · 下面 `<aomap_fragment>` 那一段是三方 `aomap_fragment` chunk 的逐行搬运
  *     （含 clearcoat / sheen / `computeSpecularOcclusion` 三个分支）。
  *
- * @param {{metalness:boolean, ao:boolean, aoIntensity:{value:number}}|null} orm
+ * @param {{metalness:boolean, ao:boolean, aoUv1?:boolean, aoIntensity:{value:number}}|null} orm
  *        `FoldOrmMaps()` 的返回值。
  */
 export function MakeOrmPatch(orm) {
   if (!orm) return null;
+  const separateAo = orm.ao && orm.aoUv1;
   return MakePatch({
-    key: `orm${orm.metalness ? "m" : ""}${orm.ao ? "a" : ""}`,
+    key: `orm${orm.metalness ? "m" : ""}${orm.ao ? "a" : ""}${separateAo ? "1" : ""}`,
     uniforms: (uniforms) => { uniforms.uOrmAoIntensity = orm.aoIntensity; },
+    // An authored AO unwrap can reuse the ORM sampler at a second coordinate.
+    vertex: separateAo ? [
+      ["#include <uv_pars_vertex>", /* glsl */`
+        #ifndef USE_UV1
+          attribute vec2 uv1;
+        #endif
+        varying vec2 vOrmAoUv;`],
+      ["#include <uv_vertex>", /* glsl */`
+        vOrmAoUv = (roughnessMapTransform * vec3(uv1, 1.0)).xy;`],
+    ] : [],
     // **不加 define**：`onBeforeCompile` 里的 `shader.defines` 就是 `material.defines`
     // 本身，往里写一位会永久留在材质上，而 `getParameters` 是在 onBeforeCompile
     // **之前**读它的 —— 于是同一份材质会先按"没有这一位"编一次、重编时再按
@@ -291,6 +303,7 @@ export function MakeOrmPatch(orm) {
     fragment: [
       ["#include <common>", /* glsl */`
         uniform float uOrmAoIntensity;
+        ${separateAo ? "varying vec2 vOrmAoUv;" : ""}
         // 本像素的 ORM texel 与材质自带的遮蔽量。后者给 B7 的微阴影用
         // （它挂在 <lights_fragment_end>，比 <aomap_fragment> 早，读不到下面算的值）。
         vec4 gOrmTexel = vec4(1.0);
@@ -301,7 +314,7 @@ export function MakeOrmPatch(orm) {
         #ifdef USE_ROUGHNESSMAP
           gOrmTexel = texelRoughness;
         #endif
-${orm.ao ? `        gMaterialAo = gOrmTexel.r;` : `        #ifdef USE_AOMAP
+${orm.ao ? `        gMaterialAo = ${separateAo ? "texture2D(roughnessMap, vOrmAoUv).r" : "gOrmTexel.r"};` : `        #ifdef USE_AOMAP
           gMaterialAo = texture2D(aoMap, vAoMapUv).r;
         #endif`}`],
       ...(orm.metalness ? [["#include <metalnessmap_fragment>", /* glsl */`
@@ -314,7 +327,7 @@ ${orm.ao ? `        gMaterialAo = gOrmTexel.r;` : `        #ifdef USE_AOMAP
       ...(orm.ao ? [["#include <aomap_fragment>", /* glsl */`
         #ifdef USE_ROUGHNESSMAP
         {
-          float ormAo = (gOrmTexel.r - 1.0) * uOrmAoIntensity + 1.0;
+          float ormAo = (gMaterialAo - 1.0) * uOrmAoIntensity + 1.0;
           reflectedLight.indirectDiffuse *= ormAo;
           #if defined( USE_CLEARCOAT )
             clearcoatSpecularIndirect *= ormAo;
@@ -358,6 +371,7 @@ export function FoldOrmMaps(material) {
       metalness, ao,
       aoIntensity: { value: ao ? (material.aoMapIntensity ?? 1) : 1 },
     };
+    if (ao && material.userData.ormAoUv1) folded.aoUv1 = true;
     if (metalness) material.metalnessMap = null;
     if (ao) material.aoMap = null;
   }

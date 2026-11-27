@@ -758,6 +758,7 @@ export class MaterialLibrary {
       opacity: options.opacity ?? 1,
       flatShading: !!options.flatShading,
     });
+    if (options.aoUv1) material.userData.ormAoUv1 = true;
     // 表面着色升级：POM 深度 / 细节法线 / 微阴影倍率按配方查
     // Data_Tuning_Materials.SURFACE_RECIPES。四个标量存进 userData（纯数字，
     // clone 时 JSON 拷得过去），Static() 克隆一份时照原样重建同一路补丁。

@@ -19,13 +19,15 @@ SEAM_PROFILE = dict(rays=64, nearFraction=.022, farFraction=.043,
                     nearWeight=.72, nearFalloff=.60, farFalloff=1.)
 CALIBRATION_PROFILE = dict(rays=40, nearFraction=.016, farFraction=.036,
                            nearWeight=.76, nearFalloff=2., farFalloff=2.)
+JOINT_PROFILE = dict(rays=96, nearFraction=.023, farFraction=.043,
+                     nearWeight=.80, nearFalloff=.44, farFalloff=.90)
 
 
 def Digest(path):
     return sha256(path.read_bytes()).hexdigest()
 
 
-def ReadSurface(collection):
+def ReadSurface(collection, uvLayer="SteelAtlas"):
     vertices, triangles, textureCoordinates = [], [], []
     depsgraph = bpy.context.evaluated_depsgraph_get()
     for obj in collection.objects:
@@ -35,9 +37,9 @@ def ReadSurface(collection):
         mesh = evaluated.to_mesh()
         try:
             mesh.calc_loop_triangles()
-            uv = mesh.uv_layers.get("SteelAtlas")
+            uv = mesh.uv_layers.get(uvLayer)
             if uv is None:
-                raise ValueError(f"Missing authored steel UVs on {obj.name}")
+                raise ValueError(f"Missing {uvLayer} UVs on {obj.name}")
             offset = len(vertices)
             vertices.extend(evaluated.matrix_world @ vertex.co for vertex in mesh.vertices)
             triangles.extend(tuple(offset + key for key in face.vertices) for face in mesh.loop_triangles)
@@ -80,7 +82,7 @@ def Hemisphere(normal, rays):
 
 
 def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
-                   nearWeight, nearFalloff, farFalloff):
+                   nearWeight, nearFalloff, farFalloff, composite=None):
     tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True)
     points = np.asarray([tuple(vertex) for vertex in vertices])
     length = float(np.ptp(points, axis=0).max())
@@ -89,7 +91,7 @@ def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
     offset = 4e-5 * length
     baked = np.zeros((EDGE, EDGE), dtype=np.float32)
     coverage = np.zeros(baked.shape, dtype=np.uint16)
-    for indices, uv in zip(triangles, uvs):
+    for face, (indices, uv) in enumerate(zip(triangles, uvs)):
         sample = TexelSamples(uv)
         if sample is None:
             continue
@@ -109,6 +111,8 @@ def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
                     broad = max(0., 1. - distance / far)
                     blocked += nearWeight * tight**nearFalloff + farWeight * broad**farFalloff
             visibility[i] = 1. - blocked / rays
+        if composite is not None:
+            visibility = composite(face, weights, visibility)
         # Repeated UVs cannot store each owner's shadow. Keep the least occluded
         # owner so a buried face cannot paint a dark mark on an exposed surface.
         baked[rows, columns] = np.maximum(baked[rows, columns], visibility)
@@ -165,29 +169,77 @@ def SavePlate(pixels, path):
         bpy.data.images.remove(image)
 
 
-def Main(output=None, *, calibration=False):
+def LoadRedPlate(path):
+    image = bpy.data.images.load(str(path), check_existing=False)
+    try:
+        if tuple(image.size) != (EDGE, EDGE):
+            raise ValueError(f"Expected a {EDGE} × {EDGE} plate: {path}")
+        image.colorspace_settings.name = "Non-Color"
+        rgba = np.empty(EDGE * EDGE * 4, dtype=np.float32)
+        image.pixels.foreach_get(rgba)
+        return np.rint(rgba.reshape(EDGE, EDGE, 4)[::-1, :, 0] * 255).astype(np.uint8)
+    finally:
+        bpy.data.images.remove(image)
+
+
+def SamplePlate(pixels, uv):
+    xy = np.clip(uv * [EDGE, -EDGE] + [-.5, EDGE - .5], 0, EDGE - 1)
+    x0, y0 = xy.astype(int).T
+    x1, y1 = np.minimum(x0 + 1, EDGE - 1), np.minimum(y0 + 1, EDGE - 1)
+    fu, fv = (xy - np.stack((x0, y0), axis=1)).T
+    top = pixels[y0, x0] * (1 - fu) + pixels[y0, x1] * fu
+    bottom = pixels[y1, x0] * (1 - fu) + pixels[y1, x1] * fu
+    return (top * (1 - fv) + bottom * fv) / 255
+
+
+def Main(output=None, *, calibration=False, legacyOrm=None):
     project = Path(__file__).resolve().parents[1]
     output = Path(output) if output is not None else project / "_import/Source/Type89Launcher"
     output.mkdir(parents=True, exist_ok=True)
-    profile = CALIBRATION_PROFILE if calibration else SEAM_PROFILE
-    suffix = "ContactAo" if calibration else "SeamAo"
+    joint = legacyOrm is not None
+    if joint and calibration:
+        raise ValueError("Choose a joint bake or a calibration bake")
+    profile = JOINT_PROFILE if joint else CALIBRATION_PROFILE if calibration else SEAM_PROFILE
+    suffix = "JointAo" if joint else "ContactAo" if calibration else "SeamAo"
     model = project / "Model/Model_Type89Launcher.tzm.json"
-    layoutFile = project / "_blender/Data_Type89LauncherSteelAtlas.json"
+    atlasName = "Contact" if joint else "Steel"
+    layoutFile = project / f"_blender/Data_Type89Launcher{atlasName}Atlas.json"
     collection = bpy.data.collections.get("Type89LauncherExterior")
     if collection is None or collection.name not in bpy.context.scene.collection.children:
         raise ValueError("Open the authored Type89Launcher scene before baking contact occlusion")
-    vertices, triangles, uvs = ReadSurface(collection)
+    vertices, triangles, uvs = ReadSurface(collection, "ContactAo" if joint else "SteelAtlas")
     modelInfo = json.loads(model.read_bytes())
     if len(triangles) != modelInfo["triangles"] or len(triangles) > 10000:
         raise ValueError("Contact bake geometry does not match the game mesh triangle budget")
     layoutBytes = layoutFile.read_bytes().replace(b"\r\n", b"\n")
     layout = json.loads(layoutBytes)
-    pixels, charts = ComposeCharts(*BakeVisibility(vertices, triangles, uvs, **profile), layout)
+    composite = None
+    provenance = {}
+    if joint:
+        source = project / "_import/Source/Type89Launcher"
+        prior = LoadRedPlate(legacyOrm)
+        oldGeometry = np.minimum(LoadRedPlate(source / "Texture_Type89LauncherContactAo.png"),
+                                 LoadRedPlate(source / "Texture_Type89LauncherSeamAo.png"))
+        _, _, steelUvs = ReadSurface(collection)
+
+        def BlendDetail(face, weights, visibility):
+            uv = weights @ steelUvs[face]
+            # Retain the photographed micro-occlusion and the original deep seams.
+            # Where the separated surface is more enclosed, apply its local visibility.
+            old = SamplePlate(oldGeometry, uv)
+            contact = visibility * (.80 + .20 * visibility)
+            ratio = np.minimum(1., (contact + 1 / 255) / (old + 1 / 255))
+            return SamplePlate(prior, uv) * ratio
+
+        composite = BlendDetail
+        provenance["legacyRedSha256"] = sha256(prior.tobytes()).hexdigest()
+    baked = BakeVisibility(vertices, triangles, uvs, **profile, composite=composite)
+    pixels, charts = ComposeCharts(*baked, layout)
     image = output / f"Texture_Type89Launcher{suffix}.png"
     SavePlate(pixels, image)
     record = {"file": image.name, "sha256": Digest(image), "pixelSha256": sha256(pixels.tobytes()).hexdigest(),
               "modelSha256": Digest(model), "atlasSha256": sha256(layoutBytes).hexdigest(), "size": EDGE,
-              "triangles": len(triangles), "rays": profile["rays"], "charts": charts}
+              "triangles": len(triangles), "rays": profile["rays"], "charts": charts, **provenance}
     if not calibration:
         record["falloff"] = {key: value for key, value in profile.items() if key != "rays"}
     (output / f"Data_Type89Launcher{suffix}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")

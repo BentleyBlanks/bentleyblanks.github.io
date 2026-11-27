@@ -1,6 +1,8 @@
 """Bake the museum-referenced steel finish into one color, normal and ORM atlas."""
 
+import argparse
 from hashlib import sha256
+from io import BytesIO
 import json
 from pathlib import Path
 import subprocess
@@ -21,8 +23,11 @@ CONTACT_AO = SOURCE.with_name("Texture_Type89LauncherContactAo.png")
 CONTACT_RECORD = CONTACT_AO.with_name("Data_Type89LauncherContactAo.json")
 SEAM_AO = SOURCE.with_name("Texture_Type89LauncherSeamAo.png")
 SEAM_RECORD = SEAM_AO.with_name("Data_Type89LauncherSeamAo.json")
+JOINT_AO = SOURCE.with_name("Texture_Type89LauncherJointAo.png")
+JOINT_RECORD = JOINT_AO.with_name("Data_Type89LauncherJointAo.json")
 REFERENCE = HERE / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 ATLAS_FILE = HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json"
+CONTACT_ATLAS_FILE = ATLAS_FILE.with_name("Data_Type89LauncherContactAtlas.json")
 ATLAS = json.loads(ATLAS_FILE.read_text(encoding="utf-8"))
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 LUMA_NEUTRAL_WARMTH = np.array([.48, -.101, -.414])
@@ -1488,11 +1493,11 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     return maps
 
 
-def ReadContactAo(imagePath=CONTACT_AO, recordPath=CONTACT_RECORD):
+def ReadContactAo(imagePath=CONTACT_AO, recordPath=CONTACT_RECORD, atlasFile=ATLAS_FILE):
     record = json.loads(recordPath.read_bytes())
     model = HERE.parent / "Model/Model_Type89Launcher.tzm.json"
     expected = {"file": imagePath.name, "sha256": Sha256(imagePath), "modelSha256": Sha256(model)}
-    layout = ATLAS_FILE.read_bytes().replace(b"\r\n", b"\n")
+    layout = atlasFile.read_bytes().replace(b"\r\n", b"\n")
     # Older bakes recorded the Windows checkout's CRLF bytes for this JSON.
     layoutDigests = {sha256(layout).hexdigest(), sha256(layout.replace(b"\n", b"\r\n")).hexdigest()}
     if (any(record.get(field) != value for field, value in expected.items())
@@ -1514,7 +1519,15 @@ def ComposeContactAo(orm, visibility):
     return Image.fromarray(surface)
 
 
-def Bake():
+def EncodeLegacyOrm(pixels, visibility):
+    orm = Image.fromarray(pixels).resize((1024, 1024), Image.Resampling.BOX)
+    stream = BytesIO()
+    ComposeContactAo(orm, visibility).save(stream, format="WEBP", method=6, quality=82)
+    with Image.open(stream) as image:
+        return image.convert("RGB")
+
+
+def Bake(legacyOrm=None):
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
     calibrationVisibility, contact = ReadContactAo()
     seamVisibility, seams = ReadContactAo(SEAM_AO, SEAM_RECORD)
@@ -1522,15 +1535,20 @@ def Bake():
     # Keep the darker AO sample so a joint hit by either pass keeps its shadow.
     maps = BuildAtlas(reference, calibrationVisibility, seamVisibility)
     visibility = np.minimum(calibrationVisibility, seamVisibility)
-    size = ATLAS["size"]
-    for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 82)):
-        image = Image.fromarray(pixels)
-        if outputSize != size:
-            image = image.resize((outputSize, outputSize), Image.Resampling.BOX)
+    orm = EncodeLegacyOrm(maps[2], visibility)
+    if legacyOrm is not None:
+        orm.save(legacyOrm, format="PNG")
+        return
+    joints, jointRecord = ReadContactAo(JOINT_AO, JOINT_RECORD, CONTACT_ATLAS_FILE)
+    pixels = np.array(orm)
+    if sha256(pixels[..., 0].tobytes()).hexdigest() != jointRecord["legacyRedSha256"]:
+        raise ValueError("Rebake the joint AO from the current steel finish's legacy ORM")
+    pixels[..., 0] = joints
+    for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
-        if channel == "Orm":
-            image = ComposeContactAo(image, visibility)
-        image.save(output, method=6, quality=quality)
+        Image.fromarray(image).save(output, method=6, quality=84)
+    # Keep the shallow contact gradients within the project's 1 MiB set budget.
+    Image.fromarray(pixels).save(HERE.parent / "Texture" / f"Texture_{STEM}Orm.webp", method=6, quality=86)
     subprocess.run([sys.executable, str(HERE / "Script_BakePbrTexture.py"), "--audit", "--name", STEM], check=True)
     recordPath = HERE / "TextureBakes" / f"Texture_{STEM}.json"
     record = json.loads(recordPath.read_text(encoding="utf-8"))
@@ -1540,6 +1558,8 @@ def Bake():
                            "record": CONTACT_RECORD.relative_to(HERE.parent).as_posix()}
     record["seamAo"] = {"path": SEAM_AO.relative_to(HERE.parent).as_posix(), "sha256": seams["sha256"],
                         "record": SEAM_RECORD.relative_to(HERE.parent).as_posix()}
+    record["jointAo"] = {"path": JOINT_AO.relative_to(HERE.parent).as_posix(), "sha256": jointRecord["sha256"],
+                         "record": JOINT_RECORD.relative_to(HERE.parent).as_posix()}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
                "sleeveDetail": reference["closeups"]["Sleeve"]["detail"],
@@ -1588,4 +1608,6 @@ def Bake():
 
 
 if __name__ == "__main__":
-    Bake()
+    cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("--legacy-orm", type=Path, help="Write the UV0 reference plate for the Blender joint bake")
+    Bake(cli.parse_args().legacy_orm)
