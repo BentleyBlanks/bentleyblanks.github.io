@@ -638,6 +638,147 @@ export class FlowMapView {
       context.fillStyle="#94774f";context.strokeStyle="#493d2b";
       context.fillRect(p[0]-4,p[1]+3,8,5);context.strokeRect(p[0]-4,p[1]+3,8,5);
     }
+    if (actor.evadingArtillery) {
+      context.save();
+      context.beginPath();
+      context.arc(p[0], p[1], 8.5, 0, Math.PI * 2);
+      context.strokeStyle = "#e24734cc";
+      context.lineWidth = 1.6;
+      context.setLineDash([3, 2]);
+      context.stroke();
+      context.restore();
+    }
+  }
+
+  DrawArtillery2D(context, effect, width, height) {
+    const center = this.ToScreen(effect.p);
+    const outerR = Math.max(9, (effect.radius || 6) * this.scale);
+    if (center[0] + outerR + 120 < 0 || center[0] - outerR - 120 > width
+      || center[1] + outerR + 120 < 0 || center[1] - outerR - 120 > height) {
+      return;
+    }
+    const dodge = effect.role === "dodge";
+    if (effect.kind === "artilleryCrater") {
+      const craterR = Math.max(4, outerR * 0.38);
+      context.save();
+      context.globalAlpha = Clamp(effect.alpha ?? 0.4, 0, 1) * 0.65;
+      const g = context.createRadialGradient(center[0], center[1], 0, center[0], center[1], craterR);
+      g.addColorStop(0, "rgba(38, 30, 22, 0.85)");
+      g.addColorStop(0.65, "rgba(62, 50, 36, 0.45)");
+      g.addColorStop(1, "rgba(62, 50, 36, 0)");
+      context.fillStyle = g;
+      context.beginPath();
+      context.arc(center[0], center[1], craterR, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = "rgba(48, 38, 28, 0.5)";
+      context.lineWidth = 1;
+      context.setLineDash([3, 3]);
+      context.stroke();
+      context.restore();
+      return;
+    }
+    if (effect.kind === "artilleryBlast") {
+      const t = Clamp(effect.age / Math.max(0.1, effect.duration || 1.6), 0, 1);
+      const shockR = outerR * (0.45 + 0.85 * Math.pow(t, 0.65));
+      const flashAlpha = Clamp(1 - effect.age / 0.48, 0, 1);
+      const smokeAlpha = Clamp(1 - t, 0, 1) * 0.72;
+      context.save();
+      const dustGrad = context.createRadialGradient(center[0], center[1], 0, center[0], center[1], outerR * (0.55 + t * 0.55));
+      dustGrad.addColorStop(0, `rgba(74, 58, 42, ${(smokeAlpha * 0.85).toFixed(3)})`);
+      dustGrad.addColorStop(0.55, `rgba(116, 86, 54, ${(smokeAlpha * 0.48).toFixed(3)})`);
+      dustGrad.addColorStop(1, "rgba(116, 86, 54, 0)");
+      context.fillStyle = dustGrad;
+      context.beginPath();
+      context.arc(center[0], center[1], outerR * (0.55 + t * 0.55), 0, Math.PI * 2);
+      context.fill();
+      if (flashAlpha > 0.02) {
+        const coreR = Math.max(5, outerR * (0.42 + (1 - flashAlpha) * 0.25));
+        const fireGrad = context.createRadialGradient(center[0], center[1], 0, center[0], center[1], coreR);
+        fireGrad.addColorStop(0, `rgba(255, 246, 200, ${(flashAlpha * 0.96).toFixed(3)})`);
+        fireGrad.addColorStop(0.45, `rgba(244, 128, 42, ${(flashAlpha * 0.82).toFixed(3)})`);
+        fireGrad.addColorStop(1, "rgba(205, 56, 26, 0)");
+        context.fillStyle = fireGrad;
+        context.beginPath();
+        context.arc(center[0], center[1], coreR, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.beginPath();
+      context.arc(center[0], center[1], shockR, 0, Math.PI * 2);
+      context.strokeStyle = dodge ? `rgba(232, 74, 52, ${((1 - t) * 0.92).toFixed(3)})` : `rgba(232, 152, 54, ${((1 - t) * 0.88).toFixed(3)})`;
+      context.lineWidth = 2.2;
+      context.stroke();
+      context.restore();
+      return;
+    }
+    if (effect.kind !== "artilleryWarn") return;
+
+    const strokeCol = dodge ? "#cf2e22" : "#c67717";
+    const fillCol = dodge ? "rgba(218, 48, 34, 0.16)" : "rgba(212, 128, 28, 0.13)";
+    const ringCol = dodge ? "#ff5b42" : "#f2a63a";
+    const progress = Clamp(effect.progress ?? 0, 0, 1);
+
+    // 1. Northern incoming trajectory & descending shell head
+    if (effect.from) {
+      const tailWorld = [Lerp(effect.from[0], effect.p[0], 0.55), Lerp(effect.from[1], effect.p[1], 0.55)];
+      const tail = this.ToScreen(tailWorld);
+      Line(context, [tail, center], dodge ? "#cf2e2299" : "#c6771790", 1.8, [6, 4]);
+      const midArrow = [Lerp(tail[0], center[0], 0.55), Lerp(tail[1], center[1], 0.55)];
+      const prevArrow = [Lerp(tail[0], center[0], 0.42), Lerp(tail[1], center[1], 0.42)];
+      Arrow(context, prevArrow, midArrow, strokeCol, 1.8);
+      const shellPt = [Lerp(tail[0], center[0], progress), Lerp(tail[1], center[1], progress)];
+      const streakStart = [Lerp(tail[0], center[0], Math.max(0, progress - 0.18)), Lerp(tail[1], center[1], Math.max(0, progress - 0.18))];
+      Line(context, [streakStart, shellPt], ringCol, 3);
+      Circle(context, shellPt, 4.2, "#fff2c6", strokeCol);
+    }
+
+    // 2. Danger zone outer boundary & shrinking impact reticle
+    context.save();
+    context.beginPath();
+    context.arc(center[0], center[1], outerR, 0, Math.PI * 2);
+    context.fillStyle = fillCol;
+    context.fill();
+    context.strokeStyle = strokeCol;
+    context.lineWidth = dodge ? 2.1 : 1.6;
+    context.setLineDash(dodge ? [7, 4] : [5, 5]);
+    context.stroke();
+    context.setLineDash([]);
+
+    const innerR = Math.max(3, outerR * (1 - progress));
+    context.beginPath();
+    context.arc(center[0], center[1], innerR, 0, Math.PI * 2);
+    context.strokeStyle = ringCol;
+    context.lineWidth = dodge ? 2.4 : 1.8;
+    context.stroke();
+
+    // Center crosshair
+    const ch = Math.min(7, outerR * 0.35);
+    Line(context, [[center[0] - ch, center[1]], [center[0] + ch, center[1]]], strokeCol, 1.5);
+    Line(context, [[center[0], center[1] - ch], [center[0], center[1] + ch]], strokeCol, 1.5);
+    Circle(context, center, 2.5, ringCol, "#1c120d");
+    context.restore();
+
+    // 3. Crisp callout badge & hover tooltip hit target
+    const rem = (effect.remainingS ?? 0).toFixed(1);
+    const caption = dodge
+      ? `⚠ ${effect.label} · 躲避 ${rem}s`
+      : `北来炮弹 ${rem}s · ${effect.label}`;
+    const lx = Clamp(center[0] + outerR + 6, 8, Math.max(8, width - caption.length * 11 - 14));
+    const ly = Clamp(center[1] - 4, 14, height - 14);
+    Label(context, caption, lx, ly, dodge ? "#9e1c14" : "#8b4f0b", 11.5, true);
+
+    const tipParts = [
+      `${effect.label}（${effect.caliber || "75mm"} · ${dodge ? "需躲避" : "远程压制"}）`,
+      `预计落地 ${rem}s · 杀伤半径 ${effect.radius}m`,
+      effect.dodgeHint ? `建议：${effect.dodgeHint}` : null,
+      effect.note || null,
+    ].filter(Boolean);
+    this.hits.push({
+      type: "artillery",
+      id: effect.id,
+      screen: center,
+      radius: Math.max(14, outerR),
+      text: tipParts.join(" · "),
+    });
   }
 
   DrawScale(context,width,height) {
@@ -828,6 +969,11 @@ export class FlowMapView {
     cpu?.Begin("特效与标注");
     this.DrawSmokeColumns(context, frame);
     for(const effect of frame.effects) {
+      if(effect.kind==="artilleryCrater"||effect.kind==="artilleryWarn"||effect.kind==="artilleryBlast") {
+        if(this.DrawArtilleryEffect) this.DrawArtilleryEffect(context,effect,frame,width,height);
+        else this.DrawArtillery2D(context,effect,width,height);
+        continue;
+      }
       if(effect.kind==="blast") Circle(context,Screen(effect.p),(1+effect.age*2)*this.scale,"#dfa56822","#e3ab63");
       if(effect.kind==="grenade") {const p=Screen([Lerp(effect.a[0],effect.b[0],effect.phase),Lerp(effect.a[1],effect.b[1],effect.phase)]);p[1]-=Math.sin(effect.phase*Math.PI)*16;this.DrawPath(context,[effect.a,effect.b],effect.side==="enemy"?"#a6443480":"#b7944b80",1,[3,5]);Circle(context,p,3.5,effect.side==="enemy"?"#a64434":"#f2da98");}
       if(effect.kind==="plane") {

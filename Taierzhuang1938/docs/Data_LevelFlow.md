@@ -198,6 +198,11 @@ Timeline 小窗右上角的箭头可收起或展开时间轴，默认展开，�
 
 ## 维护与验证
 
+- 2026-11-27 回撤路线北方远距零星炮击编排：
+  - 新增纯数据模块 `Scenes/FirstLevelEncounter/Data_LevelFlowArtillery.mjs`（01–07 共用段 11 发）与 `MERGED_ARTILLERY`（`Scenes/FirstLevelMerged/Data_LevelFlowMerged.mjs`，08–13 合并段 8 发），以及纯逻辑采样/规避模块 `Scenes/FirstLevelEncounter/Script_LevelFlowArtillery.mjs`（零 three、零 DOM，回拖完全确定）。
+  - 全程 19 发来弹全部源自北侧远方（`-Z` 高抛物线），区分 `dodge`（9 发，2.8–3.2 s 落点提示与呼啸预警，近旁队员平滑伏低/安全侧移避弹）与 `suppress`（10 发，侧翼高地/北沿/河滩压制），严格避开开场坍塌肉搏（01–02）、返掷手榴弹（03d）、战车近身缠斗（06b–06h）、关帝庙潜行清剿（09a–09d）、空袭（10b–10c）与洞内休整离村（11a–11c），且 `08c+36s` 掷弹筒直接对齐何有田 `08c+33s` 预警对白。
+  - Encounter Designer 2D 视口（`Script_LevelFlowView.mjs`）与 3D 视口（`Script_LevelFlowPerspective.mjs`）同步渲染北方弹道、贴地收缩落点预警圈、倒计时标签、悬停详情、爆心冲击波与渐隐弹坑；底部时间轴增加可点击炮击标记（红色菱形=需躲避、琥珀圆点=远炮压制），右侧「原文」面板自动列出当前拍的炮击编排并支持一键跳转预览。
+
 - 2026-11-26 北沙河真实 SRTM N35E117 高度图同步、水系拓宽延伸与外围战壕清场：
   - 基于 AWS Open Data SRTM 30 m（`N35E117.hgt.gz`）以 OSM 核实的北沙河铁路桥（`35.145029°N, 117.106797°E`，基准海拔 65 m）为中心，由 `Script_BeishaheDemCli.mjs` 离线生成 257×257 覆盖 12.288 km 范围的 `Heightmap/Data_BeishaheDem.mjs` 与 16 位灰度图 `Heightmap/Texture_BeishaheDem.png`（东北滕州–龙山低山丘陵至西南微山湖冲积平原真实高差 46.1–120.3 m）。
   - 新增纯 JS 地理模块 `Script_BeishaheGeography.mjs`，叠加亚 30 m 鲁南黄土岗脊/河谷阶地细节并贯通拓宽北沙河主河道（东西平滑延伸出视距）与河汊子支流（北延出视距、南延经铁路涵洞绕北沙河村西侧于铁路桥西汇入沙河），统一接入遭遇设计编辑器（`Script_LevelFlowTerrain.mjs` / `Script_LevelFlowGpuRaster.mjs`）、场景编辑器与 Play 远景地面（`Script_EditorBlockoutLevels.mjs`）及 `FirstLevelMerged` 构建脚本（固定 Y 物件/村落/铁路/道路/壕沟全保护）。

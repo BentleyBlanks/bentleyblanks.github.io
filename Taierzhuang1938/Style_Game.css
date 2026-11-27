@@ -604,6 +604,8 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   background: rgba(15,12,10,0.6); font: 600 13px/1 Arial, sans-serif;
 }
 .hudGrenadeWarning.returnable .txt { display: flex; }
+.hudGrenadeWarning.artillery { color: #ff6e3a; }
+.hudGrenadeWarning.artillery .ico::before { border-style: dashed; border-bottom-color: currentColor; }
 .hudGrenadeWarning.lethal { color: #ff5746; }
 .hudGrenadeWarning.urgent .ico { animation: hudGrenadePulse 0.42s ease-in-out infinite; }
 @keyframes hudGrenadePulse {

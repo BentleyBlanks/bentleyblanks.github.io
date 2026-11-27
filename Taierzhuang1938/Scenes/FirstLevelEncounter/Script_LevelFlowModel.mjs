@@ -8,6 +8,8 @@ import { SampleFlowDialogue } from "./Script_LevelFlowDialogue.mjs";
 import { FLOW_STREET_DEFENSE } from "./Data_LevelFlow.mjs";
 import { StageVillageActors, VillageStealthAt } from "./Script_LevelFlowVillage.mjs";
 import { BeishaheActors, BeishaheEffects, BeishaheSignals, ApplyBeishaheSurfaces } from "./Script_LevelFlowBeishahe.mjs";
+import { FLOW_FRONT_ARTILLERY } from "./Data_LevelFlowArtillery.mjs";
+import { CompileArtillerySchedule, SampleArtilleryEffects, ApplyArtilleryEvasion } from "./Script_LevelFlowArtillery.mjs";
 export { Clamp, Lerp, Distance, SampleRoute } from "./Script_LevelFlowGeometry.mjs";
 
 let elapsed = 0;
@@ -22,6 +24,7 @@ export const STAGE_TIMELINE = FLOW_STAGES.map((stage) => {
   const beats = FLOW_TIMELINE.filter((beat) => beat.stage === stage.id);
   return { ...stage, start: beats[0].start, end: beats.at(-1).end, beats };
 });
+export const FLOW_FRONT_ARTILLERY_SCHEDULE = CompileArtillerySchedule(FLOW_FRONT_ARTILLERY, FLOW_TIMELINE);
 
 function Track(points, time) {
   if (time <= points[0][0]) return points[0].slice(1);
@@ -829,7 +832,7 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
   const beat = FLOW_TIMELINE.find((entry) => time < entry.end) ?? FLOW_TIMELINE.at(-1);
   const stage = STAGE_TIMELINE.find((entry) => entry.id === beat.stage);
   const progress = Clamp((time - beat.start) / beat.duration, 0, 1);
-  const player = SampleBeatRoute(beat, progress);
+  let player = SampleBeatRoute(beat, progress);
   if (!compiledDocuments.has(document)) compiledDocuments.set(document, CompileEncounters(document, FLOW_TIMELINE));
   const tankTrigger=compiledDocuments.get(document).triggers.find((trigger)=>trigger.id==="Trigger_TankEscort");
   const tankStart=tankTrigger?.firedAt??Infinity;
@@ -867,6 +870,17 @@ export function EvaluateFlow(requestedTime, document = DEFAULT_ENCOUNTER_DOCUMEN
     if (pursuer) for (const id of ["luo", "liu", ...(actors[0].pose === "shoot" ? ["player"] : [])]) {
       const defender = actors.find(actor => actor.id === id);
       effects.push({kind:"fire", a:defender.p, b:pursuer.p, side:defender.side, phase:(time*3.2+defender.p[0])%1});
+    }
+  }
+  effects.push(...SampleArtilleryEffects(FLOW_FRONT_ARTILLERY_SCHEDULE, time));
+  player = ApplyArtilleryEvasion(FLOW_FRONT_ARTILLERY_SCHEDULE, time, actors, player);
+  const evadingIds = new Set(actors.filter((actor) => actor.evadingArtillery).map((actor) => actor.id));
+  if (evadingIds.size) {
+    for (let i = effects.length - 1; i >= 0; i--) {
+      const eff = effects[i];
+      if (eff.kind === "fire" && (evadingIds.has(eff.sourceId) || (eff.side === "player" && evadingIds.has("player")))) {
+        effects.splice(i, 1);
+      }
     }
   }
   const zone = beat.zone ? { p:beat.zone.slice(0,2), radius:beat.zone[2], condition:beat.gate, active:progress>=0.75 } : null;

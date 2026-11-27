@@ -408,9 +408,10 @@ function PopulateVariantPicker() {
 }
 
 function PopulateTimeline() {
-  const stagesEl = Element("timelineStages"), beatsEl = Element("timelineBeats");
+  const stagesEl = Element("timelineStages"), beatsEl = Element("timelineBeats"), artilleryEl = Element("timelineArtillery");
   stagesEl.replaceChildren();
   beatsEl.replaceChildren();
+  artilleryEl?.replaceChildren();
   stagesEl.dataset.forked = String(!activeVariant.spec.isBaseline);
   const sharedStages = new Set(activeVariant.spec.sharedStages || []);
   const duration = activeVariant.duration;
@@ -437,6 +438,20 @@ function PopulateTimeline() {
     button.classList.toggle("cinematic", cinematic);
     button.title = `${beat.id.toUpperCase()} · ${FormatFlowTime(beat.start)} · ${beat.title}${cinematic ? " · 镜头动画段" : ""}`;
     beatsEl.append(button);
+  }
+  if (artilleryEl) {
+    for (const strike of activeVariant.artillery || []) {
+      const roleLabel = strike.role === "dodge" ? "需躲避" : "远炮压制";
+      const previewTime = Math.max(strike.warnAt + 0.35, strike.impactAt - 1.5);
+      const marker = Button("", () => { SetPlaying(false); Seek(previewTime); });
+      marker.className = "lfArtilleryMarker";
+      marker.dataset.artillery = strike.id;
+      marker.dataset.role = strike.role;
+      marker.style.left = `${strike.impactAt / duration * 100}%`;
+      marker.setAttribute("aria-label", `${strike.beat.toUpperCase()} ${strike.label}（${roleLabel}）`);
+      marker.title = `${strike.beat.toUpperCase()} · ${FormatFlowTime(strike.impactAt)} · ${roleLabel} · ${strike.label}（${strike.caliber || "75mm"}）${strike.dodgeHint ? ` · ${strike.dodgeHint}` : ""}`;
+      artilleryEl.append(marker);
+    }
   }
   if (!timeline) {
     timeline = new EncounterTimeline({
@@ -545,8 +560,39 @@ function UpdateTimeline() {
     FormatSourcePassage(Element("sourcePassage"), activeVariant.sourceExcerpts[frame.beat.id]);
     Element("planningNote").hidden = !frame.beat.planning;
     Element("planningNote").textContent = frame.beat.planning ? `当前编排 · ${frame.beat.planning}` : "";
+    const artNote = Element("artilleryNote");
+    if (artNote) {
+      const beatStrikes = (activeVariant.artillery || []).filter((item) => item.beat === frame.beat.id);
+      artNote.hidden = !beatStrikes.length;
+      artNote.replaceChildren();
+      if (beatStrikes.length) {
+        const heading = document.createElement("strong");
+        heading.textContent = `北方远距炮击（本拍 ${beatStrikes.length} 发）`;
+        artNote.append(heading);
+        for (const strike of beatStrikes) {
+          const row = document.createElement("div");
+          row.className = "lfArtilleryItem";
+          row.dataset.role = strike.role;
+          const jump = Button(
+            `${FormatFlowTime(strike.impactAt)} · ${strike.role === "dodge" ? "躲避" : "压制"} · ${strike.label}`,
+            () => { SetPlaying(false); Seek(Math.max(strike.warnAt + 0.35, strike.impactAt - 1.5)); },
+          );
+          jump.className = "lfArtilleryJump";
+          const desc = document.createElement("p");
+          desc.textContent = `${strike.dodgeHint ? `规避动作：${strike.dodgeHint}。` : ""}${strike.note || ""}`;
+          row.append(jump, desc);
+          artNote.append(row);
+        }
+      }
+    }
     for (const button of document.querySelectorAll("[data-beat]")) button.classList.toggle("selected", button.dataset.beat === shownBeat);
     Element("frameHeading").textContent = `${frame.stage.id} ${frame.stage.title} / ${frame.beat.id.toUpperCase()}`;
+  }
+  const activeArtillery = new Set(
+    (activeVariant.artillery || []).filter((item) => time >= item.warnAt && time < item.blastEndAt).map((item) => item.id),
+  );
+  for (const marker of document.querySelectorAll("[data-artillery]")) {
+    marker.classList.toggle("active", activeArtillery.has(marker.dataset.artillery));
   }
   const timeText = `${FormatFlowTime(time)} / ${FormatFlowTime(activeVariant.duration)}`;
   if (Element("flowTime").textContent !== timeText) Element("flowTime").textContent = timeText;
@@ -598,7 +644,7 @@ function Render(tick = null) {
   finally { debug?.EndFrame(failure); }
 }
 function Hit(point, view = map) {
-  const priority = { annotationHandle: 6, annotation: 5, actor: 3, group: 2, trigger: 1 };
+  const priority = { annotationHandle: 6, annotation: 5, artillery: 4, actor: 3, group: 2, trigger: 1 };
   const DistanceTo = (item) => Math.hypot(item.screen[0] - point[0], item.screen[1] - point[1]);
   const candidates = view.hits.filter((item) => (item.type !== "actor" || !view.PickActor) && DistanceTo(item) <= item.radius);
   const body = view.PickActor?.(point);
@@ -895,7 +941,7 @@ async function Start() {
     Play: { Start: (mode) => gamePlay.Start(mode), Pause: (on) => gamePlay.Pause(on), Stop: () => gamePlay.Stop(), SetLayout: (count) => gamePlay.SetLayout(count), State: () => gamePlay.Inspect(), Guide: () => playGuide?.Inspect() || null, SetGuideTab: (tab) => ShowPlayTab(tab) },
     Evaluate: (value) => activeVariant.evaluate(value, project.value),
     Stealth: () => structuredClone(frame.stealth),
-    Inspect: () => ({ variant: activeVariant.id, scene: activeVariant.spec.scene, time, playing, stage: frame.stage.id, beat: frame.beat.id, duration: activeVariant.duration, actors: frame.actors, effects: frame.effects, dialogue: frame.dialogue, stretchersPassed: frame.stretchersPassed, task: frame.beat.task, speechBubbles: workspace.Visible().map((entry) => entry.map.InspectSpeech?.() || entry.map.speechBubbles || []), layers: { ...workspace.active.layers }, view: { center: [...map.center], scale: map.scale }, viewports: workspace.Serialize(), rendering: workspace.Visible().map((entry) => entry.map.Diagnostics?.() || null), mapObjects: mapData.objects.length, terrainBuild: mapData.terrain.buildInfo, groups: frame.groups, triggers: frame.triggers, document: structuredClone(project.value) }),
+    Inspect: () => ({ variant: activeVariant.id, scene: activeVariant.spec.scene, time, playing, stage: frame.stage.id, beat: frame.beat.id, duration: activeVariant.duration, actors: frame.actors, effects: frame.effects, artillery: activeVariant.artillery || [], dialogue: frame.dialogue, stretchersPassed: frame.stretchersPassed, task: frame.beat.task, speechBubbles: workspace.Visible().map((entry) => entry.map.InspectSpeech?.() || entry.map.speechBubbles || []), layers: { ...workspace.active.layers }, view: { center: [...map.center], scale: map.scale }, viewports: workspace.Serialize(), rendering: workspace.Visible().map((entry) => entry.map.Diagnostics?.() || null), mapObjects: mapData.objects.length, terrainBuild: mapData.terrain.buildInfo, groups: frame.groups, triggers: frame.triggers, document: structuredClone(project.value) }),
     ToScreen: (point, index = workspace.activeIndex) => workspace.entries[index].map.ToScreen(point),
     SetLayout: (count) => { workspace.SetLayout(count); Element("viewportLayout").value = String(count); },
     SetViewType: (index, type) => workspace.SetType(index, type),

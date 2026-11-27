@@ -109,6 +109,7 @@ LocalPreview 打开遭遇编辑器时开始监听当前工作树的源文件，�
 - `Script_EncounterPlayDialogue`：独立于音频的文字行动指令、真实人物头顶气泡与玩家视口底部回退。
 - `AdvancedTools/Script_LevelFlowPlay`：编辑快照、播放／暂停／停止、右侧状态、内容指纹与宿主缓存。停止后不运行后台玩法或 GPU 渲染。
 - `Script_EncounterPlaySplit`：本地人物铸模缓存边界（`LoadEncounterCast`），发布构建（`--deploy` / `--strip-dev-tools`）替换为 `Script_EncounterPlaySplitStub`，让 `EncounterPlay` 正式战役直接上线 GitHub Pages 而不引入 `AdvancedTools/`。
+- `Script_EncounterArtilleryRuntime`：第一关回撤路线北方远距零星炮击实时运行时。按节拍时钟与玩家推进距离触发真实高抛物线 `Combat.FireShell`（含啸声、弹坑、墙体遮挡破片与震屏耳鸣）、`Vfx.IncomingMarker` 地面收缩落点提示圈、`Combat.GrenadeThreats` → HUD `来袭炮弹` 边缘预警、友军 AI 伏低避弹与试玩 2D 小地图实时预警圈；支持自动抬升仰角防山脊早撞、跳过已大幅甩开的陈旧落点，并在 `Suspend`/`Retry`/`Begin` 时彻底清零。
 
 ## 第一关正式战役同步（2026-11-23）
 

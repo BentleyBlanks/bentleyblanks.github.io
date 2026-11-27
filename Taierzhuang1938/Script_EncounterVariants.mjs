@@ -13,9 +13,13 @@ import {
 import { FLOW_SOURCE_EXCERPTS } from "./Scenes/FirstLevelEncounter/Data_LevelFlowSource.mjs";
 import { ENCOUNTER_PLAY as BASE_PLAY_CONFIG } from "./Scenes/FirstLevelEncounter/Data_Play.mjs";
 import {
-  FLOW_TIMELINE, STAGE_TIMELINE, FLOW_DURATION, DEFAULT_ENCOUNTER_DOCUMENT,
+  FLOW_TIMELINE, STAGE_TIMELINE, FLOW_DURATION, DEFAULT_ENCOUNTER_DOCUMENT, FLOW_FRONT_ARTILLERY_SCHEDULE,
   EvaluateFlow, FormatFlowTime, SharedFrontActors, SharedFrontOpeningActors, SharedFrontEffects,
 } from "./Scenes/FirstLevelEncounter/Script_LevelFlowModel.mjs";
+import { FLOW_FRONT_ARTILLERY } from "./Scenes/FirstLevelEncounter/Data_LevelFlowArtillery.mjs";
+import {
+  CompileArtillerySchedule, SampleArtilleryEffects, ApplyArtilleryEvasion,
+} from "./Scenes/FirstLevelEncounter/Script_LevelFlowArtillery.mjs";
 import {
   CreateEncounterDocument, CompileEncounters, SampleEncounters, ENCOUNTER_CINEMATICS,
 } from "./Scenes/FirstLevelEncounter/Script_LevelFlowEncounter.mjs";
@@ -24,7 +28,7 @@ import { Clamp, Distance, SampleBeatRoute } from "./Scenes/FirstLevelEncounter/S
 import { BeishaheSurfaceAt } from "./Scenes/FirstLevelEncounter/Script_LevelFlowBeishahe.mjs";
 import {
   MERGED_SOURCE, MERGED_STAGES, MERGED_BEATS, MERGED_WAVES, MERGED_DIALOGUE,
-  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_STEALTH, MERGED_CINEMATICS, MERGED_MISSION_AREAS, MERGED_MUSIC,
+  MERGED_PLAY_GATES, MERGED_GUIDANCE, MERGED_SIGNALS, MERGED_STEALTH, MERGED_CINEMATICS, MERGED_MISSION_AREAS, MERGED_MUSIC, MERGED_ARTILLERY,
 } from "./Scenes/FirstLevelMerged/Data_LevelFlowMerged.mjs";
 import {
   MergedActors, ApplyMergedSurfaces, MergedEffects, MergedSignals, MergedSurfaceAt,
@@ -93,6 +97,7 @@ function CompileMergedVariant(spec) {
   const { timeline, duration } = BuildTimeline(beatsRaw);
   const stages = BuildStageTimeline(stagesRaw, timeline);
   const BeatById = (id) => timeline.find((beat) => beat.id === id);
+  const artillery = CompileArtillerySchedule([...FLOW_FRONT_ARTILLERY, ...MERGED_ARTILLERY], timeline);
 
   const baseDoc = CreateEncounterDocument(timeline, wavesRaw, {
     id: spec.id,
@@ -155,7 +160,7 @@ function CompileMergedVariant(spec) {
     const beat = timeline.find((entry) => time < entry.end) ?? timeline.at(-1);
     const stage = stages.find((entry) => entry.id === beat.stage);
     const progress = Clamp((time - beat.start) / beat.duration, 0, 1);
-    const player = SampleBeatRoute(beat, progress);
+    let player = SampleBeatRoute(beat, progress);
     const compiled = GetCompiled(document);
     const tankTrigger = compiled.triggers.find((t) => t.id === "Trigger_TankEscort");
     const tankStart = tankTrigger?.firedAt ?? Infinity;
@@ -189,6 +194,17 @@ function CompileMergedVariant(spec) {
         for (const id of ["luo", "liu", ...(actors[0].pose === "shoot" ? ["player"] : [])]) {
           const defender = actors.find((actor) => actor.id === id);
           if (defender) effects.push({ kind: "fire", a: defender.p, b: pursuer.p, side: defender.side, phase: (time * 3.2 + defender.p[0]) % 1 });
+        }
+      }
+    }
+    effects.push(...SampleArtilleryEffects(artillery, time));
+    player = ApplyArtilleryEvasion(artillery, time, actors, player);
+    const evadingIds = new Set(actors.filter((actor) => actor.evadingArtillery).map((actor) => actor.id));
+    if (evadingIds.size) {
+      for (let i = effects.length - 1; i >= 0; i--) {
+        const eff = effects[i];
+        if (eff.kind === "fire" && (evadingIds.has(eff.sourceId) || (eff.side === "player" && evadingIds.has("player")))) {
+          effects.splice(i, 1);
         }
       }
     }
@@ -233,6 +249,7 @@ function CompileMergedVariant(spec) {
     cinematics,
     sourceInfo: MERGED_SOURCE,
     sourceExcerpts,
+    artillery,
     stealthPlan: null,
     surfaceAt: MergedSurfaceAt,
     evaluate: Evaluate,
@@ -263,6 +280,7 @@ function CompileOriginalVariant(spec) {
     cinematics: ENCOUNTER_CINEMATICS,
     sourceInfo: FLOW_SOURCE,
     sourceExcerpts: FLOW_SOURCE_EXCERPTS,
+    artillery: FLOW_FRONT_ARTILLERY_SCHEDULE,
     stealthPlan: FLOW_VILLAGE_STEALTH,
     surfaceAt: BeishaheSurfaceAt,
     evaluate: (time, doc = defaultDocument) => EvaluateFlow(time, doc),

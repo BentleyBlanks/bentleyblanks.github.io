@@ -15,6 +15,7 @@ import { SpeakingCastOptions } from "./Script_FirstLevelSpeakingCast.mjs";
 import { EncounterPlayView } from "./Script_EncounterPlayView.mjs";
 import { EncounterPlayDialogue, EncounterDialogueLines } from "./Script_EncounterPlayDialogue.mjs";
 import { EncounterTankRuntime } from "./Script_EncounterTankRuntime.mjs";
+import { EncounterArtilleryRuntime } from "./Script_EncounterArtilleryRuntime.mjs";
 import { LoadToolsVolume, ToolsVolumeLevel } from "./Script_EditorVolume.mjs";
 import { ENCOUNTER_PLAY_STARTUP } from "./Data_Tuning_EncounterPlayStartup.mjs";
 import { XBOT_CAST_CHARACTERS, XBOT_FACTION_CHARACTERS } from "./Data_XBotCharacters.mjs";
@@ -145,6 +146,7 @@ export class EncounterPlay {
       groundAt,formalOnly:true,asyncBlood:true,riggedPoseOnly:true,
       characterKeys:[...new Set([...Object.values(this.plan.config.casts).map(id=>XBOT_CAST_CHARACTERS[id]).filter(Boolean),...Object.values(XBOT_FACTION_CHARACTERS).flat()])]});
     this.tanks=new EncounterTankRuntime(host,this.puppets,{groundAt});
+    this.artillery=new EncounterArtilleryRuntime(host,this.variant,{groundAt});
     this.blastHookInstalled=false;this.previousOnBlast=null;this.blastHandler=null;
     this.InstallBlastHook();
     this.view=this.isCampaign?CreateSingleViewportStub(host):new EncounterPlayView(host);
@@ -284,6 +286,7 @@ export class EncounterPlay {
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
     this.areaGuard.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);
+    this.artillery?.Reset();
     if(this.pendingOpening&&this.opening?.loaded){
       this.combatStarted=false;
       const frame=this.variant.evaluate(this.plan.time,this.plan.document);
@@ -355,6 +358,7 @@ export class EncounterPlay {
     this.noFireGrenades=this.host.state.grenades+this.host.state.bundles;
     this.noFireFailure=null;
     this.areaGuard.Reset();this.areaFailure=null;this.host.hud.SetMissionArea?.(null);
+    this.artillery?.Reset();
     for(const actor of this.plan.initial)if(this.IsSoldier(actor))this.Spawn(actor,true);
     if(this.isCampaign&&this.host.ctx.hudRoot&&!this.host.state.menu)this.host.ctx.hudRoot.style.display="";
     if(this.host.viewmodel)this.host.viewmodel.root.visible=true;
@@ -374,6 +378,9 @@ export class EncounterPlay {
     if(payload.variantId&&payload.variantId!==this.variant.id) {
       this.variant=CompileEncounterVariant(payload.variantId);
       this.stealth=this.variant.stealthPlan?new VillageStealthPlay(this.host,new VillageStealthRules(this.variant.timeline)):null;
+      this.artillery?.SetVariant(this.variant);
+    } else {
+      this.artillery?.Reset();
     }
     this.pendingOpening=!!(this.isCampaign&&payload.opening);
     this.openingActive=false;
@@ -420,6 +427,7 @@ export class EncounterPlay {
   Suspend() {
     this.opening?.Stop();
     this.tanks?.Reset();
+    this.artillery?.Reset();
     this.RestoreBlastHook();
     this.openingActive=false;this.pendingOpening=false;this.combatStarted=false;
     if(this.previousEnvironmentObserverMode!==undefined) this.host.ctx.env.observerMode=this.previousEnvironmentObserverMode;
@@ -821,6 +829,20 @@ export class EncounterPlay {
       ?(isBayonetRush?24:escortTethered?12:isMgPost?8:group?.behavior==="flank"?16:group?.behavior==="bounds"?14:16)
       :0;
     const authoredStance=guide&&speed>3.5?0:current?.pose==="prone"?2:current?.pose==="kneel"||current?.pose==="crouch"?1:0;
+    const artilleryEvade=entry.spec.side==="nra"&&!guide?this.artillery?.EvasionFor(soldier.position):null;
+    if(artilleryEvade) {
+      const evadeX=soldier.position.x+artilleryEvade.away[0]*1.8;
+      const evadeZ=soldier.position.z+artilleryEvade.away[1]*1.8;
+      const evadeY=this.groundAt(evadeX,evadeZ);
+      const canShift=!this.host.ai.Blocked?.(evadeX,evadeZ,evadeY);
+      this.host.ai.DirectActor(soldier,{
+        x:canShift?evadeX:soldier.position.x,
+        z:canShift?evadeZ:soldier.position.z,
+        yaw,forceYaw:false,stance:1,combat:false,moving:canShift,speed:3.2,
+        arrivalRadius:0.45,allowCover:false,coverSlackM:0,suppressible:true,tacticalRadiusM:0,fixBayonet:false,
+      });
+      return;
+    }
     this.host.ai.DirectActor(soldier,{x:target[0],z:target[1],yaw,forceYaw,
       stance:allowCover?null:authoredStance,
       combat,moving,speed,arrivalRadius:Math.min(reachM,0.7),
@@ -932,6 +954,7 @@ export class EncounterPlay {
     this.orderClock-=dt;
     if(this.orderClock<=0){for(const entry of this.entries.values())this.Order(entry,frame);this.orderClock=cfg.orderEveryS;}
     const tankOverrides=this.tanks.Update(frame,dt,this.entries);
+    this.artillery?.Update(dt,frame,{playerPos:player.position,stealthActive:!!(stealth.active||frame.stealth?.active)});
     const units=frame.actors.filter(a=>a.id!=="player"&&!this.entries.has(a.id)&&!this.plan.groups.has(a.groupId)).map(a=>{
       const spec=EncounterActorSpec(a,frame.actors.find(parent=>parent.id===a.parentId),this.variant);
       if(a.side==="civilian"&&!spec.castId&&["person","child"].includes(a.kind))spec.castId=a.kind==="child"?"nier":"geng";
@@ -1102,12 +1125,12 @@ export class EncounterPlay {
       opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,
       time:this.openingActive?(this.opening?.State().t||0):this.plan.time,
       elapsed:this.plan.elapsed,waiting:this.plan.waiting,completed:this.plan.completed,failed:this.failed,
-      objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],
+      objective:this.ObjectiveText(),alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],artillery:this.artillery?.State()||[],
       dead:[...this.plan.dead],triggers:[...this.plan.triggers.keys()],signals:this.sceneSignals||[],
       missionArea:this.areaGuard?.State()??null,
     };
   }
-  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),missionArea:this.areaGuard?.State()??null,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],signals:this.sceneSignals||[]};}
+  State(){return {...this.plan.State(),mode:this.mode,hostId:this.hostId,active:this.active,paused:this.paused,starting:this.starting,initialized:this.initialized,ready:this.ready&&!this.starting,opening:this.openingActive,pendingOpening:this.pendingOpening,openingState:this.opening?.State()||null,hints:this.hudInfo||{},dialogue:this.speech.State(),error:this.error||null,failed:this.failed,stealth:this.stealth?this.stealth.state:(this.plan.Frame().stealth||null),missionArea:this.areaGuard?.State()??null,layout:this.view.count,view:this.view.State(),music:this.music,alive:this.AliveIds().size,actors:this.Actors(),tanks:this.tanks?.State()||[],artillery:this.artillery?.State()||[],signals:this.sceneSignals||[]};}
   CapturesInput() {
     return !this.active || this.paused || this.starting || !this.ready || this.openingActive || !this.combatStarted || this.failed || !!this.stealth?.CapturesInput()
       || (this.stealth?VillageStealthAt(this.plan.time,this.variant.timeline).locked:false)
@@ -1170,6 +1193,7 @@ export class EncounterPlay {
     this.entries.clear();
     this.host.ai.tactics.Reset();
     this.tanks?.Reset();
+    this.artillery?.Reset();
     this.puppets.SyncFrame([],0);
     combat.ClearProjectiles();
     this.pendingActions.clear();

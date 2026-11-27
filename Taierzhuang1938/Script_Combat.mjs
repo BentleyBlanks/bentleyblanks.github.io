@@ -257,7 +257,8 @@ export class CombatSystem {
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
     OnImpact = null, byPlayer = false, sourceCollider = null,
-    incoming = true, report = false, Elapsed = null, occludedSuppression = false, feedbackOnly = false } = {}) {
+    incoming = true, report = false, Elapsed = null, occludedSuppression = false, feedbackOnly = false,
+    warn = false, warnRadius = null, npcDamageScale = 1 } = {}) {
     // 一发炮弹的三声里的前两声（第三声是落地，走 Blast）。**写在这儿而不是调用点**：
     // 见 SHELL.incomingCue 的抬头 —— 原来只有序章那两处自己补了啸声，
     // 第一关的军列炮击、前沿弹着点、战车主炮全程是哑的。
@@ -279,7 +280,9 @@ export class CombatSystem {
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
       velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider, Elapsed,
-      occludedSuppression, feedbackOnly };
+      occludedSuppression, feedbackOnly,
+      warn: !!warn, warnRadius: Number.isFinite(warnRadius) ? warnRadius : null,
+      npcDamageScale: Number.isFinite(npcDamageScale) ? npcDamageScale : 1 };
     this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
@@ -364,7 +367,9 @@ export class CombatSystem {
         this.BlastFeedback(impact,shell.radius,shell.kind);
       }else this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
         // 来向给落地扬尘：斜着砸进去的弹，下游一侧抛得多（Vfx.GroundImpact）。
-        { incoming: shell.velocity.clone(), ...(shell.occludedSuppression ? { occludedSuppression: true } : {}) });
+        { incoming: shell.velocity.clone(),
+          ...(shell.occludedSuppression ? { occludedSuppression: true } : {}),
+          ...(shell.npcDamageScale !== 1 ? { npcDamageScale: shell.npcDamageScale } : {}) });
       shell.OnImpact?.(impact); this.shellVisuals.Retire(shell); this.shells.splice(i, 1);
     }
   }
@@ -835,10 +840,11 @@ export class CombatSystem {
         const close = enemyGrenade && falloff >= BLAST.grenadeCloseMinFalloff;
         const trauma = enemyGrenade && !close && GrenadeTrauma(falloff, position, s.position);
         const injury = close || trauma ? Math.max(dmg, Math.min(damage, BLAST.grenadeCloseDamage)) : dmg;
-        const died = s.TakeHit(injury, "torso", dir,
+        const appliedInjury = options?.npcDamageScale !== undefined ? injury * options.npcDamageScale : injury;
+        const died = s.TakeHit(appliedInjury, "torso", dir,
           { kind: "blast", falloff, trauma, weaponId: explosiveId, point: at.clone(),
             blastOrigin: position.clone() });
-        onHit?.(s, injury, position);
+        onHit?.(s, appliedInjury, position);
         s.suppression = Clamp01(s.suppression + BLAST.soldierSuppression);
         // 只数日军。玩家的手榴弹也炸得到自己人，而给误伤发一记"击杀确认"
         // 是这套反馈能犯的最难看的错。
@@ -917,6 +923,24 @@ export class CombatSystem {
         distance,
         dangerRadius,
         returnable: p === returnable,
+      });
+    }
+    for (const shell of this.shells) {
+      if (!shell.warn) continue;
+      const remaining = Math.max(0.05, shell.flight - shell.age);
+      const dx = shell.target.x - playerPosition.x;
+      const dz = shell.target.z - playerPosition.z;
+      const distance = Math.hypot(dx, dz);
+      const dangerRadius = shell.warnRadius ?? (shell.radius * BLAST.radiusScale);
+      if (distance > dangerRadius) continue;
+      threats.push({
+        kind: "ArtilleryShell",
+        owner: "ija",
+        position: shell.target,
+        fuse: remaining,
+        distance,
+        dangerRadius,
+        returnable: false,
       });
     }
     // 先保命：更快爆的排前面；同一引信下更近的排前面。

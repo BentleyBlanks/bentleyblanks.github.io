@@ -6,7 +6,7 @@
   <title>Encounter Designer · 血战滕县</title>
   <link rel="stylesheet" data-interface-theme href="../Style_Interface.css?v=20261113DarkWorkspace">
   <link rel="stylesheet" href="../Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261127WideInspector">
+  <link rel="stylesheet" href="./Style_LevelFlow.css?v=20261127Artillery">
   <script>
     (function () {
       var request = new XMLHttpRequest();
@@ -61,7 +61,7 @@
     <output id="fpsStatus" class="lfFpsStatus" data-level="idle" title="编辑器视口实际重绘帧率，每 0.5 秒更新；「静止」表示画面没有变化、没有重绘">— FPS</output>
     <a class="lfBack" href="../index.html?editor=tools" title="返回高级工具">返回工具 ↗</a>
   </header>
-  <template id="viewportLegend"><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="cover" aria-hidden="true"></span>掩体 <span class="airwall" aria-hidden="true"></span>空气墙</div></template>
+  <template id="viewportLegend"><div class="lfMapLegend"><i class="player"></i>顺子 <i class="friend"></i>我方 <i class="enemy"></i>日军 <span class="trigger"></span>触发区 <span class="spawn">△</span>生成区 <span class="artillery" aria-hidden="true"></span>炮击落点 <span class="cover" aria-hidden="true"></span>掩体 <span class="airwall" aria-hidden="true"></span>空气墙</div></template>
   <main class="lfWorkspace">
     <section class="lfViewport"><div id="viewportGrid" class="lfViewGrid" aria-label="同步遭遇视口"></div><div id="mapTooltip" class="lfTooltip" hidden></div><div id="mapLoading">载入空间底图…</div></section>
     <aside class="lfInspector">
@@ -94,7 +94,7 @@
           </form>
         </div>
       </section>
-      <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
+      <section id="scriptPane" class="lfPane" hidden><div class="lfSourceHeading"><span id="beatId"></span><span id="stageStatus"></span></div><h2 id="beatTitle"></h2><div id="sourcePassage"></div><p id="planningNote" hidden></p><div id="artilleryNote" class="lfArtilleryNote" hidden></div><a id="sourceLink" target="_blank" rel="noopener">打开 Notion 原稿 ↗</a></section>
       <section id="playGuidePane" class="lfPlayGuidePane" aria-label="试玩 2D 地图与任务导览" hidden>
         <div id="playStatus" class="lfPlayStatus" hidden role="status">
           <div class="lfPlayStatusMeta">
@@ -131,6 +131,7 @@
             <span><i class="enemy"></i>日军</span>
             <span><i class="civilian"></i>平民</span>
             <span><i class="target"></i>目标</span>
+            <span><i class="artillery"></i>炮击</span>
             <span><i class="airwall"></i>空气墙</span>
             <span id="playMapUnitSummary" class="lfPlayUnitSummary"></span>
           </div>
@@ -151,7 +152,7 @@
   <footer class="lfTimeline" data-collapsed="false">
     <div id="flowTimeline" class="lfTimelineContent">
     <div class="lfTransport"><div class="lfPlayback"><button id="previousBeat" title="上一拍" aria-label="上一拍">⏮</button><button id="playFlow" class="sePrimary" aria-pressed="false">播放</button><button id="nextBeat" title="下一拍" aria-label="下一拍">⏭</button></div><output id="flowTime"></output><span id="timelineMode" hidden></span><select id="flowSpeed" aria-label="播放速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select><label class="lfLoop"><input id="loopStage" type="checkbox"><span>循环本段</span></label><div class="lfTimelineZoom"><output id="timelineScale" aria-label="时间轴缩放"></output><button id="timelineFit" type="button" aria-pressed="false" title="自适应显示全程">全程</button></div></div>
-    <div id="timelineScroll" class="lfTimelineScroll" tabindex="0" aria-label="剧情时间轴，滚轮缩放，Shift加滚轮横移"><div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="3249" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div></div>
+    <div id="timelineScroll" class="lfTimelineScroll" tabindex="0" aria-label="剧情时间轴，滚轮缩放，Shift加滚轮横移"><div id="timelineAxis" class="lfTimeAxis"><div id="timelineRuler" class="lfRuler" aria-hidden="true"></div><div id="timelineStages" class="lfStages" aria-label="阶段"></div><input id="flowSeek" type="range" min="0" max="3249" step="0.05" value="0" aria-label="全程时间轴"><div id="timelineArtillery" class="lfArtilleryTrack" aria-label="北方远距炮击时间点"></div><div id="timelineBeats" class="lfBeats" aria-label="全程逐拍时间轴"></div><div class="lfPlayhead" aria-hidden="true"></div></div></div>
     </div>
     <button id="toggleTimeline" class="lfTimelineToggle" type="button" aria-label="收起 Timeline" aria-controls="flowTimeline" aria-expanded="true" title="收起 Timeline"><span>Timeline</span><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 9 7 7 7-7"/></svg></button>
   </footer>

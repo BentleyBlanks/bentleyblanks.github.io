@@ -31,6 +31,9 @@ const threeHooks = registerHooks({
   },
 });
 const { AiDirector } = await import("./Script_Ai.mjs");
+const { EncounterArtilleryRuntime } = await import("./Script_EncounterArtilleryRuntime.mjs");
+const { CombatSystem } = await import("./Script_Combat.mjs");
+const THREE = await import("three");
 threeHooks.deregister();
 
 const dirHere = path.dirname(fileURLToPath(import.meta.url));
@@ -945,4 +948,110 @@ for (const spec of ENCOUNTER_VARIANTS) {
   assert.ok(bfsReach((x, z) => (z < 610 || z > 685) || x <= 102), "10a 老耿家至救护所应同时贯通西巷外侧路线 (x<=102)");
 }
 
-console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates, enemy occlusion & full zero-clip/zero-LOS/fire-line audit");
+// 9. 回撤路线北方远距零星炮击编排、规避、回拖确定性与 Play 运行时门禁
+{
+  const frontArt = original.artillery || [];
+  const mergedArt = merged.artillery || [];
+  assert.equal(frontArt.length, 11, "01-07 共用段编排 11 发北方远距炮弹");
+  assert.equal(mergedArt.length, 19, "L1_BeishaheMerged 全程编排 19 发北方远距炮弹（前 11 + 合并段 8）");
+  assert.deepEqual(
+    mergedArt.slice(0, 11).map((item) => [item.id, item.beat, item.impactAt, item.p, item.role]),
+    frontArt.map((item) => [item.id, item.beat, item.impactAt, item.p, item.role]),
+    "01-07 共用段炮击时间表在原版与单村合并版间完全一致",
+  );
+
+  const forbiddenBeats = new Set([
+    "01a", "01b", "01c", "01d", "01e", "02a", "02b", "02c", "02d", "02e", "02f", "02g", "02h", "02i",
+    "03d", "06b", "06c", "06d", "06e", "06f", "06g", "06h", "07a", "07b", "07c",
+    "09a", "09b", "09c", "09d", "10b", "10c", "11a", "11b", "11c", "13c", "13d", "13e",
+  ]);
+  let dodgeCount = 0, suppressCount = 0;
+  for (const strike of mergedArt) {
+    assert.ok(!forbiddenBeats.has(strike.beat), `${strike.id} 不得落在静默/近战/潜行/空袭拍 ${strike.beat}`);
+    assert.ok(strike.from[1] < strike.p[1] - 100, `${strike.id} 必须来自北侧远方 (-Z)`);
+    assert.ok(strike.warnS >= 2.5 && strike.radius >= 5.0, `${strike.id} 预警时长与爆炸半径须合理`);
+    assert.ok(strike.warnAt > strike.beatStart + 1.0 && strike.evadeEndAt < strike.beatEnd, `${strike.id} 须完整留在所属节拍内`);
+    if (strike.role === "dodge") dodgeCount++;
+    else if (strike.role === "suppress") suppressCount++;
+
+    // 预警、爆炸、留坑及回拖确定性
+    const midWarnT = strike.impactAt - strike.warnS * 0.45;
+    const warnFrame = merged.evaluate(midWarnT);
+    const warnEff = warnFrame.effects.find((e) => e.kind === "artilleryWarn" && e.id === strike.id);
+    assert.ok(warnEff && warnEff.progress > 0.3 && warnEff.remainingS > 0.5, `${strike.id} 在预警窗内输出 artilleryWarn`);
+    const blastFrame = merged.evaluate(strike.impactAt + 0.2);
+    assert.ok(blastFrame.effects.some((e) => e.kind === "artilleryBlast" && e.id === strike.id), `${strike.id} 起爆时输出 artilleryBlast`);
+    const craterFrame = merged.evaluate(strike.impactAt + 2.5);
+    assert.ok(craterFrame.effects.some((e) => e.kind === "artilleryCrater" && e.id === strike.id), `${strike.id} 爆后保留 artilleryCrater`);
+    merged.evaluate(0);
+    assert.deepEqual(merged.evaluate(midWarnT), warnFrame, `${strike.id} 任意回拖保持完全确定`);
+
+    if (strike.role === "dodge") {
+      const peakFrame = merged.evaluate(strike.impactAt - 0.15);
+      const pActor = peakFrame.actors.find((a) => a.id === "player");
+      assert.ok(pActor?.evadingArtillery && pActor.pose === "crouch" && !pActor.firing, `${strike.id} 预警末期顺子伏低避弹且暂停射击`);
+      assert.deepEqual(peakFrame.player, pActor.p, `${strike.id} frame.player 与 actors[0].p 保持同步`);
+    }
+  }
+  assert.equal(dodgeCount, 9, "全程含 9 处需主动躲避的迫近炮弹");
+  assert.equal(suppressCount, 10, "全程含 10 处侧翼/北沿/河滩压制炮弹");
+
+  // 08c 掷弹筒与何有田对白「掷弹筒砸过来了！缩沟底！」(08c+33s) 严格同步
+  const mortar08c = mergedArt.find((s) => s.id === "Art_08c_TrenchDodge");
+  assert.ok(mortar08c && Math.abs((mortar08c.warnAt - mortar08c.beatStart) - 33.2) < 0.05, "08c 掷弹筒在何有田喊话后 0.2s 立即亮出落点预警");
+
+  // 实时 Play 运行时：触发真实 FireShell + IncomingMarker、潜行静默、越过跳过、友军避弹向量与 Reset
+  const firedShells = [], incomingMarkers = [], playedAudio = [];
+  const fakeHost = {
+    battlefield: { GroundHeight: () => 0, Raycast: () => null },
+    combat: {
+      PredictShellImpact: (_from, target) => target.clone(),
+      FireShell: (from, target, opts) => { firedShells.push({ from, target, opts }); return {}; },
+    },
+    vfx: { IncomingMarker: (pos, flight, opts) => { incomingMarkers.push({ pos, flight, opts }); } },
+    audio: { Play: (cue, opts) => { playedAudio.push({ cue, opts }); } },
+  };
+  const artRt = new EncounterArtilleryRuntime(fakeHost, merged, { groundAt: () => 0 });
+  const frame08a = merged.evaluate(merged.BeatById("08a").start + 1);
+  // 潜行激活时不触发
+  artRt.Update(20, frame08a, { playerPos: { x: 105, z: 412 }, stealthActive: true });
+  assert.equal(firedShells.length, 0, "潜行态不得触发远距炮击");
+  // 正常接近 08a 官道触发 dodge 炮弹
+  artRt.Update(9.5, frame08a, { playerPos: { x: 105, z: 412 }, stealthActive: false });
+  assert.equal(firedShells.length, 1, "08a 推进至官道触发北方远距炮弹");
+  assert.equal(firedShells[0].opts.warn, true, "dodge 炮弹开启 HUD 预警标志");
+  assert.ok(firedShells[0].from.z < firedShells[0].target.z - 100, "实时炮弹从北侧高空飞来");
+  assert.equal(incomingMarkers.length, 1, "同步投影地面落点提示圈");
+  assert.equal(artRt.State().length, 1, "State 暴露在途预警给 2D 试玩小地图");
+  const evadeVec = artRt.EvasionFor({ x: 105, z: 414 });
+  assert.ok(evadeVec && evadeVec.away[0] < -0.5, "近旁友军收到背离落点的避弹方向");
+  artRt.Reset();
+  assert.equal(artRt.State().length, 0, "Reset 后彻底清空在途炮击与触发记录");
+
+  // 玩家已大幅南撤甩开该落点时直接跳过
+  artRt.Update(12, frame08a, { playerPos: { x: 105, z: 445 }, stealthActive: false });
+  assert.equal(firedShells.length, 1, "已大幅越过落点时跳过陈旧炮弹");
+
+  // Combat.GrenadeThreats 接管 warn:true 炮弹并忽略普通炮弹
+  const stubCombatHost = {
+    battlefield: { GroundHeight: () => 0, Raycast: () => null },
+    ai: { soldiers: [] },
+    scene: { add() {}, remove() {} },
+    library: { Get: () => new THREE.MeshBasicMaterial() },
+    player: { Alive: true, position: new THREE.Vector3(106, 0, 414) },
+  };
+  const combat = new CombatSystem(stubCombatHost);
+  combat.FireShell(new THREE.Vector3(108, 48, 250), new THREE.Vector3(107.8, 0, 414.5), {
+    flight: 3.1, kind: "Shell75", radius: 5.8, damage: 52, warn: true, warnRadius: 8.4,
+  });
+  combat.FireShell(new THREE.Vector3(108, 48, 250), new THREE.Vector3(107.8, 0, 414.5), {
+    flight: 3.1, kind: "Shell75", radius: 5.8, damage: 34, warn: false,
+  });
+  const threats = combat.GrenadeThreats(new THREE.Vector3(106, 0, 414));
+  assert.equal(threats.length, 1, "GrenadeThreats 仅上报带 warn:true 的来袭炮弹");
+  assert.equal(threats[0].kind, "ArtilleryShell");
+  assert.equal(threats[0].returnable, false);
+  combat.Dispose();
+}
+
+console.log("[EncounterVariantsTest] PASS: registry, 01-07 shared parity, z<355 scene inheritance, overrides, isolated storage, 08-13 playable gates, enemy occlusion, artillery bombardment & full zero-clip/zero-LOS/fire-line audit");

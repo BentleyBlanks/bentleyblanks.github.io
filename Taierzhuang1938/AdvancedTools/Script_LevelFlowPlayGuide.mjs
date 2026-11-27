@@ -480,6 +480,59 @@ class PlayGuideMapView extends FlowMapView {
       }
     }
 
+    // 5b. Live incoming artillery warnings & blasts
+    for (const strike of options.artillery || []) {
+      const sp = Screen(strike.p);
+      const outerR = Math.max(8, (strike.radius || 6) * this.scale);
+      if (sp[0] + outerR + 40 < 0 || sp[0] - outerR - 40 > width
+        || sp[1] + outerR + 40 < 0 || sp[1] - outerR - 40 > height) continue;
+      const dodge = strike.role === "dodge";
+      if (strike.phase === "blast") {
+        const t = Clamp(strike.progress ?? 0, 0, 1);
+        context.save();
+        context.beginPath();
+        context.arc(sp[0], sp[1], outerR * (0.5 + t * 0.8), 0, Math.PI * 2);
+        context.strokeStyle = dodge ? `rgba(242, 76, 56, ${((1 - t) * 0.9).toFixed(3)})` : `rgba(240, 162, 62, ${((1 - t) * 0.85).toFixed(3)})`;
+        context.lineWidth = 2.2;
+        context.stroke();
+        context.restore();
+        continue;
+      }
+      const strokeCol = dodge ? "#f04638" : "#e59a2e";
+      const fillCol = dodge ? "rgba(240, 70, 56, 0.22)" : "rgba(229, 154, 46, 0.16)";
+      if (strike.from) {
+        const tail = Screen([
+          strike.from[0] + (strike.p[0] - strike.from[0]) * 0.6,
+          strike.from[1] + (strike.p[1] - strike.from[1]) * 0.6,
+        ]);
+        Line(context, [tail, sp], `${strokeCol}99`, 1.4, [4, 3]);
+      }
+      context.save();
+      context.beginPath();
+      context.arc(sp[0], sp[1], outerR, 0, Math.PI * 2);
+      context.fillStyle = fillCol;
+      context.fill();
+      context.strokeStyle = strokeCol;
+      context.lineWidth = dodge ? 2 : 1.5;
+      context.setLineDash([5, 3]);
+      context.stroke();
+      context.setLineDash([]);
+      const innerR = Math.max(2.5, outerR * (1 - Clamp(strike.progress ?? 0, 0, 1)));
+      context.beginPath();
+      context.arc(sp[0], sp[1], innerR, 0, Math.PI * 2);
+      context.strokeStyle = dodge ? "#ff8870" : "#ffd078";
+      context.lineWidth = 2;
+      context.stroke();
+      context.restore();
+      const rem = (strike.remainingS ?? 0).toFixed(1);
+      DrawPillLabel(context, dodge ? `⚠ 炮弹躲避 ${rem}s` : `炮弹 ${rem}s`, Clamp(sp[0], 56, width - 56), Clamp(sp[1] - outerR - 10, 14, height - 14), {
+        bg: dodge ? "#33120fec" : "#2b1c0de6",
+        border: strokeCol,
+        color: dodge ? "#ffe0d8" : "#ffe7bc",
+        fontSize: 10,
+      });
+    }
+
     // 6. Primary Mission Objective Beacon (in-view OR edge-clamped off-screen indicator!)
     let hasTargetMarker = false;
     if (target?.point) {
@@ -1006,6 +1059,7 @@ export class LevelFlowPlayGuide {
         showAirWalls: this.showAirWalls,
         softBoundary,
         areaWarning: !!state.missionArea?.warning,
+        artillery: state.artillery || [],
       }, nowMs);
     }
   }

@@ -834,7 +834,7 @@ export class FlowPerspectiveView extends FlowMapView {
       Segment([x,base+0.85,z],[x,base+0.85,z-1.5],3);
       for(const side of [-0.35,0.35]) Segment([x,base+0.8,z-0.5],[x+side,base,z-0.8]);
     }
-    const crouch=actor.heavy||["kneel","drag","down"].includes(actor.pose)?0.65:1,height=actor.kind==="child"?1.05:1.65;
+    const crouch=actor.heavy||["kneel","crouch","drag","down"].includes(actor.pose)?0.62:1,height=actor.kind==="child"?1.05:1.65;
     const gait=["walk","run","drag"].includes(actor.pose)?Math.sin(frame.time*5+x)*0.2:0;
     Segment([x,base+0.55*crouch,z],[x,base+height*0.8*crouch,z],3.5);
     Segment([x,base+0.55*crouch,z],[x-0.2,base+0.02,z+gait],2);Segment([x,base+0.55*crouch,z],[x+0.2,base+0.02,z-gait],2);
@@ -919,6 +919,99 @@ export class FlowPerspectiveView extends FlowMapView {
     const b=[effect.b[0],this.Ground(effect.b)+(target?.elevation||0)+0.8,effect.b[1]];
     const vertices=this.FaceVertices([a,b,b]);
     if(vertices.length>=2) this.raster.Stroke(context,vertices[0],vertices[1],"#c47b34",1.2,{visible:0,hidden:0},0);
+  }
+
+  DrawArtilleryEffect(context,effect,frame,width,height) {
+    const [tx,tz]=effect.p,groundY=this.Ground(effect.p),dodge=effect.role==="dodge";
+    const Ring=(radius,fill,stroke,lineWidth=1.8,dash=[])=>{
+      const segs=36,ringPts=[];
+      for(let i=0;i<segs;i++) {
+        const ang=i/segs*Math.PI*2,rx=tx+Math.cos(ang)*radius,rz=tz+Math.sin(ang)*radius;
+        ringPts.push([rx,this.Ground([rx,rz])+0.07,rz]);
+      }
+      const verts=this.FaceVertices(ringPts);
+      if(verts.length<3) return;
+      const pts=verts.map(v=>[v.x,v.y]);
+      if(fill) Polygon(context,pts,fill);
+      if(stroke) Line(context,[...pts,pts[0]],stroke,lineWidth,dash);
+    };
+    if(effect.kind==="artilleryCrater") {
+      const a=Clamp(effect.alpha??0.4,0,1)*0.5;
+      Ring((effect.radius||6)*0.34,`rgba(44,34,24,${a.toFixed(3)})`,`rgba(30,24,18,${(a*0.8).toFixed(3)})`,1,[3,3]);
+      return;
+    }
+    if(effect.kind==="artilleryBlast") {
+      const t=Clamp(effect.age/Math.max(0.1,effect.duration||1.6),0,1);
+      const radius=effect.radius||6;
+      Ring(radius*(0.45+0.8*Math.pow(t,0.65)),null,dodge?`rgba(240,80,56,${((1-t)*0.9).toFixed(3)})`:`rgba(240,162,62,${((1-t)*0.85).toFixed(3)})`,2.2);
+      const puffY=groundY+1.2+t*6.5;
+      const v=this.Vertex([tx,puffY,tz]);
+      if(v.depth>=this.near&&v.depth<=this.far) {
+        const scrR=Clamp((radius*0.65+t*radius*0.5)*this.focal/Math.max(2,v.depth),10,160);
+        const flash=Clamp(1-effect.age/0.45,0,1);
+        context.save();
+        const smokeA=Clamp(1-t,0,1)*0.72;
+        const sg=context.createRadialGradient(v.x,v.y,scrR*0.1,v.x,v.y,scrR);
+        sg.addColorStop(0,`rgba(68,54,40,${(smokeA*0.88).toFixed(3)})`);
+        sg.addColorStop(0.6,`rgba(104,84,60,${(smokeA*0.45).toFixed(3)})`);
+        sg.addColorStop(1,"rgba(104,84,60,0)");
+        context.fillStyle=sg;context.beginPath();context.arc(v.x,v.y,scrR,0,Math.PI*2);context.fill();
+        if(flash>0.02) {
+          const cv=this.Vertex([tx,groundY+1.4,tz]);
+          const fr=Clamp(radius*0.42*this.focal/Math.max(2,cv.depth),6,96);
+          const fg=context.createRadialGradient(cv.x,cv.y,0,cv.x,cv.y,fr);
+          fg.addColorStop(0,`rgba(255,248,205,${(flash*0.95).toFixed(3)})`);
+          fg.addColorStop(0.45,`rgba(244,126,38,${(flash*0.82).toFixed(3)})`);
+          fg.addColorStop(1,"rgba(205,54,24,0)");
+          context.fillStyle=fg;context.beginPath();context.arc(cv.x,cv.y,fr,0,Math.PI*2);context.fill();
+        }
+        context.restore();
+      }
+      return;
+    }
+    if(effect.kind!=="artilleryWarn") return;
+
+    const progress=Clamp(effect.progress??0,0,1),radius=effect.radius||6;
+    const strokeCol=dodge?"#df3628":"#d4821a",ringCol=dodge?"#ff6448":"#f5b044";
+    Ring(radius,dodge?"rgba(222,52,36,0.18)":"rgba(218,136,30,0.14)",strokeCol,dodge?2.0:1.5,dodge?[7,4]:[5,5]);
+    Ring(Math.max(0.35,radius*(1-progress)),null,ringCol,dodge?2.5:1.9);
+
+    // 3D parabolic descent trajectory from far north sky
+    if(effect.from) {
+      const [fx,fz]=effect.from,fromY=this.Ground(effect.from),apex=48;
+      const ArcPt=(u)=>[fx+(tx-fx)*u,fromY+(groundY-fromY)*u+4*apex*u*(1-u),fz+(tz-fz)*u];
+      const steps=16,u0=0.35;
+      for(let i=0;i<steps;i++) {
+        const a=ArcPt(u0+(1-u0)*i/steps),b=ArcPt(u0+(1-u0)*(i+1)/steps);
+        const verts=this.FaceVertices([a,b,b]);
+        if(verts.length>=2) Line(context,[[verts[0].x,verts[0].y],[verts[1].x,verts[1].y]],dodge?"#e03e2d88":"#d6892880",1.6,[5,4]);
+      }
+      const shellU=u0+(1-u0)*progress;
+      const head3=ArcPt(shellU),tail3=ArcPt(Math.max(u0,shellU-0.065));
+      const sv=this.FaceVertices([tail3,head3,head3]);
+      if(sv.length>=2) {
+        Line(context,[[sv[0].x,sv[0].y],[sv[1].x,sv[1].y]],ringCol,3.2);
+        context.save();
+        context.beginPath();context.arc(sv[1].x,sv[1].y,4.2,0,Math.PI*2);
+        context.fillStyle="#fff2c2";context.fill();
+        context.strokeStyle=strokeCol;context.lineWidth=1.5;context.stroke();
+        context.restore();
+      }
+    }
+
+    const centerV=this.Vertex([tx,groundY+0.25,tz]);
+    if(centerV.depth>=this.near&&centerV.depth<=this.far&&centerV.x>-30&&centerV.x<width+30&&centerV.y>-30&&centerV.y<height+30) {
+      const rem=(effect.remainingS??0).toFixed(1);
+      const caption=dodge?`⚠ ${effect.label} · 躲避 ${rem}s`:`北来炮弹 ${rem}s · ${effect.label}`;
+      Label(context,caption,Clamp(centerV.x+10,8,Math.max(8,width-caption.length*11-12)),Clamp(centerV.y-12,14,height-14),dodge?"#9e1c14":"#8b4f0b",11.5,true);
+      const tipParts=[
+        `${effect.label}（${effect.caliber||"75mm"} · ${dodge?"需躲避":"远程压制"}）`,
+        `预计落地 ${rem}s · 杀伤半径 ${radius}m`,
+        effect.dodgeHint?`建议：${effect.dodgeHint}`:null,
+        effect.note||null,
+      ].filter(Boolean);
+      this.hits.push({type:"artillery",id:effect.id,screen:[centerV.x,centerV.y],radius:18,text:tipParts.join(" · ")});
+    }
   }
   InspectOcclusion() {
     // Detailed fragment counts are an explicit inspection operation. Playback,

@@ -1665,15 +1665,18 @@ export class Hud {
         project(threat.position.x, threat.position.y, threat.position.z), threat, player, width, height);
       const { x, y, offscreen } = point;
 
+      const isArtillery = threat.kind === "ArtilleryShell";
       const urgent = threat.fuse <= GRENADE_WARNING.urgentFuseS;
       const lethal = threat.distance <= threat.dangerRadius * GRENADE_WARNING.lethalRadiusFrac;
       el.style.display = "";
       el.style.left = `${x.toFixed(1)}px`;
       el.style.top = `${y.toFixed(1)}px`;
-      el.className = `hudGrenadeWarning${offscreen ? " edge" : ""}`
+      el.className = `hudGrenadeWarning${offscreen ? " edge" : ""}${isArtillery ? " artillery" : ""}`
         + `${urgent ? " urgent" : ""}${lethal ? " lethal" : ""}${threat.returnable ? " returnable" : ""}`;
-      const kind = threat.kind === "GrenadeBundle"
-        ? T("hud.grenade.bundle") : T("hud.grenade.single");
+      const kind = isArtillery
+        ? T("hud.grenade.artillery")
+        : threat.kind === "GrenadeBundle"
+          ? T("hud.grenade.bundle") : T("hud.grenade.single");
       // Keep distance/type in the accessible description; the visible warning is icon-first.
       const metres = Math.max(1, Math.ceil(threat.distance));
       const warning = threat.returnable
