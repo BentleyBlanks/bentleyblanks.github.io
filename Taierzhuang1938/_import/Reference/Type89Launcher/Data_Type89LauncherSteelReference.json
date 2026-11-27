@@ -8241,5 +8241,130 @@
       "sigma": 1.2,
       "strength": 0.8
     }
+  },
+  "sleeveReverseFinish": {
+    "angularRange": [-0.13, 0.365],
+    "knots": [-0.13, -0.094, -0.055, -0.015, 0.025, 0.065, 0.105, 0.145, 0.185, 0.225, 0.265, 0.305, 0.335, 0.365],
+    "angularFeather": 0.055,
+    "axialRange": [0.035, 1.014],
+    "axialFeather": 0.078,
+    "axialKnots": [0.055, 0.19, 0.36, 0.56, 0.75, 0.9, 1.0],
+    "tint": [-0.017829, -0.195599],
+    "fields": {
+      "gain": [1.5418012, 1.4548815, 1.3488263, 1.1726398, 0.9009536, 0.6183093, 0.5884845, 0.6627706, 0.6935731, 0.3358933, 0.0910278, 0.0013056, -0.031053, -0.0528662],
+      "axialGain": [0.0689737, 0.0660672, 0.06272, 0.0542328, 0.0448169, 0.0147579, -0.0114148],
+      "tilt": [-0.0019236, -0.0067892, -0.0111246, -0.0125282, -0.0077103, -0.0003305, 0.0032443, 0.0041965, 0.0090129, 0.013353, -0.0188149, -0.0650958, -0.0956516, -0.1097654],
+      "tiltV": [-0.0024175, -0.000828, 0.0014278, 0.0052447, 0.0091754, 0.0096081, -0.0027179, -0.0283276, -0.0562357, -0.0727301, -0.0725223, -0.0579717, -0.0346997, -0.0091836]
+    },
+    "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+    "pose": [0.9282111403496914, -0.2931799779212158, -0.0026327672149387533, 0.1759392557546735, 202.11803619830596, 438.66659210149584, 787.6538430910846],
+    "sourceShape": [406, 900],
+    "crop": [166, 604, 82, 154],
+    "captureRevision": "cf4fe20d8d5863e8a384513ca305da1a29d7e9ed",
+    "rigSha256": "bd87a053edd9b5587175a1240417bb95e0ce904268ca146c92e5cc7f676a2dd3",
+    "validationRanges": {
+      "axial": [
+        [0.25, 0.36],
+        [0.59, 0.68]
+      ],
+      "lighting": "Broad"
+    },
+    "frameSha256": {
+      "Broad.f32": "b91cf5ff168428ce1453eb87a3dbe87fda291454e4cc3977f95627fc63c50cf2",
+      "BroadAcrossMinus.f32": "4e2408f8bd4bb593425136dfce232a76069846af6753098da7bb3e4e8d351c1e",
+      "BroadAcrossPlus.f32": "7c78e4c2d64a6915378d4182f916daaacecb3a775826ada9a8947963e9c5cc31",
+      "BroadAlongMinus.f32": "85b7782f5509516f3380b2bcb8da54d313acf7b5e10547c625e9e82d76b7ec5c",
+      "BroadAlongPlus.f32": "84ed8770dc37635877ef670e3c20977f1c1beab351c12bc61bef675b5bbb85f5",
+      "BroadBaseMinus.f32": "cbffd2b09d196d2123963da1fb5df36a4c43c831ef56126aa0cba832b2b5d0f3",
+      "BroadBasePlus.f32": "20026440b2ec32b587b44882d9647a2a77989b5db511bf06f82172c578f37c3d",
+      "BroadRoughMinus.f32": "26e2a3806c12a6b2a18c24ad5b723a1a134b6fa2f6af66022bcceba645e41637",
+      "BroadRoughPlus.f32": "dcb9c6e3101febd98c324906208120d02ee5f261a20a471990b6adab87c55b7c",
+      "HeldOut.f32": "d1100cac1f190e2e42f8c34b469ef10dc8b8498eb899d50d11b9d4e715f75c84",
+      "HeldOutAcrossMinus.f32": "2aa9782cb6fadafbc70f9486796794cdc881d5bb7b9058dc8fceb03b58cfd420",
+      "HeldOutAcrossPlus.f32": "8b9d3a839ac7e96bf0e948571d9371fc1afcc6f275b9c6e2b00180746f3aa2df",
+      "HeldOutAlongMinus.f32": "eba3736c1e7e0697024d195773081dc0e06e1af79f9a5c61b4d200cb5529b9b9",
+      "HeldOutAlongPlus.f32": "1090cc8254694387ead3147c6a377e32e8fb4719a9b670d583afde369cefe921",
+      "HeldOutBaseMinus.f32": "9c4395fd2055a53acb7fe2f17a3ae280791bc558ff9afc11566a6099fd9a42f8",
+      "HeldOutBasePlus.f32": "28c5a19266df63dc3860c7e554754c2be02dd99b86e7aaa517241b68f1f96282",
+      "HeldOutRoughMinus.f32": "9b39b1c071cba06a3a3a03f80614366671a71bf51664e68300d2a316a8ab4f6b",
+      "HeldOutRoughPlus.f32": "221695f884caa29f5f277258d0ce227a20ac56994b01b217173797c4431661c3",
+      "Matched.f32": "99e94f5c5e24148a6003b42edbc3021e8942107cca2cc607b1396e30aa70a189",
+      "MatchedAcrossMinus.f32": "b37d5ec565b7368592a0e66ae9f640633e5db157f4ebe60492ed5733957ebf06",
+      "MatchedAcrossPlus.f32": "60a8bf664651e38fc8ab3845104b9531f5f5b0dd5ffbeec79b4f741f87af3bd9",
+      "MatchedAlongMinus.f32": "ac5b9b673b132dc627e7514fbd754e2470d71a5c84cec8f5c8f567bb4776911f",
+      "MatchedAlongPlus.f32": "7f0300106d17d65cb4b6bd2ca435985420cac83b7540de957269b6f8792ca73b",
+      "MatchedBaseMinus.f32": "172f18335036704421ea1818a94f97a72143a9e8312230bf449005265b455d59",
+      "MatchedBasePlus.f32": "2ccda066483a599e32a87687b4f01441678b9fc1e21ab94e876a63abb55a3c9e",
+      "MatchedRoughMinus.f32": "18d8cba023e9ab4f9576df251894864a4914c21bc79ec81c2a38fc472f645052",
+      "MatchedRoughPlus.f32": "74cd4debb0a3f78464f58fc91143c2a7aac0813ab5800f4bdeea636843bd4789",
+      "MaterialChannels.f32": "b19e3b4c373c890f39ace44609905fdf9e01fc46fe947fc1b50b65024a2475bc",
+      "UV.f32": "cdaacc35343e3e6b96757fe7dac9770f062f3c305c50b186c59aa789f198df11",
+      "UVContact.f32": "aa05f7e8758d9bd023c90a8eb9b7e4dabc87aa1722005cf44de039e2c33b7233"
+    },
+    "photo1Weight": 1.0,
+    "frontFrameSha256": {
+      "AcrossMinus.png": "ca2f044527afb9f155d9e8bb2359b1c5df6d33f3da04742d624ab90b787cfaa9",
+      "AcrossPlus.png": "c7688106f5f68d5126c80412b9619c808b80bf2b6df2592dbd16ae6a6bc7fa38",
+      "albedo.png": "b59d82b8b1b215c21f4b1b54d34f158712af3867b5fdd7fb753b811993ffbb16",
+      "AlongMinus.png": "1110e6dbd1839507fb362babffd1ab7380a0a23ecf69ba1819c90d2aba6ce567",
+      "AlongPlus.png": "82ca72b8169c05b4a380c523e435373549d94ebbc7bab474ee294b582f58d5db",
+      "BaseMinus.png": "250c0777757e906993ef2dc2bc302ebe6cfca22e3c01471ce8fe0aca4d4a0b02",
+      "BasePlus.png": "0dd35e242997fbc9552c86205f246fd834e2b4ce84606ad11b730fcfeb202236",
+      "beauty.png": "f5dd8e9efe1e3db42f0a9300439e9246d750825e2beb8f487b98f7398444aebf",
+      "flatRelief.png": "7b783538f1b364f928dcdd742621f8eece5c2f0a1b966a2d16a424af3893167a",
+      "normal.png": "cfd2479f09b1c055c4fd18472a481a09f912271e5f5d412b1bfac1591991a37c",
+      "roughness.png": "571750fad16e3cd6ade58643c597b66fe3134a95d7a9d0253b8af655f2cf5520",
+      "uv.png": "fb0539c1296edbb796d9cd2bdc7ea24ff6ce22eebccd4c8a1ce09cf80493b561",
+      "uvHi.png": "636d40c9bdf34c5a586d24f73ae8300a0258624a6020017788f694b9c284df15",
+      "uvLo.png": "7a322b330a34e3d0c2611126e8f5e95b8bfab4f795e5730c6ac69dd23ce8cd8a"
+    },
+    "defaultFrameSha256": {
+      "AcrossMinus.png": "7a342f577e1757a37e7c8c444662a175d7bed66766f5ae67e82edddbf374a09f",
+      "AcrossPlus.png": "e8ff0efaf8fe1736822b80461857a2ee8571f5acc90dbd5daa27e1c560d3a257",
+      "albedo.png": "b59d82b8b1b215c21f4b1b54d34f158712af3867b5fdd7fb753b811993ffbb16",
+      "AlongMinus.png": "5cf614dc31b67cb677987c502d0f4767a3bcf2fea7eb505a8fdee06ddab43952",
+      "AlongPlus.png": "2fa0f7ff8ed2c52baf8193e75cedd4533840c9f18d8beb103c9fd7a94dbe91f9",
+      "BaseMinus.png": "be3957ea3f9294d36e1824d654435475528858910d9fcf81193c26d6ac62b7a7",
+      "BasePlus.png": "1cf3a4703b071aa593f36ffd397c51b273f9f9e261ea687c7e91160408110368",
+      "beauty.png": "8387cd4f553bd6d934f4d9feff2073abc193b076da9a324efb5700ac0ffc3a9c",
+      "flatRelief.png": "825723f528e76937626da285707e26e5764fa99dc44d131443ee4b570aaa2afd",
+      "normal.png": "cfd2479f09b1c055c4fd18472a481a09f912271e5f5d412b1bfac1591991a37c",
+      "roughness.png": "571750fad16e3cd6ade58643c597b66fe3134a95d7a9d0253b8af655f2cf5520",
+      "uv.png": "fb0539c1296edbb796d9cd2bdc7ea24ff6ce22eebccd4c8a1ce09cf80493b561",
+      "uvHi.png": "636d40c9bdf34c5a586d24f73ae8300a0258624a6020017788f694b9c284df15",
+      "uvLo.png": "7a322b330a34e3d0c2611126e8f5e95b8bfab4f795e5730c6ac69dd23ce8cd8a"
+    },
+    "defaultWeight": 1.5,
+    "tintFade": [0.184, 0.268],
+    "detail": {
+      "file": "Texture_Type89LauncherSleeveBackDetail.png",
+      "sha256": "2c6b2a9820cb6e034b8461fa4562779d51709be814d880f8fd536b6e74073545",
+      "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "footprint": {
+        "uCenter": 0.115,
+        "uHalfSpan": 0.24,
+        "vRange": [0.07, 0.982]
+      },
+      "scale": 16384,
+      "frames": {
+        "UV": "cdaacc35343e3e6b96757fe7dac9770f062f3c305c50b186c59aa789f198df11",
+        "UVContact": "aa05f7e8758d9bd023c90a8eb9b7e4dabc87aa1722005cf44de039e2c33b7233",
+        "Matched": "a99c5fef375c899aac5bdcd5158faf40bd555bcd5b0cc0c585e07ab838db8b96",
+        "HeldOut": "514dd89bebb3073f611d38bd459bdd455070f196ca6ce1ff4f4b2eeaba410c80",
+        "Broad": "ef58b05a15fd2cb51c764d4d9dda99eca1cca3e76a0f92ca082c6ef0056ad7be"
+      },
+      "phaseBins": 96,
+      "strength": 1.58
+    },
+    "center": 0.12,
+    "source": {
+      "file": "Mariners8.jpg",
+      "url": "https://catalogs.marinersmuseum.org/object/CL2830",
+      "label": "Mariners Museum 1946.0037.000001, photograph 8"
+    },
+    "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+    "sourceFinishSha256": "32eb89c9466665997b81dac73d4e10c4eaea265a7924337542737c57527db7f4",
+    "horizonSha256": "cb817434e76ca17fa7b210e273b7bc9801da26ff6db8a517aecb96bfe0b71eb5",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7"
   }
 }

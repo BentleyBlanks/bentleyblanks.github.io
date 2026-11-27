@@ -111,6 +111,15 @@ def ReverseReflectionIdentity(reference):
             "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
 
 
+def SleeveReverseIdentity(reference):
+    front = reference["closeups"]["Sleeve"]
+    encoded = json.dumps(front, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    horizon = RECORD.parents[3] / "Data_Type89LauncherSleeveHorizon.mjs"
+    file = horizon.read_bytes().replace(b"\r\n", b"\n")
+    return {"frontPhotoSha256": front["source"]["sha256"], "sourceFinishSha256": sha256(encoded).hexdigest(),
+            "horizonSha256": sha256(file).hexdigest(), "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
+
+
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
 BARREL_MARKS = RECORD.with_name("Texture_Type89LauncherBarrelMarks.png")
 BARREL_SMALL_MARKS = RECORD.with_name("Texture_Type89LauncherSmallBarrelMarks.png")
@@ -2592,7 +2601,8 @@ def Main():
     priorFlank = record.get("knurl", {}).get("flankWear", {})
     priorShoulderBalance = record.get("shoulder", {}).get("Flank", {}).get("reflectionBalance")
     priorWideBalance = record.get("barrelPatina", {}).get("wideReflectionBalance")
-    priorReverseBalance = record.pop("reverseReflectionBalance", None)
+    reverseFits = [(name, record.pop(name, None), identity) for name, identity in (
+        ("reverseReflectionBalance", ReverseReflectionIdentity), ("sleeveReverseFinish", SleeveReverseIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
@@ -2659,12 +2669,13 @@ def Main():
     if priorWideBalance and all(priorWideBalance.get(field) == value
                                 for field, value in WideReflectionIdentity(record).items()):
         record["barrelPatina"]["wideReflectionBalance"] = priorWideBalance
-    if priorReverseBalance:
-        photo = args.photos / priorReverseBalance["source"]["file"]
-        unchanged = not photo.is_file() or sha256(photo.read_bytes()).hexdigest() == priorReverseBalance["sourceSha256"]
-        if unchanged and all(priorReverseBalance.get(field) == value
-                             for field, value in ReverseReflectionIdentity(record).items()):
-            record["reverseReflectionBalance"] = priorReverseBalance
+    for name, previous, identity in reverseFits:
+        if previous is None:
+            continue
+        photo = args.photos / previous["source"]["file"]
+        unchanged = not photo.is_file() or sha256(photo.read_bytes()).hexdigest() == previous["sourceSha256"]
+        if unchanged and all(previous.get(field) == value for field, value in identity(record).items()):
+            record[name] = previous
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

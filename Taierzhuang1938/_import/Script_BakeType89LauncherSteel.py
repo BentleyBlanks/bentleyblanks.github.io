@@ -13,7 +13,9 @@ from PIL import Image, ImageDraw, ImageFilter
 from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
-from Script_MeasureType89LauncherSteel import ReverseReflectionIdentity, SurfaceBalanceIdentity, WideReflectionIdentity
+from Script_MeasureType89LauncherSteel import (
+    ReverseReflectionIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
+)
 
 
 HERE = Path(__file__).resolve().parent
@@ -332,6 +334,11 @@ def ApplyTabResponses(tile, tab, visibility=None, seamVisibility=None):
 def SmoothRamp(value):
     t = np.clip(value, 0, 1)
     return t * t * (3 - 2 * t)
+
+
+def RangeFade(value, limits, feather):
+    first, last = limits
+    return SmoothRamp((value - first) / feather) * SmoothRamp((last - value) / feather)
 
 
 def ApplyKnurlAlbedoBalance(base, u, axial, seamVisibility, balance):
@@ -1387,14 +1394,10 @@ def ApplyBarrelReverseReflection(tile, reference, u, v, seamVisibility):
     if detail["photoSha256"] != balance["sourceSha256"]:
         raise ValueError("Reverse barrel fine detail does not match its registered photograph")
 
-    def Fade(axis, limits, width):
-        lo, hi = limits
-        return SmoothRamp((axis - lo) / width) * SmoothRamp((hi - axis) / width)
-
     center = balance["center"]
     angle = center + (u - center + .5) % 1 - .5
-    coverage = Fade(angle, balance["angularRange"], balance["angularFeather"])
-    coverage *= Fade(v, balance["axialRange"], balance["axialFeather"])
+    coverage = RangeFade(angle, balance["angularRange"], balance["angularFeather"])
+    coverage *= RangeFade(v, balance["axialRange"], balance["axialFeather"])
     coverage *= SmoothRamp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
     fields = {name: np.interp(angle, balance["knots"], balance["coefficients"][name])
               for name in ("gain", "tilt", "tiltV")}
@@ -1409,6 +1412,31 @@ def ApplyBarrelReverseReflection(tile, reference, u, v, seamVisibility):
     vector = normal[active] + smoothing["strength"] * coverage[active, None] * (filtered[active] - normal[active])
     vector /= np.linalg.norm(vector, axis=-1, keepdims=True)
     tile[1][active] = np.rint(127.5 * (vector + 1)).astype(np.uint8)
+
+
+def ApplySleeveReverseFinish(tile, reference):
+    balance = reference["sleeveReverseFinish"]
+    if any(balance.get(key) != value for key, value in SleeveReverseIdentity(reference).items()):
+        raise ValueError("Reverse sleeve balance does not match the photographed front and groove shading")
+    detail = balance["detail"]
+    if detail["sourceSha256"] != balance["sourceSha256"]:
+        raise ValueError("Reverse sleeve fine detail does not match its registered photograph")
+
+    height, width = tile[0].shape[:2]
+    u, v = PlanarTexelCenters(width, height)
+    center = balance["center"]
+    u = center + (u - center + .5) % 1 - .5
+    coverage = RangeFade(u, balance["angularRange"], balance["angularFeather"])
+    coverage *= RangeFade(v, balance["axialRange"], balance["axialFeather"])
+    source = balance["fields"]
+    fields = {name: np.interp(u, balance["knots"], source[name]) for name in ("gain", "tilt", "tiltV")}
+    fields["gain"] += np.interp(v, balance["axialKnots"], source["axialGain"])
+    fields["gain"] += detail["strength"] * SampleResponseFields(detail, ("gain",), u, v)["gain"]
+    first, last = balance["tintFade"]
+    tintOpacity = SmoothRamp((last - u) / (last - first))
+    for name, tint in zip(("tintRed", "tintBlue"), balance["tint"]):
+        fields[name] = tint * tintOpacity
+    ApplyMaterialFields(tile, fields, coverage)
 
 
 def BuildAtlas(reference, contactAo=None, seamAo=None):
@@ -1509,6 +1537,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
                     ApplyCollarResponse(tile, collar, calibration)
+            elif name == "Sleeve" and "sleeveReverseFinish" in reference:
+                ApplySleeveReverseFinish(tile, reference)
         if name in surfaceBalances or (name == "Barrel" and (wideBarrelBalance or reverseBarrelBalance)):
             if name == "Barrel":
                 u, v = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
@@ -1639,6 +1669,8 @@ def Bake(legacyOrm=None):
             details[f"{name.lower()}SurfaceBalance"] = calibration
     if (reverse := reference.get("reverseReflectionBalance")) is not None:
         details["reverseBarrelDetail"] = reverse["detail"]
+    if (sleeve := reference.get("sleeveReverseFinish")) is not None:
+        details["reverseSleeveDetail"] = sleeve["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
