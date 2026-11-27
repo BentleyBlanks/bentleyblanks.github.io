@@ -62,9 +62,11 @@ def Sample(image, shape, position):
     return np.asarray(fit, dtype=np.float32) / 255
 
 
-def TextileSample(image, width, height, position):
-    tile = Sample(image, (width // 3, height // 2), position)
+def TextileSample(image, width, height, position, *, continuous=False):
+    tile = Sample(image, (width // 3, height if continuous else height // 2), position)
     row = np.concatenate((tile, tile[:, ::-1]), axis=1)
+    if continuous:
+        return np.tile(row, (1, 2, 1))[:, :width]
     mirror = np.concatenate((row, row[::-1]), axis=0)
     return np.tile(mirror, (2, 2, 1))[:height, :width]
 
@@ -73,7 +75,8 @@ def TextileDetails(guide, tags, samples, strip):
     cloth, _, red, _ = MaterialRegions(guide, tags)
     height, width = cloth.shape
     position = (.5, (.19, .44, .68, .82)[strip])
-    linen, cord = (TextileSample(source, width, height, position) @ LUMA for source in samples[1:])
+    linen, cord = (TextileSample(source, width, height, position, continuous=strip >= 2) @ LUMA
+                   for source in samples[1:])
     field = np.where(red, cord, linen)
     scale = width / 992
     fibers = gaussian_filter(field, .32 * scale) - gaussian_filter(field, 1.85 * scale)
@@ -95,7 +98,7 @@ def MergeUnseen(color, tags, samples, strip):
         if not np.any(mask):
             continue
         position = (.5, (.19, .44, .68, .82)[strip])
-        field = TextileSample(source, width, height, position) if i else Sample(source, (width, height), position)
+        field = TextileSample(source, width, height, position, continuous=True) if i else Sample(source, (width, height), position)
         center = np.median(field.reshape(-1, 3), axis=0)
         observed = np.median(color[mask], axis=0)
         synthetic = observed + .77 * (field - center)
@@ -103,14 +106,47 @@ def MergeUnseen(color, tags, samples, strip):
     return np.clip(result, 0, 1)
 
 
-def EdgeProjection(color, tags, visible, fromBottom):
+def CleanClothEdges(fabric, tags, visible, factor):
+    _, green, _, _ = MaterialRegions(fabric, tags)
+    chroma = np.ptp(fabric, axis=-1) / np.maximum(fabric.max(axis=-1), .0001)
+    green &= ((green & visible & (chroma > .19)).sum(axis=0) >= 2 * factor)[None, :]
+    red, linen = (tags == 4) & ~green, (tags == 3) & ~green
+    finish, rimColors = fabric.copy(), fabric.copy()
+    height, width = visible.shape
+    y = np.arange(height)[:, None]
+    for layer in (linen, green, red):
+        valid = layer & visible
+        diffuse = valid & (chroma > .19)
+        if not diffuse.any():
+            diffuse = valid
+        if not diffuse.any():
+            continue
+        fallback = np.median(fabric[diffuse], axis=0)
+        tones = np.broadcast_to(fallback, (width, 3)).copy()
+        for col in np.flatnonzero(diffuse.any(axis=0)):
+            rows = np.flatnonzero(diffuse[:, col])
+            trim = len(rows) // 5
+            tones[col] = np.median(fabric[rows[trim:len(rows) - trim], col], axis=0)
+
+        # At an oblique view the projected edge of either broad face is visible
+        # beside the rim. Both need the same diffuse fabric at the join.
+        top, bottom = np.argmax(valid, axis=0), height - 1 - np.argmax(valid[::-1], axis=0)
+        distance = np.maximum(0, np.minimum(y - top, bottom - y))
+        weight = 1 - Smoothstep(1.5 * factor, 9.5 * factor, distance)
+        rimColors[layer] = np.broadcast_to(tones, fabric.shape)[layer]
+        finish[layer] += weight[layer, None] * (rimColors[layer] - finish[layer])
+    return finish, rimColors
+
+
+def EdgeProjection(color, tags, visible, fromBottom, fabric):
     height = visible.shape[0]
     known = distance_transform_edt(~visible.any(axis=0), return_distances=False, return_indices=True)[0]
     first = np.argmax(visible, axis=0)
     last = height - 1 - np.argmax(visible[::-1], axis=0)
     inset = np.minimum(5, np.maximum(0, (last - first) // 3))
     edge = (last - inset if fromBottom else first + inset)[known]
-    return (np.broadcast_to(color[edge, known], color.shape),
+    paint = np.where(tags[edge, known, None] >= 3, fabric[edge, known], color[edge, known])
+    return (np.broadcast_to(paint, color.shape),
             np.broadcast_to(tags[edge, known], tags.shape))
 
 
@@ -122,9 +158,11 @@ def Tiles(photo, labels, fit, size, samples, balanced=None):
     if size == BASE_SIZE:
         detail = front - gaussian_filter(front, (.9, .9, 0))
         front = np.clip(front + .32 * detail, 0, 1)
-    yield 0, front, tags, color
+    front, rimCloth = CleanClothEdges(front, tags, visible, factor)
+    guide = np.where(tags[..., None] >= 3, front, color)
+    yield 0, front, tags, guide
     for strip, opposite in ((2, False), (3, True)):
-        edge, kind = EdgeProjection(color, tags, visible, opposite)
+        edge, kind = EdgeProjection(color, tags, visible, opposite, rimCloth)
         yield strip, MergeUnseen(edge, kind, samples, strip), kind, edge
 
 
@@ -132,6 +170,10 @@ def MirrorRim(tile):
     # The lower half of the rim chart meets the photographed face at positive X.
     half = tile[len(tile) // 2:]
     return np.concatenate((half[::-1], half), axis=0)
+
+
+def MatchRimMetal(tile, textile):
+    return np.where(textile[..., None], tile, MirrorRim(tile))
 
 
 def BaseTile(color, details):
@@ -250,7 +292,7 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
     for strip, color, tags, guide in Tiles(photo, labels, fit, BASE_SIZE, samples, balanced):
         tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
         if strip:
-            tile = MirrorRim(gaussian_filter(tile, (.69, .69, 0)))
+            tile = MatchRimMetal(gaussian_filter(tile, (.69, .69, 0)), tags >= 3)
         highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
         base[strip], = PadTiles((tile,), ((.49, .47, .44),), highCoverage, factor)
 
@@ -259,8 +301,7 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
         details = TextileDetails(guide, tags, samples, strip)
         ambient = occlusion[regions[strip]]
         if strip:
-            color, ambient = MirrorRim(color), MirrorRim(ambient)
-            details = tuple(MirrorRim(detail) for detail in details)
+            color, ambient = MatchRimMetal(color, tags >= 3), MirrorRim(ambient)
         layers = DataTiles(color, details, ambient)
         data[strip] = PadTiles(layers, ((.5, .5, 1), (1, .74, .64)), coverage[strip])
 
