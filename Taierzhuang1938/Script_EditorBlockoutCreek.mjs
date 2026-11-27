@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { MakePatch } from "./Script_MaterialPatches.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { BLOCKOUT_CREEK_LOOK } from "./Data_Tuning_WhiteboxMaterial.mjs";
+import { BuildContinuousWaterGeometry } from "./Script_WaterGeometry.mjs";
 
 /** 地面顶点属性名：泥权重 0…1。 */
 export const MUD_ATTRIBUTE = "blockoutMud";
@@ -165,22 +166,12 @@ export const MUD_PATCH = MakePatch({
 export function BuildCreekWater(blocks, groundAt, scene, { name = "BlockoutWater", material: given = null } = {}) {
   if (!blocks.length) return null;
   const look = BLOCKOUT_CREEK_LOOK.water;
-  const positions = [], uvs = [], indices = [];
-  for (const b of blocks) {
-    const c = Math.cos(b.ry || 0), s = Math.sin(b.ry || 0), y = (b.y ?? groundAt(b.x, b.z)) + (b.h || 0) / 2;
-    const base = positions.length / 3;
-    for (const [lx, lz] of [[-b.w / 2, -b.d / 2], [b.w / 2, -b.d / 2], [b.w / 2, b.d / 2], [-b.w / 2, b.d / 2]]) {
-      const x = b.x + lx * c + lz * s, z = b.z - lx * s + lz * c;
-      positions.push(x, y, z);
-      uvs.push(x / look.tileM, z / look.tileM);
-    }
-    indices.push(base, base + 2, base + 1, base, base + 3, base + 2);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
+  const geometry = BuildContinuousWaterGeometry(blocks, groundAt, {
+    stepM: 2.0,
+    across: 3,
+    uvScale: 1 / look.tileM,
+    bankTuckM: 0.55,
+  });
   let material = given;
   if (material) {
     // 不透明的水面和水块顶面同一高度：往相机拉一点，不闪

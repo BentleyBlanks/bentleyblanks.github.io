@@ -34,6 +34,7 @@ import {
   WATER_RIPPLES,
   WATER_PRESETS,
 } from "./Data_Tuning_Water.mjs";
+import { BuildContinuousWaterGeometry } from "./Script_WaterGeometry.mjs";
 
 const MAX_WAVES = 6;
 const MAX_RIPPLES = WATER_RIPPLES.maxCount;
@@ -1542,56 +1543,11 @@ function EnsureWaterEdgeAttribute(geometry) {
 }
 
 /**
- * 把一组（可能旋转的）矩形水块细分成带 aWaterEdge 岸边衰减属性的连续水面几何，
- * 供白盒编辑器切入正式试玩（formal variant）时用 3A 水面渲染 BlockoutWater。
+ * 把一组（可能旋转、弯曲串接的）水块拼接成连续、无缝、带 aWaterEdge 岸边衰减属性的平滑水面几何，
+ * 供白盒编辑器切入正式试玩（formal variant）及正式关卡渲染连续河道与水塘。
  */
-export function BuildWaterBlockGeometry(blocks, groundAt, { stepM = 2.0 } = {}) {
-  const positions = [], normals = [], uvs = [], edges = [], indices = [];
-  for (const b of blocks || []) {
-    const w = Math.max(0.2, b.w || 1);
-    const d = Math.max(0.2, b.d || 1);
-    const nx = Math.max(2, Math.min(48, Math.ceil(w / stepM)));
-    const nz = Math.max(2, Math.min(48, Math.ceil(d / stepM)));
-    const c = Math.cos(b.ry || 0);
-    const s = Math.sin(b.ry || 0);
-    const y = (b.y ?? (groundAt ? groundAt(b.x, b.z) : 0)) + (b.h || 0) / 2;
-    const base = positions.length / 3;
-    for (let iz = 0; iz <= nz; iz += 1) {
-      const vz = iz / nz;
-      const lz = (vz - 0.5) * d;
-      const distZ = Math.min(vz, 1 - vz) * d;
-      for (let ix = 0; ix <= nx; ix += 1) {
-        const vx = ix / nx;
-        const lx = (vx - 0.5) * w;
-        const distX = Math.min(vx, 1 - vx) * w;
-        const wx = b.x + lx * c + lz * s;
-        const wz = b.z - lx * s + lz * c;
-        const shoreEdge = Math.min(1.0, Math.min(distX, distZ) / 1.2);
-        positions.push(wx, y, wz);
-        normals.push(0, 1, 0);
-        uvs.push(wx, wz);
-        edges.push(shoreEdge);
-      }
-    }
-    const stride = nx + 1;
-    for (let iz = 0; iz < nz; iz += 1) {
-      for (let ix = 0; ix < nx; ix += 1) {
-        const a = base + iz * stride + ix;
-        const bIdx = a + 1;
-        const cIdx = a + stride;
-        const dIdx = cIdx + 1;
-        indices.push(a, cIdx, bIdx, bIdx, cIdx, dIdx);
-      }
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setAttribute("aWaterEdge", new THREE.Float32BufferAttribute(edges, 1));
-  geometry.setIndex(indices);
-  geometry.computeBoundingSphere();
-  return geometry;
+export function BuildWaterBlockGeometry(blocks, groundAt, { stepM = 2.0, across = 8 } = {}) {
+  return BuildContinuousWaterGeometry(blocks, groundAt, { stepM, across, bankTuckM: 0.55 });
 }
 
 /**

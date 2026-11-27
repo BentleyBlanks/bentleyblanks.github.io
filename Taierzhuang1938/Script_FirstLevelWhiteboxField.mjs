@@ -477,7 +477,7 @@ export class FirstLevelWhiteboxField {
       // visual:false —— 只要碰撞，画面由模型负责（例：接收院的空担架摞）。
       const look = this.looks && targetSink === sink ? this.looks.LookOf(block) : null;
       if(block.visual!==false && !defenses.replaced.has(block.id) && !defenses.replaced.has(seamOwner)) {
-        if (this.looks && targetSink === sink && block.semantic === "water") {
+        if (targetSink === sink && block.semantic === "water" && !block.blockoutWater) {
           waterBlocks.push(block);
           this.waterBodies.push({
             x: block.x, z: block.z, w: block.w, d: block.d,
@@ -599,13 +599,34 @@ export class FirstLevelWhiteboxField {
       this.stats.roofShells = shells.length;
       // 名字沿用 StaticWhiteBoxes：Script_FirstLevelFrontBreakables 按这个名字找静态合批塌顶点。
       this.meshes.push(...this.looks.FlushBuckets(lookBuckets, this.scene, "FirstLevelWhitebox_StaticWhiteBoxes"));
-      const waterMesh=BuildWhiteboxWater(waterBlocks,this.scene);
-      if(waterMesh) {
-        this.waterMesh=waterMesh;
-        this.meshes.push(waterMesh);
-      }
       this.stats.looks = { ...this.looks.stats.looks };
       this.stats.lookFallbackSets = this.looks.stats.fallbackSets.slice();
+    }
+    if (waterBlocks.length) {
+      const pondWaterBlocks = [];
+      const riverWaterBlocks = [];
+      for (const b of waterBlocks) {
+        if (/pond/i.test(b.id || "")) pondWaterBlocks.push(b);
+        else riverWaterBlocks.push(b);
+      }
+      const riverWaterMesh = BuildWhiteboxWater(riverWaterBlocks, this.scene, {
+        preset: "muddyRiver",
+        name: "FirstLevelWhitebox_Water",
+        groundAt: terrainAt,
+      });
+      if (riverWaterMesh) {
+        if (!this.waterMesh) this.waterMesh = riverWaterMesh;
+        this.meshes.push(riverWaterMesh);
+      }
+      const pondWaterMesh = BuildWhiteboxWater(pondWaterBlocks, this.scene, {
+        preset: "pond",
+        name: "FirstLevelWhitebox_Ponds",
+        groundAt: terrainAt,
+      });
+      if (pondWaterMesh) {
+        if (!this.waterMesh) this.waterMesh = pondWaterMesh;
+        this.meshes.push(pondWaterMesh);
+      }
       this.stats.waterBlocks = waterBlocks.length;
     }
     if(airWallSink){

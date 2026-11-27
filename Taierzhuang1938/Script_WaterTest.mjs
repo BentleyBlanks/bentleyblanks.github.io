@@ -23,6 +23,7 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { QUALITY_PRESETS } from "./Data_Tuning_Graphics.mjs";
@@ -33,6 +34,7 @@ import {
   WATER_PRESETS,
   WATER_RIPPLES,
 } from "./Data_Tuning_Water.mjs";
+import { TraceWaterChains, BuildContinuousWaterGeometry } from "./Script_WaterGeometry.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(here, "..");
@@ -84,6 +86,33 @@ Check(
       && Array.isArray(s.waves) && s.waves.length >= 6 && s.edgeFadeDepth > 0;
   }) && JSON.stringify({ WATER_QUALITY_TIERS, WATER_PRESETS, WATER_RIPPLES }).length > 500,
 );
+
+// --- 1b. PCG 弯道水体自动缝合契约（河汊子主河道、西支流、北沙河水盒） ---
+{
+  const encDoc = JSON.parse(fs.readFileSync(path.join(here, "Scenes/FirstLevelEncounter/Scene_FirstLevelEncounter.json"), "utf8"));
+  const encWater = encDoc.objects.filter((o) => o.material === "Whitebox/Water" && o.visual !== false);
+  const encTraced = TraceWaterChains(encWater);
+  const mainChain = encTraced.chains.find((c) => c.ids.includes("RiverWater_1_11"));
+  const tribChain = encTraced.chains.find((c) => c.ids.includes("TributaryWater_1"));
+  const encGeom = BuildContinuousWaterGeometry(encWater, null, { stepM: 2.0, across: 4, bankTuckM: 0.55 });
+  const pos = encGeom.attributes.position.array;
+  const nrm = encGeom.attributes.normal.array;
+  let allFinite = pos.length > 0 && encGeom.index?.count > 0;
+  let allUpward = true;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (!Number.isFinite(pos[i]) || !Number.isFinite(pos[i + 1]) || !Number.isFinite(pos[i + 2])) { allFinite = false; break; }
+    if (nrm[i + 1] < 0.99) { allUpward = false; break; }
+  }
+  encGeom.dispose();
+  Check(
+    "Scene_FirstLevelEncounter 弯道水盒无缝缝合成单条主河道 + 单条支流（零离散断口）",
+    !!mainChain && mainChain.ids.length >= 25
+      && !!tribChain && tribChain.ids.length === 4
+      && encTraced.chains.length === 2
+      && allFinite && allUpward,
+    `chains=${encTraced.chains.map((c) => c.ids.length).join("+")} singles=${encTraced.singles.length} ribbons=${encTraced.ribbons.length} verts=${pos.length / 3}`,
+  );
+}
 
 if (QUICK) {
   console.log(`\nWaterTest (quick): ${passed} passed, ${failed} failed`);

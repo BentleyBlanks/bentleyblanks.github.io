@@ -24,6 +24,7 @@ import { TRENCH_DETAILS, TRENCH_LOOKS, EffectiveTrenchDetail } from "../Data_Tre
 import { MISSION_LAYOUT } from "../Data_FirstLevelMissionLayout.mjs";
 import { ApplyPatches } from "../Script_MaterialPatches.mjs";
 import { MakeWhiteboxGridPatch } from "../Script_WhiteboxGrid.mjs";
+import { BuildContinuousWaterGeometry } from "../Script_WaterGeometry.mjs";
 import { WHITEBOX_MATERIAL } from "../Data_Tuning_WhiteboxMaterial.mjs";
 import { ENCOUNTER_DEFAULT_VARIANT_ID, ENCOUNTER_VARIANTS } from "../Data_EncounterVariants.mjs";
 import { SceneEditorEnvironment } from "./Script_SceneEditorEnvironment.mjs";
@@ -358,6 +359,12 @@ class SceneEditorApp {
     objGroup.name = "SceneEditor_InheritedObjects";
     const matrix = new THREE.Matrix4(), color = new THREE.Color();
     for (const [key, list] of groups) {
+      if (key === "box:Whitebox/Water") {
+        const mesh = this.BuildWaterMesh(list, key, baseDoc, sampler, this.inherited);
+        mesh.name = `SceneEditor_Inherited_${key}`;
+        objGroup.add(mesh);
+        continue;
+      }
       const kind = key.startsWith("bd:") ? key.slice(3) : "box";
       const geometry = kind === "backdropBlob" || kind === "backdropHill" ? this.geometry.sphere
         : kind === "backdropTree" || key === "tree" ? this.geometry.cone : this.geometry.box;
@@ -1072,8 +1079,35 @@ class SceneEditorApp {
     return this.environment.AttachMaterial(material);
   }
 
+  /** 水面物件（Whitebox/Water）按首尾相接的连续河道条带重建，消除刚性水盒在弯道与变宽处的缺口和台阶。 */
+  BuildWaterGeometry(list, sampler, ctx = null) {
+    const resolved = list.map((obj) => {
+      if (!obj?.pos || obj.pos[1] !== null) return obj;
+      return { ...obj, pos: [obj.pos[0], this.BaseY(obj, ctx), obj.pos[2]] };
+    });
+    return BuildContinuousWaterGeometry(resolved, sampler || null, {
+      stepM: 2.0,
+      across: 4,
+      bankTuckM: 0.55,
+    });
+  }
+
+  BuildWaterMesh(list, key, doc = this.model.doc, sampler = this.sampler, ctx = null) {
+    const geometry = this.BuildWaterGeometry(list, sampler, ctx);
+    const material = this.MakeLayerMaterial(key, doc);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false;
+    mesh.userData.waterCount = list.length;
+    return mesh;
+  }
+
   RebuildObjects() {
-    for (const layer of this.layers) { this.world.remove(layer.mesh); layer.mesh.dispose(); layer.mesh.material.dispose(); }
+    for (const layer of this.layers) {
+      this.world.remove(layer.mesh);
+      if (layer.isWaterSurface) layer.mesh.geometry.dispose();
+      else layer.mesh.dispose?.();
+      layer.mesh.material.dispose();
+    }
     this.layers = [];
     this.where.clear();
     const groups = new Map();
@@ -1094,6 +1128,22 @@ class SceneEditorApp {
     }
     const matrix = new THREE.Matrix4(), color = new THREE.Color();
     for (const [key, list] of groups) {
+      if (key === "box:Whitebox/Water") {
+        const mesh = this.BuildWaterMesh(list, key, this.model.doc, this.sampler);
+        mesh.name = `SceneEditor_${key}`;
+        const layer = { key, mesh, ids: [], objects: list, isWaterSurface: true };
+        list.forEach((obj, i) => {
+          if (!obj.meta?.airWallSpline) {
+            layer.ids.push(obj.id);
+            this.where.set(obj.id, { layer, index: i });
+          } else {
+            layer.ids.push(null);
+          }
+        });
+        this.world.add(mesh);
+        this.layers.push(layer);
+        continue;
+      }
       const kind = key.startsWith("bd:") ? key.slice(3) : "box";
       const geometry = kind === "backdropBlob" || kind === "backdropHill" ? this.geometry.sphere
         : kind === "backdropTree" || key === "tree" ? this.geometry.cone : this.geometry.box;
@@ -1126,12 +1176,23 @@ class SceneEditorApp {
   /** 只挪了位置 / 角度 / 尺寸：改这几个实例的矩阵，不重建。override 给拖动中的预览物件。 */
   UpdateInstances(ids, override = null) {
     const matrix = new THREE.Matrix4();
+    const dirtyWaterLayers = new Set();
     for (const id of ids) {
       const at = this.where.get(id);
       const obj = override?.get(id) || this.model.Find(id);
       if (!at || !obj) continue;
+      if (at.layer.isWaterSurface) {
+        dirtyWaterLayers.add(at.layer);
+        continue;
+      }
       at.layer.mesh.setMatrixAt(at.index, this.Matrix(obj, matrix));
       at.layer.mesh.instanceMatrix.needsUpdate = true;
+    }
+    for (const layer of dirtyWaterLayers) {
+      const updatedList = layer.objects.map((o) => override?.get(o.id) || this.model.Find(o.id) || o);
+      const nextGeom = this.BuildWaterGeometry(updatedList, this.sampler);
+      layer.mesh.geometry.dispose();
+      layer.mesh.geometry = nextGeom;
     }
     this.SyncSelectionLines(override);
   }
@@ -2880,7 +2941,7 @@ ${seg.note}` : ""}`;
       Show: (opts) => { Object.assign(this.show, opts); this.RebuildObjects(); this.RebuildInheritedObjects(); },
       SelectInherited: (id) => this.SelectInherited(id),
       InheritedLayers: () => (this.inherited?.objectGroup?.children || []).map((m) => ({
-        name: m.name, count: m.count ?? 0, color: m.material?.color?.getHex?.() ?? null, transparent: !!m.material?.transparent,
+        name: m.name, count: m.count ?? m.userData?.waterCount ?? 0, color: m.material?.color?.getHex?.() ?? null, transparent: !!m.material?.transparent,
       })),
       // 壕沟（docs/Data_Scene.md §9）
       Trench: (id) => this.model.FindTrench(id),
