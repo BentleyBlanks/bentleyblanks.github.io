@@ -23523,7 +23523,7 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherGripRearWear.png",
-      "sha256": "d6c7d452265cc00e8fe9eecbe839accf378eaef37428f007acf686b190dde5bc",
+      "sha256": "696c2ba94989af45938b6c718585ab556f529ca233499b9e8a29b77e6e0f305c",
       "scale": 56000,
       "strength": 0.9,
       "fields": [
@@ -24517,6 +24517,22 @@
       "V89CoarseResponse/Local": "b781bd594e4a1c337dbcf50b5763659b346659aa312815b1b5fac821f8ab800b",
       "V89CoarseResponse/WholeGainPlus": "357b3e20c0bea31367d304d0261d9ecf8769626bbeb907700bf3f50bbc7f8f2a",
       "V89CoarseResponse/LocalRoughMinus": "13abf868b354b1de3aea09f60ee0e00604213879dd7c4b63b0a30459388064d9"
+    },
+    "frontWearRefinement": {
+      "revision": "2a9333ecb8b538f52fb08291a7126a0eb13e4375",
+      "sourcePhotoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+      "previousDetailSha256": "d6c7d452265cc00e8fe9eecbe839accf378eaef37428f007acf686b190dde5bc",
+      "lightRigSha256": "8d5f7fe681cc11b9ca6f588deb9cad0397449c926b2e21e849cd203f97a54345",
+      "strength": 2.08,
+      "frames": {
+        "UV": "5e79d8ba011be477e6691f1f0e90a649acca265b28df505d4ef40f45b7e03efe",
+        "MaterialChannels": "b12c4456ae090f9bb88058d00e1b96bc3e1e5f31a1024c3178aec3133c0a2784",
+        "Matched": "b4dc2f9a33bc3d9585537cbd03e07aff3e425d4d7f076068d55fa2aa9d711146",
+        "MatchedGainPlus": "98e4c6115e5328c8ba91bdd0a1cef9af515dc8ab26909d1397396daa4583697c",
+        "MatchedRedMinus": "3ddc12b7d2754a19640f884b50883432334f1b1c4397225005de125f6bc51174",
+        "MatchedRoughPlus": "88bf10241e512db9792c1cd9ec2c9ad9188198809a5233ab376f4b29df63e77e",
+        "MatchedMetalMinus": "5de1b16b60d142b88b776646e94b603cf609f98451ed89dc4e2531661d6332ad"
+      }
     }
   }
 }

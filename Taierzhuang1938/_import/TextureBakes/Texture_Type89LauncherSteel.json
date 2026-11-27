@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 569966,
-      "sha256": "2585614ae22fec31c42abb864851c723cf0d204f71b942844c8d33f6df9c0bb5"
+      "bytes": 569888,
+      "sha256": "b255c65fee26568b1f1673a1a9a230273891f64aac5d309c6aebdab11d601464"
     },
     {
       "channel": "Normal",
@@ -35,8 +35,8 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 84926,
-      "sha256": "c0f61e7b275390341316c7070930cd0f28bb0d5bf4273ad976660c8109ad8cbc"
+      "bytes": 85004,
+      "sha256": "6caa4523d638b30e117071e5dd660fd0d6ac041a1cb396a89d79a4e712b7ed5b"
     }
   ],
   "totalBytes": 1041238,
@@ -54,15 +54,15 @@
     "lowFreq": 0.0977,
     "seam": 0.1269,
     "interior": 0.0269,
-    "seamRatio": 4.715,
+    "seamRatio": 4.713,
     "border": 0.717,
-    "swing": 0.1177,
+    "swing": 0.1176,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "50c641e7765ce52f03ecc0ae84356a10f3a09446f6872896b1ccf3e67d5152a0",
+    "sha256": "09f8c8bdbc3df571f0e838a372385cd8a12755902e786b948ba41429e3784a1f",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -273,7 +273,7 @@
     },
     "gripRearDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherGripRearWear.png",
-      "sha256": "d6c7d452265cc00e8fe9eecbe839accf378eaef37428f007acf686b190dde5bc"
+      "sha256": "696c2ba94989af45938b6c718585ab556f529ca233499b9e8a29b77e6e0f305c"
     }
   },
   "contactAo": {
