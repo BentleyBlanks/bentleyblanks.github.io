@@ -5586,6 +5586,42 @@
           "uHalfSpan": 0.132,
           "vRange": [0.3878991489361702, 0.6829191489361702]
         }
+      },
+      "chromaCalibration": {
+        "photoSha256": "5b54ca60f4792a5a8611b5a21f7ff0d77f7c7ba75d39eab4ac36d799b048aefa",
+        "projection": [510, 431, 468, 186],
+        "footprint": {
+          "uCenter": 0.642,
+          "uHalfSpan": 0.132,
+          "vRange": [0.3878991489361702, 0.6829191489361702]
+        },
+        "file": "Texture_Type89LauncherNeckChroma.png",
+        "sha256": "a87d639263f5deaf5d792b2e44a8dcf2e8b5fec5f5e5de2cd434e56535d509f5",
+        "scale": 110000,
+        "frameSha256": {
+          "V53NeckStudyDefault": {
+            "beauty.png": "794839a94fecff35a69a46a556439f63b3125f51a97b0207dfae7083819f6171",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "RedBluePlus.png": "f50e3a891ff091c628b008f157a81a3346cbeabbbb21ade0e75404692aa57636",
+            "RedBlueMinus.png": "45258d28969f53192b91630ba214065cdd9db48caa9ca6a8442ee077e9a775e2",
+            "GreenPlus.png": "bf3a6a8b1649480eb491799a084d106dbcd9cb2b3ed1dfbcfae25c6e3017aa9c",
+            "GreenMinus.png": "a3823c64c7d7273e16560a5c1a7500e5bd58bed038d5f697c69b654df6d84747",
+            "GainPlus.png": "ab416dbc132ca2474ce00479c0a5009e77bd0bc955d132a89b449907bbebdce6",
+            "GainMinus.png": "722929122fc68438e4851d70f4be6c7edb185ca028ea2d1ca0688b5abd20a83e"
+          },
+          "V53NeckStudyMuseum": {
+            "beauty.png": "efe9c59c4277b8afbef4f7dbe3a8e3c13b4a6e53b9b5ea27671a7dcc2d0f4743",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "RedBluePlus.png": "d4134db30c6f516db68c97b3cff1f04366edde25547ba6c52a67a5ec9267bc4a",
+            "RedBlueMinus.png": "dd0a604f194a6a838e7aac170d96b2502545f590656b0718f6222ef6900afe0c",
+            "GreenPlus.png": "fda25400fe517543bbb446f9d2f95dd3f3ba0ac248b7877b9da7cc44921d7361",
+            "GreenMinus.png": "24badcfe5db64abe6ad598a2bcc7d0a31be7ec7e84a00ba308a572e7172151db",
+            "GainPlus.png": "16e4490c03dfe2c0fab8364f0f8707fa6f8660a3edb47d1af83156cb461861ee",
+            "GainMinus.png": "50f51dbad7d9b51d2ba417dd83dfff28017dae4ebe0c2b9bf8001d96584fbc05"
+          }
+        }
       }
     },
     "Tab": {

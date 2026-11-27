@@ -26,6 +26,7 @@ SADDLE_DETAIL = RECORD.with_name("Texture_Type89LauncherSaddleDetail.png")
 SADDLE_RESPONSE = RECORD.with_name("Texture_Type89LauncherSaddleResponse.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
+NECK_CHROMA = RECORD.with_name("Texture_Type89LauncherNeckChroma.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
@@ -200,11 +201,15 @@ def ReadRegisteredFrame(folder):
     return u, v, visible, images["beauty.png"].astype(float), hashes
 
 
-def ReadRegisteredLuma(folder, name, hashes):
+def ReadRegisteredRgb(folder, name, hashes):
     data = (folder / name).read_bytes()
     hashes[name] = sha256(data).hexdigest()
     with Image.open(BytesIO(data)) as frame:
-        return np.asarray(frame.convert("RGB"), dtype=float) @ REGISTERED_LUMA
+        return np.asarray(frame.convert("RGB"), dtype=float)
+
+
+def ReadRegisteredLuma(folder, name, hashes):
+    return ReadRegisteredRgb(folder, name, hashes) @ REGISTERED_LUMA
 
 
 def RegisteredBarrelPhotoFrame(photo, barrel, folder):
@@ -1500,7 +1505,92 @@ def NeckDetail(image, field):
     return {**detail, "footprint": {**footprint, "vRange": vRange}}
 
 
-def NeckFinish(folder):
+def NeckChromaIdentity(neck):
+    trace = neck["stampTrace"]
+    return {"photoSha256": neck["source"]["sha256"],
+            "projection": [trace["imageCenter"], trace["imageRadius"], *trace["imageYForVRange"]],
+            "footprint": neck["detail"]["footprint"]}
+
+
+def NeckChromaCalibration(photo, neck, evidence):
+    names = ("V53NeckStudyDefault", "V53NeckStudyMuseum")
+    folders = [evidence / name for name in names]
+    frames = [ReadRegisteredFrame(folder) for folder in folders]
+    u, v = frames[0][:2]
+    if not (np.array_equal(u, frames[1][0]) and np.array_equal(v, frames[1][1])):
+        raise ValueError("The neck color views must use the same registered camera")
+    identity = NeckChromaIdentity(neck)
+    center, radius, first, last = identity["projection"]
+    span = neck["footprint"]["uHalfSpan"]
+
+    def PhotoCoordinates(u, v):
+        return center + radius * np.sin(2 * np.pi * span * (2 * u - 1)), first + (last - first) * v
+
+    x, y = PhotoCoordinates(u, v)
+    target = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
+    distances = BarrelStampDistances(photo, neck["stampTrace"]["strokes"])
+    clearance = map_coordinates(distances, (y, x), order=1)
+    interior = frames[0][2] & frames[1][2] & (u > .075) & (u < .925) & (v > .074) & (v < .926)
+    interior = binary_erosion(interior, iterations=3)
+    lightness = target @ REGISTERED_LUMA
+    selected = interior & (clearance > 18) & (lightness > 31) & (lightness < 214)
+    if selected.sum() < 6000:
+        raise ValueError("The color response views do not cover the photographed neck surface")
+
+    def Features(rgb):
+        gray = rgb @ REGISTERED_LUMA
+        chroma = rgb[..., (0, 2)] / np.maximum(gray[..., None], 27)
+        return np.concatenate((chroma, (1.50 * np.log(gray + 16))[..., None]), axis=-1)
+
+    observed = np.stack([Features(frame[3][selected]) for frame in frames], axis=1)
+    residual = Features(target[selected])[:, None, :] - observed
+    # Use the measured lightness response to keep the luminance close to the
+    # current finish while fitting the color errors shared by both fixtures.
+    residual[..., 2] *= .16
+    firstResidual, secondResidual = residual[:, :, :2].transpose(1, 0, 2)
+    agreement = np.sum(firstResidual * secondResidual, axis=-1) / np.maximum(
+        np.linalg.norm(firstResidual, axis=-1) * np.linalg.norm(secondResidual, axis=-1), .001)
+    confidence = .40 + .60 * np.clip(agreement, 0, 1)
+    hashes = {name: frame[4] for name, frame in zip(names, frames)}
+
+    def Trial(name):
+        return np.stack([Features(ReadRegisteredRgb(folder, name + ".png", hashes[folder.name])[selected])
+                         for folder in folders], axis=1)
+
+    axes = (("RedBlue", (.32, -.020, -.34), (.88, .75), .049),
+            ("Green", (-.15, .19, -.16), (.67, .61), .059),
+            ("Gain", (.24, .24, .24), (.50, .48), .079))
+    basis = [Trial(axis + sign) - observed for axis, *_ in axes for sign in ("Plus", "Minus")]
+    weights = confidence[:, None, None] * np.array([.43, .57])[None, :, None]
+    shape = (101, 83)
+    bins = np.rint(u[selected] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(v[selected] * (shape[1] - 1)).astype(int)
+
+    def Smooth(values):
+        field = np.bincount(bins, weights=values, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(field, (1.12, 1.15))
+
+    support = Smooth(confidence)
+
+    def Average(values):
+        return Smooth(np.sum(values * weights, axis=(1, 2))) / np.maximum(support, .36)
+
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    fit = FitSignedResponse(pull, response, axes, 9)
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    x, y = PhotoCoordinates(uu, vv)
+    fade = np.clip((map_coordinates(distances, (y, x), order=1) - 15) / 18, 0, 1)
+    fade *= np.clip(np.minimum(uu, 1 - uu) / .12, 0, 1) * np.clip(np.minimum(vv, 1 - vv) / .12, 0, 1)
+    fade *= np.clip(support / .71, 0, 1)
+    gains = np.zeros((*shape, 3))
+    for i, (_, vector, _, _) in enumerate(axes):
+        amount = gaussian_filter(fit[..., 2*i] - fit[..., 2*i+1], (.84, .88)) * fade
+        gains += amount[..., None] * vector
+    fields = np.moveaxis(.82 * np.clip(gains, -.31, .34), -1, 0)
+    return WriteResponseFields(NECK_CHROMA, identity, fields, hashes, scale=110000)
+
+
+def NeckFinish(folder, previous=None, *, chromaEvidence=None):
     image, source = Photo(folder, 6)
     angles = np.linspace(-.132, .132, 23)
     imageCenter, imageRadius = 510, 431
@@ -1538,6 +1628,11 @@ def NeckFinish(folder):
         ],
     }
     field["detail"] = NeckDetail(image, field)
+    if chromaEvidence is not None:
+        field["chromaCalibration"] = NeckChromaCalibration(image, field, chromaEvidence)
+    elif previous and (calibration := previous.get("chromaCalibration")):
+        if all(calibration.get(key) == value for key, value in NeckChromaIdentity(field).items()):
+            field["chromaCalibration"] = calibration
     return field
 
 
@@ -1959,6 +2054,7 @@ def Main():
     options.add_argument("--barrel-band-evidence", type=Path, help="V50 Evidence directory with three-light barrel response captures")
     options.add_argument("--barrel-grain-evidence", type=Path, help="V51 Evidence directory with registered fine-grain color response captures")
     options.add_argument("--saddle-response-evidence", type=Path, help="V52 Evidence directory with saddle material response captures")
+    options.add_argument("--neck-chroma-evidence", type=Path, help="V53 Evidence directory with the neck color response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -1976,7 +2072,7 @@ def Main():
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": sleeve,
                           "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
-                          "Neck": NeckFinish(args.photos),
+                          "Neck": NeckFinish(args.photos, prior.get("Neck"), chromaEvidence=args.neck_chroma_evidence),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)

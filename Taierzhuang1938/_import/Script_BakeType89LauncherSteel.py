@@ -122,7 +122,7 @@ def BarrelTexelCenters(width, height, sampling):
     return np.meshgrid(np.interp(column, packed, arc), last - row * (last - first))
 
 
-def ApplyResponseFields(tile, calibration, channels, uu, vv):
+def SampleResponseFields(calibration, channels, uu, vv):
     path = REFERENCE.with_name(calibration["file"])
     if Sha256(path) != calibration["sha256"]:
         raise ValueError(f"Response fields do not match the measured reference: {path}")
@@ -130,9 +130,13 @@ def ApplyResponseFields(tile, calibration, channels, uu, vv):
         encoded = (np.asarray(image, dtype=float) - 32768) / calibration["scale"]
     if encoded.ndim != 2 or encoded.shape[1] % len(channels):
         raise ValueError(f"Invalid response fields: {path}")
+    return {name: ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
+            for name, field in zip(channels, np.split(encoded, len(channels), axis=1))}
+
+
+def ApplyResponseFields(tile, calibration, channels, uu, vv):
     base, normal, orm = tile
-    fields = {name: ReferenceField({"footprint": calibration["footprint"], "value": field.T}, uu, vv, "value")
-              for name, field in zip(channels, np.split(encoded, len(channels), axis=1))}
+    fields = SampleResponseFields(calibration, channels, uu, vv)
     gain = fields["gain"]
     base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
     tiltU, tiltV = fields.get("tilt"), fields.get("tiltV")
@@ -159,16 +163,35 @@ def ApplyBarrelResponse(tile, closeup, calibration, channels):
     ApplyResponseFields(tile, calibration, channels, *BarrelTexelCenters(width, height, ATLAS["barrelSampling"]))
 
 
+def PlanarTexelCenters(width, height):
+    padding = ATLAS["padding"]
+    column = (np.arange(width) + .5 - padding) / (width - 2 * padding)
+    row = 1 - (np.arange(height) + .5 - padding) / (height - 2 * padding)
+    return np.meshgrid(column, row)
+
+
 def ApplySaddleResponse(tile, saddle, calibration):
     if (calibration["photoSha256"] != saddle["source"]["sha256"]
             or calibration["sampleStrips"] != saddle["source"]["sampleStrips"]
             or calibration["footprint"] != saddle["footprint"]):
         raise ValueError("The saddle response does not match the source photo and projection")
     height, width = tile[0].shape[:2]
-    padding = ATLAS["padding"]
-    column = (np.arange(width) + .5 - padding) / (width - 2 * padding)
-    row = 1 - (np.arange(height) + .5 - padding) / (height - 2 * padding)
-    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *np.meshgrid(column, row))
+    ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *PlanarTexelCenters(width, height))
+
+
+def ApplyNeckChroma(tile, neck, calibration):
+    trace = neck["stampTrace"]
+    projection = [trace["imageCenter"], trace["imageRadius"], *trace["imageYForVRange"]]
+    if (calibration["photoSha256"] != neck["source"]["sha256"] or calibration["projection"] != projection
+            or calibration["footprint"] != neck["detail"]["footprint"]):
+        raise ValueError("The neck color response does not match the source photo and projection")
+    base = tile[0]
+    height, width = base.shape[:2]
+    channels = ("red", "green", "blue")
+    fields = SampleResponseFields(calibration, channels, *PlanarTexelCenters(width, height))
+    gain = np.stack([fields[name] for name in channels], axis=-1)
+    linear = SrgbToLinear(base / 255) * np.exp(gain)
+    base[:] = np.rint(255 * np.clip(LinearToSrgb(linear), 0, 1)).astype(np.uint8)
 
 
 def PhotographicGrain(closeup, xx, vv):
@@ -1056,6 +1079,10 @@ def BuildAtlas(reference):
                 saddle = reference["closeups"]["Saddle"]
                 if (calibration := saddle.get("responseCalibration")) is not None:
                     ApplySaddleResponse(tile, saddle, calibration)
+            elif name == "Neck":
+                neck = reference["closeups"]["Neck"]
+                if (calibration := neck.get("chromaCalibration")) is not None:
+                    ApplyNeckChroma(tile, neck, calibration)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1098,6 +1125,8 @@ def Bake():
             details[name] = calibration
     if (calibration := reference["closeups"]["Saddle"].get("responseCalibration")) is not None:
         details["saddleResponse"] = calibration
+    if (calibration := reference["closeups"]["Neck"].get("chromaCalibration")) is not None:
+        details["neckChroma"] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
