@@ -548,7 +548,7 @@ class Node:
 # ---------------------------------------------------------------------------
 
 def _ExtractLoops(bm, tile):
-    """Triangulate and collect positions, normals and authored UVs."""
+    """Triangulate and collect positions, normals and authored UVs.
 
     光滑法线只由**相邻的 smooth 面**加权累加：直接拿 vert.normal 的话，
     圆柱端盖（flat）会把侧壁（smooth）的法线往轴向拽，柱面边缘出现一圈死光。

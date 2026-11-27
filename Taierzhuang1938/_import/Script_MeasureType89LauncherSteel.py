@@ -17,6 +17,7 @@ REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 CONTACT_AO = RECORD.parents[2] / "Source/Type89Launcher/Texture_Type89LauncherContactAo.png"
 SEAM_AO = CONTACT_AO.with_name("Texture_Type89LauncherSeamAo.png")
+JOINT_AO = CONTACT_AO.with_name("Texture_Type89LauncherJointAo.png")
 
 
 def SaveReferenceRecord(record):
@@ -99,6 +100,15 @@ def WideReflectionIdentity(reference):
     encoded = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return {"photoSha256": patina["source"]["sha256"], "sourceFinishSha256": sha256(encoded).hexdigest(),
             "contactAoSha256": ContactAoSha256(), "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest()}
+
+
+def ReverseReflectionIdentity(reference):
+    basis = {"overall": reference["footprint"], "front": reference["barrelPatina"],
+             "closeup": reference["closeups"]["Barrel"]}
+    encoded = json.dumps(basis, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return {"sourceFinishSha256": sha256(encoded).hexdigest(),
+            "contactAoSha256": ContactAoSha256(), "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest(),
+            "jointAoSha256": sha256(JOINT_AO.read_bytes()).hexdigest()}
 
 
 BARREL_DETAIL = RECORD.with_name("Texture_Type89LauncherBarrelDetail.png")
@@ -2582,6 +2592,7 @@ def Main():
     priorFlank = record.get("knurl", {}).get("flankWear", {})
     priorShoulderBalance = record.get("shoulder", {}).get("Flank", {}).get("reflectionBalance")
     priorWideBalance = record.get("barrelPatina", {}).get("wideReflectionBalance")
+    priorReverseBalance = record.pop("reverseReflectionBalance", None)
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,
@@ -2648,6 +2659,12 @@ def Main():
     if priorWideBalance and all(priorWideBalance.get(field) == value
                                 for field, value in WideReflectionIdentity(record).items()):
         record["barrelPatina"]["wideReflectionBalance"] = priorWideBalance
+    if priorReverseBalance:
+        photo = args.photos / priorReverseBalance["source"]["file"]
+        unchanged = not photo.is_file() or sha256(photo.read_bytes()).hexdigest() == priorReverseBalance["sourceSha256"]
+        if unchanged and all(priorReverseBalance.get(field) == value
+                             for field, value in ReverseReflectionIdentity(record).items()):
+            record["reverseReflectionBalance"] = priorReverseBalance
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)

@@ -86,6 +86,7 @@
 - 筒身钢面与驻钣凸面分别按第 7 张近照和第 1 张馆藏照片校准底色与切线法线。拟合使用校准灯、斜视、默认灯和柔光的响应，并约束亮斑的亮度。刻印及深接缝有独立的衰减，另从反向斜视复测。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 以第 1 张馆藏照测量整段筒身亮带的横向轮廓，从三个光照及机位响应联合校准底色和切线法线。拟合约束默认灯的中间调，用柔光和第 7 张刻印近照独立复测。 [采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 - 单独展开第二套接缝 UV，在轮齿、旋钮底座、两侧拨片支架、尾套沟槽和驻钣接头上各自烘焙遮蔽。独立 UV 消除钢材重叠处的暗缝丢失。原钢面底色和法线逐文件一致。游戏和检查台以 ORM 红通道读取这份遮蔽，三张贴图合计 1,046,648 字节。 [接缝烘焙记录](../_import/Source/Type89Launcher/Data_Type89LauncherJointAo.json)
+- 第 8 张馆藏照用于校准背面筒身的两条宽亮带和磨蚀细纹。用箍圈、支柱、旋钮及驻钣等筒身外的钢件估计布光，分别调节底色与两个切线方向的法线，再从原图提取滤去宽反光的局部纹理。背面法线沿轴向减弱重复横纹。另两组布光和留出的轴向区段用于复测。 [背面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
 ## 重建与贴图
 
@@ -119,4 +120,5 @@
 - 肩部的跨机位反光参数保存在 `shoulder.Flank.reflectionBalance`。烘焙沿现有 UV 岛施加材质响应，并在照片覆盖边缘和深接缝内衰减。
 - 筒身和驻钣的底色及切线法线参数分别保存在 `closeups.Barrel.surfaceBalance` 和 `closeups.Saddle.surfaceBalance` 对应的 16 位采样图中。烘焙前核对原照、原材质和两份接缝遮蔽的哈希。
 - 整段筒身的亮带参数保存在 `barrelPatina.wideReflectionBalance`。计算以原 UV 弧度和轴向采样为基准，在第 7 张近照的校准区及深接缝衰减。
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV68/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 背面亮带系数和细纹采样保存在 `reverseReflectionBalance`。烘焙前核对原有正面和刻印材质、三份 AO 及 16 位采样图的哈希。背面修正按周向边缘、筒身两端和深接缝过渡，重采样相邻窄条 UV。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV70/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

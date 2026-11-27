@@ -8174,5 +8174,72 @@
         }
       }
     }
+  },
+  "reverseReflectionBalance": {
+    "center": 0.1,
+    "angularRange": [-0.074, 0.254],
+    "axialRange": [0.116, 0.874],
+    "angularFeather": 0.032,
+    "axialFeather": 0.058,
+    "visibilityFloor": 0.65,
+    "visibilityFade": 0.24,
+    "knots": [-0.074, -0.04, -0.01, 0.022, 0.048, 0.075, 0.104, 0.133, 0.16, 0.185, 0.209, 0.232, 0.254],
+    "coefficients": {
+      "gain": [0.0260175, 0.1890554, 0.3079585, 0.2770104, 0.081648, -0.0537626, 0.0370742, 0.233545, 0.3467935, 0.3538653, 0.2638049, 0.1407202, 0.0098349],
+      "tilt": [0.0135525, 0.154282, 0.2717926, 0.29, 0.2447127, 0.2048193, 0.161161, 0.1165798, 0.1010517, 0.0441513, -0.006054, -0.0237393, -0.0184639],
+      "tiltV": [-0.0172148, -0.1376629, -0.23, -0.23, -0.0799508, 0.0773222, 0.1369085, 0.1264939, 0.0566313, -0.0195554, -0.0506437, -0.042433, -0.0139162]
+    },
+    "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+    "basisRendererRevision": "8feef68f6ba78da0f0aa22805d739117b147bb5a",
+    "poseRegistration": [0.9282111403496914, -0.2931799779212158, -0.0026327672149387533, 0.1759392557546735, 127.9417125688784, 277.822174997614, 498.84743395768686],
+    "validationRows": [
+      [0.12, 0.29],
+      [0.62, 0.78]
+    ],
+    "rigSha256": "13b7ff9bf1227b8dcdb3b2e53029d5d8c94fc1b97616747de317f71c85060810",
+    "responseImages": {
+      "Matched.f32": "86db1ac5924987b74b678efd176afb58969d9288338d21afccd7df0c7c39dd0a",
+      "MatchedAcrossMinus.f32": "9080ea29f9b172cde7656f7dd2b2d2b781539f2e9ed9cf276d18820117b8b0d4",
+      "MatchedAcrossPlus.f32": "918b77bbf23e5bc3278f6d9b7e555b810f9b13ab00cb7efc73ab8bf2c0a7f9c2",
+      "MatchedAlongMinus.f32": "593419738ca46eec4d46e20ed25990a1ff2347e872ce3a725bad395010fd7024",
+      "MatchedAlongPlus.f32": "77acda2c9ab2e72c928ef6e5b035a1707682d5ee551ee8f6fe32cb83dbb456ea",
+      "MatchedBaseMinus.f32": "5a3c80336592fadbac6f05ff9a809db5e66b7a3a0289369e591e8dbf546f6f6d",
+      "MatchedBasePlus.f32": "fc2d4ac5c815e19eecf931695a0de728b622796baa6e0ccf66129e534bb30ee7",
+      "MatchedRoughMinus.f32": "0989114a466e2f5d18a7f9d23a70b745fdb58b34d135dfcb8c3985e84e43536c",
+      "MatchedRoughPlus.f32": "34d85c83036b7759708e77565a3339fd3c139c542f803261e5cfa116d227d3b6"
+    },
+    "detail": {
+      "file": "Texture_Type89LauncherReverseDetail.png",
+      "sha256": "5cc89231c843fc30999c5a2248bd0024d8311c766fb307f94fd74b1a991e6a96",
+      "scale": 16384,
+      "footprint": {
+        "uCenter": 0.084,
+        "uHalfSpan": 0.151,
+        "vRange": [0.136, 0.854]
+      },
+      "photoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "capturePose": [0.9282111403496914, -0.2931799779212158, -0.0026327672149387533, 0.1759392557546735, 202.11803619830596, 438.66659210149584, 787.6538430910846],
+      "capturePixels": [406, 900],
+      "captureHashes": {
+        "UV": "4efe56f1417439b5ce7e333ce1ed52139b8b28caf02b6eaf352ade8e29bdf18a",
+        "Matched": "54e669694cd1c332c6e8d478dcefd6eea43766b96a8dfed95f279e62b1baccef",
+        "HeldOut": "2c95de3a45fe326c30500ef05bfb5378ff1cd51f3fcb0ef98f29f7e80e6d64de",
+        "Broad": "25fa1a9b862102816dea6be546fca4c0e3c9f5509bc4b43872b9fca10bf8b279"
+      },
+      "strength": 1.72
+    },
+    "source": {
+      "file": "Mariners8.jpg",
+      "url": "https://catalogs.marinersmuseum.org/object/CL2830",
+      "label": "Mariners Museum 1946.0037.000001, photograph 8"
+    },
+    "sourceFinishSha256": "ab93aea90ac8b2c9a07763e5ce34d4a69766f09620e977507ca5e6b510141b7a",
+    "contactAoSha256": "75a7687bb2ca950ebbc2ffb96bcb38c46375e6927f3a4db4b012423d65f5b0f4",
+    "seamAoSha256": "5bb978cb0d1537575c015c82a423f4a6c7b19c49829cbd1c3f817bc65b680db0",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "axialNormalSmoothing": {
+      "sigma": 1.2,
+      "strength": 0.8
+    }
   }
 }

@@ -10,10 +10,10 @@ import sys
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
-from scipy.ndimage import gaussian_filter, map_coordinates
+from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
-from Script_MeasureType89LauncherSteel import SurfaceBalanceIdentity, WideReflectionIdentity
+from Script_MeasureType89LauncherSteel import ReverseReflectionIdentity, SurfaceBalanceIdentity, WideReflectionIdentity
 
 
 HERE = Path(__file__).resolve().parent
@@ -1379,6 +1379,38 @@ def ApplyBarrelWideReflection(tile, reference, u, v, seamVisibility):
     ApplyMaterialFields(tile, fields, coverage)
 
 
+def ApplyBarrelReverseReflection(tile, reference, u, v, seamVisibility):
+    balance = reference["reverseReflectionBalance"]
+    if any(balance.get(key) != value for key, value in ReverseReflectionIdentity(reference).items()):
+        raise ValueError("Reverse barrel balance does not match the front, close-up and contact atlas")
+    detail = balance["detail"]
+    if detail["photoSha256"] != balance["sourceSha256"]:
+        raise ValueError("Reverse barrel fine detail does not match its registered photograph")
+
+    def Fade(axis, limits, width):
+        lo, hi = limits
+        return SmoothRamp((axis - lo) / width) * SmoothRamp((hi - axis) / width)
+
+    center = balance["center"]
+    angle = center + (u - center + .5) % 1 - .5
+    coverage = Fade(angle, balance["angularRange"], balance["angularFeather"])
+    coverage *= Fade(v, balance["axialRange"], balance["axialFeather"])
+    coverage *= SmoothRamp((seamVisibility - balance["visibilityFloor"]) / balance["visibilityFade"])
+    fields = {name: np.interp(angle, balance["knots"], balance["coefficients"][name])
+              for name in ("gain", "tilt", "tiltV")}
+    fields["gain"] += detail["strength"] * SampleResponseFields(detail, ("gain",), angle, v)["gain"]
+    ApplyMaterialFields(tile, fields, coverage)
+
+    # Reduce the repeated circumferential texture while leaving the measured wear in base color.
+    smoothing = balance["axialNormalSmoothing"]
+    normal = tile[1].astype(float) / 127.5 - 1
+    filtered = gaussian_filter1d(normal, smoothing["sigma"], axis=0, mode="nearest")
+    active = coverage > 1e-4
+    vector = normal[active] + smoothing["strength"] * coverage[active, None] * (filtered[active] - normal[active])
+    vector /= np.linalg.norm(vector, axis=-1, keepdims=True)
+    tile[1][active] = np.rint(127.5 * (vector + 1)).astype(np.uint8)
+
+
 def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
@@ -1396,11 +1428,13 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     shoulder = reference["shoulder"]["Flank"]
     surfaceBalances = {name: closeups[name] for name in ("Barrel", "Saddle") if "surfaceBalance" in closeups[name]}
     wideBarrelBalance = "wideReflectionBalance" in reference["barrelPatina"]
+    reverseBarrelBalance = "reverseReflectionBalance" in reference
     if "albedoBalance" in flank and "surfaceCalibration" not in flank:
         raise ValueError("Knurl albedo balance requires the registered flank response")
     visibility = seamVisibility = None
     needsSeamVisibility = ("steelBalance" in tab or "albedoBalance" in flank
-                           or "reflectionBalance" in shoulder or bool(surfaceBalances) or wideBarrelBalance)
+                           or "reflectionBalance" in shoulder or bool(surfaceBalances)
+                           or wideBarrelBalance or reverseBarrelBalance)
     if needsSeamVisibility or "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
@@ -1475,7 +1509,7 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
                     ApplyCollarResponse(tile, collar, calibration)
-        if name in surfaceBalances or (name == "Barrel" and wideBarrelBalance):
+        if name in surfaceBalances or (name == "Barrel" and (wideBarrelBalance or reverseBarrelBalance)):
             if name == "Barrel":
                 u, v = BarrelTexelCenters(width, height, ATLAS["barrelSampling"])
             else:
@@ -1485,6 +1519,8 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
                 ApplyCloseupSurfaceBalance(tile, surfaceBalances[name], u, v, regionVisibility)
             if name == "Barrel" and wideBarrelBalance:
                 ApplyBarrelWideReflection(tile, reference, u, v, regionVisibility)
+            if name == "Barrel" and reverseBarrelBalance:
+                ApplyBarrelReverseReflection(tile, reference, u, v, regionVisibility)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1601,6 +1637,8 @@ def Bake(legacyOrm=None):
     for name in ("Barrel", "Saddle"):
         if (calibration := reference["closeups"][name].get("surfaceBalance")) is not None:
             details[f"{name.lower()}SurfaceBalance"] = calibration
+    if (reverse := reference.get("reverseReflectionBalance")) is not None:
+        details["reverseBarrelDetail"] = reverse["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
