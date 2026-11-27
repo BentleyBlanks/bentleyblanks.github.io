@@ -14432,8 +14432,8 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "38d4d82cc1a88f7411338227fb76992a682fdc787523906a909dbe86d0a33958",
-      "scale": 40000,
+      "sha256": "dee293cdfba133620bdf07cc31b23416165f9ed61380bc47ad42f00ccd329c5a",
+      "scale": 32157,
       "strength": 0.76,
       "fields": [
         "gain",
@@ -14493,6 +14493,70 @@
           "RoughMinus": "5034bf4fdfd482f0d7cc9c28ec220bfbdbd0a53c2dd9476053322f1341cdf456",
           "MetalPlus": "daff934872b80d63cbe83c811519be89d2e26a7db4bb6c3bcfa77230e17d3a09",
           "MetalMinus": "95bee0df3aac27bd260771ed5eac964ef7d7c14d843935475f83e6bbd6c8fc88"
+        }
+      }
+    },
+    "currentCameraCalibration": {
+      "referencePhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "galleryEnergy": 2.065,
+      "galleryFill": 2.35,
+      "coarseDetailSha256": "d30b9c65dec9a9e3a5640862108020622b61290336fa833a630aa64a06d81920",
+      "grainStrength": 0.76,
+      "fineFrames": {
+        "default": {
+          "ProbeZero": "0fdf3226a9eb60ee6c8d45c63a36b0b7ab8c1531e66b4a55bffb48a68aa83765",
+          "BasePlus": "b550dbb0227323a3965457764be9490f3486f570f3906438c6c6a6093b2bafea",
+          "BaseMinus": "d3593327f57d1743cbf181f5b09b2dcd9efe71b88e6ab8ee8efd04fbc831eff7",
+          "TintRedPlus": "d5ef4a1d957eeb75318ee5138164666deeaf90d0dd67770cc02baed2df0a4141",
+          "TintRedMinus": "35ef6a0a1b661a4d26f54900065a14181bb0806a57547401b2ecd706900354c1",
+          "TintBluePlus": "1fedd75cae8bc85a4e98753312d12c282c4c636f6dd12a6214c6c004c55de42f",
+          "TintBlueMinus": "d28c02e1e2449a9d99ca62f5f444714909bfa129439f17ae223db08e1d149024",
+          "uvHi": "f1a8d59a64ff1a828c5b1a2684280383570ebe374e26ab29b4701c7cec66f4ed",
+          "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
+        },
+        "gallery": {
+          "ProbeZero": "74fb21f833de9858dd014a900fa9dbc1e5096bf9a1e78023c651d463851a9270",
+          "BasePlus": "2fa1b49d6fbdbef6dd47701302652d5eefbeb0c59cd2dec87bdbe20007fd7621",
+          "BaseMinus": "700fac91d9ce79e949abe94b65ed4a64456826c04fbc4a79bd3703ca671a66e6",
+          "TintRedPlus": "6dd9d8755490efaee78022c9fbbacff354f77154e9401348b75af376d5972bc2",
+          "TintRedMinus": "f1da945552f7388b17e1f5879c1943de1dab6a2d881eb5e04f735b92d76fb5be",
+          "TintBluePlus": "14ee43b522f73e9ff85cb3b8fa70da31e538c21eea66d6ec3063940a726654db",
+          "TintBlueMinus": "dafa6c9b3dd991e7af5ec833acefaa261fd52c0704154fb0052e03655818f921",
+          "uvHi": "f1a8d59a64ff1a828c5b1a2684280383570ebe374e26ab29b4701c7cec66f4ed",
+          "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
+        }
+      },
+      "previousDetailSha256": "38d4d82cc1a88f7411338227fb76992a682fdc787523906a909dbe86d0a33958",
+      "coarseFrames": {
+        "default": {
+          "ProbeZero": "c5035f0f4b8e4c97515ba0778636c7f9f270b852918764a5a42444b4c0b5e2e8",
+          "BasePlus": "8e5a63113c6616688b727e0a80d24665aba99c0ef23a4df5166a90f708533afa",
+          "BaseMinus": "31563d2a9f38ba5d597b12d060ac9a245244cb6c33bf9b1e1e1d8c92f5427956",
+          "AcrossPlus": "6b7c7ea40b72690e6e1b9dfa5c71f524ffb30b32e472cde2777338f37fd33bdf",
+          "AcrossMinus": "96792f8fdf99d8af85fecf0493fd7f685ee6615294b67485a0dde14ea6b8826e",
+          "AlongPlus": "9cdeac3d728eac34601db25cc0a48044c35768d61e353b4b3414b1aee8c1f159",
+          "AlongMinus": "19bb3b66b8e3cb70bc2c0017d5eb98e34ea028695b7433a7b0a28e2279ff9435",
+          "RoughPlus": "4f81309dd91daef715a41fbaefe75f2b62f1fd3a8bc932c5abeefc75972f58ce",
+          "RoughMinus": "1a754dbefb6a5724c177e1dc5748059bb21713b6ce5cd11e7e9a379796fa5150",
+          "MetalPlus": "59ec5fb92b29305f71faeff36bf86957d3c04d315da68f95280b33125cc5bc30",
+          "MetalMinus": "39b7186e0119426688ce6205e78def111e2eb611f928fbd887c4f1adb6d076b4",
+          "uvHi": "f1a8d59a64ff1a828c5b1a2684280383570ebe374e26ab29b4701c7cec66f4ed",
+          "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
+        },
+        "gallery": {
+          "ProbeZero": "b34105ae1a7659260f2c4e9dffb071980d30f55461a2805ac1bf783d60a2b128",
+          "BasePlus": "b2f79ebf11cce3bd85cc947351201e066862b2566a701dddfe52def7cfa1fe4c",
+          "BaseMinus": "9f879232f66f9e97fa1267c6537203d780d1b9d284b35ecfe4381f6050bdf491",
+          "AcrossPlus": "42b7b77d940bc4a11f230d6d705e94643293247b6f90fd39f8909cf406d1945c",
+          "AcrossMinus": "44a4dd8d518dda0083a1ed56968570c2b5e5b5a3534e2781a4e4a708bcb3d299",
+          "AlongPlus": "e82c17797322fa42fdcdef6b29767306d364e606b5a0433426dbc3524d8861cc",
+          "AlongMinus": "42fd6a5df2db19f3e33687892c41ae61f28804e57089f7faa7f0f92b8d033a28",
+          "RoughPlus": "7245922f033983947178623b5ca40f29b62f5f76e32bfc07ee301cfdb351b104",
+          "RoughMinus": "c363fe52d7a8c1d53ad68fbbbd1528278336c609c11b72bfe48295bff3c78aff",
+          "MetalPlus": "6ca858b27d57a193762d22922b757d90f77286bde19b4056c6c4e4c0c26705be",
+          "MetalMinus": "d5339467772fe7519cd8071522f13588c0be07a921d348ee33602ada7d06e014",
+          "uvHi": "f1a8d59a64ff1a828c5b1a2684280383570ebe374e26ab29b4701c7cec66f4ed",
+          "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
         }
       }
     }
