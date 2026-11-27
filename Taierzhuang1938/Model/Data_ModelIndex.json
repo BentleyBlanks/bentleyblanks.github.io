@@ -519,11 +519,11 @@
    "name": "Dadao",
    "category": "weapon",
    "file": "Model_Dadao.tzm.json",
-   "triangles": 9632,
+   "triangles": 9896,
    "meshBlocks": 1,
    "nodes": 5,
    "joints": 0,
-   "bytes": 184335,
+   "bytes": 188735,
    "materials": [
     "dadao"
    ],
@@ -545,9 +545,9 @@
      0.26988
     ]
    },
-   "sourceTriangles": 9632,
-   "targetTriangles": 9632,
-   "triangleLimit": 10812
+   "sourceTriangles": 9896,
+   "targetTriangles": 9896,
+   "triangleLimit": 10000
   },
   {
    "name": "OfficerSwordSet",

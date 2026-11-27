@@ -1,5 +1,6 @@
 """Build a textured game prop from the visible Yang Yunfeng photo contours."""
 
+from bisect import bisect_right
 from collections import Counter
 import json
 import math
@@ -8,13 +9,14 @@ from pathlib import Path
 import bmesh
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 from mathutils.geometry import delaunay_2d_cdt
 
 from TzmCore import AUTHORED_NORMAL_LAYER, Node
 
 
 FIT_FILE = Path(__file__).with_name("Data_YangYunfengDadaoFit.json")
-TRIANGLE_LIMIT = 10_812
+TRIANGLE_LIMIT = 10_000
 
 
 def Plane(frame, x, y):
@@ -152,6 +154,17 @@ def BuildPlate(fit, name):
             t = min(1, max(0, (AcrossBlade(u, v, outline) - .71) / .22))
             # Preserve the engine's +Y visual edge orientation and the photo projection.
             depths[i] *= 1 - .84 * t * t * (3 - 2 * t)
+    elif name == "Pommel":
+        aperture = [Plane(frame, *p) for loop in fit["parts"][name]["loops"][1:] for p in loop]
+        left, right = min(u for u, _ in aperture), max(u for u, _ in aperture)
+        centerU = (left + right) / 2
+        centerV = (min(v for _, v in aperture) + max(v for _, v in aperture)) / 2
+        for i in used:
+            u, v = Plane(frame, *coordinates[i])
+            theta = math.atan2(v - centerV, 1.12 * (u - centerU))
+            roll = .5 + .5 * math.cos(13 * theta + 1.3 * math.sin(4 * theta) + .6 * math.sin(9 * theta))
+            yarn = min(1, max(0, (u - left + 9) / 22))
+            depths[i] *= 1 - .069 * yarn * roll
     front = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], depths[i])) for i in used}
     back = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], -depths[i])) for i in used}
     boundaries = Counter(tuple(sorted((a, b))) for face in shell for a, b in zip(face, face[1:] + face[:1]))
@@ -197,21 +210,95 @@ def TuckRows(mesh, frame, section, photographedEnd, direction):
             for extension, width, thickness in ((14.0, .77, .52), (6.2, .96, .96), (.72, 1.0, 1.0))]
 
 
-def BuildGrip(fit):
+def GuardBack(outline, v):
+    return max(a[0] + (b[0] - a[0]) * (v - a[1]) / (b[1] - a[1])
+               for a, b in zip(outline, outline[1:] + outline[:1])
+               if min(a[1], b[1]) <= v < max(a[1], b[1]))
+
+
+def SeatUpperGrip(mesh, fit, section, profile, guard):
+    frame = fit["frame"]
+    first, low, high = profile
+    center, radius = (high + low) / 2, (high - low) / 2
+    outline = [Plane(frame, *point) for point in fit["parts"]["Guard"]["loops"][0]]
+    surface = BVHTree.FromBMesh(guard)
+    origin, towards = .12, Vector((-1, 0, 0))
+    rows = []
+    # The wrap stays compressed through the guard's rounded rear edge. It
+    # regains its oval cross section over the exposed length of the collar.
+    for offset, width, depthScale in ((-9.0, .88, .32), (-4.0, .97, .24), (0, 1, .145),
+                                       (2.7, 1, .24), (7.8, 1, .49)):
+        row = []
+        for side, depth in section:
+            v = center + radius * width * side
+            edge = GuardBack(outline, v)
+            out = min(1, (first - edge - .95) / 7.8)
+            u = edge + offset * (out if offset > 0 else 1)
+            x, y, z = World(frame, u, v, .34 * radius * depth * depthScale)
+            hit = surface.ray_cast(Vector((origin, y, z)), towards, 2 * origin)[0]
+            if hit is not None:
+                # Keep the overlap inside the metal itself on both faces.
+                limit = max(.00005, hit.x - .65 * frame["scale"])
+                x = math.copysign(min(abs(x), limit), x)
+            row.append(mesh.verts.new((x, y, z)))
+        rows.append(row)
+    return rows
+
+
+def GripProfileAt(samples, u):
+    for a, b in zip(samples, samples[1:]):
+        if a[0] <= u <= b[0]:
+            t = (u - a[0]) / (b[0] - a[0])
+            return a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2])
+    return (samples[0] if u < samples[0][0] else samples[-1])[1:]
+
+
+def BuildGrip(fit, guard):
     frame = fit["frame"]
     mesh = bmesh.new()
-    count = 30
+    count = 28
     section = [(math.sin(i * math.tau / count), math.cos(i * math.tau / count)) for i in range(count)]
     samples = fit["grip"]
     widths = [bottom - top for _, top, bottom in samples]
-    start = next(i for i, width in enumerate(widths) if width >= .90 * max(widths[:8]))
+    guardBack = max(Plane(frame, *p)[0] for p in fit["parts"]["Guard"]["loops"][0])
+    start = next(i for i, row in enumerate(samples) if row[0] > guardBack + 3)
     end = next(i for i in reversed(range(len(widths))) if widths[i] >= .90 * max(widths[-12:]))
-    rows = TuckRows(mesh, frame, section, samples[:start + 1], -1)
-    for u, top, bottom in samples[start:end + 1]:
+    rows = SeatUpperGrip(mesh, fit, section, samples[start], guard)
+    first, last = samples[start][0], samples[end][0]
+    laps = [lap for lap in fit.get("clothLaps", ()) if first < lap[0] < last]
+    raisedLaps = [(center, width, rise) for center, _, _, width, rise in laps if rise >= .06]
+    coordinates = {u for u, _, _ in samples[start:end + 1]}
+    # Sample the rounded shoulder and tucked edge of each prominent cloth lap.
+    for center, width, _ in raisedLaps:
+        coordinates.update((center - 1.15 * width, center + .62 * width))
+    guides = [(first, 0, 0), *(lap[:3] for lap in laps), (last, 0, 0)]
+    stations = [point[0] for point in guides]
+    for u in sorted(coordinates):
+        top, bottom = GripProfileAt(samples, u)
         center, radius = (top + bottom) / 2, max(.5, (bottom - top) / 2)
-        nearby = min(1, (u - samples[start][0]) / 24, (samples[end][0] - u) / 27)
-        seated = .76 + .24 * nearby * nearby * (3 - 2 * nearby)
-        rows.append([mesh.verts.new(World(frame, u, center + radius * v, radius * .34 * seated * depth)) for v, depth in section])
+        startFade = min(1, (u - first) / 31)
+        endFade = min(1, (last - u) / 27)
+        seated = (.68 + .32 * startFade * startFade * (3 - 2 * startFade)) * (.76 + .24 * endFade * endFade * (3 - 2 * endFade))
+        index = min(len(guides) - 1, bisect_right(stations, u))
+        a, b = guides[index - 1:index + 1]
+        blend = (u - a[0]) / (b[0] - a[0])
+        slope = a[1] + blend * (b[1] - a[1])
+        bow = a[2] + blend * (b[2] - a[2])
+        lift = 0
+        for lap, width, rise in raisedLaps:
+            distance = (u - lap) / width
+            shoulder = math.exp(-((distance + 1.15) / 1.25) ** 2)
+            tuck = math.exp(-((distance - .62) / .86) ** 2)
+            lift += rise * (shoulder - .56 * tuck)
+        row = []
+        for side, depth in section:
+            v = center + radius * side - frame["center"]
+            bend = u + slope * v + bow * v * v
+            low, high = GripProfileAt(samples, bend)
+            aligned = (low + high) / 2 + (high - low) * side / 2
+            thickness = radius * .34 * seated * (1 + lift * (.89 + .11 * side))
+            row.append(mesh.verts.new(World(frame, bend, aligned, thickness * depth)))
+        rows.append(row)
     rows.extend(reversed(TuckRows(mesh, frame, section, samples[end:][::-1], 1)))
     for a, b in zip(rows, rows[1:]):
         for i in range(count):
@@ -229,8 +316,9 @@ def ReadFit():
 def BuildParts(fit=None):
     if fit is None:
         fit = ReadFit()
-    return [("Blade", BuildPlate(fit, "Blade")), ("Guard", BuildPlate(fit, "Guard")),
-            ("Grip", BuildGrip(fit)), ("Pommel", BuildPlate(fit, "Pommel"))]
+    guard = BuildPlate(fit, "Guard")
+    return [("Blade", BuildPlate(fit, "Blade")), ("Guard", guard),
+            ("Grip", BuildGrip(fit, guard)), ("Pommel", BuildPlate(fit, "Pommel"))]
 
 
 def BuildDadao(fit=None):

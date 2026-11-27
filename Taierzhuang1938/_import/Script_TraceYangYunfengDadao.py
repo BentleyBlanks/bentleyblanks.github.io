@@ -20,6 +20,18 @@ SOURCE_WIDENING = 1.15
 SOURCE_PIVOT = (1090, 547)
 VIRTUAL_SPAN = .900
 VIRTUAL_TIP_Z = -.630
+# Centre, slope, curvature, shoulder width and rise of the visible laps in the rectified photo.
+CLOTH_LAPS = (
+    (1311, -.150, .0015, 3.5, .048),
+    (1339, -.066, .0015, 4.8, .094),
+    (1386, -.066, .0015, 4.1, .054),
+    (1423, -.122, -.0015, 5.4, .112),
+    (1470, -.178, 0, 5.8, .118),
+    (1497, -.094, 0, 3.2, .055),
+    (1537, -.178, .0015, 4.7, .100),
+    (1573, -.206, -.0015, 6.2, .046),
+    (1643, -.038, -.0015, 5.2, .088),
+)
 
 
 def ReadReference(source):
@@ -202,6 +214,7 @@ def Fit(source):
             "Pommel": RefineFitting(PlateSamples(joined["Pommel"], .63, (7, 8)), 1.22, .39),
         },
         "grip": GripRows(joined["Grip"], frame, atlas),
+        "clothLaps": CLOTH_LAPS,
     }, masks
 
 

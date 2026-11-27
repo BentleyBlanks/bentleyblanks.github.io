@@ -162,8 +162,8 @@ export const MESHES = {
   },
   Dadao: {
     file: "Model_Dadao.tzm.json", category: "weapon",
-    version: "yangyunfeng-dadao-detail-20261128",
-    triangles: 9632, meshBlocks: 1, nodes: 5, joints: 0,
+    version: "yangyunfeng-dadao-textiles-20261128",
+    triangles: 9896, meshBlocks: 1, nodes: 5, joints: 0,
     materials: ["dadao"], mounts: ["muzzle", "gripR", "gripL"],
     span: [0.02690, 0.14825, 0.90008], lengthM: 0.900, bladeM: 0.599,
     draws: { high: 1, medium: 1, low: 1 },
