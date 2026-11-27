@@ -1,4 +1,4 @@
-"""Bake the assembled game prop's local contact occlusion into its steel UV0 atlas."""
+"""Bake local contact occlusion from the assembled game prop."""
 
 from hashlib import sha256
 import json
@@ -21,6 +21,10 @@ CALIBRATION_PROFILE = dict(rays=40, nearFraction=.016, farFraction=.036,
                            nearWeight=.76, nearFalloff=2., farFalloff=2.)
 JOINT_PROFILE = dict(rays=96, nearFraction=.023, farFraction=.043,
                      nearWeight=.80, nearFalloff=.44, farFalloff=.90)
+# The higher sampling density resolves contacts that cross a small part of a texel.
+# Keep the ray reach short so this pass follows adjoining edges and recesses.
+DETAIL_PROFILE = dict(rays=48, nearFraction=.007, farFraction=.015,
+                      nearWeight=.78, nearFalloff=.30, farFalloff=.85)
 
 
 def Digest(path):
@@ -49,10 +53,10 @@ def ReadSurface(collection, uvLayer="SteelAtlas"):
     return vertices, triangles, np.asarray(textureCoordinates)
 
 
-def TexelSamples(uv):
-    pixel = uv * [EDGE, -EDGE] + [0, EDGE]
+def TexelSamples(uv, edge=EDGE):
+    pixel = uv * [edge, -edge] + [0, edge]
     left, top = [max(0, ceil(value - .5)) for value in pixel.min(axis=0)]
-    right, bottom = [min(EDGE, floor(value + .5)) for value in pixel.max(axis=0) + 1e-8]
+    right, bottom = [min(edge, floor(value + .5)) for value in pixel.max(axis=0) + 1e-8]
     if left >= right or top >= bottom:
         return None
     a, b, c = pixel
@@ -82,17 +86,17 @@ def Hemisphere(normal, rays):
 
 
 def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
-                   nearWeight, nearFalloff, farFalloff, composite=None):
+                   nearWeight, nearFalloff, farFalloff, composite=None, edge=EDGE):
     tree = BVHTree.FromPolygons(vertices, triangles, all_triangles=True)
     points = np.asarray([tuple(vertex) for vertex in vertices])
     length = float(np.ptp(points, axis=0).max())
     near, far = nearFraction * length, farFraction * length
     farWeight = 1. - nearWeight
     offset = 4e-5 * length
-    baked = np.zeros((EDGE, EDGE), dtype=np.float32)
+    baked = np.zeros((edge, edge), dtype=np.float32)
     coverage = np.zeros(baked.shape, dtype=np.uint16)
     for face, (indices, uv) in enumerate(zip(triangles, uvs)):
-        sample = TexelSamples(uv)
+        sample = TexelSamples(uv, edge)
         if sample is None:
             continue
         rows, columns, weights = sample
@@ -118,6 +122,16 @@ def BakeVisibility(vertices, triangles, uvs, *, rays, nearFraction, farFraction,
         baked[rows, columns] = np.maximum(baked[rows, columns], visibility)
         coverage[rows, columns] += 1
     return baked, coverage
+
+
+def ResolveSupersamples(baked, coverage, scale):
+    shape = (EDGE, scale, EDGE, scale)
+    blocks = coverage.reshape(shape)
+    area = (blocks > 0).sum(axis=(1, 3))
+    total = baked.reshape(shape).sum(axis=(1, 3))
+    # Average covered subsamples before padding each chart. Gutter samples carry no visibility.
+    np.divide(total, area, out=total, where=area > 0)
+    return total, blocks.max(axis=(1, 3))
 
 
 def PadChart(field, filled, padding):
@@ -192,22 +206,25 @@ def SamplePlate(pixels, uv):
     return (top * (1 - fv) + bottom * fv) / 255
 
 
-def Main(output=None, *, calibration=False, legacyOrm=None):
+def Main(output=None, *, calibration=False, legacyOrm=None, contactDetail=False):
     project = Path(__file__).resolve().parents[1]
     output = Path(output) if output is not None else project / "_import/Source/Type89Launcher"
     output.mkdir(parents=True, exist_ok=True)
     joint = legacyOrm is not None
-    if joint and calibration:
-        raise ValueError("Choose a joint bake or a calibration bake")
+    if sum((joint, calibration, contactDetail)) > 1:
+        raise ValueError("Choose one contact bake mode")
     profile = JOINT_PROFILE if joint else CALIBRATION_PROFILE if calibration else SEAM_PROFILE
     suffix = "JointAo" if joint else "ContactAo" if calibration else "SeamAo"
+    if contactDetail:
+        profile, suffix = DETAIL_PROFILE, "ContactDetailAo"
     model = project / "Model/Model_Type89Launcher.tzm.json"
-    atlasName = "Contact" if joint else "Steel"
+    hasContactUvs = joint or contactDetail
+    atlasName = "Contact" if hasContactUvs else "Steel"
     layoutFile = project / f"_blender/Data_Type89Launcher{atlasName}Atlas.json"
     collection = bpy.data.collections.get("Type89LauncherExterior")
     if collection is None or collection.name not in bpy.context.scene.collection.children:
         raise ValueError("Open the authored Type89Launcher scene before baking contact occlusion")
-    vertices, triangles, uvs = ReadSurface(collection, "ContactAo" if joint else "SteelAtlas")
+    vertices, triangles, uvs = ReadSurface(collection, "ContactAo" if hasContactUvs else "SteelAtlas")
     modelInfo = json.loads(model.read_bytes())
     if len(triangles) != modelInfo["triangles"] or len(triangles) > 10000:
         raise ValueError("Contact bake geometry does not match the game mesh triangle budget")
@@ -233,7 +250,11 @@ def Main(output=None, *, calibration=False, legacyOrm=None):
 
         composite = BlendDetail
         provenance["legacyRedSha256"] = sha256(prior.tobytes()).hexdigest()
-    baked = BakeVisibility(vertices, triangles, uvs, **profile, composite=composite)
+    sampleScale = 2 if contactDetail else 1
+    baked = BakeVisibility(vertices, triangles, uvs, **profile, composite=composite, edge=EDGE * sampleScale)
+    if contactDetail:
+        baked = ResolveSupersamples(*baked, sampleScale)
+        provenance["subsamplesPerTexel"] = sampleScale ** 2
     pixels, charts = ComposeCharts(*baked, layout)
     image = output / f"Texture_Type89Launcher{suffix}.png"
     SavePlate(pixels, image)

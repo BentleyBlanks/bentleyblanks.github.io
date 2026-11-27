@@ -28,10 +28,13 @@ SEAM_AO = SOURCE.with_name("Texture_Type89LauncherSeamAo.png")
 SEAM_RECORD = SEAM_AO.with_name("Data_Type89LauncherSeamAo.json")
 JOINT_AO = SOURCE.with_name("Texture_Type89LauncherJointAo.png")
 JOINT_RECORD = JOINT_AO.with_name("Data_Type89LauncherJointAo.json")
+CONTACT_DETAIL_AO = SOURCE.with_name("Texture_Type89LauncherContactDetailAo.png")
+CONTACT_DETAIL_RECORD = CONTACT_DETAIL_AO.with_name("Data_Type89LauncherContactDetailAo.json")
 REFERENCE = HERE / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 ATLAS_FILE = HERE.parent / "_blender/Data_Type89LauncherSteelAtlas.json"
 CONTACT_ATLAS_FILE = ATLAS_FILE.with_name("Data_Type89LauncherContactAtlas.json")
 ATLAS = json.loads(ATLAS_FILE.read_text(encoding="utf-8"))
+CONTACT_ATLAS = json.loads(CONTACT_ATLAS_FILE.read_text(encoding="utf-8"))
 LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 LUMA_NEUTRAL_WARMTH = np.array([.48, -.101, -.414])
 
@@ -1717,7 +1720,17 @@ def Bake(legacyOrm=None):
     pixels = np.array(orm)
     if sha256(pixels[..., 0].tobytes()).hexdigest() != jointRecord["legacyRedSha256"]:
         raise ValueError("Rebake the joint AO from the current steel finish's legacy ORM")
-    pixels[..., 0] = joints
+    fineContact, fineContactRecord = ReadContactAo(CONTACT_DETAIL_AO, CONTACT_DETAIL_RECORD, CONTACT_ATLAS_FILE)
+    # Near-field occluders sharpen the narrow seams while the original joint bake
+    # carries the wider shadows and the photographed surface relief.
+    blocked = (255 - fineContact) / 255.
+    contactWeight = SmoothRamp((blocked - .045) / .42)
+    x, y, width, height = CONTACT_ATLAS["regions"]["RibbedLowerSleeve"]
+    sleeve = np.s_[y:y + height, x:x + width]
+    # The sleeve's flanks already have a calibrated light response. Reserve
+    # the added occlusion for its most enclosed groove bottoms and end contacts.
+    contactWeight[sleeve] = SmoothRamp((blocked[sleeve] - .39) / .23)
+    pixels[..., 0] = np.rint(joints * (1. - .66 * contactWeight)).astype(np.uint8)
     if (collar := reference.get("collarJointFinish")) is not None:
         ApplyCollarPackedRoughness(pixels, maps[2], collar)
     saddle = reference.get("saddleJointFinish")
@@ -1742,6 +1755,9 @@ def Bake(legacyOrm=None):
                         "record": SEAM_RECORD.relative_to(HERE.parent).as_posix()}
     record["jointAo"] = {"path": JOINT_AO.relative_to(HERE.parent).as_posix(), "sha256": jointRecord["sha256"],
                          "record": JOINT_RECORD.relative_to(HERE.parent).as_posix()}
+    record["contactDetailAo"] = {"path": CONTACT_DETAIL_AO.relative_to(HERE.parent).as_posix(),
+                                 "sha256": fineContactRecord["sha256"],
+                                 "record": CONTACT_DETAIL_RECORD.relative_to(HERE.parent).as_posix()}
     details = {"barrelDetail": reference["closeups"]["Barrel"]["detail"],
                "stemDetail": reference["closeups"]["Stem"]["detail"],
                "sleeveDetail": reference["closeups"]["Sleeve"]["detail"],
