@@ -1,8 +1,8 @@
 # 八九式中战车乙型（馆藏外形复原）
 
-**GeometryV55 / SurfaceV17** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,422 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
+**GeometryV55 / SurfaceV18** 沿用土浦保存车 2007 年状态的外形，以 V6 战损三视图制作游戏外观。高模有 1,487,422 三角面。游戏 GLB 按默认场景可见实例实测 **79,997 三角面**，含左右各 81 节履带、30 个轮组及 176 三角面的积泥几何。硬上限为 80,000 三角面。
 
-炮盾外框、炮塔下缘、车首板、侧裙和后翼子板按多视角复核，后甲板补做弧形把手并校正百叶边沿。低模保留主要履带开孔、中央减料槽、轮盘轮廓、罩板边缘和可见关节。小销眼和细铸纹由高模投射。实体排气罩的孔阵在游戏中由双面遮罩表现。9 个材质共用 9 张贴图。车体图集 4K，护网 1K，履带在 2K 图集内保留四套 1K 鞋面。底色、OpenGL 切线法线和 ORM 分通道烘焙。ORM 在既有高模投射与接触遮蔽上叠加弹凹和泥边的局部遮蔽。
+炮盾外框、炮塔下缘、车首板、侧裙和后翼子板按多视角复核，后甲板补做弧形把手并校正百叶边沿。低模保留主要履带开孔、中央减料槽、轮盘轮廓、罩板边缘和可见关节。小销眼和细铸纹由高模投射。实体排气罩的孔阵在游戏中由双面遮罩表现。9 个材质共用 9 张贴图。车体图集 4K，护网 1K，履带在 2K 图集内保留四套 1K 鞋面。底色、OpenGL 切线法线和 ORM 分通道烘焙。ORM 红通道包含高模投射、积泥边缘和按装配几何重烘的接触遮蔽。
 
 2007 年的圆筒护套和开盖姿态用该年主照复核。2025 年照片用于核形，闭盖和不同保存状态的附件按各张照片分别理解。光照和机位为对照拟合，取不到的内构、精确倒角半径、漆膜微观粗糙度和止挡速度属于复原参数。照片与取舍见 [图证档案](Data_ReferenceArchive.json)、[图证与复原边界](Data_References.md)及[本版导出验收](Data_ExportAudit.json)。
 
@@ -10,14 +10,16 @@ SurfaceV16 对标 2007 主照和同车细节照，校正了暖橄榄漆、较粗
 
 V17 将 V6 正、左、俯三张图按装甲边缘和附件配准。炮塔左前、车首两肩和左后排气罩附近做分开的烟炱及局部崩漆。履带前后绕圈、下承载段和裙板下缘加半干泥，浮尘集中在泥边。右侧、后方与遮挡处按同车材质和痕迹延续推定。参见[战损复核](Data_BattleWearReview.json)。
 
+V18 在同一装配坐标中按 42 毫米和 145 毫米两种距离重烘 AO，补足炮塔座圈、炮盾与车首框、舱盖铰链、排气护罩、裙板和轮组、履带节接合处的遮蔽。车体固定件与活动盖分开接收遮蔽，固定座仍参加贴合面的烘焙。游戏贴图只写入 ORM 红通道。高模和低模的 Blender 工程提供 Baked contact AO 渲染通道。参见[遮蔽复核](Data_AmbientOcclusionReview.json)。
+
 ## 源工程与重建
 
-新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV17。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存配准三视图、中性光近景、回导及浏览器验证。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
+新源位于 C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV18。根下的 Scene_Type89MediumTankHighPbr.blend 保留可编辑的烟炱、伤痕材质和积泥几何。Game/Scene_Type89MediumTankGamePbr.blend 是可编辑低模，Game/Runtime/Model_Type89MediumTank.glb 是游戏文件。Review 保存相同机位的材质与 AO 灰度对照，以及开盖、回导和浏览器验证。V17 战损三视图保存在 GeometryV55SurfaceV17。V16 的 2007 馆藏漆面与原照分别保存在 GeometryV55SurfaceV16 和 References。
 
-从仓库根重建。脚本以 G55 的 V16 资产为底稿，通过 BlenderMCP 写高源，再生成低模贴图与交付件。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=controls、--stage=high、--stage=game 单独执行。
+从仓库根重建。脚本用冻结的 V17 工程烘焙，更新两份 Blender 源并生成 V18 游戏 GLB。系统 Python 使用 Pillow、NumPy、OpenCV。可用 --stage=bake、--stage=maps、--stage=bind、--stage=runtime 单独执行。
 
 ```powershell
-node Taierzhuang1938/_blender/Script_RebuildType89BattleWear.mjs
+node Taierzhuang1938/_blender/Script_RebuildType89ContactAo.mjs
 ```
 
 ## 运行与验收

@@ -2,11 +2,11 @@
   "schema": "Type89RestorationReleaseV55",
   "reviewedOn": "2026-11-27",
   "geometryVersion": "20261126GeometryV55",
-  "materialRevision": "SurfaceV17",
+  "materialRevision": "SurfaceV18",
   "runtime": {
     "file": "Model_Type89MediumTank.glb",
-    "sha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
-    "bytes": 37934632,
+    "sha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+    "bytes": 39492684,
     "renderedTriangles": 79997,
     "hardCeiling": 80000,
     "meshInstances": 269,
@@ -41,7 +41,7 @@
   "highSource": {
     "blend": "Scene_Type89MediumTankHighPbr.blend",
     "triangles": 1487422,
-    "sha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
+    "sha256": "100be20f1fac15c4fa71d3fcaaf13610bca6123a97a8e4443b83f05c97175232",
     "referenceSource": "SurfaceV14/Scene_Type89MediumTankHighPbr.blend",
     "referenceSourceSha256": "f84f9b6c069118bba42d181f66b4d243833ea790167889d72ae2fcce778cb02e",
     "changes": {
@@ -116,8 +116,8 @@
   "gameSource": {
     "blend": "Game/Scene_Type89MediumTankGamePbr.blend",
     "triangles": 80109,
-    "sha256": "859d59201ddbb0a2529ec1c9219cf278c7efbcd4fcfc27ab972ef76947c32fa9",
-    "bakeSourceSha256": "c0fbde9868c2776346b006294851b0ee5af05179b39e13e882d18c5225fdf19e",
+    "sha256": "2ab47947a73fd4295aec4e3da83bb47aef13a5526befb263d0f6188ff611ce6e",
+    "bakeSourceSha256": "100be20f1fac15c4fa71d3fcaaf13610bca6123a97a8e4443b83f05c97175232",
     "exportBeforePackingSha256": "e22d551568fe9d413cc236772ab5f921041c7bacdcb8aaa6d269a9adfd76751e",
     "removedByZeroAreaCleanup": 54,
     "removedOnExplicitTriangulation": 0,
@@ -295,7 +295,7 @@
     "evidenceLocal": "Review/Comparisons, Review/Browser, Review/Data_PhotoAlignment.json, Review/Data_GameMotionReleased.json"
   },
   "referenceArchive": "Data_ReferenceArchive.json",
-  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV17",
+  "editableSourceDirectory": "C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type89MediumTank/GeometryV55SurfaceV18",
   "photographsAndSourceRemainLocal": true,
   "metalFinish": {
     "pass": true,
@@ -321,5 +321,34 @@
       "guardAlphaExactlyPreserved": true
     },
     "localEvidence": "Review/Comparisons, Review/High, Review/Runtime, Review/Browser"
+  },
+  "ambientOcclusion": {
+    "Body": {
+      "size": [
+        4096,
+        4096
+      ],
+      "strengthenedTexels": 5294497,
+      "redSha256": "7f0fcd3751167e7332df992df64010caf62466199c037cc88a2f581d3db06da2"
+    },
+    "Guard": {
+      "size": [
+        1024,
+        1024
+      ],
+      "strengthenedTexels": 63829,
+      "redSha256": "9026e7cc53981806842dd9ab6b696a3f8bf5a7150e4915b45d3380a4f1c129cc"
+    },
+    "Track": {
+      "size": [
+        2048,
+        2048
+      ],
+      "strengthenedTexels": 1187105,
+      "redSha256": "b38b1fa5c5a7d9901847a0fda871d261fb79c4ab29c4ad972689043f993c7d58"
+    },
+    "proof": "Data_AmbientOcclusionReview.json",
+    "baselineRuntimeSha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+    "nonAoPayloadsByteExact": 801
   }
 }

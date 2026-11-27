@@ -1,0 +1,246 @@
+{
+  "schema": "Type89AmbientOcclusionV1",
+  "baseline": "SurfaceV17",
+  "revision": "SurfaceV18",
+  "geometryVersion": "20261126GeometryV55",
+  "baselineRuntimeSha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+  "weights": [
+    0.68,
+    0.5
+  ],
+  "regions": {
+    "Body": {
+      "Mesh_Hull": {
+        "sampledTexels": 3516974,
+        "strengthenedTexels": 467918,
+        "fractionStrengthened": 0.13305,
+        "oldP12": 0.0,
+        "newP12": 0.0
+      },
+      "Mesh_BowPlate": {
+        "sampledTexels": 211227,
+        "strengthenedTexels": 36685,
+        "fractionStrengthened": 0.17368,
+        "oldP12": 0.0784,
+        "newP12": 0.0784
+      },
+      "Mesh_BowMgMount": {
+        "sampledTexels": 23589,
+        "strengthenedTexels": 2843,
+        "fractionStrengthened": 0.12052,
+        "oldP12": 0.0,
+        "newP12": 0.0
+      },
+      "Mesh_DriverVisionFlap": {
+        "sampledTexels": 35135,
+        "strengthenedTexels": 3554,
+        "fractionStrengthened": 0.10115,
+        "oldP12": 0.0039,
+        "newP12": 0.0039
+      },
+      "Mesh_TurretYaw": {
+        "sampledTexels": 792887,
+        "strengthenedTexels": 159246,
+        "fractionStrengthened": 0.20084,
+        "oldP12": 0.3686,
+        "newP12": 0.2824
+      },
+      "Mesh_MainGunPitch": {
+        "sampledTexels": 39666,
+        "strengthenedTexels": 12109,
+        "fractionStrengthened": 0.30527,
+        "oldP12": 0.0,
+        "newP12": 0.0
+      },
+      "Mesh_CommanderCupola": {
+        "sampledTexels": 56426,
+        "strengthenedTexels": 12165,
+        "fractionStrengthened": 0.21559,
+        "oldP12": 0.0039,
+        "newP12": 0.0039
+      },
+      "Mesh_SideVisionFrameLeft": {
+        "sampledTexels": 7409,
+        "strengthenedTexels": 3474,
+        "fractionStrengthened": 0.46889,
+        "oldP12": 0.098,
+        "newP12": 0.098
+      },
+      "Mesh_EngineHatchLeft": {
+        "sampledTexels": 171758,
+        "strengthenedTexels": 34025,
+        "fractionStrengthened": 0.1981,
+        "oldP12": 0.0863,
+        "newP12": 0.0863
+      },
+      "Mesh_ExhaustGuard": {
+        "sampledTexels": 78525,
+        "strengthenedTexels": 12356,
+        "fractionStrengthened": 0.15735,
+        "oldP12": 0.0039,
+        "newP12": 0.0039
+      },
+      "Mesh_VerticalSkirtLeftFront": {
+        "sampledTexels": 79178,
+        "strengthenedTexels": 6761,
+        "fractionStrengthened": 0.08539,
+        "oldP12": 0.0039,
+        "newP12": 0.0039
+      },
+      "Mesh_FrontIdlerLeft": {
+        "sampledTexels": 197169,
+        "strengthenedTexels": 8734,
+        "fractionStrengthened": 0.0443,
+        "oldP12": 0.0745,
+        "newP12": 0.0745
+      },
+      "Mesh_RoadWheelLeft01": {
+        "sampledTexels": 34454,
+        "strengthenedTexels": 14728,
+        "fractionStrengthened": 0.42747,
+        "oldP12": 0.0471,
+        "newP12": 0.0471
+      }
+    },
+    "Guard": {
+      "Mesh_ExhaustGuardPerforatedSheet": {
+        "sampledTexels": 1048576,
+        "strengthenedTexels": 43719,
+        "fractionStrengthened": 0.04169,
+        "oldP12": 0.0,
+        "newP12": 0.0
+      }
+    },
+    "Track": {
+      "Mesh_TrackLinkLeft000": {
+        "sampledTexels": 609442,
+        "strengthenedTexels": 149934,
+        "fractionStrengthened": 0.24602,
+        "oldP12": 0.0,
+        "newP12": 0.0
+      }
+    }
+  },
+  "runtime": {
+    "nodes": 530,
+    "meshInstances": 269,
+    "renderedTriangles": 79997,
+    "sha256": "59d7b686a9632b4bb2f938461225d2e80ee8352ef31432d460fa26b587be5824",
+    "bytes": 39492684,
+    "retainedNonAoPayloads": 801,
+    "sharedTextures": 9,
+    "revision": "SurfaceV18",
+    "baselineRuntimeSha256": "840be511f339c03208da21df9f6d4bb406c957bb1ae6c9e283877b5428c651cc",
+    "bandsMetres": [
+      0.042,
+      0.145
+    ],
+    "samplesPerBand": 24,
+    "highSourceSha256": "100be20f1fac15c4fa71d3fcaaf13610bca6123a97a8e4443b83f05c97175232",
+    "packedOrmRedOnly": true,
+    "gameSourceSha256": "2ab47947a73fd4295aec4e3da83bb47aef13a5526befb263d0f6188ff611ce6e"
+  },
+  "runtimeMaps": {
+    "Body": {
+      "size": [
+        4096,
+        4096
+      ],
+      "strengthenedTexels": 5294497,
+      "redSha256": "7f0fcd3751167e7332df992df64010caf62466199c037cc88a2f581d3db06da2"
+    },
+    "Guard": {
+      "size": [
+        1024,
+        1024
+      ],
+      "strengthenedTexels": 63829,
+      "redSha256": "9026e7cc53981806842dd9ab6b696a3f8bf5a7150e4915b45d3380a4f1c129cc"
+    },
+    "Track": {
+      "size": [
+        2048,
+        2048
+      ],
+      "strengthenedTexels": 1187105,
+      "redSha256": "b38b1fa5c5a7d9901847a0fda871d261fb79c4ab29c4ad972689043f993c7d58"
+    }
+  },
+  "highMaps": [
+    {
+      "file": "Texture_Type89HighArmorPoseOrm.png",
+      "size": [
+        4096,
+        4096
+      ],
+      "changedTexels": 2983857,
+      "otherChannelsExact": true,
+      "sha256": "d8bc91008bed81f768f6c649f3fe10cda7a174ef3255f8f68bdaaa4620bf442e"
+    },
+    {
+      "file": "Texture_Type89HighExhaustOrm.png",
+      "size": [
+        512,
+        512
+      ],
+      "changedTexels": 70694,
+      "otherChannelsExact": true,
+      "sha256": "2af195755b968d4812c686f88fe998727372120c8c61404a0869651c5d05857b"
+    },
+    {
+      "file": "Texture_Type89HighGuardOrm.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "changedTexels": 372655,
+      "otherChannelsExact": true,
+      "sha256": "06ab478b8a2da28027fbc3ccaf1b0ef9e8d889dc070390b30f661d688e0f80f2"
+    },
+    {
+      "file": "Texture_Type89HighRubberOrm.png",
+      "size": [
+        512,
+        512
+      ],
+      "changedTexels": 47422,
+      "otherChannelsExact": true,
+      "sha256": "f88d384d06eb7399e2df7bda265494b86cfc0f8fce56b1f88820280ce46088e2"
+    },
+    {
+      "file": "Texture_Type89HighSteelOrm.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "changedTexels": 444845,
+      "otherChannelsExact": true,
+      "sha256": "7dfeff502e0132584fab027092ff8f4d5853e0af970029dbd2f71a35617aa20b"
+    },
+    {
+      "file": "Texture_Type89HighTrackOrm.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "changedTexels": 296250,
+      "otherChannelsExact": true,
+      "sha256": "168c0d04c52f2d778d09923d9ca3a148b4e62cc1909d279b52cc434d0c9d6ed2"
+    }
+  ],
+  "releaseNotes": [
+    "Pose-safe geometric ambient visibility at 42 mm and 145 mm, with the turret race and roof seat kept in contact.",
+    "Fixed seams keep local bolts, suspension and the repeating track bank as blockers. Hinged and rotating receivers are baked separately.",
+    "Small fixed seat witnesses can shade their own covers. Moving closures do not cast their closed shape onto the fixed hull.",
+    "Only the red channel of the 4K Body, 2K Track and 1K Guard atlases is updated. All other payloads are byte-exact."
+  ],
+  "verification": {
+    "realWebGlCases": 24,
+    "webglErrors": [],
+    "poses": [
+      "rest",
+      "inspection hatches open and turret angled"
+    ],
+    "localEvidence": "Review/Browser, Review/Blender, Review/Comparisons"
+  }
+}
