@@ -19,50 +19,50 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 561114,
-      "sha256": "b53f63d0962a71f01d39a901d11e350ab1e553ece91abbdb380c5ac784213161"
+      "bytes": 560898,
+      "sha256": "e33f1fbdb3e2c10ef8c4a48e2c00e9c8cd99e5c7020c914652ed0e7ea9dd482c"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 400940,
-      "sha256": "7e8feb6f3dcd3cac97237f74db92b6f146bf60509c985c0ab225a82d7b0ba97f"
+      "bytes": 401336,
+      "sha256": "eca5b981b95869412ebbc71e1bd773458ab95242d17a06bf66111b30bd5f1c58"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 52364,
-      "sha256": "36c7fa6d00f8004a950afb59badcf9a3215198db8bd4c44851af3cf058f6d88e"
+      "bytes": 52426,
+      "sha256": "ff0d3966c75e1ec9f69350ccfd9b776ddf454c724ed79131ef822831fc87ceaa"
     }
   ],
-  "totalBytes": 1014418,
+  "totalBytes": 1014660,
   "metrics": {
     "meanSrgb": [
-      0.4358,
-      0.4246,
-      0.3963
+      0.4357,
+      0.4245,
+      0.3962
     ],
-    "luma": 0.4189,
-    "lumaStd": 0.1081,
+    "luma": 0.4188,
+    "lumaStd": 0.108,
     "sat": 0.0906,
     "clipLow": 0.0001,
     "clipHigh": 0.0,
     "lowFreq": 0.1039,
-    "seam": 0.1244,
+    "seam": 0.1245,
     "interior": 0.0255,
-    "seamRatio": 4.882,
-    "border": 0.742,
-    "swing": 0.087,
+    "seamRatio": 4.89,
+    "border": 0.743,
+    "swing": 0.0867,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "4a42d036345bfbc25dc25de45761d6c8dbce9bbcc5dac50088bb826d99bbf1c6",
+    "sha256": "3aaefab71b6661d5edcc2e07d7d94303d5d0b7c11e2b1e5adfeab766d1b64c1d",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -146,6 +146,14 @@
     "neckMarks": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherNeckMarks.png",
       "sha256": "a0254ca067b31dbadb7a95f2d276685c349fa7e64e87634227a8c9dcc4490d1d"
+    },
+    "tabGrain": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherTabGrain.png",
+      "sha256": "53d6f41b2c6bda8d23fc6973c0e0bfd9541f3bc596c06161730b92e527a8a646"
+    },
+    "tabResponse": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherTabResponse.png",
+      "sha256": "79543653e43db10871cacafd5954e7566b2e30ba8dd8711dd8580b8f18cf62ce"
     }
   }
 }

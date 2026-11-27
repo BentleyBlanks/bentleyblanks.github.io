@@ -29,6 +29,8 @@ STEM_RESPONSE = RECORD.with_name("Texture_Type89LauncherStemResponse.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 NECK_CHROMA = RECORD.with_name("Texture_Type89LauncherNeckChroma.png")
 NECK_MARKS = RECORD.with_name("Texture_Type89LauncherNeckMarks.png")
+TAB_GRAIN = RECORD.with_name("Texture_Type89LauncherTabGrain.png")
+TAB_RESPONSE = RECORD.with_name("Texture_Type89LauncherTabResponse.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
@@ -1853,7 +1855,167 @@ def TabDetail(image, number, uAnchors, strips, alternate=None):
     return SaveDetailPlate(tone, warmth, confidence, xs, ys, path, halfSize=False, adjustment=adjustment)
 
 
-def TabFinish(folder, number):
+def TabResponseIdentity(tab):
+    source = tab["source"]
+    peer = source["pairedPhoto"]
+    return {"photoSha256": source["sha256"], "pairedPhotoSha256": peer["sha256"],
+            "projection": peer["projectionFromPrimary"], "sampleStrips": source["sampleStrips"],
+            "outlineUV": tab["outlineUV"], "footprint": tab["footprint"]}
+
+
+def RegisteredTabFace(tab, photos, folder):
+    u, v, visible, rgb, hashes = ReadRegisteredFrame(folder)
+    anchors, lower, upper = np.asarray(tab["outlineUV"]).T
+    realU = anchors[0] + u * (anchors[-1] - anchors[0])
+    bottom, top = (np.interp(realU, anchors, side) for side in (lower, upper))
+    span = (v - bottom) / (top - bottom)
+    x, begin, end = (np.interp(realU, anchors, column) for column in np.asarray(tab["source"]["sampleStrips"]).T)
+    y = begin + np.clip(span, 0, 1) * (end - begin)
+    transform = np.asarray(tab["source"]["pairedPhoto"]["projectionFromPrimary"])
+    projected = np.stack((x, y, np.ones_like(x)), axis=-1) @ transform.T
+    px, py = (projected[..., :2] / projected[..., 2:3]).transpose(2, 0, 1)
+    target = [SampleBilinear(photos[0], x, y), SampleBilinear(photos[1], px, py)]
+    gray = rgb @ REGISTERED_LUMA
+    region = visible & (u > .10) & (u < .92) & (span > .12) & (span < .88)
+    region = binary_erosion(region, iterations=2)
+    for luma in target:
+        region &= (luma > 27) & (luma < 234)
+    region &= gray > 23
+    return u, span, region, target, gray, hashes
+
+
+def FitTabGrain(tab, photos, evidence):
+    folders = [evidence / name for name in ("V56TabStudyDefault", "V56TabStudyFill")]
+    a, b = [RegisteredTabFace(tab, photos, folder) for folder in folders]
+    u, span, _, target = a[:4]
+    if not (np.array_equal(u, b[0]) and np.array_equal(span, b[1])):
+        raise ValueError("The tab detail views must share registered surface coordinates")
+    keep = a[2] & b[2]
+    shape = (181, 89)
+    bins = np.rint(u[keep] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(span[keep] * (shape[1] - 1)).astype(int)
+    count = np.bincount(bins, minlength=np.prod(shape)).reshape(shape).astype(float)
+    detailScale, backgroundScale = (.67, .99), (3.6, 4.5)
+    detail = gaussian_filter(count, detailScale)
+    background = gaussian_filter(count, backgroundScale)
+    if np.count_nonzero(detail > .61) < 4300:
+        raise ValueError("The two photographs do not resolve the visible tab detail")
+
+    def Deposit(luma):
+        return np.bincount(bins, weights=np.log(luma[keep] + 18), minlength=np.prod(shape)).reshape(shape)
+
+    def Contrast(luma):
+        signal = Deposit(luma)
+        return (gaussian_filter(signal, detailScale) / np.maximum(detail, .01)
+                - gaussian_filter(signal, backgroundScale) / np.maximum(background, .01))
+
+    expected = [Contrast(luma) for luma in target]
+    rendered = [Contrast(row[4]) for row in (a, b)]
+    slopes = []
+    for folder, row in zip(folders, (a, b)):
+        plus, minus = (ReadRegisteredLuma(folder, "Gain" + side + ".png", row[-1])
+                       for side in ("Plus", "Minus"))
+        derivative = gaussian_filter(Deposit(plus) - Deposit(minus), detailScale)
+        slopes.append(np.clip(derivative / (.52 * np.maximum(detail, .01)), .22, .94))
+    observed = .48 * rendered[0] + .52 * rendered[1]
+    primary, alternate = (band - observed for band in expected)
+    targetBand = .57 * expected[0] + .43 * expected[1]
+    # Keep only the deviations shared by the two real photographs and both measured lights.
+    agree = ((np.sign(primary) == np.sign(alternate))
+             & (np.sign(targetBand - rendered[0]) == np.sign(targetBand - rendered[1])))
+    shared = np.clip(np.minimum(abs(primary), abs(alternate)) / .034, 0, 1) * agree
+    slope = .48 * slopes[0] + .52 * slopes[1]
+    gain = np.clip((.57 * primary + .43 * alternate) / slope, -.235, .235)
+    raw = gaussian_filter(gain * shared * np.clip((detail - .39) / .92, 0, 1), (.55, .64))
+    uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    coverage = np.clip((np.minimum(uu, 1 - uu) - .09) / .09, 0, 1)
+    coverage *= np.clip((np.minimum(vv, 1 - vv) - .10) / .13, 0, 1)
+    return (raw - gaussian_filter(raw, backgroundScale)) * coverage * 1.18, {
+        folder.name: row[-1] for folder, row in zip(folders, (a, b))}
+
+
+def TabSurfaceView(tab, photos, folder, photoIndex, weight, axes, museum, shape):
+    u, span, valid, target, observed, hashes = RegisteredTabFace(tab, photos, folder)
+    if valid.sum() < 11000:
+        raise ValueError(f"The tab response is unresolved in {folder.name}")
+
+    def Read(name):
+        return ReadRegisteredLuma(folder, name + ".png", hashes)[valid]
+
+    if np.max(abs(Read("ProbeZero") - observed[valid])) > .3:
+        raise ValueError(f"The tab response baseline does not reproduce {folder.name}")
+    baseline = np.log(observed[valid] + 18)
+    if photoIndex is not None:
+        residual = np.clip(np.log(target[photoIndex][valid] + 18) - baseline, -.46, .37)
+    elif museum is not None:
+        if not (np.array_equal(u, museum[0]) and np.array_equal(span, museum[1])):
+            raise ValueError("The warm-light response must share the original tab camera")
+        residual = np.clip(np.log(museum[4][valid] + 18) - baseline, -.30, .30)
+    else:
+        residual = np.zeros_like(baseline)
+    basis = [np.log(Read(axis + side) + 18) - baseline
+             for axis, *_ in axes for side in ("Plus", "Minus")]
+    bins = np.rint(u[valid] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(span[valid] * (shape[1] - 1)).astype(int)
+
+    def Smooth(values):
+        plane = np.bincount(bins, weights=values, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(plane, (1.43, 1.38))
+
+    support = Smooth(np.ones(valid.sum()))
+
+    def Average(values):
+        return weight * Smooth(values) / np.maximum(support, .44)
+
+    pull, response = ResponseEquations(basis, residual, Average, shape)
+    return pull, response, support, hashes
+
+
+def FitTabSurface(tab, photos, evidence, *, resolve):
+    if resolve:
+        setups = (("V56TabResolveDefault", 0, .23), ("V56TabResolveFill", 0, .22),
+                  ("V56TabResolvePhoto4", 1, .13), ("V56TabResolveMuseum", None, .42))
+        axes = (("Across", .16, (.44, .43), .048), ("Along", .16, (.46, .42), .056),
+                ("Rough", .14, (.51, .46), .049), ("Gain", .26, (.40, .36), .064))
+    else:
+        setups = (("V56TabSurfaceDefault", 0, .37), ("V56TabSurfaceFill", 0, .35),
+                  ("V56TabSurfacePhoto4Matched", 1, .16), ("V56TabSurfaceMuseumResponse", None, .12))
+        axes = (("Across", .16, (.68, .79), .039), ("Along", .16, (.60, .73), .043),
+                ("Rough", .14, (.63, .67), .048), ("Gain", .26, (.65, .80), .068))
+    shape = (61, 47)
+    museum = RegisteredTabFace(tab, photos, evidence / "V56TabStudyMuseum") if resolve else None
+    rows = [TabSurfaceView(tab, photos, evidence / name, photo, weight, axes, museum, shape)
+            for name, photo, weight in setups]
+    pull = np.sum([row[0] for row in rows], axis=0)
+    response = np.sum([row[1] for row in rows], axis=0)
+    fit = FitSignedResponse(pull, response, axes, 10)
+    u, v = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
+    coverage = np.clip((np.minimum(u, 1 - u) - .07) / .085, 0, 1)
+    coverage *= np.clip((np.minimum(v, 1 - v) - .09) / .115, 0, 1)
+    coverage *= np.clip(np.minimum(rows[0][2], rows[1][2]) / .76, 0, 1)
+    fields = {axis: gaussian_filter(step * (fit[..., 2*i] - fit[..., 2*i+1]), (.81, .92)) * coverage
+              for i, (axis, step, _, _) in enumerate(axes)}
+    hashes = {setup[0]: row[-1] for setup, row in zip(setups, rows)}
+    if museum is not None:
+        hashes["V56TabStudyMuseum"] = museum[-1]
+    return fields, hashes
+
+
+def TabResponseCalibrations(image, alternate, tab, evidence):
+    photos = [photo @ REGISTERED_LUMA for photo in (image, alternate)]
+    identity = TabResponseIdentity(tab)
+    grain, grainHashes = FitTabGrain(tab, photos, evidence)
+    initial, initialHashes = FitTabSurface(tab, photos, evidence, resolve=False)
+    remaining, resolveHashes = FitTabSurface(tab, photos, evidence, resolve=True)
+    limits = {"Across": (-.17, .14), "Along": (-.148, .14), "Rough": (-.12, .125), "Gain": (-.23, .218)}
+    fields = [np.clip(initial[name] + .87 * remaining[name], *limits[name])
+              for name in ("Gain", "Across", "Along", "Rough")]
+    return {"grainCalibration": WriteResponseFields(TAB_GRAIN, identity, (grain,), grainHashes, scale=95000),
+            "surfaceCalibration": WriteResponseFields(TAB_RESPONSE, identity, fields,
+                                                       {**initialHashes, **resolveHashes})}
+
+
+def TabFinish(folder, number, previous=None, *, responseEvidence=None):
     image, source = Photo(folder, number)
     # UV bounds sampled through the artwork's curved face. Each photograph
     # has its own strips of visible metal, in increasing local V order.
@@ -1888,6 +2050,15 @@ def TabFinish(folder, number):
     warmth = (samples[..., 0] - samples[..., 2]) / np.maximum(lightness, 25)
     exposed = np.clip((lightness - body - 7) / 34, 0, 1) * np.clip((.61-warmth)/.39, .2, 1)
     field["rubbedCoverage"] = np.rint(100 * exposed).astype(int).tolist()
+    if alternate is not None:
+        if responseEvidence is not None:
+            field.update(TabResponseCalibrations(image, alternate, field, responseEvidence))
+        elif previous:
+            identity = TabResponseIdentity(field)
+            for name in ("grainCalibration", "surfaceCalibration"):
+                if (calibration := previous.get(name)) and all(
+                        calibration.get(key) == value for key, value in identity.items()):
+                    field[name] = calibration
     return field
 
 
@@ -2217,6 +2388,7 @@ def Main():
     options.add_argument("--neck-chroma-evidence", type=Path, help="V53 Evidence directory with the neck color response captures")
     options.add_argument("--neck-mark-evidence", type=Path, help="V54 Evidence directory with the neck mark response captures")
     options.add_argument("--stem-response-evidence", type=Path, help="V55 Evidence directory with stem material response captures")
+    options.add_argument("--tab-response-evidence", type=Path, help="V56 Evidence directory with paired-photo tab response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -2237,7 +2409,8 @@ def Main():
                           "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
                           "Neck": NeckFinish(args.photos, prior.get("Neck"), chromaEvidence=args.neck_chroma_evidence,
                                              markEvidence=args.neck_mark_evidence),
-                          "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
+                          "Tab": TabFinish(args.photos, 5, prior.get("Tab"), responseEvidence=args.tab_response_evidence),
+                          "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)
     record["knurl"] = KnurlFrequency(args.photos)

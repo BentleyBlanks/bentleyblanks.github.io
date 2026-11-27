@@ -208,6 +208,27 @@ def ApplyNeckChroma(tile, neck, calibration):
     base[:] = np.rint(255 * np.clip(LinearToSrgb(linear), 0, 1)).astype(np.uint8)
 
 
+def ApplyTabResponses(tile, tab):
+    source = tab["source"]
+    peer = source["pairedPhoto"]
+    height, width = tile[0].shape[:2]
+    uu, vv = PlanarTexelCenters(width, height)
+    anchors, lower, upper = np.asarray(tab["outlineUV"]).T
+    lo, hi = (np.interp(uu, anchors, rail) for rail in (lower, upper))
+    span = (vv - lo) / np.maximum(hi - lo, 1e-6)
+    for key, channels in (("grainCalibration", ("gain",)),
+                          ("surfaceCalibration", ("gain", "tilt", "tiltV", "roughness"))):
+        calibration = tab.get(key)
+        if calibration is None:
+            continue
+        if (calibration["photoSha256"] != source["sha256"] or calibration["pairedPhotoSha256"] != peer["sha256"]
+                or calibration["projection"] != peer["projectionFromPrimary"]
+                or calibration["sampleStrips"] != source["sampleStrips"]
+                or calibration["outlineUV"] != tab["outlineUV"] or calibration["footprint"] != tab["footprint"]):
+            raise ValueError("Tab response data do not match the paired source photographs and projection")
+        ApplyResponseFields(tile, calibration, channels, uu, span)
+
+
 def PhotographicGrain(closeup, xx, vv):
     detail = closeup["detail"]
     path = REFERENCE.with_name(detail["file"])
@@ -1104,6 +1125,10 @@ def BuildAtlas(reference):
                 if (calibration := neck.get("markCalibration")) is not None:
                     CheckNeckRegistration(neck, calibration)
                     ApplyResponseFields(tile, calibration, ("gain",), *PlanarTexelCenters(width, height))
+            elif name == "Tab":
+                tab = reference["closeups"]["Tab"]
+                if "grainCalibration" in tab or "surfaceCalibration" in tab:
+                    ApplyTabResponses(tile, tab)
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1152,6 +1177,9 @@ def Bake():
         details["neckChroma"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:
         details["neckMarks"] = calibration
+    for key, name in (("grainCalibration", "tabGrain"), ("surfaceCalibration", "tabResponse")):
+        if (calibration := reference["closeups"]["Tab"].get(key)) is not None:
+            details[name] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
