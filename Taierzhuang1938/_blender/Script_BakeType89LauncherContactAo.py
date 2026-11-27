@@ -180,12 +180,13 @@ def Main(output=None, *, calibration=False):
     modelInfo = json.loads(model.read_bytes())
     if len(triangles) != modelInfo["triangles"] or len(triangles) > 10000:
         raise ValueError("Contact bake geometry does not match the game mesh triangle budget")
-    layout = json.loads(layoutFile.read_bytes())
+    layoutBytes = layoutFile.read_bytes().replace(b"\r\n", b"\n")
+    layout = json.loads(layoutBytes)
     pixels, charts = ComposeCharts(*BakeVisibility(vertices, triangles, uvs, **profile), layout)
     image = output / f"Texture_Type89Launcher{suffix}.png"
     SavePlate(pixels, image)
     record = {"file": image.name, "sha256": Digest(image), "pixelSha256": sha256(pixels.tobytes()).hexdigest(),
-              "modelSha256": Digest(model), "atlasSha256": Digest(layoutFile), "size": EDGE,
+              "modelSha256": Digest(model), "atlasSha256": sha256(layoutBytes).hexdigest(), "size": EDGE,
               "triangles": len(triangles), "rays": profile["rays"], "charts": charts}
     if not calibration:
         record["falloff"] = {key: value for key, value in profile.items() if key != "rays"}

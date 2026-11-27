@@ -169,6 +169,14 @@ def ApplyBaseLogGain(base, logGain):
     return np.where((logGain != 0)[..., None], corrected, base)
 
 
+def ApplyBaseChroma(base, red, blue):
+    steel = SrgbToLinear(base)
+    tint = np.exp(np.stack((red, np.zeros_like(red), blue), axis=-1))
+    tinted = steel * tint
+    exposure = (steel @ LUMA) / np.maximum(tinted @ LUMA, 1e-8)
+    return np.clip(LinearToSrgb(tinted * exposure[..., None]), 0, 1)
+
+
 def BarrelTexelCenters(width, height, sampling):
     padding = ATLAS["padding"]
     arc, packed = np.asarray(sampling["angularCurve"]).T
@@ -196,8 +204,10 @@ def ApplyResponseFields(tile, calibration, channels, uu, vv, coverage=None):
     if coverage is not None:
         for field in fields.values():
             field *= coverage
-    gain = fields["gain"]
-    base[:] = np.rint(255 * np.clip(ApplyBaseLogGain(base / 255, gain), 0, 1)).astype(np.uint8)
+    color = np.clip(ApplyBaseLogGain(base / 255, fields["gain"]), 0, 1)
+    if "tintRed" in fields:
+        color = ApplyBaseChroma(color, fields["tintRed"], fields["tintBlue"])
+    base[:] = np.rint(255 * color).astype(np.uint8)
     tiltU, tiltV = fields.get("tilt"), fields.get("tiltV")
     if tiltU is not None or tiltV is not None:
         # Bias the tangent direction of the existing relief before normalizing it.
@@ -268,7 +278,7 @@ def ApplyNeckChroma(tile, neck, calibration):
     base[:] = np.rint(255 * np.clip(LinearToSrgb(linear), 0, 1)).astype(np.uint8)
 
 
-def ApplyTabResponses(tile, tab, visibility=None):
+def ApplyTabResponses(tile, tab, visibility=None, seamVisibility=None):
     source = tab["source"]
     peer = source["pairedPhoto"]
     height, width = tile[0].shape[:2]
@@ -279,7 +289,8 @@ def ApplyTabResponses(tile, tab, visibility=None):
     for key, channels in (("grainCalibration", ("gain",)),
                           ("surfaceCalibration", ("gain", "tilt", "tiltV", "roughness")),
                           ("warmCalibration", ("gain", "tilt", "tiltV", "roughness", "metalness")),
-                          ("lightBalance", ("gain", "tilt", "tiltV", "roughness", "metalness"))):
+                          ("lightBalance", ("gain", "tilt", "tiltV", "roughness", "metalness")),
+                          ("steelBalance", ("gain", "tilt", "tiltV", "roughness", "metalness", "tintRed", "tintBlue"))):
         calibration = tab.get(key)
         if calibration is None:
             continue
@@ -289,16 +300,22 @@ def ApplyTabResponses(tile, tab, visibility=None):
                 or calibration["outlineUV"] != tab["outlineUV"] or calibration["footprint"] != tab["footprint"]):
             raise ValueError("Tab response data do not match the paired source photographs and projection")
         coverage = None
-        if key in ("warmCalibration", "lightBalance"):
+        if key in ("warmCalibration", "lightBalance", "steelBalance"):
             if (calibration.get("contactAoSha256") != Sha256(CONTACT_AO)
                     or calibration.get("surfaceSha256") != tab.get("surfaceCalibration", {}).get("sha256")
                     or calibration.get("grainSha256") != tab.get("grainCalibration", {}).get("sha256")):
                 raise ValueError("Tab light response must be measured on the current tab finish and contact AO")
             coverage = np.clip((visibility - .54) / .32, 0, 1)
-        if key == "lightBalance":
+        if key in ("lightBalance", "steelBalance"):
             if calibration.get("warmSha256") != tab.get("warmCalibration", {}).get("sha256"):
                 raise ValueError("The balanced tab response must use the measured warm finish as its base")
             coverage = .92 * np.clip((visibility - .56) / .30, 0, 1)
+        if key == "steelBalance":
+            if (calibration.get("lightBalanceSha256") != tab.get("lightBalance", {}).get("sha256")
+                    or calibration.get("seamAoSha256") != Sha256(SEAM_AO)):
+                raise ValueError("Tab steel balance does not match the measured finish and seam AO")
+            t = np.clip((seamVisibility - .61) / .27, 0, 1)
+            coverage = t * t * (3 - 2 * t)
         ApplyResponseFields(tile, calibration, channels, uu, span, coverage)
 
 
@@ -1241,7 +1258,7 @@ def BakeShoulder(quadrants, width, height, index, reference):
             for left, right in zip(main, flank)]
 
 
-def BuildAtlas(reference, contactAo=None):
+def BuildAtlas(reference, contactAo=None, seamAo=None):
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
     side = min(source.size) // 2
@@ -1254,12 +1271,17 @@ def BuildAtlas(reference, contactAo=None):
     size = ATLAS["size"]
     tab = reference["closeups"]["Tab"]
     flank = reference["knurl"]["flankWear"]
-    visibility = None
-    if "warmCalibration" in tab or "lightBalance" in tab or "surfaceCalibration" in flank:
+    visibility = seamVisibility = None
+    if "warmCalibration" in tab or "lightBalance" in tab or "steelBalance" in tab or "surfaceCalibration" in flank:
         if contactAo is None:
             contactAo, _ = ReadContactAo()
         contactImage = Image.fromarray(contactAo).resize((size, size), Image.Resampling.BILINEAR)
         visibility = np.asarray(contactImage, dtype=float) / 255
+    if "steelBalance" in tab:
+        if seamAo is None:
+            seamAo, _ = ReadContactAo(SEAM_AO, SEAM_RECORD)
+        seam = Image.fromarray(np.minimum(contactAo, seamAo)).resize((size, size), Image.Resampling.BILINEAR)
+        seamVisibility = np.asarray(seam, dtype=float) / 255
     maps = [np.zeros((size, size, 3), dtype=np.uint8) for _ in range(3)]
     for index, (name, (x, y, width, height)) in enumerate(ATLAS["regions"].items()):
         if name == "Stripe":
@@ -1313,9 +1335,10 @@ def BuildAtlas(reference, contactAo=None):
                 if (calibration := neck.get("markCalibration")) is not None:
                     CheckNeckRegistration(neck, calibration)
                     ApplyResponseFields(tile, calibration, ("gain",), *PlanarTexelCenters(width, height))
-            elif name == "Tab" and any(key in tab for key in ("grainCalibration", "surfaceCalibration", "warmCalibration", "lightBalance")):
+            elif name == "Tab" and any(key in tab for key in ("grainCalibration", "surfaceCalibration", "warmCalibration", "lightBalance", "steelBalance")):
                 outlineVisibility = None if visibility is None else visibility[y:y + height, x:x + width]
-                ApplyTabResponses(tile, tab, outlineVisibility)
+                seam = None if seamVisibility is None else seamVisibility[y:y + height, x:x + width]
+                ApplyTabResponses(tile, tab, outlineVisibility, seam)
             elif name == "CollarRing":
                 collar = reference["closeups"]["CollarRing"]
                 if (calibration := collar.get("responseCalibration")) is not None:
@@ -1331,9 +1354,12 @@ def BuildAtlas(reference, contactAo=None):
 def ReadContactAo(imagePath=CONTACT_AO, recordPath=CONTACT_RECORD):
     record = json.loads(recordPath.read_bytes())
     model = HERE.parent / "Model/Model_Type89Launcher.tzm.json"
-    expected = {"file": imagePath.name, "sha256": Sha256(imagePath),
-                "modelSha256": Sha256(model), "atlasSha256": Sha256(ATLAS_FILE)}
-    if any(record.get(field) != value for field, value in expected.items()):
+    expected = {"file": imagePath.name, "sha256": Sha256(imagePath), "modelSha256": Sha256(model)}
+    layout = ATLAS_FILE.read_bytes().replace(b"\r\n", b"\n")
+    # Older bakes recorded the Windows checkout's CRLF bytes for this JSON.
+    layoutDigests = {sha256(layout).hexdigest(), sha256(layout.replace(b"\n", b"\r\n")).hexdigest()}
+    if (any(record.get(field) != value for field, value in expected.items())
+            or record.get("atlasSha256") not in layoutDigests):
         raise ValueError(f"Rebake {imagePath.name} from the current launcher mesh and UV atlas")
     with Image.open(imagePath) as image:
         pixels = np.array(image.convert("L"))
@@ -1357,7 +1383,7 @@ def Bake():
     seamVisibility, seams = ReadContactAo(SEAM_AO, SEAM_RECORD)
     # The photographed material fits use the original visibility weights.
     # Keep the darker AO sample so a joint hit by either pass keeps its shadow.
-    maps = BuildAtlas(reference, calibrationVisibility)
+    maps = BuildAtlas(reference, calibrationVisibility, seamVisibility)
     visibility = np.minimum(calibrationVisibility, seamVisibility)
     size = ATLAS["size"]
     for channel, pixels, outputSize, quality in zip(("Base", "Normal", "Orm"), maps, (2048, 2048, 1024), (84, 84, 82)):
@@ -1408,7 +1434,8 @@ def Bake():
     if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:
         details["neckMarks"] = calibration
     for key, name in (("grainCalibration", "tabGrain"), ("surfaceCalibration", "tabResponse"),
-                      ("warmCalibration", "tabWarmResponse"), ("lightBalance", "tabLightBalance")):
+                      ("warmCalibration", "tabWarmResponse"), ("lightBalance", "tabLightBalance"),
+                      ("steelBalance", "tabSteelBalance")):
         if (calibration := reference["closeups"]["Tab"].get(key)) is not None:
             details[name] = calibration
     for key, name in (("surfaceCalibration", "knurlFlankResponse"), ("lightBalance", "knurlLightBalance")):

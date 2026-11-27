@@ -16,6 +16,7 @@ LUMA = np.array([.2126, .7152, .0722], dtype=np.float32)
 REGISTERED_LUMA = np.array([.2126, .7152, .0722])
 RECORD = Path(__file__).resolve().parent / "Reference/Type89Launcher/Data_Type89LauncherSteelReference.json"
 CONTACT_AO = RECORD.parents[2] / "Source/Type89Launcher/Texture_Type89LauncherContactAo.png"
+SEAM_AO = CONTACT_AO.with_name("Texture_Type89LauncherSeamAo.png")
 
 
 def SaveReferenceRecord(record):
@@ -37,6 +38,13 @@ def TabWarmIdentity(tab):
 
 def TabLightBalanceIdentity(tab):
     return TabWarmIdentity(tab) | {"warmSha256": tab.get("warmCalibration", {}).get("sha256")}
+
+
+def TabSteelBalanceIdentity(tab):
+    return TabLightBalanceIdentity(tab) | {
+        "lightBalanceSha256": tab.get("lightBalance", {}).get("sha256"),
+        "seamAoSha256": sha256(SEAM_AO.read_bytes()).hexdigest(),
+    }
 
 
 def KnurlFlankResponseIdentity(flank):
@@ -2588,6 +2596,9 @@ def Main():
         calibration = previous.get("lightBalance")
         if calibration and all(calibration.get(field) == value for field, value in identity.items()):
             current["lightBalance"] = calibration
+    balance = prior.get("Tab", {}).get("steelBalance")
+    if balance and all(balance.get(field) == value for field, value in TabSteelBalanceIdentity(tab).items()):
+        tab["steelBalance"] = balance
     SaveReferenceRecord(record)
     print("Measured close-ups:", ", ".join(record["closeups"]), "knurl UV cycles:",
           record["knurl"]["angularCycles"], record["knurl"]["axialCycles"], flush=True)
