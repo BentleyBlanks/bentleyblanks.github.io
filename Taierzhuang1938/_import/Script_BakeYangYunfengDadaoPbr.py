@@ -1,4 +1,4 @@
-"""Project the observed photo colors into the game's Dadao PBR atlas."""
+"""Bake photo color, fiber relief and mesh contact shadows for the Dadao atlas."""
 
 import argparse
 import hashlib
@@ -18,6 +18,7 @@ REFERENCE = ROOT / "_import/Reference/SichuanDadao"
 STEEL = REFERENCE / "Texture_YangYunfengSteel03.webp"
 TEXTILES = REFERENCE / "Texture_YangYunfengTextiles.webp"
 DIFFUSE_FIT = REFERENCE / "Texture_YangYunfengDiffuseFit.png"
+GEOMETRY_AO = REFERENCE / "Texture_YangYunfengGeometryAo.png"
 
 
 def LinearSrgb(image):
@@ -68,13 +69,28 @@ def TextileSample(image, width, height, position):
     return np.tile(mirror, (2, 2, 1))[:height, :width]
 
 
+def TextileDetails(guide, tags, samples, strip):
+    cloth, _, red, _ = MaterialRegions(guide, tags)
+    height, width = cloth.shape
+    position = (.5, (.19, .44, .68, .82)[strip])
+    linen, cord = (TextileSample(source, width, height, position) @ LUMA for source in samples[1:])
+    field = np.where(red, cord, linen)
+    scale = width / 992
+    fibers = gaussian_filter(field, .32 * scale) - gaussian_filter(field, 1.85 * scale)
+    # The photographed wrapping supplies the irregular lap edges between the yarns.
+    luma = guide @ LUMA
+    narrow = gaussian_filter(luma, (.95 * scale, .78 * scale))
+    broad = gaussian_filter(luma, (1.7 * scale, 3.7 * scale))
+    return cloth, np.clip(fibers, -.14, .14), np.clip(narrow - broad, -.15, .13)
+
+
 def MergeUnseen(color, tags, samples, strip):
     steel, linen, cord = samples
     height, width = color.shape[:2]
     cloth, green, red, tan = MaterialRegions(color, tags)
     # Match the reference palette while using the generated fiber and steel grain on the back and rims.
     result = gaussian_filter(color, (2.0, 2.5, 0))
-    groups = ((~cloth, steel, .49), (tan, linen, .75), (red, cord, .70), (green, linen, .54))
+    groups = ((~cloth, steel, .49), (tan, linen, .26), (red, cord, .25), (green, linen, .27))
     for i, (mask, source, blend) in enumerate(groups):
         if not np.any(mask):
             continue
@@ -106,30 +122,61 @@ def Tiles(photo, labels, fit, size, samples, balanced=None):
     if size == BASE_SIZE:
         detail = front - gaussian_filter(front, (.9, .9, 0))
         front = np.clip(front + .32 * detail, 0, 1)
-    yield front, tags
-    yield MergeUnseen(color, tags, samples, 1), tags
+    yield front, tags, color
+    yield MergeUnseen(color, tags, samples, 1), tags, color
     for strip, opposite in ((2, False), (3, True)):
         edge, kind = EdgeProjection(color, tags, visible, opposite)
-        yield MergeUnseen(edge, kind, samples, strip), kind
+        yield MergeUnseen(edge, kind, samples, strip), kind, edge
 
 
-def DataTiles(color, tags):
-    textile, _, _, _ = MaterialRegions(color, tags)
+def BaseTile(color, details):
+    textile, fibers, _ = details
+    adjusted = color.copy()
+    adjusted[textile] *= 1 + .34 * fibers[textile, None]
+    return np.clip(adjusted, 0, 1)
+
+
+def DataTiles(color, details, geometryAo):
+    textile, fibers, folds = details
     luma = color @ LUMA
     haze = gaussian_filter(luma, (3.0, 6.0))
     fine = gaussian_filter(luma, .55) - haze
-    strength = np.where(textile, .81, .51)
-    dy, dx = np.gradient(strength * fine)
+    relief = np.where(textile, .42 * fine + 1.35 * folds + .96 * fibers, .51 * fine)
+    dy, dx = np.gradient(relief)
     direction = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
     normal = .5 + .5 * direction / np.linalg.norm(direction, axis=2, keepdims=True)
     age = 1 - Smoothstep(.40, .82, luma)
-    rough = np.where(textile, .84 + .08 * age, .44 + .23 * age)
+    fabricRoughness = np.clip(.88 + .07 * age - .20 * fibers, .82, .98)
+    rough = np.where(textile, fabricRoughness, .44 + .23 * age)
     metal = np.where(textile, 0, .91 - .24 * age)
-    occlusion = .987 + .18 * np.minimum(0, fine)
+    lapShade = Smoothstep(.010, .073, -folds)
+    yarnShade = Smoothstep(.008, .085, -fibers)
+    clothAo = 1 - .32 * lapShade - .07 * yarnShade
+    occlusion = geometryAo * np.where(textile, clothAo, 1)
     return normal, np.stack((occlusion, rough, metal), axis=2)
 
 
-def Bake(reference, fitFile, textileSource, diffuseFit, out):
+def ExportGeometryAo(trace, output):
+    with np.load(trace) as record:
+        values, coverage = record["ao"], record["coverage"]
+    if values.shape != (DATA_SIZE, DATA_SIZE) or coverage.shape != values.shape:
+        raise ValueError("The Blender occlusion bake must use the production UV atlas size")
+    result = np.ones(values.shape, dtype=np.float32)
+    for strip in range(4):
+        top = strip * 256 + 20
+        region = np.s_[top:top + 216, 16:1008]
+        mask = coverage[region]
+        strength = 1 - values[region]
+        support = gaussian_filter(mask.astype(np.float32), .70)
+        smoothed = gaussian_filter(strength * mask, .70) / np.maximum(support, .00001)
+        distance, nearest = distance_transform_edt(~mask, return_indices=True)
+        shaded = (.40 * strength + .60 * smoothed)[tuple(nearest)]
+        result[region] -= np.where(distance <= 4, shaded, 0)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(np.uint8(np.round(result * 255))).save(output, optimize=True)
+
+
+def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_AO):
     fit = json.loads(fitFile.read_text(encoding="utf-8"))
     if hashlib.sha256(reference.read_bytes()).hexdigest() != fit["reference"]["sha256"]:
         raise ValueError("Trace the approved reference before baking the project UVs")
@@ -152,9 +199,18 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out):
         linen = textile.crop((26, 14, round(width * .639), height - 14))
         red = textile.crop((round(width * .691), 14, width - 24, height - 14))
     samples = (steel, linen, red)
-    base = [color for color, _ in Tiles(photo, labels, fit, BASE_SIZE, samples, balanced)]
+    with Image.open(aoSource) as image:
+        if image.size != (DATA_SIZE, DATA_SIZE):
+            raise ValueError("The geometry AO must have the same resolution as ORM")
+        occlusion = np.asarray(image.convert("L"), dtype=np.float32) / 255
+    base = [BaseTile(color, TextileDetails(guide, tags, samples, strip))
+            for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, BASE_SIZE, samples, balanced))]
     base[1:] = [gaussian_filter(tile, (.69, .69, 0)) for tile in base[1:]]
-    data = [DataTiles(color, tags) for color, tags in Tiles(photo, labels, fit, DATA_SIZE, samples)]
+    data = []
+    for strip, (color, tags, guide) in enumerate(Tiles(photo, labels, fit, DATA_SIZE, samples)):
+        top = strip * 256 + 20
+        details = TextileDetails(guide, tags, samples, strip)
+        data.append(DataTiles(color, details, occlusion[top:top + 216, 16:1008]))
     out.mkdir(parents=True, exist_ok=True)
     Save(base, BASE_SIZE, out / "Texture_DadaoBase.webp", 91)
     Save([normal for normal, _ in data], DATA_SIZE, out / "Texture_DadaoNormal.webp", 87)
@@ -167,6 +223,10 @@ if __name__ == "__main__":
     parser.add_argument("--fit", type=Path, default=DEFAULT_FIT)
     parser.add_argument("--textile", type=Path, default=TEXTILES)
     parser.add_argument("--diffuse", type=Path, default=DIFFUSE_FIT)
+    parser.add_argument("--occlusion", type=Path, default=GEOMETRY_AO)
+    parser.add_argument("--raycast", type=Path, help="Rebuild the geometry AO image from a Blender raycast bake")
     parser.add_argument("--out", type=Path, default=ROOT / "Texture")
     args = parser.parse_args()
-    Bake(args.reference, args.fit, args.textile, args.diffuse, args.out)
+    if args.raycast:
+        ExportGeometryAo(args.raycast, args.occlusion)
+    Bake(args.reference, args.fit, args.textile, args.diffuse, args.out, args.occlusion)
