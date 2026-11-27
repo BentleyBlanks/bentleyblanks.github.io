@@ -680,11 +680,16 @@
         </div>
       </section>
 
-      <!-- 焦点 2：云端算力（Colab CLI / Modal）+ 内置 OAuth 授权 -->
+      <!-- 焦点 2：云端算力（Colab CLI / Modal）+ 剩余计算单元 + 内置 OAuth 授权 -->
       <section class="mwHeroCard" id="sysGpuPanel">
         <div class="mwHeroHeadRow kpiClickable" id="kpiGpuCard" title="点击配置云端 GPU">
           <div class="mwHeroHeadLeft">
             <div class="mwEyebrow">云端算力 · MiniMax-H3 &amp; 动捕提骨</div>
+            <div id="sysColabBalanceRow" class="mwHeroNumRow">
+              <span id="sysColabBalance" class="mwHeroNum mwMono">—</span>
+              <span class="mwHeroUnit">计算单元</span>
+              <span id="sysColabRate" class="mwRatePill mwMono">0.00 / 时</span>
+            </div>
             <div class="mwHeroTitleRow">
               <span id="gGpuName" class="mwCardTitle">Colab CLI · 0 卡休眠</span>
               <span class="mwStatusInline"><i id="dotCloud" class="mwTinyDot"></i><span id="kpiGpuSub">—</span></span>

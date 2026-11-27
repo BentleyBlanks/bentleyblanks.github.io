@@ -324,14 +324,29 @@ function renderSystemAggregated() {
   const isSleep = !tmRun || tmRun.containerState === "scaled_to_zero" || tmRun.status === "succeeded";
   const isColab = (c?.backend || appState.config?.mocapBackend || "colab_cli") === "colab_cli";
   $("#dotCloud").className = `mwTinyDot ${c?.online ? "ok" : "warn"}`;
+  const balRow = $("#sysColabBalanceRow");
+  const balEl = $("#sysColabBalance");
+  const rateEl = $("#sysColabRate");
+  if (balRow) balRow.classList.toggle("hidden", !isColab);
   if (isColab) {
     if (c?.online) {
-      $("#kpiGpuState").textContent = c.balance != null ? `${c.balance} 单元` : c.activeJobs > 0 ? "运行中" : "已就绪";
-      $("#kpiGpuSub").textContent = c.hourlyRate != null ? `Colab · ${c.hourlyRate}/时` : `Colab v${c.version || "0.8"}`;
+      const balNum = c.balance != null ? Number(c.balance) : null;
+      if (balEl) balEl.textContent = balNum != null && Number.isFinite(balNum) ? balNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+      if (rateEl) {
+        const r = c.hourlyRate != null ? Number(c.hourlyRate) : 0;
+        rateEl.textContent = r > 0 ? `消耗 ${r.toFixed(2)} / 时` : "当前 0.00 / 时";
+        rateEl.classList.toggle("isBurning", r > 0);
+      }
+      $("#kpiGpuState").textContent = balNum != null ? `${balNum} 单元` : c.activeJobs > 0 ? "运行中" : "已就绪";
+      $("#kpiGpuSub").textContent = c.activeJobs > 0 ? `${c.activeJobs} 个活跃会话 · v${c.version || "0.8"}` : `Colab CLI v${c.version || "0.8"} · 已连接`;
     } else if (c?.installed) {
+      if (balEl) balEl.textContent = "—";
+      if (rateEl) { rateEl.textContent = "未授权"; rateEl.classList.remove("isBurning"); }
       $("#kpiGpuState").textContent = "Colab CLI";
       $("#kpiGpuSub").textContent = "待授权登录";
     } else {
+      if (balEl) balEl.textContent = "—";
+      if (rateEl) { rateEl.textContent = "未安装"; rateEl.classList.remove("isBurning"); }
       $("#kpiGpuState").textContent = "未安装";
       $("#kpiGpuSub").textContent = "google-colab-cli";
     }
