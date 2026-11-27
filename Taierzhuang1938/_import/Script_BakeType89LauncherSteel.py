@@ -14,8 +14,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    CollarJointIdentity, NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveJointIdentity,
-    SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
+    CollarJointIdentity, CollarReflectanceIdentity, NeckJointIdentity, ReverseReflectionIdentity,
+    SaddleJointIdentity, SleeveJointIdentity, SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
 )
 
 
@@ -1577,29 +1577,33 @@ def ApplyNeckJointFinish(maps, packed, reference):
     ApplyJointMaterialFields(maps, packed, "Neck", fields)
 
 
-def ApplySleeveJointFinish(maps, packed, reference):
-    finish = reference["sleeveJointFinish"]
-    if any(finish.get(key) != value for key, value in SleeveJointIdentity(reference).items()):
-        raise ValueError("Joint sleeve response does not match the existing finish and groove shading")
+def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity):
+    if any(finish.get(key) != value for key, value in identity.items()):
+        raise ValueError(f"{region} response does not match the underlying material and AO")
     coverage, detail = (finish[key] for key in ("coverage", "detail"))
-    if detail["rearPhotoSha256"] != finish["sourceSha256"]:
-        raise ValueError("Sleeve wear does not match its registered photograph")
+    if (detail["rearPhotoSha256"] != finish["sourceSha256"]
+            or detail.get("frontPhotoSha256", finish["frontPhotoSha256"]) != finish["frontPhotoSha256"]):
+        raise ValueError(f"{region} wear does not match its registered photographs")
     sources = []
     for record in (coverage, detail):
         file = REFERENCE.with_name(record["file"])
         if Sha256(file) != record["sha256"]:
-            raise ValueError(f"Sleeve response data does not match {file.name}")
+            raise ValueError(f"{region} response data does not match {file.name}")
         with Image.open(file) as image:
             sources.append(np.asarray(image, dtype=float))
 
-    _, _, width, height = ATLAS["regions"]["Sleeve"]
+    _, _, width, height = ATLAS["regions"][region]
     u, v = PlanarTexelCenters(width, height)
     weight = PeriodicMaterialField(sources[0] / 65535., u, v)
     fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
     encoded = (sources[1] - 32768.) / detail["scale"]
     for name, layer in zip(detail["fields"], np.split(encoded, len(detail["fields"]), axis=1), strict=True):
         fields[name] += PeriodicMaterialField(layer, u, v) * detail["strength"]
-    ApplyJointMaterialFields(maps, packed, "Sleeve", fields)
+    ApplyJointMaterialFields(maps, packed, region, fields)
+
+
+def ApplySleeveJointFinish(maps, packed, reference):
+    ApplyCoveredPhotoFinish(maps, packed, "Sleeve", reference["sleeveJointFinish"], SleeveJointIdentity(reference))
 
 
 def ApplyCollarPackedRoughness(packed, original, balance):
@@ -1809,9 +1813,13 @@ def Bake(legacyOrm=None):
     sleeveFinish = reference.get("sleeveJointFinish")
     if sleeveFinish is not None:
         ApplySleeveJointFinish(maps, pixels, reference)
+    collarReflectance = reference.get("collarReflectanceFinish")
+    if collarReflectance is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "CollarRing", collarReflectance, CollarReflectanceIdentity(reference))
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
-        Image.fromarray(image).save(output, method=6, quality=84)
+        quality = collarReflectance.get("baseQuality", 84) if collarReflectance and channel == "Base" else 84
+        Image.fromarray(image).save(output, method=6, quality=quality)
     # Keep the shallow contact gradients within the project's 1 MiB set budget.
     Image.fromarray(pixels).save(HERE.parent / "Texture" / f"Texture_{STEM}Orm.webp", method=6, quality=86)
     subprocess.run([sys.executable, str(HERE / "Script_BakePbrTexture.py"), "--audit", "--name", STEM], check=True)
@@ -1882,6 +1890,9 @@ def Bake(legacyOrm=None):
     if sleeveFinish is not None:
         details["jointSleeveCoverage"] = sleeveFinish["coverage"]
         details["jointSleeveDetail"] = sleeveFinish["detail"]
+    if collarReflectance is not None:
+        details["collarReflectanceCoverage"] = collarReflectance["coverage"]
+        details["collarReflectanceDetail"] = collarReflectance["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
