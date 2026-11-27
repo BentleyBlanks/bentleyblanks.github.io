@@ -1,15 +1,15 @@
 // Dots 511, user-approved HanYang-class reduction. Author frame measured from
 // the delivered vertices: metres, +Y up, muzzle -Z. See Model/Type38_511.
 export const TYPE38_511 = {
-  version: '511-rear-contact-28',
-  url: './Model/Type38_511/Model_Type38_511.glb?v=511-rear-contact-28',
+  version: '511-seated-plate-29',
+  url: './Model/Type38_511/Model_Type38_511.glb?v=511-seated-plate-29',
   npcLodUrl: './Model/Type38_511/Model_Type38_511NpcLod.glb?v=1',
   npcLodPart: 'Exterior_FoldedFrame12',
   npcTriangles: 75286,
   triangles: 79894,
   parts: 45,
   renderMeshes: 23,
-  sourceSha256: 'eb49e0d9a8f6e7886a35e3b9caa262255874e726383dcfc1991ce0046ae49c5f',
+  sourceSha256: '49f58f3998759f7f5da27b3745078e164b174be436773f1c8d9e6a557bdd907b',
   frameOffset: [0, -0.005, -0.027],
   textureAnisotropy: 16,
   wood: ['T38_460G_WoodGroove_VisualCandidate','Wood_UpperFittedCrown05'],

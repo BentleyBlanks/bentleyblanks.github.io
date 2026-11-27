@@ -1,14 +1,18 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v28
+## 当前交付版 v29
 
-游戏使用 `511-rear-contact-28`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-seated-plate-29`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
 | 游戏取用 | [运行时配置](../../Data_Type38_511.mjs) · [近景 GLB](Model_Type38_511.glb) · [NPC 照门 LOD](Model_Type38_511NpcLod.glb) |
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
+
+## 尾盘下方的钢片贴合缝 · 2026-11-27
+
+标注两侧的锯齿来自木托肩部的局部凹槽和顶点法线。恢复木托曲面，按钢片轮廓拟合接缝附近的法线，并使钢片底边嵌进木面。沿两侧以 464 处近边缘采样检查贴合，再离线重烘木托和钢片的局部 AO。以两侧近景与斜光检查高光。 [贴合修复脚本](../../_blender/Script_Type38SeatFit.py)
 
 ## 后部倒角与高密度离线 AO · 2026-11-27
 

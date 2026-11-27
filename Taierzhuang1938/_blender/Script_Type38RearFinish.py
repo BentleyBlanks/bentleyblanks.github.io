@@ -51,7 +51,7 @@ def KnurlCavity(normalMap):
     return .33 * Ramp(.008, .074, valleys)
 
 
-def BakeRearFinish(repo, doc, views, *, polishMetal=True):
+def BakeRearFinish(repo, doc, views, *, polishMetal=True, partsFilter=REAR_PARTS):
     scene, geometryGroups, subjects = OcclusionScene(repo, doc, views)
     charts = defaultdict(list)
     reserved = defaultdict(list)
@@ -83,7 +83,7 @@ def BakeRearFinish(repo, doc, views, *, polishMetal=True):
         slices = [(row['part'], (row['indexStart'], row['indexCount']))
                   for row in node['extras'].get('SourceRanges', [])] or [(part, None)]
         for name, span in slices:
-            if name in REAR_PARTS:
+            if name in partsFilter:
                 charts[index].append((name, span, primitive, material, rotation, location, group))
 
     for index, entries in charts.items():

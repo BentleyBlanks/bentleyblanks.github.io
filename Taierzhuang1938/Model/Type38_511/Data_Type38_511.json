@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 35,
+  "version": 37,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "eb49e0d9a8f6e7886a35e3b9caa262255874e726383dcfc1991ce0046ae49c5f",
+  "runtimeSha256": "49f58f3998759f7f5da27b3745078e164b174be436773f1c8d9e6a557bdd907b",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 79894,
@@ -70,8 +70,8 @@
     {
       "index": 6,
       "name": "Texture_Type38_BodyBatch03_metallicRoughnessTexture",
-      "bytes": 1496454,
-      "sha256": "eb01d7f940b23c81823274720e1f1d290812888add857eb8c41faaa3ab1f4b19"
+      "bytes": 1505382,
+      "sha256": "ac92f5f2deaf82ccf02824152c059619d9c6febd6ef09d93086cb431ff39e5bd"
     },
     {
       "index": 7,
@@ -376,8 +376,8 @@
     {
       "index": 57,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 2454006,
-      "sha256": "3a33f8f9f2285421be33107f49c542d4025e3b66fb06319d5b5a17cefd8438b9"
+      "bytes": 2453981,
+      "sha256": "d42702e6b6c20c2fd772337fbfbff5c6b7afbf55bef1ea5be9faf51ae3e2eeb2"
     },
     {
       "index": 58,
@@ -1030,6 +1030,16 @@
       "T38_435F2_VisualBackingRearEnd",
       "T38_440D2_IndependentVisibleRecess",
       "T38_460G_WoodGroove_VisualCandidate"
+    ]
+  },
+  "stockSeat": {
+    "edgeSamples": 464,
+    "seatedEdgeSamples": 460,
+    "visibleFaceSamples": 61184,
+    "coveredFaceSamples": 0,
+    "aoImages": [
+      6,
+      57
     ]
   }
 }
