@@ -27,6 +27,7 @@ SADDLE_RESPONSE = RECORD.with_name("Texture_Type89LauncherSaddleResponse.png")
 STEM_DETAIL = RECORD.with_name("Texture_Type89LauncherStemDetail.png")
 NECK_DETAIL = RECORD.with_name("Texture_Type89LauncherNeckDetail.png")
 NECK_CHROMA = RECORD.with_name("Texture_Type89LauncherNeckChroma.png")
+NECK_MARKS = RECORD.with_name("Texture_Type89LauncherNeckMarks.png")
 SLEEVE_DETAIL = RECORD.with_name("Texture_Type89LauncherSleeveDetail.png")
 KNURL_DETAIL = RECORD.with_name("Texture_Type89LauncherKnurlDetail.png")
 KNURL_FLANK = RECORD.with_name("Texture_Type89LauncherKnurlFlank.png")
@@ -1512,6 +1513,13 @@ def NeckChromaIdentity(neck):
             "footprint": neck["detail"]["footprint"]}
 
 
+def NeckPhotoCoordinates(neck, u, v):
+    trace = neck["stampTrace"]
+    angle = 2 * np.pi * neck["footprint"]["uHalfSpan"] * (2 * u - 1)
+    first, last = trace["imageYForVRange"]
+    return trace["imageCenter"] + trace["imageRadius"] * np.sin(angle), first + (last - first) * v
+
+
 def NeckChromaCalibration(photo, neck, evidence):
     names = ("V53NeckStudyDefault", "V53NeckStudyMuseum")
     folders = [evidence / name for name in names]
@@ -1520,13 +1528,7 @@ def NeckChromaCalibration(photo, neck, evidence):
     if not (np.array_equal(u, frames[1][0]) and np.array_equal(v, frames[1][1])):
         raise ValueError("The neck color views must use the same registered camera")
     identity = NeckChromaIdentity(neck)
-    center, radius, first, last = identity["projection"]
-    span = neck["footprint"]["uHalfSpan"]
-
-    def PhotoCoordinates(u, v):
-        return center + radius * np.sin(2 * np.pi * span * (2 * u - 1)), first + (last - first) * v
-
-    x, y = PhotoCoordinates(u, v)
+    x, y = NeckPhotoCoordinates(neck, u, v)
     target = np.stack([SampleBilinear(channel, x, y) for channel in np.moveaxis(photo, -1, 0)], axis=-1)
     distances = BarrelStampDistances(photo, neck["stampTrace"]["strokes"])
     clearance = map_coordinates(distances, (y, x), order=1)
@@ -1578,7 +1580,7 @@ def NeckChromaCalibration(photo, neck, evidence):
     pull, response = ResponseEquations(basis, residual, Average, shape)
     fit = FitSignedResponse(pull, response, axes, 9)
     uu, vv = np.meshgrid(np.linspace(0, 1, shape[0]), np.linspace(0, 1, shape[1]), indexing="ij")
-    x, y = PhotoCoordinates(uu, vv)
+    x, y = NeckPhotoCoordinates(neck, uu, vv)
     fade = np.clip((map_coordinates(distances, (y, x), order=1) - 15) / 18, 0, 1)
     fade *= np.clip(np.minimum(uu, 1 - uu) / .12, 0, 1) * np.clip(np.minimum(vv, 1 - vv) / .12, 0, 1)
     fade *= np.clip(support / .71, 0, 1)
@@ -1590,7 +1592,73 @@ def NeckChromaCalibration(photo, neck, evidence):
     return WriteResponseFields(NECK_CHROMA, identity, fields, hashes, scale=110000)
 
 
-def NeckFinish(folder, previous=None, *, chromaEvidence=None):
+def NeckMarkContrast(photo, neck, distances, folder):
+    u, v, visible, rgb, hashes = ReadRegisteredFrame(folder)
+    x, y = NeckPhotoCoordinates(neck, u, v)
+    target = SampleBilinear(photo, x, y)
+    render = rgb @ REGISTERED_LUMA
+    distance = map_coordinates(distances, (y, x), order=1)
+    inside = binary_erosion(visible & (u > .05) & (u < .95) & (v > .07) & (v < .93), iterations=3)
+    steel = inside & (distance > 9)
+    support = gaussian_filter(steel.astype(float), (8, 8))
+    selected = inside & (support > .075) & (target > 24) & (render > 18)
+
+    def Surrounding(signal):
+        return gaussian_filter(signal * steel, (8, 8)) / np.maximum(support, .04)
+
+    backgrounds = [Surrounding(signal) for signal in (target, render)]
+    contrast = [(signal - background) / np.maximum(background, 30)
+                for signal, background in zip((target, render), backgrounds)]
+    return u, v, selected, distance, contrast, render, backgrounds[1], hashes
+
+
+def FitNeckMarks(photo, neck, distances, folders):
+    a, b = [NeckMarkContrast(photo, neck, distances, folder) for folder in folders]
+    u, v, _, distance = a[:4]
+    if not (np.array_equal(u, b[0]) and np.array_equal(v, b[1])):
+        raise ValueError("The neck mark views must use the same registered camera")
+    selected = a[2] & b[2] & (distance < 12)
+    if selected.sum() < 900:
+        raise ValueError("The render does not cover the photographed marks")
+    residual = np.stack([(row[4][0] - row[4][1])[selected] for row in (a, b)], axis=-1)
+    effects = []
+    for folder, row in zip(folders, (a, b)):
+        changes = [ReadRegisteredLuma(folder, "Gain" + side + ".png", row[-1]) for side in ("Plus", "Minus")]
+        effects.append(np.column_stack([(change - row[5])[selected] / np.maximum(row[6][selected], 30)
+                                        for change in changes]))
+    positive, negative = np.stack(effects, axis=1).transpose(2, 0, 1)
+    weights = np.array([.46, .54])
+    brighter = np.sum(weights * residual * (positive - negative), axis=-1) >= 0
+    slope = np.where(brighter[:, None], positive, -negative) / .24
+    gain = np.sum(weights * slope * np.clip(residual, -.62, .62), axis=-1)
+    gain /= np.sum(weights * slope**2, axis=-1) + .11**2
+    gain = np.where(brighter, np.clip(gain, 0, .57), np.clip(gain, -.57, 0))
+    gain *= np.clip((12 - distance[selected]) / 7, 0, 1)
+    shape = (301, 193)
+    bins = np.rint(u[selected] * (shape[0] - 1)).astype(int) * shape[1]
+    bins += np.rint(v[selected] * (shape[1] - 1)).astype(int)
+
+    def Smooth(signal):
+        field = np.bincount(bins, weights=signal, minlength=np.prod(shape)).reshape(shape)
+        return gaussian_filter(field, (1.00, .86), mode="constant")
+
+    field = Smooth(gain) / np.maximum(Smooth(np.ones_like(gain)), .26)
+    return field, {folder.name: row[-1] for folder, row in zip(folders, (a, b))}
+
+
+def NeckMarkCalibration(image, neck, evidence):
+    distances = BarrelStampDistances(image, neck["stampTrace"]["strokes"])
+    photo = image @ REGISTERED_LUMA
+    study = [evidence / ("V54NeckMarkStudy" + view) for view in ("Default", "Museum")]
+    resolved = [evidence / ("V54NeckMarkResolve" + view) for view in ("Default", "Museum")]
+    first, studyHashes = FitNeckMarks(photo, neck, distances, study)
+    remaining, resolveHashes = FitNeckMarks(photo, neck, distances, resolved)
+    field = np.clip(first + .90 * remaining, -.99, .99)
+    return WriteResponseFields(NECK_MARKS, NeckChromaIdentity(neck), (field,),
+                               {**studyHashes, **resolveHashes}, scale=30000)
+
+
+def NeckFinish(folder, previous=None, *, chromaEvidence=None, markEvidence=None):
     image, source = Photo(folder, 6)
     angles = np.linspace(-.132, .132, 23)
     imageCenter, imageRadius = 510, 431
@@ -1628,11 +1696,14 @@ def NeckFinish(folder, previous=None, *, chromaEvidence=None):
         ],
     }
     field["detail"] = NeckDetail(image, field)
-    if chromaEvidence is not None:
-        field["chromaCalibration"] = NeckChromaCalibration(image, field, chromaEvidence)
-    elif previous and (calibration := previous.get("chromaCalibration")):
-        if all(calibration.get(key) == value for key, value in NeckChromaIdentity(field).items()):
-            field["chromaCalibration"] = calibration
+    identity = NeckChromaIdentity(field)
+    for name, sourceEvidence, measure in (("chromaCalibration", chromaEvidence, NeckChromaCalibration),
+                                          ("markCalibration", markEvidence, NeckMarkCalibration)):
+        calibration = (previous or {}).get(name)
+        if sourceEvidence is not None:
+            field[name] = measure(image, field, sourceEvidence)
+        elif calibration and all(calibration.get(key) == value for key, value in identity.items()):
+            field[name] = calibration
     return field
 
 
@@ -2055,6 +2126,7 @@ def Main():
     options.add_argument("--barrel-grain-evidence", type=Path, help="V51 Evidence directory with registered fine-grain color response captures")
     options.add_argument("--saddle-response-evidence", type=Path, help="V52 Evidence directory with saddle material response captures")
     options.add_argument("--neck-chroma-evidence", type=Path, help="V53 Evidence directory with the neck color response captures")
+    options.add_argument("--neck-mark-evidence", type=Path, help="V54 Evidence directory with the neck mark response captures")
     options.add_argument("--sleeve-evidence", type=Path, help="V39 Evidence directory containing the two registered sleeve controls")
     options.add_argument("--sleeve-response-evidence", type=Path, help="V42 Evidence directory with sleeve response and refinement captures")
     options.add_argument("--sleeve-horizon-evidence", type=Path, help="V43 Evidence directory with sleeve horizon lighting captures")
@@ -2072,7 +2144,8 @@ def Main():
     record["closeups"] = {"Barrel": barrel, "CollarRing": CollarFinish(args.photos),
                           "Stem": StemFinish(args.photos), "Sleeve": sleeve,
                           "Saddle": ShoeFinish(args.photos, prior.get("Saddle"), responseEvidence=args.saddle_response_evidence),
-                          "Neck": NeckFinish(args.photos, prior.get("Neck"), chromaEvidence=args.neck_chroma_evidence),
+                          "Neck": NeckFinish(args.photos, prior.get("Neck"), chromaEvidence=args.neck_chroma_evidence,
+                                             markEvidence=args.neck_mark_evidence),
                           "Tab": TabFinish(args.photos, 5), "TabBack": TabFinish(args.photos, 2)}
     record["ringFinish"] = EyeFinish(args.photos)
     record["wheelFinish"] = WheelFinish(args.photos)

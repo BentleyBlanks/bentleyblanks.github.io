@@ -179,12 +179,16 @@ def ApplySaddleResponse(tile, saddle, calibration):
     ApplyResponseFields(tile, calibration, ("gain", "tilt", "tiltV", "roughness"), *PlanarTexelCenters(width, height))
 
 
-def ApplyNeckChroma(tile, neck, calibration):
+def CheckNeckRegistration(neck, calibration):
     trace = neck["stampTrace"]
     projection = [trace["imageCenter"], trace["imageRadius"], *trace["imageYForVRange"]]
     if (calibration["photoSha256"] != neck["source"]["sha256"] or calibration["projection"] != projection
             or calibration["footprint"] != neck["detail"]["footprint"]):
-        raise ValueError("The neck color response does not match the source photo and projection")
+        raise ValueError("The neck response does not match the source photo and projection")
+
+
+def ApplyNeckChroma(tile, neck, calibration):
+    CheckNeckRegistration(neck, calibration)
     base = tile[0]
     height, width = base.shape[:2]
     channels = ("red", "green", "blue")
@@ -1083,6 +1087,9 @@ def BuildAtlas(reference):
                 neck = reference["closeups"]["Neck"]
                 if (calibration := neck.get("chromaCalibration")) is not None:
                     ApplyNeckChroma(tile, neck, calibration)
+                if (calibration := neck.get("markCalibration")) is not None:
+                    CheckNeckRegistration(neck, calibration)
+                    ApplyResponseFields(tile, calibration, ("gain",), *PlanarTexelCenters(width, height))
         for atlas, pixels in zip(maps, tile):
             atlas[y:y + height, x:x + width] = pixels
     x, y, width, height = ATLAS["regions"]["Stripe"]
@@ -1127,6 +1134,8 @@ def Bake():
         details["saddleResponse"] = calibration
     if (calibration := reference["closeups"]["Neck"].get("chromaCalibration")) is not None:
         details["neckChroma"] = calibration
+    if (calibration := reference["closeups"]["Neck"].get("markCalibration")) is not None:
+        details["neckMarks"] = calibration
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

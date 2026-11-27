@@ -5622,6 +5622,48 @@
             "GainMinus.png": "50f51dbad7d9b51d2ba417dd83dfff28017dae4ebe0c2b9bf8001d96584fbc05"
           }
         }
+      },
+      "markCalibration": {
+        "photoSha256": "5b54ca60f4792a5a8611b5a21f7ff0d77f7c7ba75d39eab4ac36d799b048aefa",
+        "projection": [510, 431, 468, 186],
+        "footprint": {
+          "uCenter": 0.642,
+          "uHalfSpan": 0.132,
+          "vRange": [0.3878991489361702, 0.6829191489361702]
+        },
+        "file": "Texture_Type89LauncherNeckMarks.png",
+        "sha256": "a0254ca067b31dbadb7a95f2d276685c349fa7e64e87634227a8c9dcc4490d1d",
+        "scale": 30000,
+        "frameSha256": {
+          "V54NeckMarkStudyDefault": {
+            "beauty.png": "3a0101d42af452158e9d01fe30adcf73819468bf6256bd599ffa5bc06b78834c",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "GainPlus.png": "711c01aa93a004e47a2e76395aad1a8660c63efced3fc32ad0aa53e136d724f1",
+            "GainMinus.png": "451bf8899622f6cda1665ad514d62c4f8d163267061e4832dd6ca3b4ba57be7d"
+          },
+          "V54NeckMarkStudyMuseum": {
+            "beauty.png": "103b739eb7e6f24fd07ed09fe6feeb7b0d10b085487826af93dff466b5ba3dab",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "GainPlus.png": "d45ef16bbfc6efd3b99676ae016a9d2dbb7434d81699737ab733742436335eb6",
+            "GainMinus.png": "eb5cc474d02864419eb87a8a8e139a125e4ab91291272bb05088807e627bb57a"
+          },
+          "V54NeckMarkResolveDefault": {
+            "beauty.png": "e44f0bf8a9619d83e3d61cbb8b422932bb1cb166e549c82f445bb79b3a134e58",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "GainPlus.png": "600851041eb8dd63832c65ba2b820c3e145e1dee4c66ecc6f56a6eb6f3fb414f",
+            "GainMinus.png": "e0937e6fe430c1e3eba053b4b3c2957114d718ec3a904f349c0325a2608abe14"
+          },
+          "V54NeckMarkResolveMuseum": {
+            "beauty.png": "5ce11a35c6692981b2ab8e6cd595aff27d1ca9ce5776d526928fcbf3185e8702",
+            "uvHi.png": "e2238befbe0e4035fca63f39f0ee64970a2cacf93f9391145ee5282690214b61",
+            "uvLo.png": "9f9b20b041fb64e22d4c1ceaa311fdb9fcfcff2c3acf0c8cbe1e31effad1fa00",
+            "GainPlus.png": "bc4784b192d3f759f0133c02598e51c3695073a82b58aedd51a609f9a2925117",
+            "GainMinus.png": "2fddc9a91e8a88fdbbbb73a7782f3aa9f8f55a06767e84dce8e274908b0be45d"
+          }
+        }
       }
     },
     "Tab": {
