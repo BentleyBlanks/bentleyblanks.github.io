@@ -91,8 +91,11 @@ export const STUDIO_BG_RULE =
 export const LIMB_COLOR_SUIT_RULE =
   "服装仅由本规则定义：人物统一身穿高对比度解剖左右分色贴身哑光动捕服——躯干前后正反面均为完整纯中灰色，四肢颜色严格止于肩缝与髋缝、严禁溢入胸口或躯干；按人物自身解剖方向着色，人物自身左臂与左裤腿为深钴蓝色、人物自身右臂与右裤腿为亮橙色（转身、侧身或背对镜头时颜色严格跟随人物自身左右肢体，绝不随画面左右互换）；穿深色鞋，双手保持真实肤色裸手无手套以便清晰辨认每一根手指";
 
+export const ONE_TAKE_NO_CUT_RULE =
+  "全程一镜到底（single continuous unbroken take），固定三脚架机位绝对静止，严禁切镜头、严禁多机位切换、严禁跳剪、严禁转场与景别突变，确保人物全身骨骼动作从头到尾自然连续衔接";
+
 function makeCameraPrompt(characterDesc, actionDesc) {
-  return `${STUDIO_BG_RULE}，画面中只有一名人物，无任何场景道具、无背景杂物、无文字、无水印，均匀柔和棚拍灯光。固定机位三脚架中远景拍摄，机位位于人物斜前方约45度、向下俯角约35至45度的斜向半俯视视角，镜头全程绝对静止不推拉不摇移不切换。人物身高占画面约60%，头顶与双脚鞋底留白充足，全程头手脚完整入画且双腿清晰可辨。${characterDesc}；${LIMB_COLOR_SUIT_RULE}。连贯动作：${actionDesc}。动作流畅真实、物理重心转移自然、全身四肢分色清晰且十指全程无遮挡。`;
+  return `${STUDIO_BG_RULE}，画面中只有一名人物，无任何场景道具、无背景杂物、无文字、无水印，均匀柔和棚拍灯光。${ONE_TAKE_NO_CUT_RULE}；机位位于人物斜前方约45度、向下俯角约35至45度的斜向半俯视中远景视角。人物身高占画面约60%，头顶与双脚鞋底留白充足，全程头手脚完整入画且双腿清晰可辨。${characterDesc}；${LIMB_COLOR_SUIT_RULE}。连贯动作：${actionDesc}。动作流畅真实、物理重心转移自然、全身四肢分色清晰且十指全程无遮挡。`;
 }
 
 export function buildLevel01Scene01Catalog() {

@@ -300,6 +300,16 @@ function hydrateScheduleForClient() {
   };
 }
 
+const ONE_TAKE_VIDEO_GUARD =
+  "【硬性镜头约束】全程一镜到底（single continuous unbroken take），固定三脚架机位绝不移动，严禁切镜头、严禁分镜跳转、严禁转场与景别突变，保证角色动作全程连贯衔接。";
+
+function enforceOneTakeVideoPrompt(rawPrompt) {
+  const base = String(rawPrompt || "").trim();
+  if (!base) return ONE_TAKE_VIDEO_GUARD;
+  if (/一镜到底|严禁切镜头|unbroken take/i.test(base)) return base;
+  return `${ONE_TAKE_VIDEO_GUARD}${base}`;
+}
+
 function launchMiniMaxH3Take(task, { resolution, duration, prompt } = {}) {
   const shots = task.storyboard?.shots || [];
   const readyShots = shots.filter((s) => s.status === "succeeded" && s.localPath);
@@ -372,7 +382,7 @@ function launchMiniMaxH3Take(task, { resolution, duration, prompt } = {}) {
 
   const donePromise = runColabMiniMaxH3Job({
     config: state.config,
-    prompt: prompt || task.stage1.videoPrompt,
+    prompt: enforceOneTakeVideoPrompt(prompt || task.stage1.videoPrompt),
     duration: dur,
     resolution: resVal,
     startImagePath: startShot?.localPath || null,
@@ -1840,7 +1850,7 @@ async function handleApi(req, res, urlObj) {
 
       runColabMiniMaxH3Job({
         config: state.config,
-        prompt: body.prompt || task.stage1.videoPrompt,
+        prompt: enforceOneTakeVideoPrompt(body.prompt || task.stage1.videoPrompt),
         duration,
         resolution,
         startImagePath: startShot?.localPath || null,
@@ -1928,7 +1938,7 @@ async function handleApi(req, res, urlObj) {
         profile: canvas.profile,
         projectId: canvas.projectId,
         title: `${task.title}_Take${task.stage3.takes.length + 1}`,
-        prompt: body.prompt || task.stage1.videoPrompt,
+        prompt: enforceOneTakeVideoPrompt(body.prompt || task.stage1.videoPrompt),
         model: body.model || task.stage3?.modelPreset || state.config.defaultVideoModel,
         resolution: body.resolution || task.storyboard?.qualityPreset || state.config.defaultVideoResolution,
         ratio: body.ratio || "16:9",
