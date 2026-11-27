@@ -14,8 +14,8 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    CollarJointIdentity, NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveReverseIdentity,
-    SurfaceBalanceIdentity, WideReflectionIdentity,
+    CollarJointIdentity, NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SleeveJointIdentity,
+    SleeveReverseIdentity, SurfaceBalanceIdentity, WideReflectionIdentity,
 )
 
 
@@ -1542,6 +1542,23 @@ def ApplyPackedRoughness(packed, original, region, adjustment):
     ApplyPackedSurfaceChannel(packed, original, region, adjustment, 1, (.17, .92))
 
 
+def PeriodicMaterialField(values, u, v):
+    samples = np.asarray(values)
+    rows, columns = samples.shape
+    wrapped = np.column_stack((samples, samples[:, 0]))
+    return map_coordinates(wrapped, (v * (rows - 1), (u % 1) * columns), order=1, mode="nearest")
+
+
+def ApplyJointMaterialFields(maps, packed, region, fields):
+    roughness = fields.pop("roughness")
+    metalness = fields.pop("metalness")
+    x, y, width, height = ATLAS["regions"][region]
+    tile = np.s_[y:y + height, x:x + width]
+    ApplyMaterialFields([image[tile] for image in maps], fields, None)
+    ApplyPackedRoughness(packed, maps[2], region, roughness)
+    ApplyPackedSurfaceChannel(packed, maps[2], region, metalness, 2, (0., 1.))
+
+
 def ApplyNeckJointFinish(maps, packed, reference):
     finish = reference["neckJointFinish"]
     if any(finish.get(key) != value for key, value in NeckJointIdentity(reference).items()):
@@ -1550,24 +1567,39 @@ def ApplyNeckJointFinish(maps, packed, reference):
     if detail["rearPhotoSha256"] != finish["sourceSha256"]:
         raise ValueError("Neck wear does not match the registered rear photograph")
 
-    x, y, width, height = ATLAS["regions"]["Neck"]
+    _, _, width, height = ATLAS["regions"]["Neck"]
     u, v = PlanarTexelCenters(width, height)
-    fields = {}
-    for name, values in finish["fields"].items():
-        samples = np.asarray(values)
-        rows, columns = samples.shape
-        wrapped = np.column_stack((samples, samples[:, 0]))
-        fields[name] = map_coordinates(wrapped, (v * (rows - 1), (u % 1) * columns), order=1, mode="nearest")
+    fields = {name: PeriodicMaterialField(values, u, v) for name, values in finish["fields"].items()}
     center = detail["footprint"]["uCenter"]
     angular = center + (u - center + .5) % 1 - .5
     for name, values in SampleResponseFields(detail, ("gain", "tintRed", "tintBlue"), angular, v).items():
         fields[name] += detail["strength"] * values
-    roughness = fields.pop("roughness")
-    metalness = fields.pop("metalness")
-    region = np.s_[y:y + height, x:x + width]
-    ApplyMaterialFields([image[region] for image in maps], fields, None)
-    ApplyPackedRoughness(packed, maps[2], "Neck", roughness)
-    ApplyPackedSurfaceChannel(packed, maps[2], "Neck", metalness, 2, (0., 1.))
+    ApplyJointMaterialFields(maps, packed, "Neck", fields)
+
+
+def ApplySleeveJointFinish(maps, packed, reference):
+    finish = reference["sleeveJointFinish"]
+    if any(finish.get(key) != value for key, value in SleeveJointIdentity(reference).items()):
+        raise ValueError("Joint sleeve response does not match the existing finish and groove shading")
+    coverage, detail = (finish[key] for key in ("coverage", "detail"))
+    if detail["rearPhotoSha256"] != finish["sourceSha256"]:
+        raise ValueError("Sleeve wear does not match its registered photograph")
+    sources = []
+    for record in (coverage, detail):
+        file = REFERENCE.with_name(record["file"])
+        if Sha256(file) != record["sha256"]:
+            raise ValueError(f"Sleeve response data does not match {file.name}")
+        with Image.open(file) as image:
+            sources.append(np.asarray(image, dtype=float))
+
+    _, _, width, height = ATLAS["regions"]["Sleeve"]
+    u, v = PlanarTexelCenters(width, height)
+    weight = PeriodicMaterialField(sources[0] / 65535., u, v)
+    fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
+    encoded = (sources[1] - 32768.) / detail["scale"]
+    for name, layer in zip(detail["fields"], np.split(encoded, len(detail["fields"]), axis=1), strict=True):
+        fields[name] += PeriodicMaterialField(layer, u, v) * detail["strength"]
+    ApplyJointMaterialFields(maps, packed, "Sleeve", fields)
 
 
 def ApplyCollarPackedRoughness(packed, original, balance):
@@ -1774,6 +1806,9 @@ def Bake(legacyOrm=None):
     neck = reference.get("neckJointFinish")
     if neck is not None:
         ApplyNeckJointFinish(maps, pixels, reference)
+    sleeveFinish = reference.get("sleeveJointFinish")
+    if sleeveFinish is not None:
+        ApplySleeveJointFinish(maps, pixels, reference)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
         output = HERE.parent / "Texture" / f"Texture_{STEM}{channel}.webp"
         Image.fromarray(image).save(output, method=6, quality=84)
@@ -1844,6 +1879,9 @@ def Bake(legacyOrm=None):
         details["jointSaddleDetail"] = saddle["detail"]
     if neck is not None:
         details["jointNeckDetail"] = neck["detail"]
+    if sleeveFinish is not None:
+        details["jointSleeveCoverage"] = sleeveFinish["coverage"]
+        details["jointSleeveDetail"] = sleeveFinish["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
