@@ -23588,7 +23588,7 @@
     "reflectionLift": 0.035,
     "detail": {
       "file": "Texture_Type89LauncherWheelRearResponse.png",
-      "sha256": "7ca8b90c78da4342870a77334e402948222deefed89796a597672be3c58893f9",
+      "sha256": "ddf77edce4f035dfbd46921d6f1870599a031ffea5ab5f246bd72785b987b69a",
       "scale": 58000,
       "strength": 1.0,
       "fields": [
@@ -23602,6 +23602,14 @@
       ],
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
       "frontPhotoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb"
+    },
+    "cavityCalibration": {
+      "firstPlate": "44826cf525e515d1e1655ce3dab39aacbb14a966a423bc241ce9b50a370f4d5e",
+      "trialFraction": 0.42,
+      "guardedPlate": "a98a7c9835e8cdaa65ac18dddfd73a3ac3a7eefae0dbd27fcb1d9012a6610980",
+      "previousPlateSha256": "7ca8b90c78da4342870a77334e402948222deefed89796a597672be3c58893f9",
+      "frontPhotoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
     }
   },
   "gripRearFinish": {
@@ -26196,8 +26204,8 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "9c2a0081b23c01a2954230ceefe37a29df9a17f85cfcf9350784cf87c659fbde",
-      "scale": 24819,
+      "sha256": "bd9e072eb582aa98d80b5b0e4f92993b3bcfdfb72b6cbf2cafa7f9a2328f1018",
+      "scale": 22827,
       "strength": 1.0,
       "fields": [
         "gain",
@@ -26306,6 +26314,12 @@
       "V93FrontGuardDefault/uv": "991c08dae4c7bf30ed89dc3633a99f2c602c7bac79a99819073d674344da79cf",
       "V93FrontGuardDefault/beauty": "cc9c5ea88b122e2fd2cabd71b40fe140c82b4c7dc1e431f8bdabcbd480ca9d08",
       "V93FrontGuardDefault/GainPlus": "d4591aaf1162f0d68d01c4f9e055a766c0c6d49da86edf8d039a1e9357f8930f"
+    },
+    "endReflectanceCalibration": {
+      "previousPlateSha256": "9c2a0081b23c01a2954230ceefe37a29df9a17f85cfcf9350784cf87c659fbde",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "strength": 1.4
     }
   },
   "saddleSurfaceRefinement": {
