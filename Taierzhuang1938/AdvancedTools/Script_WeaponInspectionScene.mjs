@@ -19,9 +19,12 @@ import {
   CreateStandardCameraPost, BuildStandardPostOptions, ApplyEditorLiteCameraProfile,
 } from "../Script_CameraProfile.mjs";
 import { MarkNoPrepass } from "../Script_Post.mjs";
+import { GLOBAL_SH_PROBE_COEFFICIENTS } from "../Data_GlobalShProbe.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 import { WeaponMaterialPreview } from "./Script_WeaponMaterialPreview.mjs";
-import { BakeInspectionSky, CreateInspectionSkyBackdrop } from "./Script_WeaponInspectionSky.mjs";
+import {
+  BakeInspectionSky, CreateInspectionSkyBackdrop, INSPECTION_ENVIRONMENT_PRESET,
+} from "./Script_WeaponInspectionSky.mjs";
 
 const GLB = {
   HanYang: { url: HANYANG_173R.url, Load: LoadHanYang173R, Configure: ConfigureHanYang173R, Instantiate: InstantiateHanYang173R },
@@ -46,7 +49,6 @@ const PITCH_BY_ASSET = { OfficerSwordSet: -Math.PI / 2, MediumMortar: Math.PI * 
 const CHANNELS = Object.freeze({
   beauty: 0, normal: 1, tangent: 2, albedo: 3, roughness: 4, metallic: 5, ao: 6, reflection: 7, shadow: 8,
 });
-const KEY_LIGHT_DIRECTION = new THREE.Vector3(-3, 5, 4).normalize();
 const SHADOW_MAP_SIZE = 2048;
 const WEAPON_PBR_NAMES = new Set([
   "Steel", "WoodStock", "Type89Armor", "Type89Track", "GrenadePbr", "DadaoPbr",
@@ -209,35 +211,30 @@ async function LoadMaterials(library) {
   return missing.length;
 }
 
-const STUDIO_EXPOSURE_COMPENSATION = 2.3;
-const STUDIO_ENVIRONMENT_INTENSITY = 3.2;
-
-function CreateLighting(scene) {
-  const fill = new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * 1.8 * STUDIO_EXPOSURE_COMPENSATION);
-  scene.add(fill);
-  const key = new THREE.DirectionalLight(0xfff5e7, 2.4 * STUDIO_EXPOSURE_COMPENSATION);
-  key.position.copy(KEY_LIGHT_DIRECTION);
+function CreateLighting(scene, preset, sunDirection) {
+  const key = new THREE.DirectionalLight(preset.lightColor, preset.lightIntensity);
+  key.position.copy(sunDirection);
   key.castShadow = true;
   key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   key.shadow.autoUpdate = false;
   // With equal depth and width spans, one texel covers curved surfaces' residual depth error.
   key.shadow.bias = -1 / SHADOW_MAP_SIZE;
   scene.add(key, key.target);
-  for (const [color, intensity, x, y, z] of [
-    [0xd6eaff, 1.15 * STUDIO_EXPOSURE_COMPENSATION, 3, 1, 3],
-    [0xffffff, 1.75 * STUDIO_EXPOSURE_COMPENSATION, 2, 3, -5],
-  ]) {
-    const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(x, y, z);
-    scene.add(light);
-  }
-  return { key, fill };
+
+  const globalProbe = new THREE.LightProbe();
+  globalProbe.sh.fromArray(GLOBAL_SH_PROBE_COEFFICIENTS);
+  globalProbe.intensity = preset.shProbeIntensity ?? 0.34;
+  scene.add(globalProbe);
+
+  const ambient = new THREE.AmbientLight(preset.ambientColor ?? 0x607085, preset.ambientIntensity ?? 0.16);
+  scene.add(ambient);
+  return { key, globalProbe, ambient };
 }
 
-function FitShadow(key, center, extent) {
+function FitShadow(key, center, extent, sunDirection) {
   const radius = Math.max(extent.length() * .55, .001);
   key.target.position.copy(center);
-  key.position.copy(center).addScaledVector(KEY_LIGHT_DIRECTION, 2 * radius);
+  key.position.copy(center).addScaledVector(sunDirection, 2 * radius);
   const { shadow } = key;
   const camera = shadow.camera;
   camera.left = camera.bottom = -radius;
@@ -306,14 +303,20 @@ export class WeaponInspectionScene {
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
-    this.skyTarget = BakeInspectionSky(this.renderer, KEY_LIGHT_DIRECTION);
+    const bakedSky = BakeInspectionSky(this.renderer, INSPECTION_ENVIRONMENT_PRESET);
+    this.environmentPresetName = INSPECTION_ENVIRONMENT_PRESET;
+    this.environmentPreset = bakedSky.preset;
+    this.sunDirection = bakedSky.sunDirection;
+    this.skyTarget = bakedSky.target;
     this.skyBackdrop = CreateInspectionSkyBackdrop(this.skyTarget.texture);
     this.scene.add(this.skyBackdrop);
     this.scene.environment = this.skyTarget.texture;
-    this.scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
-    const { key, fill } = CreateLighting(this.scene);
+    this.scene.environmentIntensity = bakedSky.preset.envIntensity ?? 1;
+    const { key, globalProbe, ambient } = CreateLighting(this.scene, bakedSky.preset, this.sunDirection);
     this.keyLight = key;
-    this.materialPreview = new WeaponMaterialPreview(this.scene, fill);
+    this.globalProbe = globalProbe;
+    this.ambientLight = ambient;
+    this.materialPreview = new WeaponMaterialPreview(this.scene, this.sunDirection);
     this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
     this.resizeObserver.observe(canvas);
@@ -576,7 +579,7 @@ export class WeaponInspectionScene {
     if (blade?.visible) bounds.union(new THREE.Box3().setFromObject(blade));
     bounds.getCenter(this.center);
     const extent = bounds.getSize(new THREE.Vector3());
-    FitShadow(this.keyLight, this.center, extent);
+    FitShadow(this.keyLight, this.center, extent, this.sunDirection);
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const up = this.Direction().cross(right);
     const ProjectionExtent = (axis) => Math.abs(axis.x) * extent.x + Math.abs(axis.y) * extent.y + Math.abs(axis.z) * extent.z;
@@ -646,7 +649,7 @@ export class WeaponInspectionScene {
       }
     } else {
       this.post.Render(this.scene, camera, BuildStandardPostOptions({
-        sunDirection: KEY_LIGHT_DIRECTION,
+        sunDirection: this.sunDirection,
         dt: 1 / 60,
         steadyView: true,
       }));

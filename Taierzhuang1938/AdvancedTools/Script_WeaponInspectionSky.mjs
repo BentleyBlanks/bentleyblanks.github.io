@@ -1,23 +1,18 @@
 import * as THREE from "three";
-import { SkyDome, TEST_SCENE_DAY } from "../Script_Sky.mjs";
+import { SkyDome } from "../Script_Sky.mjs";
 
-export function BakeInspectionSky(renderer, sunDirection) {
-  const sky = new SkyDome(renderer, { radius: 32, atmosphere: false, environment: false });
+export const INSPECTION_ENVIRONMENT_PRESET = "firstLevelBattleDay";
+
+export function BakeInspectionSky(renderer, presetName = INSPECTION_ENVIRONMENT_PRESET) {
+  const sky = new SkyDome(renderer, { radius: 32, atmosphere: true, environment: false });
   const scene = new THREE.Scene();
   const target = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
   scene.add(sky.mesh);
   try {
-    sky.Apply({
-      ...TEST_SCENE_DAY,
-      sunElevation: THREE.MathUtils.radToDeg(Math.asin(sunDirection.y)),
-      sunAzimuth: THREE.MathUtils.radToDeg(Math.atan2(sunDirection.x, sunDirection.z)),
-      sunIntensity: 6,
-      smoke: .55,
-      smokeColor: [.68, .71, .75],
-      cloudShape: [4.2, .40, .59, .1],
-    });
+    const preset = sky.Apply(presetName);
+    const sunDirection = sky.sunDirection.clone().normalize();
     new THREE.CubeCamera(.1, 64, target).update(renderer, scene);
-    return target;
+    return { target, preset, sunDirection };
   } catch (error) {
     target.dispose();
     throw error;

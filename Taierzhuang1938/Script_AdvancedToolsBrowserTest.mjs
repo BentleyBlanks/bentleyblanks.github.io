@@ -324,12 +324,19 @@ try {
     const sky = await page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
       const environment = stage.scene.environment;
+      const preset = stage.environmentPreset;
       return { visible: stage.skyBackdrop.visible, cube: environment?.isCubeTexture,
         shared: stage.skyBackdrop.material.uniforms.uSky.value === environment && stage.materialPreview.scene.environment === environment,
-        fill: stage.scene.children.find(light => light.isHemisphereLight)?.intensity };
+        presetName: stage.environmentPresetName,
+        sunMatch: stage.keyLight?.intensity === preset?.lightIntensity,
+        probeMatch: stage.globalProbe?.intensity === preset?.shProbeIntensity,
+        ambientMatch: stage.ambientLight?.intensity === preset?.ambientIntensity,
+        envMatch: stage.scene.environmentIntensity === preset?.envIntensity };
     });
-    Check("完整模式默认绘制天空盒，同一立方体提供环境反射和材质球照明",
-      sky.visible && sky.cube && sky.shared && sky.fill > 0 && pixels.background.every((pixel) => pixel[3] === 255)
+    Check("完整模式复用游戏环境参数绘制天空盒，同一立方体提供环境反射和材质球照明",
+      sky.visible && sky.cube && sky.shared && sky.presetName === "firstLevelBattleDay"
+      && sky.sunMatch && sky.probeMatch && sky.ambientMatch && sky.envMatch
+      && pixels.background.every((pixel) => pixel[3] === 255)
       && Math.abs(pixels.background[0][2] - pixels.background[1][2]) > 12, JSON.stringify({ sky, background: pixels.background }));
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
 
@@ -671,16 +678,27 @@ try {
     await WaitFirstPerson("HanYang");
     const held = await page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
+      stage.Draw();
       const { viewmodel, camera } = stage.firstPerson;
       const muzzle = viewmodel.rig.group.localToWorld(viewmodel.rig.muzzle.clone()).project(camera);
+      const copy = document.createElement("canvas");
+      copy.width = stage.canvas.width;
+      copy.height = stage.canvas.height;
+      const ctx = copy.getContext("2d");
+      ctx.drawImage(stage.canvas, 0, 0);
+      const AlphaAt = (u, v) => ctx.getImageData(Math.floor(u * copy.width), Math.floor(v * copy.height), 1, 1).data[3];
+      const stageAspect = stage.width / stage.height;
+      const letterboxed = stageAspect < 16 / 9 - .05;
       return { fov: camera.fov, aspect: camera.aspect, forearms: viewmodel.riggedArms?.root.visible,
         muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera,
         environment: stage.firstPerson.scene.environment === stage.scene.environment
-          && stage.firstPerson.scene.getObjectByName("InspectionSky")?.visible };
+          && stage.firstPerson.scene.getObjectByName("InspectionSky")?.visible,
+        letterboxed, topAlpha: AlphaAt(.5, .02), centerAlpha: AlphaAt(.5, .5), bottomAlpha: AlphaAt(.5, .98) };
     });
-    Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面",
+    Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面且不拉伸",
       held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent && held.environment
       && held.muzzle[0] > .05 && held.muzzle.every((coordinate) => Math.abs(coordinate) < 1)
+      && held.centerAlpha === 255 && (!held.letterboxed || (held.topAlpha === 0 && held.bottomAlpha === 0))
       && await page.locator("#firstPersonInfo").textContent() === "FOV 67° · 16:9", JSON.stringify(held));
     if (shots) await page.locator(".stage").screenshot({ path: path.join(shotDir, "WeaponInspectionFirstPerson.png") });
     await orbitPreset.click();

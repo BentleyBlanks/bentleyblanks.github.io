@@ -453,7 +453,7 @@ export class FxaaPass {
     }
     U.uGrainSeedNext.value = (U.uGrainSeed.value + 1) % FILM_GRAIN.seedCount;
     U.uGrainBlend.value = 0;
-    ctx.blitter.Blit(this.material, null);
+    ctx.blitter.Blit(this.material, null, ctx.options?.outputViewport || null);
   }
 
   /**

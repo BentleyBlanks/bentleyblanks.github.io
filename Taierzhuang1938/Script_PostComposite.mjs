@@ -1124,7 +1124,7 @@ export class CompositePass {
     } else {
       U.uLutAmount.value = 0;
     }
-    ctx.blitter.Blit(this.material, this.target, ctx.options?.outputViewport || null);
+    ctx.blitter.Blit(this.material, this.target);
   }
 
   Dispose() {

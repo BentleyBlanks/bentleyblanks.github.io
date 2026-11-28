@@ -18,13 +18,17 @@ export class WeaponInspectionFirstPerson {
     this.scene = new THREE.Scene();
     this.scene.environment = stage.scene.environment;
     this.scene.environmentIntensity = stage.scene.environmentIntensity;
+    this.sunDirection = stage.sunDirection.clone();
     const backdrop = stage.skyBackdrop.clone();
     backdrop.visible = true;
     this.scene.add(this.camera, backdrop);
     for (const source of stage.scene.children) {
       if (!source.isLight) continue;
       const light = source.clone();
-      light.castShadow = false;
+      if (light.isDirectionalLight) {
+        light.castShadow = false;
+        light.position.copy(this.sunDirection);
+      }
       this.scene.add(light);
     }
     this.viewmodel = new Viewmodel(stage.library, {
@@ -54,6 +58,7 @@ export class WeaponInspectionFirstPerson {
     const bottom = (height - frameHeight) / 2;
     if (post) {
       post.Render(this.scene, this.camera, BuildStandardPostOptions({
+        sunDirection: this.sunDirection,
         dt: 1 / 60,
         steadyView: true,
         outputViewport: { x: left, y: bottom, w: frameWidth, h: frameHeight },

@@ -1,24 +1,23 @@
 import * as THREE from "three";
 import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 
-const STUDIO_EXPOSURE_COMPENSATION = 2.3;
-
 export class WeaponMaterialPreview {
-  constructor(studio, fill) {
+  constructor(studio, sunDirection) {
     this.scene = new THREE.Scene();
     this.scene.environment = studio.environment;
     this.scene.environmentIntensity = studio.environmentIntensity;
     this.camera = new THREE.OrthographicCamera(-1.18, 1.18, 1.18, -1.18, .1, 10);
     this.camera.position.set(0, .23, 4);
     this.camera.lookAt(0, 0, 0);
-    const previewFill = fill.clone();
-    previewFill.intensity *= 1.05 / 1.25;
-    this.scene.add(previewFill);
-    const key = new THREE.DirectionalLight(0xfff6e7, 2.55 * STUDIO_EXPOSURE_COMPENSATION);
-    key.position.set(-3, 4, 4);
-    const rim = new THREE.DirectionalLight(0xcddfff, 1.3 * STUDIO_EXPOSURE_COMPENSATION);
-    rim.position.set(2, 3, -4);
-    this.scene.add(key, rim);
+    for (const source of studio.children) {
+      if (!source.isLight) continue;
+      const light = source.clone();
+      if (light.isDirectionalLight) {
+        light.castShadow = false;
+        light.position.copy(sunDirection).multiplyScalar(6);
+      }
+      this.scene.add(light);
+    }
     const geometry = new THREE.SphereGeometry(1, 48, 32);
     const uv = geometry.getAttribute("uv");
     for (const name of ["uv1", "uv2", "uv3"]) geometry.setAttribute(name, uv);
