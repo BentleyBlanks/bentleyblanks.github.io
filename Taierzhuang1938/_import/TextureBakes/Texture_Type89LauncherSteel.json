@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 563736,
-      "sha256": "c2d42b19ed4a65872b344373ee8d973b688e51b7374ea9b237363ac672c8ec69"
+      "bytes": 563606,
+      "sha256": "62aef0b727b141ce001a1981d750d8be2139378f9187be00dfb85b702b82fed5"
     },
     {
       "channel": "Normal",
@@ -39,30 +39,30 @@
       "sha256": "9e2932691b8ce19c510efd3ce97ce4531cfbf07d35f071c603a5eaef9daa7e6e"
     }
   ],
-  "totalBytes": 1044328,
+  "totalBytes": 1044198,
   "metrics": {
     "meanSrgb": [
-      0.4537,
+      0.4538,
       0.4397,
-      0.4069
+      0.407
     ],
-    "luma": 0.4334,
-    "lumaStd": 0.12,
+    "luma": 0.4335,
+    "lumaStd": 0.1199,
     "sat": 0.1032,
     "clipLow": 0.0,
     "clipHigh": 0.0002,
-    "lowFreq": 0.0976,
-    "seam": 0.1277,
-    "interior": 0.0269,
-    "seamRatio": 4.747,
+    "lowFreq": 0.0974,
+    "seam": 0.1276,
+    "interior": 0.0268,
+    "seamRatio": 4.758,
     "border": 0.711,
-    "swing": 0.1116,
+    "swing": 0.1117,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "b3290f8d311a53796f9eccfe44d0e29ff55415a6e97296c91a381f635966dc97",
+    "sha256": "7299dcf288c3588f74be42a6205da0df23e487346cf12b08c80797c77aa2eea1",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -221,7 +221,7 @@
     },
     "sleeveOpticalDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "98c9680b6242dbfce855fe0f7b7a063d72e78dab1ba9e95602ef2584ae3df9bd"
+      "sha256": "131e8001a894dc3139491aeff36b0893831aeaa7eb33ebfe7a720d3a6bb30429"
     },
     "collarReflectanceCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherCollarReflectanceCoverage.png",

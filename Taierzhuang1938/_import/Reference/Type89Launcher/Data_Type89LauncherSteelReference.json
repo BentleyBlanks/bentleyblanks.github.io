@@ -26204,7 +26204,7 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "98c9680b6242dbfce855fe0f7b7a063d72e78dab1ba9e95602ef2584ae3df9bd",
+      "sha256": "131e8001a894dc3139491aeff36b0893831aeaa7eb33ebfe7a720d3a6bb30429",
       "scale": 22827,
       "strength": 1.0,
       "fields": [
@@ -26344,6 +26344,19 @@
       "increaseAfter": 0.43,
       "fullIncreaseAt": 0.55,
       "middleAndEndGain": 1.88
+    },
+    "balancedSleeveLighting": {
+      "sourcePlateSha256": "98c9680b6242dbfce855fe0f7b7a063d72e78dab1ba9e95602ef2584ae3df9bd",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "luminanceOnly": true,
+      "sourceViews": [
+        "Default",
+        "Gallery",
+        "Rake",
+        "Matched",
+        "Broad"
+      ]
     }
   },
   "saddleSurfaceRefinement": {
