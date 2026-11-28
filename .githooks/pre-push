@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+GUARD="$REPO_ROOT/scripts/Script_CommitGuard.mjs"
+
+if [ ! -f "$GUARD" ]; then
+  exit 0
+fi
+
+exec node "$GUARD" --pre-push

@@ -1,0 +1,83 @@
+{
+  "schema": "repo.protectedPaths/1",
+  "version": 1,
+  "about": [
+    "本地 Git Hook 提交权限检查器的唯一禁区策略表（由 scripts/Script_CommitGuard.mjs 读取）。",
+    "只列已踩过坑、明确不该被 Agent 在日常开发中擅自修改的固化配置与门禁红线。",
+    "新增或调整禁区条目直接改本文件（本文件本身受 commit-guard-self-lock 保护）。"
+  ],
+  "pathRules": [
+    {
+      "id": "camera-profile-lock",
+      "category": "1",
+      "label": "相机后处理固化档案三件套",
+      "reason": "全项目统一固化相机后处理档案（standard / editorLite）、唯一装配器与静态守门测试；未经用户明确审批不得修改",
+      "paths": [
+        "Taierzhuang1938/Data_CameraProfile.mjs",
+        "Taierzhuang1938/Script_CameraProfile.mjs",
+        "Taierzhuang1938/Script_CameraProfileTest.mjs"
+      ]
+    },
+    {
+      "id": "graphics-exposure-lock",
+      "category": "2",
+      "label": "画质四档与曝光红线",
+      "reason": "四档画质开关、自动降档阶梯与物理相机测光/曝光锚点（历史高发画面变黑事故区）；未经用户明确审批不得修改",
+      "paths": [
+        "Taierzhuang1938/Data_Tuning_Graphics.mjs",
+        "Taierzhuang1938/Data_Tuning_Camera.mjs"
+      ]
+    },
+    {
+      "id": "commit-guard-self-lock",
+      "category": "7a",
+      "label": "提交检查器、禁区清单与仓库根规则自保",
+      "reason": "防止 Agent 修改禁区策略、检查脚本、Git Hook、部署工作流或根协作规则来绕过限制",
+      "paths": [
+        "scripts/Data_ProtectedPaths.json",
+        "scripts/Script_CommitGuard.mjs",
+        "scripts/Script_CommitGuardTest.mjs",
+        ".githooks/**",
+        ".github/workflows/**",
+        "AGENTS.md"
+      ]
+    }
+  ],
+  "semanticRules": [
+    {
+      "id": "asset-standards-ceiling",
+      "category": "7b",
+      "label": "资产导出标准全局红线",
+      "kind": "assetStandardsJson",
+      "file": "Taierzhuang1938/AssetPipeline/Data_AssetStandards.json",
+      "reason": "允许日常合规更新单件资产的 actualTriangles/note/贴图说明，但禁止擅改全局面数红线、调高 targetTriangles、超限登记或删除既有条目",
+      "lockedTopLevelKeys": [
+        "triangleRules",
+        "minDecimationReduction",
+        "sceneRenderLimits",
+        "proceduralBudgets",
+        "specialTriangleTargets"
+      ],
+      "forbidDeleteFile": true,
+      "forbidDeleteSourceAssets": true,
+      "forbidDeleteExternalGlb": true,
+      "forbidIncreaseExternalTargetTriangles": true,
+      "forbidActualExceedTarget": true
+    },
+    {
+      "id": "test-gate-integrity",
+      "category": "7c",
+      "label": "测试门禁完整性（禁止删测试或新增 expectedFailures 豁免）",
+      "kind": "testGateIntegrity",
+      "reason": "允许新增测试或收紧断言，但禁止删除既有自动化测试文件、从 Script_TestRunner.testDefs 删除条目或新增 expectedFailures 豁免",
+      "testFileGlobs": [
+        "Taierzhuang1938/Script_*Test*.mjs",
+        "scripts/Script_*Test*.mjs"
+      ],
+      "runnerFile": "Taierzhuang1938/Script_TestRunner.mjs",
+      "forbidDeleteTestFiles": true,
+      "forbidDeleteTestDefs": true,
+      "forbidAddExpectedFailures": true
+    }
+  ]
+}

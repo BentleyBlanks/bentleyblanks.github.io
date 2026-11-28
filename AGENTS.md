@@ -70,6 +70,7 @@
 - 资产形如 `<Category>_<DescriptivePascalCase>.<ext>`。沿用 `Model_`、`Texture_`、`Icon_`、`AudioBgm_`、`AudioSfx_`、`Scene_`、`Script_`、`Shader_`、`Material_`、`Animation_`、`Font_`、`Data_` 及项目已有类别。确需新类别时选择清楚的英文前缀并记录理由，无需为常规命名反复询问。
 - 引擎回调、公共接口、第三方文件、工具约定名称（如 index.html、AGENTS.md、package.json）保留要求的拼写；Git 分支按上文命名。不做无关批量重命名。
 - 提交标题：`<AgentName> <Project>: short change summary`，例如 `Codex GravityTank: correct roulette weights`。不用 Conventional Commit 前缀或句末句号；跨项目基础设施用 `Repository`，游戏变化优先写主要项目。
+- **本地提交权限检查器（2026-11-28）。** 禁区策略表为 `scripts/Data_ProtectedPaths.json`，检查器为 `scripts/Script_CommitGuard.mjs`，通过 `.githooks/pre-commit` 与 `.githooks/pre-push` 本地拦截（每台开发机执行一次 `node scripts/Script_CommitGuard.mjs --install-hooks`，本机所有 worktree 自动生效）。未命中禁区的日常提交静默放行；命中禁区时严禁使用 `--no-verify` 或擅自改策略表绕过——若属顺手误改应立即还原；若确需修改，须先向用户展示 diff 并获得明确同意，再通过环境变量 `COMMIT_GUARD_APPROVED="<规则ID>"` 与 `COMMIT_GUARD_REASON="<审批理由>"` 并在提交信息末尾附 `Approved-Protected: <规则ID>` 放行。
 
 ## 贴图尺寸上限
 
