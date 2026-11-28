@@ -124,6 +124,8 @@ const HUD_DAMAGE_ARC_BYTES = 20 * 1024;
 const BLADE_BLOOD_DETAIL_BYTES = 300 * 1024;
 // 1K Type 11 atlas, loaded with the weapon models; measured at 512 KiB.
 const TYPE11_EXTERIOR_BYTES = 520 * 1024;
+// Type 92 atlas: 1K base and normal, 512 packed ORM; loaded with the game model.
+const TYPE92_HMG_EXTERIOR_BYTES = 352 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -143,7 +145,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
     // Loaded with the title menu, never promoted into the shared boot PBR_SETS.
     // 2026-10-05: seven campaign maps + three historical papers add about 4 MB.
     // Only the selected pair is requested (< 1 MB), not the whole campaign set.
-    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES + TIMED_GRENADE_ASSETS_BYTES + BLADE_BLOOD_DETAIL_BYTES + TYPE11_EXTERIOR_BYTES, // Also includes lossless command-room irradiance.
+    lazy: 14 * 1024 * 1024 + HISTORY_SOURCE_ADDITIONS_BYTES + ZB26_AUTHOR_ATLAS_BYTES + BEISHAHE_METAL_ASSET_BYTES + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES + TIMED_GRENADE_ASSETS_BYTES + BLADE_BLOOD_DETAIL_BYTES + TYPE11_EXTERIOR_BYTES + TYPE92_HMG_EXTERIOR_BYTES, // Also includes lossless command-room irradiance.
     // editor：2026-10-22 白盒编辑器河沟示意加两张 1024 反照率（泥 ~300 KB、水 ~60 KB），只在 ?editor=blockout 下载，玩家不碰；上限抬到 1 MB。
     editor: 1 * 1024 * 1024,
   }),
@@ -151,7 +153,7 @@ export const TEXTURE_BUDGETS = Object.freeze({
     + SINGLE_BLANKET_ASSET_BYTES + EDITOR_CREEK_SKETCH_BYTES + BEISHAHE_METAL_ASSET_BYTES
     + BEISHAHE_SURFACE_ASSET_BYTES + BEISHAHE_TRUSS_FINISH_BYTES + BEISHAHE_MAINTENANCE_ASSET_BYTES
     + EAST_TRACK_TERRAIN_BYTES + AIRCRAFT_DITCH_TERRAIN_BYTES + TIMED_GRENADE_ASSETS_BYTES
-    + HUD_DAMAGE_ARC_BYTES + BLADE_BLOOD_DETAIL_BYTES + TYPE11_EXTERIOR_BYTES,
+    + HUD_DAMAGE_ARC_BYTES + BLADE_BLOOD_DETAIL_BYTES + TYPE11_EXTERIOR_BYTES + TYPE92_HMG_EXTERIOR_BYTES,
 });
 
 export const TEXTURE_MANIFEST = Object.freeze([
@@ -462,6 +464,19 @@ export const TEXTURE_MANIFEST = Object.freeze([
       { file: "Script_Viewmodel.mjs", token: "Type11Exterior" }],
     files: [["Texture_Type11ExteriorBase.webp", "Base", 1024, 1024], ["Texture_Type11ExteriorNormal.webp", "Normal", 1024, 1024],
       ["Texture_Type11ExteriorOrm.webp", "Orm", 1024, 1024]],
+  },
+  {
+    id: "Type92HmgExterior", kind: "material", tier: "lazy", assetBudgetBytes: TYPE92_HMG_EXTERIOR_BYTES,
+    toneClass: null, toneReason: "Authored UV atlas for blued steel, weathered tripod steel and wood grips.",
+    metersPerTile: null, normalConvention: "gl",
+    bake: "_blender/Script_Type92HmgExteriorBake.py", bakeRecord: "_import/TextureBakes/Texture_Type92HmgExterior.json",
+    source: { provider: "procedural", date: "2026-11-28", ref: "AWM RELAWM28834.001/.002 and 026540",
+      note: "Blender finish and geometry-derived contact occlusion. Museum photographs inform appearance." },
+    consumers: [{ file: "Data_Meshes.mjs", token: "Type92HmgExterior" }, { file: "Script_Actor.mjs", token: "Type92HmgExterior" },
+      { file: "Script_Viewmodel.mjs", token: "Type92HmgExterior" },
+      { file: "Script_ShellImpactRangeField.mjs", token: "Type92HmgExterior" }],
+    files: [["Texture_Type92HmgExteriorBase.webp", "Base", 1024, 1024], ["Texture_Type92HmgExteriorNormal.webp", "Normal", 1024, 1024],
+      ["Texture_Type92HmgExteriorOrm.webp", "Orm", 512, 512]],
   },
   {
     id: "WeaponSteelV2", kind: "material", tier: "boot",

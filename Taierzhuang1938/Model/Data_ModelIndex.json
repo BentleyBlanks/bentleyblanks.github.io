@@ -366,39 +366,6 @@
    "triangleLimit": 10000
   },
   {
-   "name": "Type92Hmg",
-   "category": "weapon",
-   "file": "Model_Type92Hmg.tzm.json",
-   "triangles": 20065,
-   "meshBlocks": 1,
-   "nodes": 7,
-   "joints": 0,
-   "bytes": 473269,
-   "materials": [
-    "steel"
-   ],
-   "mounts": [
-    "root",
-    "muzzle",
-    "gripR",
-    "gripL",
-    "sight",
-    "magazine"
-   ],
-   "bounds": {
-    "min": [
-     -0.46735,
-     -0.24639,
-     -0.901
-    ],
-    "max": [
-     0.06823,
-     0.31045,
-     0.255
-    ]
-   }
-  },
-  {
    "name": "ZhongZheng",
    "category": "weapon",
    "file": "Model_ZhongZheng.tzm.json",
@@ -834,6 +801,42 @@
    },
    "sourceTriangles": 29967,
    "targetTriangles": 29967,
+   "triangleLimit": 30000
+  },
+  {
+   "name": "Type92Hmg",
+   "category": "weapon",
+   "file": "Model_Type92Hmg.tzm.json",
+   "triangles": 18914,
+   "meshBlocks": 1,
+   "nodes": 7,
+   "joints": 0,
+   "bytes": 540130,
+   "materials": [
+    "type92Exterior"
+   ],
+   "mounts": [
+    "root",
+    "muzzle",
+    "gripR",
+    "gripL",
+    "sight",
+    "magazine"
+   ],
+   "bounds": {
+    "min": [
+     -0.28139,
+     -0.43235,
+     -0.901
+    ],
+    "max": [
+     0.28139,
+     0.10323,
+     0.255
+    ]
+   },
+   "sourceTriangles": 13230,
+   "targetTriangles": 13230,
    "triangleLimit": 30000
   }
  ]

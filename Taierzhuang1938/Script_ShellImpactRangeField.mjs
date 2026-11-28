@@ -6,6 +6,8 @@ import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { BreakableTrees } from "./Script_BreakableTrees.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
+import { MESHES, TYPE92_HMG_SURFACE } from "./Data_Meshes.mjs";
+import { MeshUrl } from "./Script_Meshes.mjs";
 import { SHELL_IMPACT_GROUND_TINT } from "./Data_ShellImpactRangeTerrain.mjs";
 import { BuildShellImpactLayout } from "./Script_ShellImpactRangeTerrain.mjs";
 import {
@@ -74,8 +76,12 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     const mgSpec = this._MgSpec();
     const tanksMap = this._TankSpecs();
     const urls = Object.keys(tanksMap).map((id) => [id, `./Model/Model_${id}.tzm.json`]);
-    const [mg, ...tanks] = await Promise.all([
-      LoadDocument(`./Model/Model_${mgSpec.weaponId}.tzm.json`),
+    const [finish] = MESHES[mgSpec.weaponId]?.pbrSets ?? [];
+    const mgUrl = MESHES[mgSpec.weaponId] ? MeshUrl(mgSpec.weaponId) : `./Model/Model_${mgSpec.weaponId}.tzm.json`;
+    const finishLoad = mgSpec.weaponId === "Type92Hmg" && finish && !this.library.baked.has(finish.name)
+      ? this.library.LoadExternalSet(finish.name, finish).catch(() => {}) : null;
+    const [, mg, ...tanks] = await Promise.all([
+      finishLoad, LoadDocument(mgUrl),
       ...urls.map(([, url]) => LoadDocument(url)),
     ]);
     this.mgDoc = mg;
@@ -157,8 +163,11 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     const spec = this._MgSpec();
     if (!this.mgDoc) return;
     const steel = this.Material("ImpactMgSteel", { color: 0x565b4c, roughness: 0.55, metalness: 0.2 });
+    const type92Exterior = this.library.baked.has("Type92HmgExterior")
+      ? this.library.Get("Type92HmgExterior", TYPE92_HMG_SURFACE) : steel;
     keys.set("ImpactMgSteel", steel);
-    const built = InstantiateModel(this.mgDoc, { materials: { steel }, batch: true });
+    keys.set("ImpactMgExterior", type92Exterior);
+    const built = InstantiateModel(this.mgDoc, { materials: { steel, type92Exterior }, batch: true });
     const bounds = built.bounds;
     const cx = (bounds.min.x + bounds.max.x) / 2, cz = (bounds.min.z + bounds.max.z) / 2;
     const ground = this.StaticGroundHeight(spec.x, spec.z);
@@ -167,7 +176,9 @@ export class ShellImpactRangeField extends FirstLevelWhiteboxField {
     built.root.position.set(spec.x + offset.x, ground + offset.y, spec.z + offset.z);
     built.root.updateMatrixWorld(true);
     built.root.traverse((object) => {
-      if (object.isMesh) sink.Add("ImpactMgSteel", object.geometry.clone().applyMatrix4(object.matrixWorld));
+      if (!object.isMesh) return;
+      const key = object.material === steel ? "ImpactMgSteel" : "ImpactMgExterior";
+      sink.Add(key, object.geometry.clone().applyMatrix4(object.matrixWorld));
     });
     for (const mesh of built.meshes) mesh.geometry.dispose();
     const half = Math.max(bounds.max.x - bounds.min.x, bounds.max.z - bounds.min.z) / 2;

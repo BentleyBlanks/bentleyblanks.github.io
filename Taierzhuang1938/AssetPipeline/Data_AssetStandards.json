@@ -108,10 +108,11 @@
     "Type92Hmg": {
       "name": "九二式重机枪",
       "group": "firearm",
-      "sourceTriangles": null,
-      "sourceTexture": "无",
-      "runtimeTexture": "项目共享 512px 枪钢/枪木 BaseColor + Normal + ORM",
-      "note": "本机重建源当前缺席；已提交成品 20,065 三角，仅排除两个展示 Cube。"
+      "sourceTriangles": 13230,
+      "repair": true,
+      "sourceTexture": "无，专用材质由 Blender 烘焙",
+      "runtimeTexture": "1K 基色及切线法线、512px ORM",
+      "note": "从 CadNav.com 已在游戏使用的 20,065 三角成品选留 13,230 三角，拆去布景与待重做的前端，补前段、另一前脚及遮光面，不使用减面算法。"
     },
     "Dadao": {
       "name": "川军大刀",

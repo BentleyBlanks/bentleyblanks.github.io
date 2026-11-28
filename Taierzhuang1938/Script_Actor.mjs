@@ -43,7 +43,7 @@ import {
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { HitReactionOf, ChooseHitDeath } from "./Script_HitReactionLayer.mjs";
 import { EvaluateSpineAimDistribution } from "./Script_NpcLocomotion3C.mjs";
-import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON, TYPE92_HMG_SURFACE } from "./Data_Meshes.mjs";
 import { MeshUrl, WeaponMeshId } from "./Script_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
@@ -3811,13 +3811,20 @@ export class ActorFactory {
     if (!doc || !entry) return null;
     try {
       return InstantiateModel(doc, {
-        materials: materials || {},
+        materials: meshId === "Type92Hmg"
+          ? { type92Exterior: this.Type92HmgMaterial(), ...materials } : materials || {},
         mergeMap: MESH_MERGE[this.quality] || null,
       });
     } catch (error) {
       console.warn(`[Actor] ${meshId} 实例化失败：${String(error).slice(0, 160)}`);
       return null;
     }
+  }
+
+  Type92HmgMaterial() {
+    const lib = this.library;
+    const name = lib.baked?.has("Type92HmgExterior") ? "Type92HmgExterior" : "Steel";
+    return this.Material(`type92Exterior:${name}`, () => lib.Get(name, TYPE92_HMG_SURFACE));
   }
 
   _InstantiateMesh(id) {
@@ -4317,6 +4324,7 @@ export class ActorFactory {
         lib.baked?.has("Type11Exterior") ? "Type11Exterior" : "Steel",
         { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.35, aoIntensity: 1 },
       )),
+      type92Exterior: this.Type92HmgMaterial(),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",
         { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
       zb26Wood: this.Material("zb26Wood", () => lib.Get(lib.baked?.has("Zb26VeteranWood") ? "Zb26VeteranWood" : "WoodStock",

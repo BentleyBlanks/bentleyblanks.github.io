@@ -81,7 +81,8 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
   下载原包的 `readme.txt` 允许将模型作为 artwork/project 的一部分使用，禁止单独转售或
   再分发，并要求标注 cadnav.com。因此原 `.ma`、下载包和离线转换的 `Model_Type92Hmg.glb`
   只放在本机 `Taierzhuang1938SourceAssets/Weapons/Model_CadNavType92/`，**不进入公开仓库**；
-  构建时只排除两块空白展示 Cube，完整枪体、冷却套、瞄具与三脚架不减面地进入游戏。
+  现行外观以项目已有的 CadNav.com TZM 派生成品为底稿，校正枪身和三脚架后随游戏发布。
+  编辑工程与未打包烘焙只留本机。馆藏实拍用于外观对照。见[九二式外观复原](../docs/Data_Type92HmgExterior.md)。
 - 集束手榴弹、八九式重掷弹筒：程序化模型仍按史料特征建好；集束的去柄副弹与绑绳不能由单枚来源模型替代。
 
 ## 大刀

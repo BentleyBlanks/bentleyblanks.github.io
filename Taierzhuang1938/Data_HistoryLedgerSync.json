@@ -5,6 +5,31 @@
   "repoCommit": "9cce1761ab97e25208af5badf05b5b35a49802e1",
   "assetReviews": [
     {
+      "id": "Type92HmgExterior20261128",
+      "asset": "Type92Hmg",
+      "date": "2026-11-28",
+      "classification": "similar",
+      "scope": "Type92Hmg exterior silhouette and surface only.",
+      "runtime": "Model/Model_Type92Hmg.tzm.json",
+      "sources": [
+        "https://www.awm.gov.au/collection/C310665",
+        "https://www.awm.gov.au/collection/C310666",
+        "https://www.awm.gov.au/collection/C235837",
+        "https://www.awm.gov.au/collection/C10174"
+      ],
+      "notionSnapshots": [
+        {
+          "id": "3fd60335331c8194aa82f0b238084d34",
+          "lastEdited": "2026-11-28T08:25:12.615Z"
+        },
+        {
+          "id": "3fd60335331c818fa24deadb6d72ca70",
+          "lastEdited": "2026-11-28T08:25:11.473Z"
+        }
+      ],
+      "decision": "The AWM records show an accompanying gun and tripod pair and a separate 1942 rear-view image of REL/02167. Visible fin sections, tripod and steel/wood differences have evidence. The catalog/photo discrepancy at the muzzle is unresolved. Game finish and details remain authored, and the individual gun at Tengxian remains unverified."
+    },
+    {
       "asset": "Type11",
       "date": "2026-11-28",
       "runtimeAsset": "Model/Model_Type11.tzm.json",

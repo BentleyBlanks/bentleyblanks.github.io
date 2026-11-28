@@ -76,6 +76,10 @@ export const MERGE_PROFILES = {
  *   materials：模型里出现的材质名，必须都能在调用方给的 materials 表里找到
  *   span：根空间包围盒尺寸（米），用来确认没建错比例
  */
+export const TYPE92_HMG_SURFACE = Object.freeze({
+  roughness: 1, metalness: 1, normalScale: 0.32, envMapIntensity: 1.08, aoIntensity: 1,
+});
+
 export const MESHES = {
   // 百姓。两个模型是**同一个 kind 的两个分身**（男/女由 seed 定，见 Script_Actor
   // 的 KIND_SPEC.civilian.variants）。两个都建在 1.60 m 上，女性矮的那 4.5% 走
@@ -238,13 +242,16 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。",
   },
   Type92Hmg: {
-    file: "Model_Type92Hmg.tzm.json", category: "weapon",
-    triangles: 20065, meshBlocks: 1, nodes: 7, joints: 0,
-    materials: ["steel"], mounts: WEAPON_MOUNTS,
-    span: [0.53558, 0.55684, 1.156], lengthM: 1.156,
+    file: "Model_Type92Hmg.tzm.json", category: "weapon", version: "type92-exterior-20261128",
+    triangles: 18914, meshBlocks: 1, nodes: 7, joints: 0,
+    materials: ["type92Exterior"], mounts: WEAPON_MOUNTS,
+    span: [0.56278, 0.53558, 1.156], lengthM: 1.156,
     draws: { high: 1, medium: 1, low: 1 },
-    note: "九二式重机枪。CadNav 免费 Maya ASCII 源完整保留枪体、冷却套、瞄具与三脚架；"
-      + "只排除两块空白展示方块，未减面。",
+    pbrSets: [{ name: "Type92HmgExterior",
+      albedo: "./Texture/Texture_Type92HmgExteriorBase.webp?v=type92-exterior-20261128",
+      normal: "./Texture/Texture_Type92HmgExteriorNormal.webp?v=type92-exterior-20261128",
+      orm: "./Texture/Texture_Type92HmgExteriorOrm.webp?v=type92-exterior-20261128" }],
+    note: "在 CadNav.com 游戏成品基础上参照澳大利亚战争纪念馆实物和档案照校正，补齐三脚架外形并区分发蓝钢与木质握柄。",
   },
   Type89Tank: {
     file: "Model_Type89Tank.tzm.json", category: "vehicle",

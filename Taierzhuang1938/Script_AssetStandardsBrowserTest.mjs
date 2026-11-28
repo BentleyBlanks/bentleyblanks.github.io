@@ -126,7 +126,11 @@ try {
   await page.fill("#assetSearch", "");
   await page.click('#statusFilter [data-status="attention"]');
   const attention = await page.$$eval("#assetRows tr[data-id]", (rows) => rows.map((row) => row.dataset.id));
-  Check("「需处理 / 待复核」只留源缺席的九二式", attention.join(",") === "Type92Hmg", attention.join(","));
+  const type92 = firearm.rows.find((row) => row.id === "Type92Hmg");
+  Check("九二式有实测源面数与公开构建产物，补件状态进入合规列表",
+    attention.length === 0 && type92?.cells.includes("原模保留 + 补件")
+      && type92.cells[3] === modelIndex.models.find((model) => model.name === "Type92Hmg").triangles.toLocaleString("en-US"),
+    JSON.stringify({ attention, type92 }));
 
   await page.click('.as-navItem[data-view="vehicle"]');
   await page.click('#assetRows tr[data-id="Type89Tank"]');

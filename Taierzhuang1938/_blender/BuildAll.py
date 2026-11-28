@@ -26,6 +26,7 @@ import BuildVehicles                 # noqa: E402
 import ImportWeapons                 # noqa: E402
 import ImportLugouqiaoWeapons        # noqa: E402
 import Type11Exterior                # noqa: E402
+import Type92HmgExterior             # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
 from Script_Zb26Rebuild import BuildZb26 as BuildHistoricalZb26  # noqa: E402
@@ -135,12 +136,17 @@ def main():
             # Public checkouts retain the published asset without the private Blender file.
             manifest.extend(entry for entry in previous.get("models", [])
                             if entry["name"] == "Type11" and os.path.isfile(os.path.join(out, entry["file"])))
-    # 没有可用源模的九二式保持现有运行时兜底。
-    for optional_name in ("Type92Hmg",):
-        optional_builder = ImportWeapons.BuilderFor(optional_name)
-        if optional_builder:
-            jobs.append((optional_name, "weapon", optional_builder,
-                         ImportWeapons.SOURCES[optional_name]["note"]))
+    type92 = Type92HmgExterior.ASSET_ID
+    if type92 not in removed and (not requested or type92 in requested):
+        builder = Type92HmgExterior.Builder()
+        if builder:
+            jobs.append((type92, "weapon", builder, Type92HmgExterior.AUTHORING_NOTE))
+        elif type92 in requested:
+            raise FileNotFoundError(Type92HmgExterior.SourcePath())
+        else:
+            # A public clone retains the published artwork without the private authoring source.
+            manifest.extend(entry for entry in previous.get("models", [])
+                            if entry["name"] == type92 and os.path.isfile(os.path.join(out, entry["file"])))
     lugouqiao_jobs = []
     for name, spec in ImportLugouqiaoWeapons.SOURCES.items():
         if name == "Type11":

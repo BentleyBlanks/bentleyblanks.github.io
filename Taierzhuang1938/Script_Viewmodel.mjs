@@ -52,7 +52,7 @@ import { InstantiateHanYang173R } from "./Script_HanYang173R.mjs";
 import { HANYANG_173R } from "./Data_HanYang173R.mjs";
 import { InstantiateType38_511 } from "./Script_Type38_511.mjs";
 import { TYPE38_511 } from "./Data_Type38_511.mjs";
-import { WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
+import { WEAPON_MESH_BY_ID, BAYONET_MESH_BY_WEAPON, TYPE92_HMG_SURFACE } from "./Data_Meshes.mjs";
 import { WeaponMeshId } from "./Script_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
@@ -421,6 +421,7 @@ function BuildMaterials(library) {
     lqType11Fore: SafeMaterial(library, "LugouqiaoType11Fore", VIEWMODEL_FIREARM_SURFACES.type11Fore, 0x67513a),
     type11Exterior: SafeMaterial(library, "Type11Exterior",
       { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.35, aoIntensity: 1 }, 0x555960),
+    type92Exterior: SafeMaterial(library, "Type92HmgExterior", TYPE92_HMG_SURFACE, 0x555960),
     lqMediumMortar: SafeMaterial(library, "Steel", {}, 0x555960),
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
@@ -1168,6 +1169,7 @@ const VM_MATERIAL_BY_MESH = {
   lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
   lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore",
   type11Exterior: "type11Exterior",
+  type92Exterior: "type92Exterior",
   lqMediumMortar: "lqMediumMortar", lqWeaponPlain: "lqWeaponPlain",
 };
 
@@ -1351,7 +1353,7 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
       mesh.geometry.translate(-0.06315, -0.146, 0);
     });
   }
-  if (key === "Type92Hmg") {
+  if (key === "Type92Hmg" && !doc.meshes.some((mesh) => mesh.material === "type92Exterior")) {
     // Lower the upright range ladder to its folded battle-sight position.
     built.root.traverse((mesh) => {
       if (!mesh.isMesh || !mesh.geometry?.attributes.position) return;
