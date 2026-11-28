@@ -14467,7 +14467,7 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "69f4abe4f67eb4d086f69502d43730931a40cd3eae48ac56aad8583332f9891c",
+      "sha256": "bd2a9b7f5fb2829fcf77e01c018a04ca4cf54a851671d91f414e8497676f8a6a",
       "scale": 32157,
       "strength": 0.76,
       "fields": [
@@ -14594,6 +14594,20 @@
           "uvLo": "496c60c767d58c72934b57b770a6288110231ad3c90efbb859fb383e6b8973f7"
         }
       }
+    },
+    "rearCommonLightCalibration": {
+      "sourceRevision": "af7ef53b4e6e6a2603551fddae00d0e84c6b8387",
+      "previousDetailSha256": "69f4abe4f67eb4d086f69502d43730931a40cd3eae48ac56aad8583332f9891c",
+      "photoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "fitLights": [
+        "Matched",
+        "Broad"
+      ],
+      "verificationLight": "HeldOut",
+      "adjustmentStrength": 1.36,
+      "sourceCaptureSha256": "17211b2ff1a5b8d0127c9473592a2774436f7ccce4eb31e899e53972b7f49b0e",
+      "frontCoverageSha256": "4cd1258740152c9bf85a13dcf856a60d6ed60ebd7869acd0ae2d74348fe93b80",
+      "reviewSha256": "b4259ca1b4ed58d60bf786634484ade9995e4e060ce4c217fc4a98d9886b8f4a"
     },
     "currentRearFit": {
       "sourceRevision": "72b5efbcae8bc8bc2945805f9df4b96162621fe1",

@@ -118,6 +118,8 @@
 
 - 外套筒背面按第 8 张馆藏照校准钢面明暗与亮带强弱。用两组灯的材质响应回烘底色、粗糙度和金属度，共见钢面由正面默认灯和中性布光的实渲约束。发布格式下，背面独立布光的平均亮度误差从 13.76 降至 12.75 个灰阶，三个角向区域的亮带振幅平均误差从 0.040 降至 0.028。另复测留出的像素、正面斜视及十个接缝 AO 视角。细环纹位置仍有差异。 [套筒采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 筒身背面以第 8 张馆藏照校准两组灯下同时存在的亮度和色差，按第 1 张照的正面可见区渐收修正。发布格式下，近似馆藏布光的平均亮度误差从 6.15 降至 4.42 个灰阶，独立布光从 8.38 降至 7.10，独立布光的细纹相关系数从 0.768 提至 0.809。正面及斜视的亮度平均变化均小于 0.31 个灰阶，第 7 张照片对应的刻印和十个接缝 AO 视角通过复测。独立布光下，馆藏照的窄亮带仍更强。 [筒身采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -172,4 +174,5 @@
 - 驻钣卷边校准保存在 `saddleRimFinish`。16 位图记录覆盖和细纹，烘焙校验上表面材质及接缝 AO 后合入底色、粗糙度和金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 新斜纹参数保存在 `gripFamilyPhase`。回烘校验侧照、握部材质和接缝 AO，从钢材源图分别生成基准与校准斜纹，再将局部响应合入握部原有磨蚀。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 外套筒背面光学修正保存在 `sleeveOpticalFinish`。16 位图保存材质响应与照片覆盖范围的乘积，烘焙校验既有套筒材质和接缝 AO 后合入底色、粗糙度及金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV93/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 筒身背面最近一轮的布光与采样记录保存在 `barrelJointFinish.rearCommonLightCalibration`。修正合入原有 16 位筒身材质图，由正式烘焙脚本生成底色和 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV94/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

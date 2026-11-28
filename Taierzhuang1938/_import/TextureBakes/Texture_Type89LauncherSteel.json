@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 570328,
-      "sha256": "49913d1fb9c9939722d59ce0125715ad74e806c709b430761dcf001e76ee720f"
+      "bytes": 570664,
+      "sha256": "ec1ad56d68d847bdfa399b038b41ac72c804c4618ed8a112aafe9b02652b7990"
     },
     {
       "channel": "Normal",
@@ -35,34 +35,34 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 85436,
-      "sha256": "40efd8d72105c4dc0994ed5c9b03e51b12f3cf757fe2ded55f4659119dbefc47"
+      "bytes": 85700,
+      "sha256": "29f6cc29b4a893c210998fcb6036d242d489c184c456c554a124654fa7e056f6"
     }
   ],
-  "totalBytes": 1047290,
+  "totalBytes": 1047890,
   "metrics": {
     "meanSrgb": [
-      0.4537,
-      0.4403,
+      0.4542,
+      0.4404,
       0.4078
     ],
-    "luma": 0.4339,
-    "lumaStd": 0.1186,
-    "sat": 0.1012,
+    "luma": 0.4341,
+    "lumaStd": 0.1189,
+    "sat": 0.1022,
     "clipLow": 0.0,
     "clipHigh": 0.0001,
     "lowFreq": 0.0975,
-    "seam": 0.1267,
-    "interior": 0.0268,
-    "seamRatio": 4.732,
-    "border": 0.72,
-    "swing": 0.1175,
+    "seam": 0.1273,
+    "interior": 0.0266,
+    "seamRatio": 4.786,
+    "border": 0.717,
+    "swing": 0.1173,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "8f3fb633e88933762472ee3112ae395d849ea175b49a88b6b38d603748726af4",
+    "sha256": "b6fea32bfccdbe3f3f3a90e34aa14920447f357c58d9b58c45a23262d63b4e6f",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -237,7 +237,7 @@
     },
     "jointBarrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "69f4abe4f67eb4d086f69502d43730931a40cd3eae48ac56aad8583332f9891c"
+      "sha256": "bd2a9b7f5fb2829fcf77e01c018a04ca4cf54a851671d91f414e8497676f8a6a"
     },
     "jointStemCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherStemJointCoverage.png",
