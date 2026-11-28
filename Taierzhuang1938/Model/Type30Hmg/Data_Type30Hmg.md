@@ -96,6 +96,13 @@
 - 托架上横销按两张照片可辨认的弧面配准，用独立图块校正橄榄绿旧漆、窄亮带及两端暗缝。最终 GLB 回导在留出区域的平均色差 ΔE，斜侧默认布光从 17.76 降到 9.41，侧后从 6.30 降到 2.32。斜侧亮带的亮度中值从 59.90 升到 123.12，实拍为 117.63（0–255）。斜侧旧漆亮度中值为 64.09，实拍为 52.78。托架遮挡范围与展品不同，下横销和外侧端面缺少能稳定配准的取样。 [展品正面近照](https://n.sinaimg.cn/spider20260105/600/w1920h1080/20260105/7fe9-73779b71f68929b5bef382e12e9f6237.png) · [展品侧后照](https://www.thepaper.cn/newsDetail_forward_32397997)
 - 三脚架被遮挡的局部、脚垫和机匣背面参考同期勃朗宁 M1917 的外观。照片未覆盖的磨损按展品可见部分的状态推定。 [M1917 馆藏参考照](https://commons.wikimedia.org/wiki/File:Browning_Heavy_Machine_Gun,_water_cooled,_M1917,_1918,_WWI_(32916860696).jpg)
 
+## 机匣与水冷筒的实拍材质复测
+
+- 机匣左侧板把暗漆的底色、金属度与局部反光分开校正，使用斜侧和侧后照片的配准像素拟合。留出样本中，斜侧窄窗光下的色差 ΔE 从 2.59 降到 2.29，侧后宽窗光的亮度误差从 7.55 降到 6.66（0–255）。斜侧宽窗光与侧后窄窗光的 ΔE 分别为 2.17 和 6.01，上一版为 2.16 和 5.99。 [展品斜侧照](https://portal.sina.com.hk/news-china/sina/2026/01/05/1428971/) · [展品侧后照](https://www.thepaper.cn/newsDetail_forward_32397997)
+- 水冷筒仅修正照片对得上的细纹位置。侧后开口布光下，留出细纹的相关系数由 0.415 升至 0.430。细纹反差仍约为该照片的 61%。 [展品侧后照](https://www.thepaper.cn/newsDetail_forward_32397997)
+- 枪械检查台按设备上限为这个 GLB 启用最高 16 倍各向异性贴图过滤，保留斜视时的颜色、粗糙度、法线和接缝遮蔽细节。
+- 以 `TextureRefinishFrontReflectanceMatch` 的图集为基线，追加 `--left-receiver-finish-correction TextureRefinishReferenceSteel/Data_Type30LeftPanelObservedSteel.npz` 和 `--jacket-surface-finish-correction TextureRefinishReferenceSteel/Data_Type30JacketObservedGrain.npz`。在送入 `Build` 的图集目录内使用 `TextureRefinishReferenceSteel/Texture_Type30HmgLeftPanelSpecularity.png`。这个目录保存 `Build` 实际读取的完整图集。
+
 ## 装配环境遮蔽
 
 - 在原装配 AO 上，以相邻零件表面的距离和朝向补接触阴影，再沿实际几何交线收紧齐平贴合处的暗边。盖板及侧板、铆钉底部、前后端环、软管接头、后握把、托架圆销、转座、前腿套环两端和脚座均使用同一套计算。GLB 的十种材质共用一张 **2048 × 2048** 的线性 AO 图，通过独立的 `TEXCOORD_1` 取样。
@@ -109,7 +116,7 @@
 - `Model_Type30Hmg.glb` 是自包含的场景道具，局部 `+Z` 朝前，`+Y` 向上，原点位于三脚架下方的地平面。四个网格分别对应水冷筒、机匣、三脚架和外露软管配件。
 - `C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/Type30Hmg_20261126/Scene_Type30Hmg.blend` 是可编辑源工程，局部 `+X` 朝前，`+Z` 向上。源工程打包了贴图。
 - 源工程旁的 `TextureRefinish` 目录保留原生 3840 × 2160 PNG、照片取样导引图、生成记录及转换后的颜色、金属度与粗糙度、法线三张图集。材质图由 `gpt-image-2.6-sunburst` 以 `max` 质量生成，再根据展品照片校准局部色调。水冷筒、铜圈、铜盖正面、发蓝钢、脚架和木握把各自使用独立区域。
-- 当前模型使用 `TextureRefinishFrontReflectanceMatch` 的三张图集及筒身、机匣左侧板、前端套箍、远侧前腿和后支腿的反光贴图。后支腿、机匣左侧板和后端板依据同一展品的侧后照分配了独立的磨损位置。机匣右侧板、盖板右侧沿、壳体下缘、托架右侧板、水冷筒近侧及后段、两条前支腿及上端套环的可见段、铜盖新增可见区、铜环下半段、机匣顶面和水管外皮使用对齐后的连续帧。托架左侧板的外露平面以及前端短管、铜座、软管接头及套箍的外露弧面各用独立图块。铜环、水冷筒后端圆面、后箍外侧、后握把金属环端面及环身、托架上横销侧面、远侧前腿的侧后可见弧面、转座外缘、转座主体及后脚座的上表面各用独立图集区域。水管未入镜的部分延续实拍的纹理规律。完整底面和深处遮挡区缺清晰影像，外观按同材质的可见部位推定。
+- 当前模型使用 `TextureRefinishReferenceSteel` 的三张图集及筒身、机匣左侧板、前端套箍、远侧前腿和后支腿的反光贴图。后支腿、机匣左侧板和后端板依据同一展品的侧后照分配了独立的磨损位置。机匣右侧板、盖板右侧沿、壳体下缘、托架右侧板、水冷筒近侧及后段、两条前支腿及上端套环的可见段、铜盖新增可见区、铜环下半段、机匣顶面和水管外皮使用对齐后的连续帧。托架左侧板的外露平面以及前端短管、铜座、软管接头及套箍的外露弧面各用独立图块。铜环、水冷筒后端圆面、后箍外侧、后握把金属环端面及环身、托架上横销侧面、远侧前腿的侧后可见弧面、转座外缘、转座主体及后脚座的上表面各用独立图集区域。水管未入镜的部分延续实拍的纹理规律。完整底面和深处遮挡区缺清晰影像，外观按同材质的可见部位推定。
 
 [`Script_Type30HmgPrepareAtlas.py`](../../_blender/Script_Type30HmgPrepareAtlas.py) 从 `TextureRefinish` 中的生成原图制作 PBR 图集，`--guide` 读取 `Reference_Type30MaterialGuide.png`，`--cap-wear` 读取 `Reference_Type30CapWear.png`。侧后照的磨损从 `TextureRefinishRear` 提供 `--rear-wear Reference_Type30RearWear.png` 和 `--rear-registration Data_Type30RearLegRegistration.npz`。视频的侧面磨损从 `TextureRefinishVideo` 提供 `--video-wear Reference_Type30SideVideoWear.png` 和 `--video-registration Data_Type30SideVideoRegistration.json`。
 

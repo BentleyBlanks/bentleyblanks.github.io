@@ -37,7 +37,7 @@ export const INSPECTION_MODELS = Object.freeze(Object.fromEntries([
   ["Type30Hmg", {
     id: "Type30Hmg", kind: "hmg", side: "nra", name: "三十节式重机枪", emplaced: true,
     fullName: "三十节式重机枪",
-    external: { url: "./Model/Type30Hmg/Model_Type30Hmg.glb?v=08d642ae" },
+    external: { url: "./Model/Type30Hmg/Model_Type30Hmg.glb?v=20261128steelFinish", textureAnisotropy: 16 },
   }],
   ...VEHICLE_MODELS.map((asset) => [asset.id, {
     id: asset.id, kind: "vehicle", side: "ija", name: asset.name ?? asset.label,
@@ -321,7 +321,22 @@ export class WeaponInspectionScene {
     let pending = this.externalGlbs.get(url);
     if (!pending) {
       this.externalGlbLoader ??= new ManagedGLTFLoader();
-      pending = this.externalGlbLoader.loadAsync(url).catch((error) => {
+      pending = this.externalGlbLoader.loadAsync(url).then((gltf) => {
+        const anisotropy = Math.min(asset.textureAnisotropy ?? 1, this.library.anisotropy || 1);
+        if (anisotropy > 1) {
+          gltf.scene.traverse((object) => {
+            if (!object.isMesh) return;
+            for (const material of [].concat(object.material)) {
+              for (const texture of Object.values(material)) {
+                if (!texture?.isTexture || texture.anisotropy === anisotropy) continue;
+                texture.anisotropy = anisotropy;
+                texture.needsUpdate = true;
+              }
+            }
+          });
+        }
+        return gltf;
+      }).catch((error) => {
         this.externalGlbs.delete(url);
         throw error;
       });

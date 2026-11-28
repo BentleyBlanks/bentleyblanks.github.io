@@ -799,18 +799,25 @@ try {
       && /173R.*\.glb$/.test(HanYang?.file) && /511.*\.glb$/.test(Type38?.file));
     await search.fill("三十节式");
     await Inspect("Type30Hmg");
-    Check("三十节式可从枪械清单打开，使用 GLB 的独立 AO UV",
+    Check("三十节式可从枪械清单打开，使用 GLB 的独立 AO UV 和斜角贴图采样",
       await page.locator("#modelName").textContent() === "三十节式重机枪"
       && Type30Hmg?.file === "Type30Hmg/Model_Type30Hmg.glb"
       && await page.evaluate(() => {
+        const stage = window.WeaponInspection.scene;
+        const anisotropy = Math.min(16, stage.renderer.capabilities.getMaxAnisotropy() || 1);
         let meshes = 0;
         let aoMeshes = 0;
-        window.WeaponInspection.scene.model.body.traverse((object) => {
+        const finishMaps = new Set();
+        stage.model.body.traverse((object) => {
           if (!object.isMesh) return;
           meshes += 1;
           if (object.geometry.hasAttribute("uv1") && object.material.aoMap?.channel === 1) aoMeshes += 1;
+          for (const texture of [object.material.map, object.material.normalMap, object.material.roughnessMap]) {
+            if (texture) finishMaps.add(texture);
+          }
         });
-        return meshes > 0 && aoMeshes === meshes;
+        return meshes > 0 && aoMeshes === meshes && finishMaps.size > 0
+          && [...finishMaps].every(texture => texture.anisotropy === anisotropy);
       }));
     for (const id of vehicleIds) {
       await search.fill(id);
