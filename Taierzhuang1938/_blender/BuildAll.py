@@ -25,6 +25,7 @@ import BuildProps                    # noqa: E402
 import BuildVehicles                 # noqa: E402
 import ImportWeapons                 # noqa: E402
 import ImportLugouqiaoWeapons        # noqa: E402
+import Type11Exterior                # noqa: E402
 import ImportBayonets                # noqa: E402
 import ImportVehicles                # noqa: E402
 from Script_Zb26Rebuild import BuildZb26 as BuildHistoricalZb26  # noqa: E402
@@ -105,9 +106,11 @@ def main():
     # 单件重建不能把其余模型从清单抹掉。只替换本次落盘的条目，同时可把已经
     # 废弃的型号从清单摘掉；完整构建仍从空清单开始，保证没有历史幽灵条目。
     manifest = []
-    if requested and os.path.isfile(index_path):
+    previous = {}
+    if os.path.isfile(index_path):
         with open(index_path, "r", encoding="utf-8") as handle:
             previous = json.load(handle)
+    if requested:
         manifest = [entry for entry in previous.get("models", [])
                     if entry["name"] not in requested and entry["name"] not in removed]
     failures = []
@@ -122,17 +125,26 @@ def main():
     for name, builder in BuildWeapons.WEAPON_BUILDERS.items():
         imported = BuildHistoricalZb26 if name == "Zb26" else ImportWeapons.BuilderFor(name)
         jobs.append((name, "weapon", imported or builder, ""))
-    # 这两把没有程序化 TZM 成品；可重分发源模存在时才落盘。源文件缺席则运行时
-    # 退回 Script_Actor 的程序化兜底，不阻断克隆仓库的构建。
-    for optional_name in ("Type11", "Type92Hmg"):
+    if "Type11" not in removed and (not requested or "Type11" in requested):
+        type11 = Type11Exterior.BuilderFor()
+        if type11:
+            jobs.append(("Type11", "weapon", type11, Type11Exterior.NOTES))
+        elif "Type11" in requested:
+            raise FileNotFoundError(Type11Exterior.SourcePath())
+        else:
+            # Public checkouts retain the published asset without the private Blender file.
+            manifest.extend(entry for entry in previous.get("models", [])
+                            if entry["name"] == "Type11" and os.path.isfile(os.path.join(out, entry["file"])))
+    # 没有可用源模的九二式保持现有运行时兜底。
+    for optional_name in ("Type92Hmg",):
         optional_builder = ImportWeapons.BuilderFor(optional_name)
         if optional_builder:
             jobs.append((optional_name, "weapon", optional_builder,
                          ImportWeapons.SOURCES[optional_name]["note"]))
-    # 卢沟桥资源包的同名枪（Type11）在这里排到旧导入器之后：
-    # 新资源存在时覆盖同名 job，旧模型仍留在仓库作为对比参考，不删除。
     lugouqiao_jobs = []
     for name, spec in ImportLugouqiaoWeapons.SOURCES.items():
+        if name == "Type11":
+            continue
         builder = ImportLugouqiaoWeapons.BuilderFor(name)
         if builder:
             lugouqiao_jobs.append((name, "weapon", builder, spec["note"]))

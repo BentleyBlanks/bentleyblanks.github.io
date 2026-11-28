@@ -4114,17 +4114,18 @@ export class ActorFactory {
     const built = id==='Type38_511' ? InstantiateType38_511(this.type38,{batch:true,npcLod:!detail}) : this._InstantiateMesh(id);
     if (!built || !built.nodes.has("muzzle")) return null;
 
-    // 枪模型一根关节都没有（MESHES[id].joints === 0），所以整把枪的网格都挂在
-    // root 上、局部变换是单位阵 —— 直接摘就是规范坐标系里的几何。
+    // 十一年式的弹斗盖、操作柄和导轨按静止姿态合入世界枪。
     const kind = data ? data.kind : "boltRifle";
     // 大刀与手榴弹：模型是**刀身朝 -Z**建的（跟枪一个规范系），
     // 而这个文件里的劈砍/投掷动作是按**刀身朝 +Y**写的。绕 X 转 +90° 把两边对上，
     // 这样 PoseWeapon 里那套 swing 常量一个都不用重调。
     const upright = kind === "melee" || kind === "throwable";
     const geometries = new Map();
-    for (const child of built.root.children) {
+    const meshParts = id === "Type11" ? built.meshes : built.root.children;
+    for (const child of meshParts) {
       if (!child.isMesh || !child.geometry) continue;
       const bucket = (child.material && child.material.name) || "steel";
+      if (id === "Type11" && child.parent !== built.root) child.geometry.applyMatrix4(child.matrixWorld);
       if (upright) child.geometry.rotateX(Math.PI / 2);
       if (geometries.has(bucket)) {
         geometries.set(bucket, MergeGeometries([geometries.get(bucket), child.geometry]));
@@ -4312,6 +4313,10 @@ export class ActorFactory {
             aoIntensity: authored ? 1 : undefined, aoUv1: authored });
         return authored ? AttachType89LauncherSleeveHorizon(material) : material;
       }),
+      type11Exterior: this.Material("type11Exterior", () => lib.Get(
+        lib.baked?.has("Type11Exterior") ? "Type11Exterior" : "Steel",
+        { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.35, aoIntensity: 1 },
+      )),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",
         { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1 })),
       zb26Wood: this.Material("zb26Wood", () => lib.Get(lib.baked?.has("Zb26VeteranWood") ? "Zb26VeteranWood" : "WoodStock",

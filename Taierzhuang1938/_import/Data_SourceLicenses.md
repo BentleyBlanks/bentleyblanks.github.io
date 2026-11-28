@@ -75,8 +75,7 @@ CC-BY-4.0 署名原文，文件头都有完整 credit 文本，发布时按 CC-B
 
 - 十一年式轻机枪 `Type11`：`Source/Model_SketchfabType11/scene.gltf`，
   [buh — Type 11 6.5mm Machine gun](https://sketchfab.com/3d-models/type-11-65mm-machine-gun-outdated-4a24c481a48a413d92208ccfe7772ecc)，
-  CC-BY。保留下载包内 `license.txt`；只导入完整枪体，独立摆放的桥夹、散弹和占位
-  Cube 不随士兵出现。原始主枪体约 1.05 万三角，按用户要求不减面。
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)。当前运行时资产是经修改的衍生模型，改动包括散热环、弹斗盖组件划分及全套 PBR 图集。独立展示件排除在运行时资产之外。原下载及 `license.txt` 保留，逐图对照及重建见[十一年式外观](../docs/Data_Type11Exterior.md)。
 - 九二式重机枪 `Type92Hmg`：`<SourceAssets>/Weapons/Model_CadNavType92/cadnav.com_model/Models_F1002A028/Type 92.ma`，
   [CadNav — Type 92 Heavy Machine Gun](https://www.cadnav.com/3d-models/model-48705.html)。CadNav
   下载原包的 `readme.txt` 允许将模型作为 artwork/project 的一部分使用，禁止单独转售或

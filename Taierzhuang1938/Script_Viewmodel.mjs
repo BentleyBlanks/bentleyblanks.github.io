@@ -66,7 +66,7 @@ import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_Pla
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH, ADS_LOOK_SWAY, ADS_MOVE_BOB, AIM_IDLE_SWAY, MOVE_INERTIA } from "./Data_Tuning_FirearmHandling.mjs";
 import { LookSway, AimIdleSway, AdsMoveBob, MoveInertia, CyclePlayedS, CycleReferenceS } from "./Script_FirearmHandling.mjs";
-import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_BOLT_CYCLE_LEGACY, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD } from "./Data_Tuning_FpsReload.mjs";
+import { FPS_RIFLE_RELOAD, FPS_PACKET_RELOAD, FPS_RELOAD_PROPS, FPS_BOLT_HAND, FPS_BOLT_CYCLE, FPS_BOLT_CYCLE_LEGACY, FPS_TOP_MAG_RELOAD, FPS_HOPPER_RELOAD, TYPE11_EXTERIOR_RELOAD } from "./Data_Tuning_FpsReload.mjs";
 import { CASE_EJECTION, VIEWMODEL_FIREARM_SURFACES } from "./Data_Tuning_FirearmEffects.mjs";
 import { FirearmEffects } from "./Script_Tuning_FirearmEffects.mjs";
 
@@ -419,6 +419,8 @@ function BuildMaterials(library) {
     lqType11Body: SafeMaterial(library, "LugouqiaoType11Body", VIEWMODEL_FIREARM_SURFACES.type11Body, 0x575a55),
     lqType11BodyAlt: SafeMaterial(library, "LugouqiaoType11BodyAlt", VIEWMODEL_FIREARM_SURFACES.type11BodyAlt, 0x575a55),
     lqType11Fore: SafeMaterial(library, "LugouqiaoType11Fore", VIEWMODEL_FIREARM_SURFACES.type11Fore, 0x67513a),
+    type11Exterior: SafeMaterial(library, "Type11Exterior",
+      { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.35, aoIntensity: 1 }, 0x555960),
     lqMediumMortar: SafeMaterial(library, "Steel", {}, 0x555960),
     lqWeaponPlain: SafeMaterial(library, "Steel", {}, 0x555960),
     // 刀柄缠的红布：全场唯二的高饱和点之一（另一个是青天白日帽徽）
@@ -1165,6 +1167,7 @@ const VM_MATERIAL_BY_MESH = {
   lqOfficerSword: "lqOfficerSword",
   lqType11AmmoBox: "lqType11AmmoBox", lqType11Body: "lqType11Body",
   lqType11BodyAlt: "lqType11BodyAlt", lqType11Fore: "lqType11Fore",
+  type11Exterior: "type11Exterior",
   lqMediumMortar: "lqMediumMortar", lqWeaponPlain: "lqWeaponPlain",
 };
 
@@ -1182,8 +1185,11 @@ const IRON_SIGHT_REPAIRS = {
   Type92Hmg: { replaceBlade: true, x: 0, y: 0.104, frontZ: -0.5901, frontBase: 0.076, rearZ: -0.1718, rearBase: 0.080 },
 };
 
-function RepairIronSights(group, materials, key, sight) {
-  const spec = IRON_SIGHT_REPAIRS[key];
+const TYPE11_EXTERIOR_IRON_SIGHTS = {
+  x: 0.00145, y: 0.119, frontZ: -0.7426, frontBase: 0.056, rearZ: -0.2022, rearBase: 0.077,
+};
+
+function RepairIronSights(group, materials, key, sight, spec = IRON_SIGHT_REPAIRS[key]) {
   if (!spec || !sight) return null;
   const width = key === "Type11" ? 0.004 : 0.003;
   const AddPart = (name, x, y, z, sx, sy, sz) => {
@@ -1335,7 +1341,8 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   const gripR = Mount("gripR", new THREE.Vector3());
   const gripL = Mount("gripL", gripR.clone());
   const sight = Mount("sight", null);
-  if (key === "Type11") {
+  const type11Exterior = key === "Type11" && doc?.meshes.some((mesh) => mesh.material === "type11Exterior");
+  if (key === "Type11" && !type11Exterior) {
     // Imported source was offset from its grip/bore mounts: measure the muzzle
     // ring centre, then move only the private mesh geometry back onto that frame.
     built.root.traverse((mesh) => {
@@ -1370,7 +1377,8 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
     const CollectMeshes = (root) => { const list = []; root.traverse((mesh) => { if (mesh.isMesh) list.push(mesh); }); return list; };
     ironSights = { front: CollectMeshes(authoredFront), rear: CollectMeshes(authoredRear),
       frontRegion: key==='Type38' ? TYPE38_511.frontSightRegion : authoredAsset ? {x:0,z:-0.965,base:0.0458} : { x: sight.x, z: -0.836, base: 0.060 } };
-  } else ironSights = RepairIronSights(group, materials, key, sight);
+  } else ironSights = RepairIronSights(group, materials, key, sight,
+    type11Exterior ? TYPE11_EXTERIOR_IRON_SIGHTS : undefined);
   const magazine = Mount("magazine", new THREE.Vector3(0, 0, -0.08));
   // ADS eye relief keeps the complete stock in front of the camera. Hiding the
   // rear submesh exposes its uncapped inner faces and makes the rifle look cut.
@@ -1427,12 +1435,12 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   }
   if (key === "ServicePistol") boltProxy = SplitFpsMechanism(group,key,"VmSlide_ServicePistol",new THREE.Vector3(),
     (p,name,vertices)=>name.endsWith("steel") && vertices.every(v=>v.y>=0.0179) && p.z> -0.11 && p.z<0.035);
-  if (key === "Type11") hopperFollower = SplitFpsMechanism(group,key,"VmHopperFollower",
-    new THREE.Vector3().fromArray(FPS_HOPPER_RELOAD.followerPivot),
-    (p,name,vertices)=>name.endsWith("lqType11AmmoBox") && (vertices.every(v=>v.y>.020)
-      || vertices.every(v=>v.x>-.079 && v.x<-.061 && v.y>-.011)));
-  hopperFollower?.traverse(mesh=>{if(mesh.isMesh)mesh.material=materials.lqType11Follower;});
   if(key === "Type11") {
+    hopperFollower = built.nodes.get("hopperFollower") || SplitFpsMechanism(group,key,"VmHopperFollower",
+      new THREE.Vector3().fromArray(FPS_HOPPER_RELOAD.followerPivot),
+      (p,name,vertices)=>name.endsWith("lqType11AmmoBox") && (vertices.every(v=>v.y>.020)
+        || vertices.every(v=>v.x>-.079 && v.x<-.061 && v.y>-.011)));
+    if (!type11Exterior) hopperFollower?.traverse(mesh=>{if(mesh.isMesh)mesh.material=materials.lqType11Follower;});
     operatingHandle=built.nodes.get("operatingHandle") || null;
     operatingHandleContact=built.nodes.get("fpsOperatingHandleContact") || null;
   }
@@ -1449,7 +1457,14 @@ function BuildFromModel(materials, weapon, key, doc, authoredAsset=null) {
   const feedMouth = Mount("feedMouth", null);
   if (feedMouth) clipSeat.copy(feedMouth);
   const boltOpenMount = Mount("boltOpen", null);
-  if (key === "Type11") clipSeat.fromArray(FPS_HOPPER_RELOAD.seat);
+  const authoredHopperSeat = Mount("hopperSeat", null);
+  if (key === "Type11") {
+    clipSeat.fromArray(FPS_HOPPER_RELOAD.seat);
+    if (authoredHopperSeat) {
+      clipSeat.copy(authoredHopperSeat);
+      clipSeat.x -= 2 * FPS_RELOAD_PROPS.profiles.Type38.spacing;
+    }
+  }
   if (key === "Type92Hmg") clipSeat.fromArray(STRIP_FEED_RELOAD.seat);
   const hr = armPose.contacts.right;
   const hl = armPose.contacts.left;
@@ -4395,7 +4410,8 @@ export class Viewmodel {
       if(prop.userData.loadedRounds!==rounds) {
         this._ConfigureReloadProp(prop,"Type38",rounds);prop.userData.loadedRounds=rounds;
       }
-      prop.position.set(spec.seat[0]+2*spacing,spec.seat[1]+i*spec.layerPitchM,spec.seat[2]);
+      const seat = this.rig.clipSeat;
+      prop.position.set(seat.x+2*spacing,seat.y+i*spec.layerPitchM,seat.z);
       if(offset)prop.position.add(offset);
       prop.rotation.set(0,0,Math.PI/2);
     }
@@ -4409,16 +4425,33 @@ export class Viewmodel {
     for(let i=0;i<6;i++)events.push({at:spec.cycles[i]+(spec.cycles[i+1]-spec.cycles[i])*spec.seatPhase,
       pose:spec.effort.seatPose.map(v=>v*spec.effort.cycleStrength[i]),
       right:spec.effort.seatRight,left:spec.effort.seatLeft});
-    this._PoseReloadMotion(t,spec,partial?null:spec.charge.support,events);
     const follower=this.rig.parts.hopperFollower;
+    const authoredFollower = follower?.name === "hopperFollower";
+    const support = partial ? null : spec.charge.support;
+    this._PoseReloadMotion(t,spec,support,events);
+    if (authoredFollower) {
+      // Bring the more forward hopper within both hands' reach while loading.
+      const loading = Ease.InOut(Ease.Seg(t, .015, .125))
+        * (1 - Ease.InOut(Ease.Seg(t, partial ? .85 : .79, partial ? .985 : .89)));
+      this.reloadPivot.position.addScaledVector(new THREE.Vector3().fromArray(TYPE11_EXTERIOR_RELOAD.presentationOffset), loading);
+    }
     const followerTrack=partial?spec.follower:spec.emptyFollower;
     const followerT = partial && t < .16 ? .07 + .09 * Ease.Seg(t,.07,.115) : t;
-    if(follower)follower.rotation.x=spec.followerAngleRad*ReloadTrack(followerTrack,followerT);
+    const followerOpen = authoredFollower && t < .16
+      ? ReloadTrack(TYPE11_EXTERIOR_RELOAD.opening, t)
+      : ReloadTrack(followerTrack, followerT);
+    const followerAngle = spec.followerAngleRad * followerOpen;
+    if (follower) follower.rotation.x = followerAngle;
+    if (authoredFollower && !partial) {
+      const lift = Ease.InOut(Ease.Seg(t, .80, .855)) * (1 - Ease.InOut(Ease.Seg(t, .96, 1)));
+      this.reloadPivot.position.addScaledVector(new THREE.Vector3().fromArray(TYPE11_EXTERIOR_RELOAD.chargeOffset), lift);
+    }
     let charge=null;
     if(!partial&&this.rig.parts.operatingHandle&&this.rig.operatingHandleContact) {
       this.rig.parts.operatingHandle.position.z=this.rig.operatingHandleTravel*ReloadTrack(spec.charge.slide,t);
       this.rig.group.updateWorldMatrix(true,true);
       const point=this.rig.group.worldToLocal(this.rig.operatingHandleContact.getWorldPosition(new THREE.Vector3()));
+      if (authoredFollower) point.add(new THREE.Vector3().fromArray(TYPE11_EXTERIOR_RELOAD.gripOffset));
       charge=this._HandPlacement("type11Charge",point);
       if(this.riggedArms) {
         const body=this.riggedArms.reloadBodyOffset,weight=ReloadTrack(spec.charge.body,t);
@@ -4427,7 +4460,8 @@ export class Viewmodel {
       }
     }
     const spacing=FPS_RELOAD_PROPS.profiles.Type38.spacing;
-    const seat=new THREE.Vector3(spec.seat[0]+2*spacing,spec.seat[1],spec.seat[2]);
+    const seat=this.rig.clipSeat.clone();
+    seat.x+=2*spacing;
     const pouch=seat.clone().add(new THREE.Vector3().fromArray(spec.pouchOffset));
     const clear=seat.clone().add(new THREE.Vector3().fromArray(spec.clearOffset));
     const turn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,0,1),Math.PI/2);
@@ -4452,14 +4486,17 @@ export class Viewmodel {
     if(phase<spec.alignPhase)prop.position.lerpVectors(pouch,above,Ease.InOut(phase/spec.alignPhase));
     else prop.position.lerpVectors(above,target,Ease.InOut(Ease.Seg(phase,spec.alignPhase,spec.seatPhase)));
     const Grip=(anchor)=>this._HandPlacement("hopperClip",anchor,turn);
-    const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),spec.followerAngleRad*ReloadTrack(followerTrack,followerT));
-    const followerPoint=new THREE.Vector3().fromArray(spec.followerPivot).add(new THREE.Vector3().fromArray(spec.followerRimOffset).applyQuaternion(followerTurn));
+    const followerTurn=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0),followerAngle);
+    const followerPivot=authoredFollower ? follower.position.clone() : new THREE.Vector3().fromArray(spec.followerPivot);
+    const followerPoint=followerPivot.add(new THREE.Vector3().fromArray(
+      authoredFollower ? TYPE11_EXTERIOR_RELOAD.followerRimOffset : spec.followerRimOffset).applyQuaternion(followerTurn));
     const held=this._HandPlacement("hopperFollower",followerPoint,followerTurn);
     const leftBaseRotation=this.handBaseRot.left.toArray().slice(0,3);
     const LeftRotation=weight=>new THREE.Euler().setFromQuaternion(
       new THREE.Quaternion().setFromEuler(this.handBaseRot.left).slerp(
         new THREE.Quaternion().setFromEuler(new THREE.Euler(...held.rotation,"YXZ")),weight),"YXZ").toArray().slice(0,3);
-    const approach=spec.followerApproach,recovery=spec.followerRecovery;
+    const approach=spec.followerApproach;
+    const recovery = authoredFollower ? TYPE11_EXTERIOR_RELOAD.followerRecovery : spec.followerRecovery;
     const leftFrames=[
       {at:approach.at,position:this.handBase.left.clone().lerp(held.position,approach.positionMix).add(new THREE.Vector3().fromArray(approach.offset)),
         rotation:LeftRotation(approach.rotationMix),shape:"relax",through:true},
@@ -4480,6 +4517,13 @@ export class Viewmodel {
         rotation:LeftRotation(recovery.rotationMix),shape:"recover",through:true},
       {at:.985,position:this.handBase.left,rotation:leftBaseRotation,weight:0,shape:"recover"});
     this._WorkingHandPath("left",t,leftFrames);
+    if (authoredFollower) {
+      // Rotate the free wrist during approach and recovery, outside the contact phases.
+      const stages = TYPE11_EXTERIOR_RELOAD;
+      const pitch = ReloadTrack(stages.approachWrist, t)
+        + ReloadTrack(partial ? stages.partialReturnWrist : stages.emptyReturnWrist, t);
+      this.handLeft.group.rotateOnWorldAxis(new THREE.Vector3(1, 0, 0), pitch);
+    }
     const frames=partial
       ? [{at:.115,...Grip(oldGrip||pouch),shape:"relax",through:true},
         {at:.13,...Grip(oldGrip||pouch)},{at:.19,...Grip(oldGrip||pouch)},{at:.195,...Grip(pouch)}]

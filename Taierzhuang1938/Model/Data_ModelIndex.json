@@ -588,18 +588,13 @@
    "name": "Type11",
    "category": "weapon",
    "file": "Model_Type11.tzm.json",
-   "triangles": 8420,
-   "meshBlocks": 7,
-   "nodes": 11,
-   "joints": 1,
-   "bytes": 308810,
+   "triangles": 14106,
+   "meshBlocks": 4,
+   "nodes": 14,
+   "joints": 2,
+   "bytes": 353928,
    "materials": [
-    "lqType11AmmoBox",
-    "lqType11Body",
-    "lqType11BodyAlt",
-    "lqType11Fore",
-    "lqWeaponPlain",
-    "steel"
+    "type11Exterior"
    ],
    "mounts": [
     "root",
@@ -609,22 +604,24 @@
     "sight",
     "magazine",
     "fpsOperatingHandleContact",
-    "operatingHandleStroke"
+    "operatingHandleStroke",
+    "hopperSeat",
+    "ejection"
    ],
    "bounds": {
     "min": [
-     -0.12031,
-     0.03931,
+     -0.10683,
+     -0.09873,
      -0.845
     ],
     "max": [
-     0.12031,
-     0.29508,
+     0.05485,
+     0.1223,
      0.255
     ]
    },
-   "sourceTriangles": 8255,
-   "targetTriangles": 8423,
+   "sourceTriangles": 6578,
+   "targetTriangles": 14106,
    "triangleLimit": 30000
   },
   {

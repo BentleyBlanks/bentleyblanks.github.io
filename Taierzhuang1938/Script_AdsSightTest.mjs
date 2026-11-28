@@ -203,7 +203,7 @@ try {
             const name = (o.name || "").toLowerCase();
             if (name.indexOf("bayonet") === 0) return;
             // Imported source material buckets also participate in muzzle-axis sampling.
-            if (name.indexOf("steel") < 0 && name.indexOf("lq") < 0) return;
+            if (!name.includes("steel") && !name.includes("lq") && name !== "type11_body_type11exterior") return;
             const pos = o.geometry.attributes.position;
             const v = new Vec3();
             const pts = [];

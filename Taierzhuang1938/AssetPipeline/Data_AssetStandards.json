@@ -99,11 +99,11 @@
     "Type11": {
       "name": "十一年式轻机枪",
       "group": "firearm",
-      "sourceTriangles": 8255,
+      "sourceTriangles": 6578,
       "repair": true,
-      "sourceTexture": "有（4 张）",
-      "runtimeTexture": "保留源 UV，使用源图的浏览器转换版",
-      "note": "分解展示件排除，保留装配态枪体；原 8,252 面保持，补齐操作柄与导轨 168 面。退化面清理不属于减面。"
+      "sourceTexture": "有（源漫反射图仅作比对）",
+      "runtimeTexture": "1K 底色、切线法线和 ORM 图集",
+      "note": "buh 的 CC BY 4.0 装配态枪体选定 6,578 面，重修可见散热环，独立弹斗盖，保留操作柄和导轨。制作依据见 docs/Data_Type11Exterior.md。"
     },
     "Type92Hmg": {
       "name": "九二式重机枪",

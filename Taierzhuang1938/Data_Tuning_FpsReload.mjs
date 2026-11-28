@@ -496,3 +496,17 @@ export const FPS_HOPPER_RELOAD = Object.freeze({
   oldStackVisibleUntil:.195,
   clipDropVelocity:[-.08,-.28,.035],
 });
+
+// Type 11 replacement exterior: offsets are used only by the rig with the
+// authored hopper node. Timings and inventory events use FPS_HOPPER_RELOAD.
+export const TYPE11_EXTERIOR_RELOAD = Object.freeze({
+  presentationOffset: [-.026, -.073, .176],
+  followerRimOffset: [-.04414, .01163, .03296],
+  gripOffset: [-.003, .001, .0015],
+  opening: [[0, 0], [.024, 0], [.104, 1]],
+  approachWrist: [[0, 0], [.018, 0], [.05, -.56], [.088, 0]],
+  partialReturnWrist: [[.88, 0], [.914, -.43], [.944, -.46], [.978, 0]],
+  emptyReturnWrist: [[.945, 0], [.954, -.22], [.978, 0]],
+  chargeOffset: [-.015, -.070, .077],
+  followerRecovery: { at: .918, positionMix: .47, rotationMix: .68, offset: [-.009, -.034, .034] },
+});

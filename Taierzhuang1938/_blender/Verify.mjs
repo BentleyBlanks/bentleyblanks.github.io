@@ -91,10 +91,7 @@ if (!fs.existsSync(lugouqiaoTextureManifestPath)) {
 // 没有跟着翻、旧 DCC 的 material_index=255 丢进默认桶，以及退化三角形成黑缝。
 // 浏览器会照常加载这些文件，三角数/包围盒也都合理，所以在真渲染前先直接审计
 // 压缩后的最终产物。面法线与三顶点平均光照法线反向即判坏，不依赖 Blender 环境。
-const lugouqiaoWeaponIds = [
-  "OfficerSwordSet",
-  "Type11", "MediumMortar",
-];
+const auditedWeaponIds = ["OfficerSwordSet", "MediumMortar", "Type11"];
 const AuditCompressedMesh = (mesh) => {
   const pos = Buffer.from(mesh.pos, "base64");
   const nrm = Buffer.from(mesh.nrm, "base64");
@@ -126,7 +123,7 @@ const AuditCompressedMesh = (mesh) => {
   }
   return { degenerate, reversed };
 };
-for (const id of lugouqiaoWeaponIds) {
+for (const id of auditedWeaponIds) {
   const entry = MESHES[id];
   const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", entry.file), "utf8"));
   const audit = doc.meshes.reduce((sum, mesh) => {
@@ -136,7 +133,7 @@ for (const id of lugouqiaoWeaponIds) {
     return sum;
   }, { degenerate: 0, reversed: 0 });
   Report(audit.degenerate === 0 && audit.reversed === 0,
-    `卢沟桥武器终产物法线/拓扑 ${id}（反向 ${audit.reversed}，退化 ${audit.degenerate}）`);
+    `武器终产物法线/拓扑 ${id}（反向 ${audit.reversed}，退化 ${audit.degenerate}）`);
 }
 const MaterialTriangles = (id) => {
   const doc = JSON.parse(fs.readFileSync(path.join(projectDir, "Model", MESHES[id].file), "utf8"));
@@ -144,34 +141,40 @@ const MaterialTriangles = (id) => {
 };
 const type11Doc = JSON.parse(fs.readFileSync(
   path.join(projectDir, "Model", MESHES.Type11.file), "utf8"));
-const type11SourceMeshes = type11Doc.nodes.find(node=>node.name==="body")?.meshes || [];
-const type11Buckets = new Map(type11SourceMeshes.map(index=>{
-  const mesh=type11Doc.meshes[index];return [mesh.material,mesh.idxCount/3];
-}));
-const type11SourceTriangles = built.get("Type11")?.sourceTriangles || MESHES.Type11.triangles;
-Report(type11SourceMeshes.length === 5 && type11Buckets.size === 5
-  && ["lqType11AmmoBox","lqType11Body","lqType11BodyAlt","lqType11Fore","lqWeaponPlain"].every(name=>type11Buckets.has(name))
-  && (type11Buckets.get("lqWeaponPlain") || 0) <= type11SourceTriangles * 0.10,
-  "十一年式五个材质桶均命中，默认材质不超过选定源几何的 10%");
-const type11RepairNodes=type11Doc.nodes.filter(node=>["operatingHandle","operatingHandleGuide"].includes(node.name));
-const type11RepairMeshes=type11RepairNodes.flatMap(node=>node.meshes||[]);
-Report(type11RepairNodes.length===2&&type11RepairMeshes.length===2
-  &&new Set([...type11SourceMeshes,...type11RepairMeshes]).size===type11Doc.meshes.length
-  &&type11RepairMeshes.every(index=>type11Doc.meshes[index].material==="steel")
-  &&type11RepairMeshes.reduce((sum,index)=>sum+type11Doc.meshes[index].idxCount/3,0)===168
-  &&type11Doc.nodes.find(node=>node.name==="operatingHandle")?.joint===true,
-  "十一年式补件仅为独立操作柄与固定导轨，新增 168 面；原五桶保持独立");
-const type11AmmoBox = type11Doc.meshes.find((mesh) => mesh.material === "lqType11AmmoBox");
-const type11AmmoCenterX = type11AmmoBox
-  ? type11AmmoBox.posMin[0] + type11AmmoBox.posScale[0] * 65535 * 0.5
+const type11Node = (name) => type11Doc.nodes.find(node => node.name === name);
+const type11Mount = (name) => type11Node(name)?.t;
+const visualNodes = ["body", "operatingHandle", "operatingHandleGuide", "hopperFollower"].map(type11Node);
+const visualMeshes = visualNodes.flatMap(node => node?.meshes || []);
+Report(visualNodes.every(node => node?.meshes?.length === 1)
+  && new Set(visualMeshes).size === type11Doc.meshes.length
+  && type11Doc.meshes.every(mesh => mesh.material === "type11Exterior" && mesh.uv),
+  "十一年式枪身、导轨、操作柄及弹斗盖使用完整 PBR 图集，四个可见节点各保留一块网格");
+const handle = type11Node("operatingHandle");
+const guide = type11Node("operatingHandleGuide");
+const follower = type11Node("hopperFollower");
+const handleContact = type11Node("fpsOperatingHandleContact");
+const repairTriangles = [handle, guide].flatMap(node => node?.meshes || [])
+  .reduce((sum, index) => sum + type11Doc.meshes[index].idxCount / 3, 0);
+Report(handle?.joint === true && follower?.joint === true && !guide?.joint && repairTriangles === 168
+  && type11Doc.nodes[handleContact?.parent] === handle
+  && type11Mount("operatingHandleStroke")?.[2] === 0.11,
+  "十一年式弹斗盖和操作柄可独立动画，操作柄／导轨维持原拓扑、接触挂点和行程");
+const followerMesh = type11Doc.meshes[follower?.meshes?.[0]];
+const followerMaxX = followerMesh
+  ? follower.t[0] + followerMesh.posMin[0] + followerMesh.posScale[0] * 65535
   : Infinity;
-const type11Mount = (name) => type11Doc.nodes.find((node) => node.name === name)?.t;
 const type11Muzzle = type11Mount("muzzle");
 const type11GripR = type11Mount("gripR");
 const type11GripL = type11Mount("gripL");
-Report(type11AmmoCenterX < -0.04
-  && type11Muzzle?.[2] < type11GripL?.[2] && type11GripL?.[2] < type11GripR?.[2],
-  "十一年式枪体朝向正确：左侧弹斗、枪口/前手/后手依次沿 -Z 排列");
+const type11Seat = type11Mount("hopperSeat");
+const type11Ejection = type11Mount("ejection");
+Report(followerMaxX < -0.02 && type11Seat?.[0] < -0.04 && Math.abs(type11Seat?.[2] - follower?.t[2]) < 0.08
+  && type11Muzzle?.[2] < type11GripL?.[2] && type11GripL?.[2] < type11GripR?.[2]
+  && Math.abs(type11Muzzle?.[2] - type11Doc.bounds.min[2]) < 0.01,
+  "十一年式枪体朝向正确：弹斗在左，枪口对齐可见前端，双手挂点沿 -Z 排列");
+Report(type11Ejection?.[0] > 0 && type11Ejection[1] < type11Mount("sight")?.[1]
+  && type11Ejection[2] < type11GripR?.[2] && type11Ejection[2] > type11GripL?.[2],
+  "十一年式抛壳特效使用独立机匣侧口挂点");
 const swordBuckets = MaterialTriangles("OfficerSwordSet");
 Report(swordBuckets.has("lqOfficerSword") && swordBuckets.has("lqWeaponPlain")
   && swordBuckets.size === 2, "军刀仅饰带使用源贴图，刀身/刀鞘回钢材质");
