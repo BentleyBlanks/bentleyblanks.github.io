@@ -1,8 +1,8 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v32
+## 当前交付版 v33
 
-游戏使用 `511-full-tail-32`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-album-finish-33`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
@@ -10,7 +10,24 @@
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
 
-## 尾盘厚度与钢环 · 2026-11-28
+## 名古屋实物相册对标 · 2026-11-28
+
+使用同一件实物的 46 张外观照片核对整枪两侧、俯视、斜侧和局部。照片编号采用相册显示的序号。 [Badger 实物相册](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?n=0)
+
+| 部位 | 照片 | 对标内容 |
+| --- | --- | --- |
+| 整枪侧影 | 1、61 | 左右侧的主轮廓和外部分段位置 |
+| 前端 | 2–5、22–24、62–64 | 护耳外窗、枪口外缘与前箍的轮廓。前箍外的旧长条收进木托，使前端外缘与照片一致 |
+| 护木、木槽和中箍 | 6–8、25、65–67 | 补右侧木槽凹面、中箍旁半月形木凹和挂环侧影。调整槽缘漆光与局部遮蔽 |
+| 照门 | 9、26–30、32–33、68 | 顶面的窄钢条和两侧暗肩。按照片校准钢色与粗糙度 |
+| 覆壳、侧板和柄头 | 10–11、18、34–35、69、71–72 | 核对外轮廓与材质分界，在柄头接触区补局部磨光 |
+| 下部护圈 | 19、70 | 底弧与两端转折收圆 |
+| 尾盘和盘前钢环 | 39、40、44 | 做出盘缘光面凹肩、斜向菱形滚花和钢环前后的窄接缝，离线重烘接触 AO |
+| 木托尾端与托底板 | 20–21、49–50、58 | 两侧木托拼缝、托底板上翻圆舌和正面的螺丝。调整挂环座贴合与钢面磨光 |
+
+尾盘与木托、其下钢片之间通过了 84,427 次有效净空采样。可从 v32 资产目录使用 `Script_Type38AlbumFinish.py --input <v32 资产目录> --output <输出目录>` 重建。 [相册对标脚本](../../_blender/Script_Type38AlbumFinish.py)
+
+## 尾盘厚度与钢环 · v32
 
 以同一支实物的俯视近照读取盘面、侧壁、盘前钢环和覆壳的相对比例，并用侧视与斜侧近照交叉核对。游戏网格把尾盘轴向厚度由盘面直径的 0.215 补至 0.372，覆壳后方的可见段约为盘面直径的 0.623。盘身沿圆角连续接入端面，钢环在覆壳后有清楚的一段外露。 [俯视近照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=38&n=1) · [侧照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=9&n=1) · [斜侧近照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=43&n=1)
 

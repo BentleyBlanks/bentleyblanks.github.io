@@ -2,7 +2,7 @@
   "schema": "Type38NpcSightLod",
   "version": 1,
   "generator": "_blender/Script_Type38NpcLod.py",
-  "sourceSha256": "24372d8d7a5f0c7a9b466a16223b6c71457e18a0edb358443633e67413df9d36",
+  "sourceSha256": "8ca4700fdf0dfc67cc271d7b23157f802a20572f354cea0ca7647989204a3eae",
   "sha256": "a2bc96ecb436b06d1f3bcc6843d0be8ac77d7c5bd9d931abd54b7cc7d6245809",
   "part": "Exterior_FoldedFrame12",
   "before": 5760,
