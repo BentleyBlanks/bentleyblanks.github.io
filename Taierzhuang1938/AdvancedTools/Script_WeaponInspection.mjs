@@ -25,6 +25,7 @@ function SetPressed(button, on) {
   button.classList.toggle("on", on);
 }
 const Kind = (weapon) => weapon.id === "MediumMortar" ? "迫击炮" : (KIND[weapon.kind] || weapon.kind);
+const CompactCatalogText = (text) => text.replace(/[\s\p{Pd}]+/gu, "");
 
 function LabelNode(parent, tag, text) {
   const element = document.createElement(tag);
@@ -76,9 +77,15 @@ function SyncSelection() {
 
 function FilterCatalog() {
   const query = search.value.trim().toLocaleLowerCase();
-  const matches = Object.values(INSPECTION_MODELS).filter((weapon) =>
-    (catalogSide === "all" || weapon.side === catalogSide)
-    && [weapon.id, weapon.name, weapon.fullName, Kind(weapon)].some((field) => field?.toLocaleLowerCase().includes(query)));
+  const compactQuery = CompactCatalogText(query);
+  const matches = Object.values(INSPECTION_MODELS).filter((weapon) => {
+    if (catalogSide !== "all" && weapon.side !== catalogSide) return false;
+    const kind = Kind(weapon);
+    return [weapon.id, weapon.name, weapon.fullName, kind, `${weapon.name} ${kind}`].some((field) => {
+      const text = field?.toLocaleLowerCase() ?? "";
+      return compactQuery ? CompactCatalogText(text).includes(compactQuery) : text.includes(query);
+    });
+  });
   list.replaceChildren();
   Text("catalogCount", matches.length);
   if (!matches.length) LabelNode(list, "p", "没有匹配的模型").className = "search-empty";

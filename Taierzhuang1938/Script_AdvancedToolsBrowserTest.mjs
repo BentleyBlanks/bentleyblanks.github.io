@@ -737,9 +737,12 @@ try {
       && await page.evaluate(() => !window.WeaponInspection.scene.firstPerson));
     await page.evaluate(() => localStorage.removeItem("tengxian1938_graphics_v1"));
 
-    await search.fill("zb26");
-    Check("可按编号搜索，过滤仅影响模型列表", await page.locator("[data-model]").count() === 1
-      && await page.locator("[data-model]").getAttribute("data-model") === "Zb26");
+    const selectedBeforeSearch = await page.locator("#modelName").textContent();
+    for (const query of ["zb26", "ZB-26", "捷克式轻机枪"]) {
+      await search.fill(query);
+      Check(`搜索「${query}」列出捷克式并保留当前模型`, (await listedIds()).join() === "Zb26"
+        && await page.locator("#modelName").textContent() === selectedBeforeSearch);
+    }
     await Inspect("Zb26");
     Check("换模型后同步数据、隐藏不可用的刺刀预览", await page.locator("#modelName").textContent() === "捷克式"
       && await page.locator("#bayonetToggle").isHidden() && await page.locator("#bayonetToggle").getAttribute("aria-pressed") === "false");
