@@ -146,6 +146,8 @@
 
 - 以第 8 张馆藏照的筒身左侧为依据，将纵向和横向磨蚀细纹合入底色与切线法线，并以正面照片和斜视渲染限制共见区的亮度变化。六组对位在独立布光下的平均细纹误差分别下降 13% 和 20%。局部纹理反差仍有残差。正面刻印和十个接缝 AO 视角通过复测。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 以第 1、8 张馆藏照联立校准外套筒的钢色、切线法线、粗糙度和金属度。独立布光下背面平均亮度误差从 8.39 降至 7.57 个灰阶，色差指标下降约 16%。默认灯与斜视下正面的平均亮度误差分别增加约 0.18 和 0.19 个灰阶。复核了环纹及邻接件，并按 AO 图集定位补强驻钣接头和套筒深槽，十个接缝视角的深阴影保留率最低约 99.9%。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -214,4 +216,5 @@
 - 驻钣后缘的校准保存在 `saddleSurfaceRefinement.edgeFinishRefinement`。记录关联正背两张照片、轮廓配准幅度和上一版 16 位采样图，正式重烘的三张源贴图合计 1,044,330 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 筒身左侧的校准保存在 `barrelJointFinish.leftEdgeFinishRefinement`。重烘底色和法线时沿用接缝 AO 的 ORM，三张源贴图共 1,044,292 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 筒身细纹的校准保存在 `barrelJointFinish.leftSurfaceGrainRefinement`。正式脚本重烘底色和法线，三张源贴图共 1,044,820 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV107/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 套筒钢面的分区校准保存在 `sleeveOpticalFinish.surfaceFinishBalance`，驻钣接头和套筒深槽的阴影记录在 `sleeveOpticalFinish.contactAoRetouch`。三张正式源贴图共 1,042,104 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV108/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

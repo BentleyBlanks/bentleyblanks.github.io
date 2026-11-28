@@ -26297,7 +26297,7 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "131e8001a894dc3139491aeff36b0893831aeaa7eb33ebfe7a720d3a6bb30429",
+      "sha256": "8059d22e28bdcdd190500ca02fe60e2e99d757076ba5292d5a4d5a1921e9b53d",
       "scale": 22827,
       "strength": 1.0,
       "fields": [
@@ -26358,7 +26358,11 @@
       "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
       "probeFrames": {
         "Whole_ContactHi.png": "11ab037f9bf68a23f1abcafe27edeb56d1aedb5080523b745420ef55f7e3d31a",
-        "Whole_ContactLo.png": "12eab08169f9ba93ae4d082b1bfd679fb0f4632115eb5c4e80a78cc4b9164831"
+        "Whole_ContactLo.png": "12eab08169f9ba93ae4d082b1bfd679fb0f4632115eb5c4e80a78cc4b9164831",
+        "V108/Whole_ContactUvHi.png": "11ab037f9bf68a23f1abcafe27edeb56d1aedb5080523b745420ef55f7e3d31a",
+        "V108/Whole_ContactUvLo.png": "12eab08169f9ba93ae4d082b1bfd679fb0f4632115eb5c4e80a78cc4b9164831",
+        "V108/TabReverse_ContactUvHi.png": "226acb78a87868e278d0e6760c6ba5872a92c9b8a34669475e436cea2f35c4f9",
+        "V108/TabReverse_ContactUvLo.png": "0ecdafcae09ae77c38a02f40a594a2e080d18555e8b00ea49c794f0a0b3fb2a9"
       },
       "spots": [
         {
@@ -26371,7 +26375,7 @@
             7.5,
             4.8
           ],
-          "darken": 12.0
+          "darken": 46.0
         },
         {
           "region": "Stem",
@@ -26384,6 +26388,18 @@
             5.5
           ],
           "darken": 15.0
+        },
+        {
+          "region": "RibbedLowerSleeve",
+          "center": [
+            820.92,
+            471.65
+          ],
+          "radius": [
+            4.4,
+            6.2
+          ],
+          "darken": 32.0
         }
       ]
     },
@@ -26450,6 +26466,111 @@
         "Matched",
         "Broad"
       ]
+    },
+    "surfaceFinishBalance": {
+      "sourcePlateSha256": "131e8001a894dc3139491aeff36b0893831aeaa7eb33ebfe7a720d3a6bb30429",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "frontControlViews": [
+        "Gallery",
+        "Default",
+        "Rake"
+      ],
+      "rearTrainingLights": [
+        "Matched",
+        "Broad"
+      ],
+      "photoOffsets": [
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          0
+        ],
+        [
+          2,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          0,
+          2
+        ]
+      ],
+      "lattice": [
+        16,
+        13
+      ],
+      "parameters": [
+        "gain",
+        "roughness",
+        "metalness",
+        "tilt",
+        "tiltV",
+        "tintRed",
+        "tintBlue"
+      ],
+      "rearProbeSha256": "dda36b4beda60bbe62c53c4bc84d76a57d586758ec46cbc14da7e57969b75e81",
+      "frontErrorGuards": [
+        0.16,
+        0.24,
+        0.23
+      ],
+      "strength": 0.94,
+      "compiledResponseBlend": {
+        "angles": [
+          0.0,
+          0.07142857142857142,
+          0.14285714285714285,
+          0.21428571428571427,
+          0.2857142857142857,
+          0.35714285714285715,
+          0.42857142857142855,
+          0.5,
+          0.5714285714285714,
+          0.6428571428571429,
+          0.7142857142857143,
+          0.7857142857142857,
+          0.8571428571428571,
+          0.9285714285714286
+        ],
+        "axial": [
+          0.02,
+          0.13999999999999999,
+          0.26,
+          0.38,
+          0.5,
+          0.62,
+          0.74,
+          0.86,
+          0.98
+        ],
+        "limits": [
+          0.0,
+          1.18
+        ],
+        "trialPlateSha256": "e9d218454bded309017f638ad8df6f8131cb5529eaee9c898185ee5dc6684807",
+        "frontErrorGuard": [
+          0.11,
+          0.17,
+          0.17
+        ],
+        "frontGrainTolerance": 0.007,
+        "rearRingTolerance": 0.009
+      }
     }
   },
   "saddleSurfaceRefinement": {
