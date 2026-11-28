@@ -23572,6 +23572,38 @@
       554
     ]
   },
+  "wheelRearRefinement": {
+    "frontPhotoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb",
+    "frontFitSha256": "6715f944fd2f4bc9aac19fef2dadbbbf8c297335599a3530bdab244f7059e9e5",
+    "rawSteelSha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8",
+    "atlasSha256": "d0e4227f0fd65b12a075d58f6b43ae04abb8217d5afc9f0666408e679fb45627",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+    "oxideFieldsSha256": "d9040828fda9cf4a6d951790d318343a54965514c8937511a6ae9fc8806d2541",
+    "source": {
+      "file": "Mariners8.jpg"
+    },
+    "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+    "adjustmentStrength": 1.22,
+    "reflectionLift": 0.035,
+    "detail": {
+      "file": "Texture_Type89LauncherWheelRearResponse.png",
+      "sha256": "7ca8b90c78da4342870a77334e402948222deefed89796a597672be3c58893f9",
+      "scale": 58000,
+      "strength": 1.0,
+      "fields": [
+        "gain",
+        "tilt",
+        "tiltV",
+        "roughness",
+        "metalness",
+        "tintRed",
+        "tintBlue"
+      ],
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "frontPhotoSha256": "e48e3cd4838ae3438278611529bd1289411cf8368a7091dfa37bfefa2b5c9deb"
+    }
+  },
   "gripRearFinish": {
     "frontPhotoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
     "frontFitSha256": "c2ba0c7302eff3dd82c427e40a301d55cec8f4899208c9a2b905ca64e8823e9e",

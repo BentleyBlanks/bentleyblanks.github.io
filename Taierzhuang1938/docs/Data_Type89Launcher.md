@@ -132,6 +132,8 @@
 
 - 外套筒右侧按正反面实渲响应校准末段亮度，再拟合环纹相位。独立布光下，整片背面的平均亮度误差从 10.14 降到 9.36 个灰阶，右侧环纹相关系数从 0.315 提至 0.351，末段仍比照片暗约 26 个灰阶。支柱背面按第 8 张馆藏照复校钢色和磨痕，并用第 4 张近照约束正面。独立布光下亮度误差从 11.14 降至 7.51 个灰阶，磨痕相关系数从 0.242 提至 0.491。复测正面、斜视、筒身刻印、驻钣和十个接缝 AO 视角。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 按第 8 张馆藏照校准侧轮轮缘与相邻钢面的冷暖反差，以第 3 张近照约束齿面氧化和齿顶高光。三组布光下，背面的相对色差降低约 16%–19%。复测四个近景角度、相邻钢件和十个接缝 AO 视角。弱光下齿根的暖色仍浅于馆藏近照。 [轮缘采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -193,4 +195,5 @@
 - 筒身的方向性反光和外套筒背面的整体明暗分别记录在 `barrelJointFinish.directionalResponseCalibration` 和 `sleeveOpticalFinish.rearToneCalibration`。接头底缘按 `contactAoRetouch` 中的接缝 UV 诊断调整 ORM 红通道，回烘时核对原接触遮蔽图的哈希。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 外套筒环纹反差与筒身窄亮带的复校记录在 `sleeveOpticalFinish.ringContrastCalibration` 和 `barrelJointFinish.glintProfileCalibration`。底色编码质量设为 83.48，使三张源贴图合计低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 支柱背面与套筒右侧的复校记录在 `stemJointFinish.projectedFinishCalibration` 和 `sleeveOpticalFinish.rightSideFinishCalibration`。底色编码质量回到 83.66，三张源贴图合计仍低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV100/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 侧轮背面的材质校准保存在 `wheelRearRefinement`。正式烘焙校验上一版氧化分布、接缝遮蔽及 16 位响应图，再将轮缘底色、切线法线、粗糙度和金属度合入三张贴图。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV101/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

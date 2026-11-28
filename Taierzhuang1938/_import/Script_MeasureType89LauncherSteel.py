@@ -171,6 +171,13 @@ def WheelOxideIdentity(reference):
     }
 
 
+def WheelRearIdentity(reference):
+    oxide = reference.get("wheelOxideFinish", {})
+    profile = {key: oxide.get(key) for key in ("fields", "phase")}
+    encoded = json.dumps(profile, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return WheelOxideIdentity(reference) | {"oxideFieldsSha256": sha256(encoded).hexdigest()}
+
+
 def GripRearIdentity(reference):
     grip = reference["knurl"]
     encoded = json.dumps(grip, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -2732,6 +2739,7 @@ def Main():
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
         ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
         ("shoulderReflectanceFinish", ShoulderReflectanceIdentity), ("wheelOxideFinish", WheelOxideIdentity),
+        ("wheelRearRefinement", WheelRearIdentity),
         ("gripRearFinish", GripRearIdentity), ("gripFamilyPhase", GripFamilyPhaseIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,

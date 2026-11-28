@@ -17,7 +17,7 @@ from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripFamilyPhaseIdentity, GripRearIdentity,
     NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, SaddleRimIdentity,
     ShoulderReflectanceIdentity, SleeveJointIdentity, SleeveOpticalIdentity, SleeveReverseIdentity, StemJointIdentity,
-    SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WideReflectionIdentity,
+    SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WheelRearIdentity, WideReflectionIdentity,
 )
 
 
@@ -1969,6 +1969,9 @@ def Bake(legacyOrm=None):
     saddleSurface = reference.get("saddleSurfaceRefinement")
     if saddleSurface is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "Saddle", saddleSurface, SaddleRimIdentity(reference))
+    wheelRear = reference.get("wheelRearRefinement")
+    if wheelRear is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Wheel", wheelRear, WheelRearIdentity(reference))
     if (contactRetouch := (sleeveOptical or {}).get("contactAoRetouch")) is not None:
         ApplyContactAoRetouch(pixels, contactRetouch, fineContactRecord["sha256"])
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
@@ -2076,6 +2079,8 @@ def Bake(legacyOrm=None):
         details["saddleRimDetail"] = saddleRim["detail"]
     if saddleSurface is not None:
         details["saddleSurfaceResponse"] = saddleSurface["detail"]
+    if wheelRear is not None:
+        details["wheelRearResponse"] = wheelRear["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
