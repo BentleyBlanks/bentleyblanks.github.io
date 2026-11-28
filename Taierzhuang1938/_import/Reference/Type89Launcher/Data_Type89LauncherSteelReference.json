@@ -14484,7 +14484,7 @@
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
     },
-    "baseQuality": 83.66,
+    "baseQuality": 83.47,
     "frontLightCalibration": {
       "previousDetailSha256": "2bd56a5997021cc3880ecb656c3d5966ac3666388f09f223b94be81a920d6194",
       "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
@@ -26204,7 +26204,7 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "bd9e072eb582aa98d80b5b0e4f92993b3bcfdfb72b6cbf2cafa7f9a2328f1018",
+      "sha256": "98c9680b6242dbfce855fe0f7b7a063d72e78dab1ba9e95602ef2584ae3df9bd",
       "scale": 22827,
       "strength": 1.0,
       "fields": [
@@ -26320,6 +26320,30 @@
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
       "strength": 1.4
+    },
+    "ringContrastRefinement": {
+      "referenceFrequency": 23.638079753663877,
+      "sourcePlateSha256": "bd9e072eb582aa98d80b5b0e4f92993b3bcfdfb72b6cbf2cafa7f9a2328f1018",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "strength": 1.16,
+      "axialSections": [
+        [
+          0.145,
+          0.44
+        ],
+        [
+          0.44,
+          0.65
+        ],
+        [
+          0.65,
+          0.891
+        ]
+      ],
+      "increaseAfter": 0.43,
+      "fullIncreaseAt": 0.55,
+      "middleAndEndGain": 1.88
     }
   },
   "saddleSurfaceRefinement": {
