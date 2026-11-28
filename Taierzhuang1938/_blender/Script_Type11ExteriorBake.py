@@ -19,11 +19,14 @@ from Type11Exterior import (ATLAS_UV, BASE_REV, REST_POSE, Exterior,
 from TzmCore import WriteTzm
 
 SURFACES = {
-    # Linear reflectance, roughness, metalness, bump distance in scene meters.
-    "ReceiverSteel": ((.087, .096, .104), (.175, .181, .180), .46, .79, .00015),
-    "FinSteel": ((.069, .082, .090), (.150, .160, .164), .48, .82, .00012),
-    "ContactSteel": ((.096, .107, .114), (.210, .217, .207), .40, .77, .00012),
-    "StockWood": ((.076, .033, .015), (.208, .115, .062), .52, .00, .00016),
+    # Linear oxide and polished-steel reflectance, dry roughness, metalness,
+    # shallow normal texture and bake-only edge radius (metres).
+    "ReceiverSteel": ((.289, .301, .305), (.528, .544, .535), .415, .635, .00014, .00110),
+    "TubeSteel": ((.172, .184, .190), (.417, .444, .448), .447, .681, .00009, .00065),
+    "FinSteel": ((.163, .174, .173), (.479, .496, .483), .423, .771, .00007, .00029),
+    "HopperSteel": ((.186, .189, .181), (.433, .454, .435), .441, .640, .00013, .00092),
+    "ContactSteel": ((.231, .235, .223), (.544, .549, .520), .383, .719, .00012, .00078),
+    "StockWood": ((.076, .033, .015), (.208, .115, .062), .52, .00, .00016, 0),
 }
 
 
@@ -73,7 +76,7 @@ def AssignAtlasUvs(objects):
 
 
 def Surface(name):
-    dark, light, roughness, metalness, bumpDistance = SURFACES[name]
+    dark, light, roughness, metalness, bumpDistance, bevelRadius = SURFACES[name]
     isWood = not metalness
     material = bpy.data.materials.new(name)
     material.diffuse_color = (*dark, 1)
@@ -114,25 +117,39 @@ def Surface(name):
         links.new(driver, node.inputs["Fac"])
         return node.outputs["Color"]
 
-    coarse = Noise(18 if isWood else 37, 3, (2.0, .32, 2.0) if isWood else (1, .67, 1))
-    grain = Noise(255 if isWood else 410, 2, (2.3, .062, 2) if isWood else (1, .25, 1))
-    micro = Noise(940, 1, (1, .32, 1) if isWood else (1, .65, 1))
-    finish = Math("ADD", Math("MULTIPLY", coarse, .57), Math("MULTIPLY", grain, .43))
-    edge = Math("MAXIMUM", 0, Math("SUBTRACT", position.outputs["Pointiness"], .53))
-    wear = Math("MULTIPLY", edge, .72)
-    if isWood:
-        # The cheek and heel burnish along the grain, with broken patches on the rim.
-        patch = Math("MAXIMUM", 0, Math("SUBTRACT", Noise(30, 2, (1.8, .36, 1.3)), .44))
-        wear = Math("MULTIPLY", wear, Math("ADD", .55, Math("MULTIPLY", patch, 2.0)))
-    finish = Math("ADD", finish, wear)
-    color = Ramp(finish, dark, light, .28, .82)
-    rough = Math("ADD", roughness, Math("MULTIPLY", Math("SUBTRACT", coarse, .5), .20))
-    rough = Math("SUBTRACT", rough, Math("MULTIPLY", wear, .14))
+    def Range(value, start, end, minimum=0, maximum=1):
+        node = nodes.new("ShaderNodeMapRange")
+        node.interpolation_type = "SMOOTHERSTEP"
+        node.clamp = True
+        links.new(value, node.inputs["Value"])
+        for label, limit in (("From Min", start), ("From Max", end),
+                             ("To Min", minimum), ("To Max", maximum)):
+            node.inputs[label].default_value = limit
+        return node.outputs["Result"]
+
+    def MixColor(weight, darkColor, lightColor):
+        node = nodes.new("ShaderNodeMixRGB")
+        links.new(weight, node.inputs[0])
+        links.new(darkColor, node.inputs[1])
+        links.new(lightColor, node.inputs[2])
+        return node.outputs[0]
+
     bump = nodes.new("ShaderNodeBump")
     bump.inputs["Distance"].default_value = bumpDistance
-    bump.inputs["Strength"].default_value = .27 if isWood else .20
-    links.new(Math("ADD", Math("MULTIPLY", grain, .72), Math("MULTIPLY", micro, .28)), bump.inputs["Height"])
     if isWood:
+        coarse = Noise(18, 3, (2.0, .32, 2.0))
+        grain = Noise(255, 2, (2.3, .062, 2))
+        micro = Noise(940, 1, (1, .32, 1))
+        finish = Math("ADD", Math("MULTIPLY", coarse, .57), Math("MULTIPLY", grain, .43))
+        edge = Math("MAXIMUM", 0, Math("SUBTRACT", position.outputs["Pointiness"], .53))
+        patch = Math("MAXIMUM", 0, Math("SUBTRACT", Noise(30, 2, (1.8, .36, 1.3)), .44))
+        wear = Math("MULTIPLY", Math("MULTIPLY", edge, .72),
+                    Math("ADD", .55, Math("MULTIPLY", patch, 2.0)))
+        color = Ramp(Math("ADD", finish, wear), dark, light, .28, .82)
+        rough = Math("ADD", roughness, Math("MULTIPLY", Math("SUBTRACT", coarse, .5), .20))
+        rough = Math("SUBTRACT", rough, Math("MULTIPLY", wear, .14))
+        bump.inputs["Strength"].default_value = .27
+        links.new(Math("ADD", Math("MULTIPLY", grain, .72), Math("MULTIPLY", micro, .28)), bump.inputs["Height"])
         # Shade the two shallow, worn butt fittings visible in the side photographs.
         coordinates = nodes.new("ShaderNodeSeparateXYZ")
         links.new(position.outputs["Position"], coordinates.inputs[0])
@@ -158,25 +175,94 @@ def Surface(name):
         color = finishColor.outputs[0]
         rough = Math("ADD", Math("MULTIPLY", rough, Math("SUBTRACT", 1, plate)), Math("MULTIPLY", plate, .50))
         metalness = Math("MULTIPLY", plate, .66)
+    else:
+        # Use the actual exterior edges for the baked normals and interrupt the
+        # exposed steel with oxide that follows the handling and polishing marks.
+        bevel = nodes.new("ShaderNodeBevel")
+        bevel.samples = 6
+        bevel.inputs["Radius"].default_value = bevelRadius
+        links.new(bevel.outputs["Normal"], bump.inputs["Normal"])
+        agreement = nodes.new("ShaderNodeVectorMath")
+        agreement.operation = "DOT_PRODUCT"
+        links.new(position.outputs["Normal"], agreement.inputs[0])
+        links.new(bevel.outputs["Normal"], agreement.inputs[1])
+        bevelMask = Range(agreement.outputs["Value"], .915, .9985, 1, 0)
+        convex = Range(position.outputs["Pointiness"], .484, .522, .15, 1)
+        raised = Range(position.outputs["Pointiness"], .506, .551)
+        contour = Math("MAXIMUM", Math("MULTIPLY", bevelMask, convex), Math("MULTIPLY", raised, .62))
+
+        patina = Noise(26, 3, (1.35, .71, 1.4))
+        patch = Noise(64, 2, (1.5, .52, 2.1))
+        machining = Noise(316, 2, (1.5, .077, 3.0) if name != "FinSteel" else (2.2, .48, 2.2))
+        scratchSeeds = Noise(121, 2, (2.3, .052, 2.9))
+        scratch = Math("MULTIPLY", Range(scratchSeeds, .60, .76), Range(patch, .34, .65, .12, .86))
+        pits = nodes.new("ShaderNodeTexVoronoi")
+        pits.voronoi_dimensions = "3D"
+        pits.inputs["Scale"].default_value = 570
+        links.new(position.outputs["Position"], pits.inputs["Vector"])
+        pitting = Math("MULTIPLY", Range(pits.outputs["Distance"], .090, .235, 1, 0),
+                       Range(patina, .39, .71, .16, .9))
+        exposed = Math("MULTIPLY", contour, Range(patch, .29, .69, .35, .88))
+        burnish = Math("MINIMUM", .84, Math("ADD", exposed, Math("MULTIPLY", scratch, .31)))
+        stain = Math("ADD", Math("MULTIPLY", patina, .71), Math("MULTIPLY", patch, .29))
+        bluing = Ramp(stain, tuple(channel * .77 for channel in dark),
+                      tuple(channel * 1.41 for channel in dark), .27, .78)
+        polished = Ramp(machining, tuple(channel * .68 for channel in light), light, .30, .73)
+        color = MixColor(burnish, bluing, polished)
+        darkPits = Ramp(pitting, (1, 1, 1), (.55, .57, .59), .10, 1)
+        shade = nodes.new("ShaderNodeMixRGB")
+        shade.blend_type = "MULTIPLY"
+        shade.inputs[0].default_value = 1
+        links.new(color, shade.inputs[1])
+        links.new(darkPits, shade.inputs[2])
+        color = shade.outputs[0]
+
+        rough = Math("ADD", roughness, Range(stain, .28, .75, -.067, .072))
+        rough = Math("ADD", rough, Math("MULTIPLY", pitting, .11))
+        rough = Math("SUBTRACT", rough, Math("MULTIPLY", burnish, .153))
+        height = Math("ADD", Math("MULTIPLY", machining, .62), Math("MULTIPLY", scratch, .13))
+        height = Math("SUBTRACT", height, Math("MULTIPLY", pitting, .46))
+        bump.inputs["Strength"].default_value = .36
+        links.new(height, bump.inputs["Height"])
+
+
+        # Bluing absorbs some diffuse light at the surface. Exposed and polished
+        # patches approach bare metal as their roughness falls.
+        metalness = Math("SUBTRACT", Math("ADD", metalness, Math("MULTIPLY", burnish, .94 - metalness)),
+                         Math("MULTIPLY", pitting, .044))
+        if name == "ReceiverSteel":
+            # The rear cover retains more of its oxide than the worn side rails.
+            location = nodes.new("ShaderNodeSeparateXYZ")
+            orientation = nodes.new("ShaderNodeSeparateXYZ")
+            links.new(position.outputs["Position"], location.inputs[0])
+            links.new(position.outputs["Normal"], orientation.inputs[0])
+            rear = Range(location.outputs["Y"], .083, .248, 1, 0)
+            cover = Math("MAXIMUM", Range(orientation.outputs["Z"], .34, .87),
+                         Range(orientation.outputs["Y"], -.92, -.46, 1, 0))
+            retained = Math("MULTIPLY", Math("MULTIPLY", rear, cover), Math("SUBTRACT", 1, burnish))
+            oxide = nodes.new("ShaderNodeMixRGB")
+            oxide.blend_type = "MULTIPLY"
+            links.new(retained, oxide.inputs[0])
+            links.new(color, oxide.inputs[1])
+            oxide.inputs[2].default_value = (.52, .60, .67, 1)
+            color = oxide.outputs[0]
+            rough = Math("ADD", rough, Math("MULTIPLY", retained, .038))
+            metalness = Math("ADD", metalness, Math("MULTIPLY", retained, .089))
+
     links.new(color, shader.inputs["Base Color"])
     links.new(rough, shader.inputs["Roughness"])
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    if isWood:
-        links.new(metalness, shader.inputs["Metallic"])
-    else:
-        shader.inputs["Metallic"].default_value = metalness
+    links.new(metalness, shader.inputs["Metallic"])
 
     occlusion = nodes.new("ShaderNodeAmbientOcclusion")
-    occlusion.samples = 12
-    occlusion.inputs["Distance"].default_value = .034 if isWood else .029
+    occlusion.samples = 12 if isWood else 32
+    occlusion.inputs["Distance"].default_value = .034 if isWood else .024
     channels = nodes.new("ShaderNodeCombineColor")
     channels.mode = "RGB"
-    links.new(Math("ADD", .24, Math("MULTIPLY", occlusion.outputs["AO"], .76)), channels.inputs["Red"])
+    aoFloor = .24 if isWood else .29
+    links.new(Math("ADD", aoFloor, Math("MULTIPLY", occlusion.outputs["AO"], 1 - aoFloor)), channels.inputs["Red"])
     links.new(rough, channels.inputs["Green"])
-    if isWood:
-        links.new(metalness, channels.inputs["Blue"])
-    else:
-        channels.inputs["Blue"].default_value = metalness
+    links.new(metalness, channels.inputs["Blue"])
     return material, output, shader, color, channels.outputs[0]
 
 
@@ -269,7 +355,7 @@ def PreviewRig():
     scene.cycles.samples = 28
 
 
-def Bake(*, size=1024):
+def Bake(*, size=2048):
     name = "Type11"
     path = SourcePath()
     path.parent.mkdir(parents=True, exist_ok=True)

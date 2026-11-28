@@ -43,7 +43,7 @@ import {
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
 import { HitReactionOf, ChooseHitDeath } from "./Script_HitReactionLayer.mjs";
 import { EvaluateSpineAimDistribution } from "./Script_NpcLocomotion3C.mjs";
-import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON, TYPE92_HMG_SURFACE } from "./Data_Meshes.mjs";
+import { ACTOR_MESH_BY_VARIANT, MESHES, SOLDIER_JOINTS, SOLDIER_MESH_BY_KIND, WEAPON_MESH_BY_ID, WEAPON_MESH_VARIANTS, BAYONET_MESH_BY_WEAPON, TYPE11_EXTERIOR_SURFACE, TYPE92_HMG_SURFACE } from "./Data_Meshes.mjs";
 import { MeshUrl, WeaponMeshId } from "./Script_Meshes.mjs";
 
 const Lerp = (a, b, t) => a + (b - a) * t;
@@ -4322,7 +4322,7 @@ export class ActorFactory {
       }),
       type11Exterior: this.Material("type11Exterior", () => lib.Get(
         lib.baked?.has("Type11Exterior") ? "Type11Exterior" : "Steel",
-        { roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.35, aoIntensity: 1 },
+        TYPE11_EXTERIOR_SURFACE,
       )),
       type92Exterior: this.Type92HmgMaterial(),
       zb26Steel: this.Material("zb26Steel", () => lib.Get(lib.baked?.has("Zb26VeteranSteel") ? "Zb26VeteranSteel" : "Steel",

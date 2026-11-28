@@ -16,7 +16,7 @@ from TzmCore import AUTHORED_NORMAL_LAYER, Node
 
 PROJECT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = Path(os.environ.get("TZ1938_TYPE11_EXTERIOR_SOURCE") or
-                   Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128")
+                   Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128/MetalFinish")
 REST_POSE = "MachineGunExterior"
 ATLAS_UV = "FinishAtlas"
 GAME_TO_BLEND = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))
@@ -149,10 +149,10 @@ def PrepareType11(exterior, baseline, ccBy):
             for face in group:
                 center = sum((points[i] for i in face), Vector()) / len(face)
                 (follower if center.y >= .073 else static).append(face)
-            exterior.Select("HopperWalls", "body", "ContactSteel", points, static)
+            exterior.Select("HopperWalls", "body", "HopperSteel", points, static)
             exterior.Select("HopperFollower", "hopperFollower", "ContactSteel", points, follower)
         elif len(group) > 0:
-            surface = "FinSteel" if index == 0 else "ReceiverSteel"
+            surface = "TubeSteel" if index == 0 else "ReceiverSteel"
             if index in (5, 6, 7):   # The existing CC BY cheek-side hardware remains visible.
                 surface = "ContactSteel"
             exterior.Select(f"Type11Exterior{index:02d}", "body", surface, points, group)

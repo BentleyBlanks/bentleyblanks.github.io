@@ -35,15 +35,15 @@
       "runtimeAsset": "Model/Model_Type11.tzm.json",
       "assetContract": "docs/Data_Type11Exterior.md",
       "scope": "Type 11 game exterior only. Preserve the global review anchor and unrelated Notion cursors.",
-      "decision": "Two museum specimens and the 1943 left-side photograph document observable shape. Surface color, contact wear and first-person staging are game art direction. The individual Tengxian specimen was not identified.",
+      "decision": "Two museum specimens and the 1943 left-side photograph document observable shape. Surface color, contact wear, the photographed satin response and fine pitting, and first-person staging are game art direction. The individual Tengxian specimen was not identified.",
       "notionSnapshots": [
         {
           "id": "3fd60335331c8194aa82f0b238084d34",
-          "lastEdited": "2026-11-28T08:25:12.615Z"
+          "lastEdited": "2026-11-28T11:56:31.967Z"
         },
         {
           "id": "3fd60335331c818fa24deadb6d72ca70",
-          "lastEdited": "2026-11-28T08:25:11.473Z"
+          "lastEdited": "2026-11-28T11:56:32.818Z"
         }
       ]
     },

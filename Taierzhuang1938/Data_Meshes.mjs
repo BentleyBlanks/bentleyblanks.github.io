@@ -76,6 +76,11 @@ export const MERGE_PROFILES = {
  *   materials：模型里出现的材质名，必须都能在调用方给的 materials 表里找到
  *   span：根空间包围盒尺寸（米），用来确认没建错比例
  */
+// Both the world and the viewmodel sample the authored Type 11 atlas.
+export const TYPE11_EXTERIOR_SURFACE = Object.freeze({
+  roughness: 1, metalness: 1, normalScale: 1, envMapIntensity: 1.65, aoIntensity: 1,
+});
+
 export const TYPE92_HMG_SURFACE = Object.freeze({
   roughness: 1, metalness: 1, normalScale: 0.32, envMapIntensity: 1.08, aoIntensity: 1,
 });
@@ -226,9 +231,9 @@ export const MESHES = {
     span: [0.16168, 0.22103, 1.1], lengthM: 1.100,
     draws: { high: 3, medium: 3, low: 3 },
     pbrSets: [{ name: "Type11Exterior",
-      albedo: "./Texture/Texture_Type11ExteriorBase.webp?v=20261128Type11ExteriorD",
-      normal: "./Texture/Texture_Type11ExteriorNormal.webp?v=20261128Type11ExteriorD",
-      orm: "./Texture/Texture_Type11ExteriorOrm.webp?v=20261128Type11ExteriorD" }],
+      albedo: "./Texture/Texture_Type11ExteriorBase.webp?v=20261128Type11MetalFinishB",
+      normal: "./Texture/Texture_Type11ExteriorNormal.webp?v=20261128Type11MetalFinishB",
+      orm: "./Texture/Texture_Type11ExteriorOrm.webp?v=20261128Type11MetalFinishB" }],
     note: "参照澳大利亚战争纪念馆与英国国立陆军博物馆实物照片翻修。木托、枪身和折叠两脚架基于 buh 的 CC BY 4.0 模型。",
   },
   OfficerSwordSet: {

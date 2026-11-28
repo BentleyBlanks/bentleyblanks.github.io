@@ -5,13 +5,18 @@
   "preset": null,
   "source": {
     "provider": "procedural",
-    "blenderFile": "Type11Exterior_20261128/Model_Type11Exterior.blend",
+    "blenderFile": "Type11Exterior_20261128/MetalFinish/Model_Type11Exterior.blend",
     "rawPngSha256": {
-      "Base": "41b52359ed609f64848ad4be22f758a04bf04dfe90221bf15a703b838964aa0a",
-      "Normal": "b8b301084b8d024f1f85b8b99196a722dff2bcec1af819f2490a6ba1939a8408",
-      "Orm": "23ff608647dda9805fb6bb97a66c1241cdd4c5ee90950d25fd02936d9e44ed25"
+      "Base": "72df1835b1b3e505dbff71dd0fdb7e63402e2030f8e2e8c344ebbc09bd959246",
+      "Normal": "06659f8ac1af25ae793d8fda47d07774f105b630b1bd5283bacabccff56c58c3",
+      "Orm": "4ca87e1592447d01b2b5165309694e27ab9b76a923fb793556f424f63dbac679"
     },
-    "note": "Procedure uses museum photos as visual references and bakes no photographic pixels."
+    "note": "Museum photographs guide the steel oxide, polishing, machining and pitting masks; the atlas uses no photographic pixels.",
+    "encoding": {
+      "Base": "2048 px, sRGB WebP quality 87",
+      "Normal": "1024 px, linear lossless WebP; at most one code value quantization after filtering",
+      "Orm": "1024 px, linear lossless WebP; AO/roughness/metalness quantization steps 4/4/3"
+    }
   },
   "heightSource": null,
   "params": {
@@ -23,46 +28,46 @@
     {
       "channel": "Base",
       "file": "Texture_Type11ExteriorBase.webp",
-      "width": 1024,
-      "height": 1024,
-      "bytes": 91908,
-      "sha256": "7eec05d87339fe2a77dbcccc6413aecebaadebc5fae391ce885fbdb154d63a06"
+      "width": 2048,
+      "height": 2048,
+      "bytes": 275858,
+      "sha256": "51f764dfee9da016e9320f4cfeb66805424dd60df1c3ba32f7023ae4c50f777b"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type11ExteriorNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 153536,
-      "sha256": "a049c90fab1a02ae10864d7375ea8570c5a1803bf2798b55a55579756d385fa5"
+      "bytes": 327116,
+      "sha256": "e21198ae187f85d642324d752f5f5543387fa863c16bdd3b725392543eca5827"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type11ExteriorOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 279934,
-      "sha256": "ba5b4416e9bb29e945cb89c8ba91a03f3e779fb79c336c7c044e7d78405cd8e7"
+      "bytes": 388064,
+      "sha256": "939d8865fdc4cf5e470e74f99f08035f779dd54c63d76ae46d0eb7b74e6decf0"
     }
   ],
-  "totalBytes": 525378,
+  "totalBytes": 991038,
   "metrics": {
     "meanSrgb": [
-      0.2471,
-      0.2471,
-      0.2443
+      0.2594,
+      0.2576,
+      0.2513
     ],
-    "luma": 0.2461,
-    "lumaStd": 0.187,
-    "sat": 0.0114,
-    "clipLow": 0.3622,
+    "luma": 0.2561,
+    "lumaStd": 0.2767,
+    "sat": 0.0312,
+    "clipLow": 0.5222,
     "clipHigh": 0.0,
-    "lowFreq": 0.1788,
-    "seam": 0.225,
-    "interior": 0.0118,
-    "seamRatio": 19.09,
-    "border": 0.814,
-    "swing": 0.5069,
+    "lowFreq": 0.2214,
+    "seam": 0.2839,
+    "interior": 0.0165,
+    "seamRatio": 17.208,
+    "border": 0.664,
+    "swing": 0.6415,
     "texelsPerMeter": null
   },
   "gateProblems": []

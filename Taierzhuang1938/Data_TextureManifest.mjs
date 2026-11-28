@@ -122,8 +122,8 @@ const TIMED_GRENADE_ASSETS_BYTES = 256 * 1024;
 const HUD_DAMAGE_ARC_BYTES = 20 * 1024;
 // First-person blade blood stain + gravity rivulet 1024² RGBA packed detail map (287 KiB, lazy only, 0 boot payload).
 const BLADE_BLOOD_DETAIL_BYTES = 300 * 1024;
-// 1K Type 11 atlas, loaded with the weapon models; measured at 512 KiB.
-const TYPE11_EXTERIOR_BYTES = 520 * 1024;
+// Type 11 uses a 2K base atlas for the receiver and hopper finish, with 1K normal and ORM.
+const TYPE11_EXTERIOR_BYTES = 980 * 1024;
 // Type 92 atlas: 1K base and normal, 512 packed ORM; loaded with the game model.
 const TYPE92_HMG_EXTERIOR_BYTES = 352 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
@@ -455,14 +455,15 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "Type11Exterior", kind: "material", tier: "lazy", assetBudgetBytes: TYPE11_EXTERIOR_BYTES,
-    toneClass: null, toneReason: "Authored UV atlas for blued steel, contact wear and longitudinal wood grain.",
+    sizeReason: "2K base color keeps receiver and hopper wear distinct from the 46 cooling rings in the first-person close view. Data maps stay 1K.",
+    toneClass: null, toneReason: "Satin blued steel, machined edges, localized polishing and carbon-filled recesses.",
     metersPerTile: null, normalConvention: "gl",
     bake: "_blender/Script_Type11ExteriorBake.py", bakeRecord: "_import/TextureBakes/Texture_Type11Exterior.json",
     source: { provider: "procedural", date: "2026-11-28", ref: "AWM RELAWM24898 and NAM 1981-01-9-1",
-      note: "Blender finish and geometry-derived contact occlusion. Museum photographs inform appearance." },
+      note: "Museum-guided oxide, finish-specific roughness, baked bevel normals and fine pitting." },
     consumers: [{ file: "Data_Meshes.mjs", token: "Type11Exterior" }, { file: "Script_Actor.mjs", token: "Type11Exterior" },
       { file: "Script_Viewmodel.mjs", token: "Type11Exterior" }],
-    files: [["Texture_Type11ExteriorBase.webp", "Base", 1024, 1024], ["Texture_Type11ExteriorNormal.webp", "Normal", 1024, 1024],
+    files: [["Texture_Type11ExteriorBase.webp", "Base", 2048, 2048], ["Texture_Type11ExteriorNormal.webp", "Normal", 1024, 1024],
       ["Texture_Type11ExteriorOrm.webp", "Orm", 1024, 1024]],
   },
   {

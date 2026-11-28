@@ -10,7 +10,7 @@ from PIL import Image, ImageFilter
 from Script_BakePbrTexture import Audit, ParseArgs
 
 PROJECT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128"
+DEFAULT_SOURCE = Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128/MetalFinish"
 
 
 def Package(source):
@@ -22,13 +22,21 @@ def Package(source):
         target = PROJECT / "Texture" / f"{stem}.webp"
         with Image.open(baked) as image:
             rgb = image.convert("RGB")
+            if rgb.size != (2048, 2048):
+                raise ValueError(f"{baked}: expected a 2048 x 2048 Blender bake")
+            if channel == "Normal":
+                # A one-code-value change keeps machining and bevel normals
+                # resolvable while the 1K lossless texture stays compact.
+                rgb = rgb.resize((1024, 1024), Image.Resampling.LANCZOS)
+                rgb = rgb.point([min(255, round(value / 2) * 2) for value in range(256)] * 3)
             if channel == "Orm":
-                ao, roughness, metalness = rgb.split()
-                # Suppress Cycles' AO sampling noise and retain scalar data in lossless WebP.
+                ao, roughness, metalness = rgb.resize((1024, 1024), Image.Resampling.BOX).split()
+                # Scalar work stays linear. Filter only the AO sampling noise.
                 ao = ao.filter(ImageFilter.MedianFilter(3)).point(lambda value: min(255, round(value / 4) * 4))
-                roughness = roughness.point(lambda value: min(255, round(value / 2) * 2))
+                roughness = roughness.point(lambda value: min(255, round(value / 4) * 4))
+                metalness = metalness.point(lambda value: min(255, round(value / 3) * 3))
                 rgb = Image.merge("RGB", (ao, roughness, metalness))
-            rgb.save(target, format="WEBP", quality=86, method=6, lossless=channel != "Base")
+            rgb.save(target, format="WEBP", quality=87, method=6, lossless=channel != "Base")
         rawPngSha256[channel] = hashlib.sha256(baked.read_bytes()).hexdigest()
 
     Audit(ParseArgs(["--audit", "--name", setName]))
@@ -38,9 +46,14 @@ def Package(source):
     record["date"] = "2026-11-28"
     record["source"] = {
         "provider": "procedural",
-        "blenderFile": "Type11Exterior_20261128/Model_Type11Exterior.blend",
+        "blenderFile": "Type11Exterior_20261128/MetalFinish/Model_Type11Exterior.blend",
         "rawPngSha256": rawPngSha256,
-        "note": "Procedure uses museum photos as visual references and bakes no photographic pixels.",
+        "note": "Museum photographs guide the steel oxide, polishing, machining and pitting masks; the atlas uses no photographic pixels.",
+        "encoding": {
+            "Base": "2048 px, sRGB WebP quality 87",
+            "Normal": "1024 px, linear lossless WebP; at most one code value quantization after filtering",
+            "Orm": "1024 px, linear lossless WebP; AO/roughness/metalness quantization steps 4/4/3",
+        },
     }
     recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

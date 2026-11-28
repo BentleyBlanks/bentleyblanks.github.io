@@ -11,6 +11,12 @@
 
 来源为[澳大利亚战争纪念馆 RELAWM24898](https://www.awm.gov.au/collection/C141633)、[英国国立陆军博物馆 1981-01-9-1](https://collection.nam.ac.uk/detail.php?acc=1981-01-9-1)及[1943年《Japanese Infantry Weapons》印刷第88页图56](https://commons.wikimedia.org/wiki/File:Japanese_Infantry_Weapons_(IA_1943-12-31JapaneseInfantryWeapons).pdf)。它们提供同型外观证据。滕县战场该枪的单件外观待查。
 
-可编辑工程位于 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128/Model_Type11Exterior.blend`，同目录 `Bakes/` 保留三张 1024×1024 PNG。使用工作树的 BlenderMCP 执行 `_blender/Script_Type11ExteriorBake.py` 的 `Bake()`，以 `_blender/BuildAll.py -- --only Type11` 导出编辑后的工程，再运行 `python Taierzhuang1938/_import/Script_PackageType11Exterior.py`。封装脚本保留无损法线和金属通道，并对 AO 去噪、粗糙度作低位量化。三张发布用 WebP 共 525,378 字节。
+## 钢面复校
+
+两张 NAM 侧照用于核对机匣大平面的明暗、散热环肩部的窄亮边和折叠脚架的暗面。AWM 第三张近照用于核对弹斗外壁、内角、卷边与相邻上盖的反光差异。同一检查台机位和照明下，用现行汉阳造 173R 的钢件作近景细节对照。
+
+机匣、薄环、管体、弹斗壁和常接触的钢件各用自己的发蓝色调和反光范围。对实际几何边缘烘焙浅倒角法线，加上局部磨亮、加工细纹、浅点蚀和凹处遮蔽。钢面的高光随观察角度变化。钢色和磨痕依照片作游戏美术复原。
+
+可编辑工程位于 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type11Exterior_20261128/MetalFinish/Model_Type11Exterior.blend`，同目录 `Bakes/` 保留三张 2048×2048 PNG。工作树的 BlenderMCP 可执行 `_blender/Script_Type11ExteriorBake.py` 的 `Bake()`，用 `_blender/BuildAll.py -- --only Type11` 导出工程，再运行 `python Taierzhuang1938/_import/Script_PackageType11Exterior.py`。运行时底色保留 2K，法线与 ORM 滤至 1K 后以无损 WebP 封装。三张仓库贴图共 991,038 字节。
 
 运行时外观为 14,106 三角、四个网格块、三个合批桶，枪口到托尾的模型跨度约 1.100 米。枪身、导轨、操作柄、弹斗盖在工程里独立编辑。第一人称用现有开镜与换弹时间线，校准准星视线、手部接触点及抛壳特效的机匣侧口挂点。

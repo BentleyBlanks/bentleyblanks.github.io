@@ -21,7 +21,7 @@
     { "path": "Taierzhuang1938/Texture/Texture_TerrainEastTrack*Base.webp", "format": "webp", "maxSize": 512, "quality": 92 },
     { "path": "Taierzhuang1938/Texture/Texture_TerrainEastTrack*Normal.webp", "format": "webp", "maxSize": 256, "quality": 94, "colorSpace": "linear" },
     { "path": "Taierzhuang1938/Texture/Texture_TerrainEastTrack*Orh.webp", "format": "webp-lossless", "maxSize": 256, "colorSpace": "linear" },
-    { "path": "Taierzhuang1938/Texture/Texture_Type11ExteriorBase.webp", "format": "webp", "maxSize": 1024, "quality": 86, "colorSpace": "srgb" },
+    { "path": "Taierzhuang1938/Texture/Texture_Type11ExteriorBase.webp", "format": "webp", "maxSize": 2048, "quality": 87, "colorSpace": "srgb" },
     { "path": "Taierzhuang1938/Texture/Texture_Type11ExteriorNormal.webp", "format": "webp-lossless", "maxSize": 1024, "colorSpace": "linear" },
     { "path": "Taierzhuang1938/Texture/Texture_Type11ExteriorOrm.webp", "format": "webp-lossless", "maxSize": 1024, "colorSpace": "linear" },
     { "path": "Taierzhuang1938/Texture/Texture_Trench*", "format": "png", "maxSize": 2048 },
