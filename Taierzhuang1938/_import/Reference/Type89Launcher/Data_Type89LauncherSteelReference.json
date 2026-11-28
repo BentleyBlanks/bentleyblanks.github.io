@@ -26080,5 +26080,56 @@
       "V92GuardClose/Independent": "91376b666970c271d2c3e4fa67c24e9410a832a228d4322df8e97d3d640d5b79",
       "V92DeliveryRake/Independent": "cd11fa2eb13280d06fc7ca82528aded4b076882fb69d349704037d0bbd7d04e4"
     }
+  },
+  "sleeveOpticalFinish": {
+    "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+    "frontFitSha256": "32eb89c9466665997b81dac73d4e10c4eaea265a7924337542737c57527db7f4",
+    "rawSteelSha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8",
+    "atlasSha256": "d0e4227f0fd65b12a075d58f6b43ae04abb8217d5afc9f0666408e679fb45627",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "rearFitSha256": "a244c9e1d6fc0225713edeb290f003b6ed1aab126fbb32a7c046dbc8723557b3",
+    "horizonSha256": "cb817434e76ca17fa7b210e273b7bc9801da26ff6db8a517aecb96bfe0b71eb5",
+    "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+    "sleeveFinishSha256": "92d2f98d99f9bede7182dfc155966959285181a1ad2a37852c6e8ac4444d35ab",
+    "source": {
+      "file": "Mariners8.jpg"
+    },
+    "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+    "detail": {
+      "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
+      "sha256": "306f769d1dc1b47d406939d1ccdb3abe9e793023cb997f8771b105af0942a618",
+      "scale": 56000,
+      "strength": 1.0,
+      "fields": [
+        "gain",
+        "roughness",
+        "metalness",
+        "tintRed",
+        "tintBlue"
+      ],
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301"
+    },
+    "revision": "1f65f4b2adc9e221c056534afa93a58a91d2b2cf",
+    "rearRigSha256": "0bc867bac19421a9eacffe0c84e4a1e6efdf3023b13d8d034436c982a16bcf87",
+    "bandMeasurementSha256": "dac11898c0d611cd8f90fd2865b27787cc66728b4db33262c0b5a88a6691e8a6",
+    "responseFrames": {
+      "V93PublishedSleeveRear/UV": "d8f51f06259178a78ef23e3212bf8557f95a8e6e6e3b64c5fd03934f402264ab",
+      "V93PublishedSleeveRear/MaterialChannels": "b4a4be8f23056e2fc3a6b2112be2f5abd22db196be06bfe1b71d0fe83eef5b0f",
+      "V93PublishedSleeveRear/Matched": "e1b576f31ce474bb178458b8d799f84359b5a6868d863399074edb6ac390e736",
+      "V93PublishedSleeveRear/Broad": "ace6adfb91b99fde6b73396f3630b7981cd33d29a56239a175c06ca312b9a346",
+      "V93BandResponse/MatchedRoughPlus": "1737cec6f37d5549bb0c8ddfb49c4f63dbfdff2ffc970d6a6811db5481b769c1",
+      "V93BandResponse/BroadGainMinus": "336a4859cca5328bf27cd805508f174d791446bacbde22660cb2952cd2fccc57",
+      "V93LocalResponse/Matched": "c89d92c61644e1aa99e85e92a6a7a301b16223d4bddc5e760e9c0440e99a213c",
+      "V93LocalResponse/Broad": "3478c23a6d6f72a0e105c436939d00b7774626e940f17fd0e005a99457c8e181",
+      "V93LocalResponse/MatchedMetalPlus": "d3d6faf35398cdd88ec39ecb7c4e0f4c4a64cd5d40b23e807692f2afa320909a",
+      "V93FrontGuardGallery/uv": "991c08dae4c7bf30ed89dc3633a99f2c602c7bac79a99819073d674344da79cf",
+      "V93FrontGuardGallery/beauty": "79481ff23a59b7f0bd6851eb96418adfcb08903e2fbebb39f431cd27ee707762",
+      "V93FrontGuardGallery/RoughPlus": "c3920a37ab37637c60a7210916d203c3de5419d8b4c7f6bbeca527a2dada5d39",
+      "V93FrontGuardGallery/MetalMinus": "82bbd7b7d44d46227c6423f783bb8d8742d0989f0f0298e57bb5500cbbd6e9ec",
+      "V93FrontGuardDefault/uv": "991c08dae4c7bf30ed89dc3633a99f2c602c7bac79a99819073d674344da79cf",
+      "V93FrontGuardDefault/beauty": "cc9c5ea88b122e2fd2cabd71b40fe140c82b4c7dc1e431f8bdabcbd480ca9d08",
+      "V93FrontGuardDefault/GainPlus": "d4591aaf1162f0d68d01c4f9e055a766c0c6d49da86edf8d039a1e9357f8930f"
+    }
   }
 }

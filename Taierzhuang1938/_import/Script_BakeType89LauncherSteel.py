@@ -16,7 +16,7 @@ from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeig
 from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripFamilyPhaseIdentity, GripRearIdentity,
     NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, SaddleRimIdentity,
-    ShoulderReflectanceIdentity, SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity,
+    ShoulderReflectanceIdentity, SleeveJointIdentity, SleeveOpticalIdentity, SleeveReverseIdentity, StemJointIdentity,
     SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WideReflectionIdentity,
 )
 
@@ -1620,29 +1620,31 @@ def ApplyNeckJointFinish(maps, packed, reference):
     ApplyJointMaterialFields(maps, packed, "Neck", fields)
 
 
+def ReadPhotoField(region, record):
+    file = REFERENCE.with_name(record["file"])
+    if Sha256(file) != record["sha256"]:
+        raise ValueError(f"{region} response data does not match {file.name}")
+    with Image.open(file) as image:
+        return np.asarray(image, dtype=float)
+
+
 def SampleCoveredPhotoFields(region, finish, identity, *, includeWear=True):
     if any(finish.get(key) != value for key, value in identity.items()):
         raise ValueError(f"{region} response does not match the underlying material and AO")
-    coverage = finish["coverage"]
+    coverage = finish.get("coverage") if includeWear else finish["coverage"]
     detail = finish["detail"] if includeWear else None
     if includeWear and (detail["rearPhotoSha256"] != finish["sourceSha256"]
             or detail.get("frontPhotoSha256", finish["frontPhotoSha256"]) != finish["frontPhotoSha256"]):
         raise ValueError(f"{region} wear does not match its registered photographs")
-    sources = []
-    for record in ((coverage, detail) if includeWear else (coverage,)):
-        file = REFERENCE.with_name(record["file"])
-        if Sha256(file) != record["sha256"]:
-            raise ValueError(f"{region} response data does not match {file.name}")
-        with Image.open(file) as image:
-            sources.append(np.asarray(image, dtype=float))
-
     _, _, width, height = ATLAS["regions"][region]
     u, v = PlanarTexelCenters(width, height)
-    weight = PeriodicMaterialField(sources[0] / 65535., u, v)
-    fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
+    fields = {}
+    if coverage is not None:
+        weight = PeriodicMaterialField(ReadPhotoField(region, coverage) / 65535., u, v)
+        fields = {name: PeriodicMaterialField(values, u, v) * weight for name, values in finish["fields"].items()}
     if not includeWear:
         return fields
-    encoded = (sources[1] - 32768.) / detail["scale"]
+    encoded = (ReadPhotoField(region, detail) - 32768.) / detail["scale"]
     for name, layer in zip(detail["fields"], np.split(encoded, len(detail["fields"]), axis=1), strict=True):
         correction = PeriodicMaterialField(layer, u, v) * detail["strength"]
         fields[name] = fields[name] + correction if name in fields else correction
@@ -1911,6 +1913,9 @@ def Bake(legacyOrm=None):
     sleeveFinish = reference.get("sleeveJointFinish")
     if sleeveFinish is not None:
         ApplySleeveJointFinish(maps, pixels, reference)
+    sleeveOptical = reference.get("sleeveOpticalFinish")
+    if sleeveOptical is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Sleeve", sleeveOptical, SleeveOpticalIdentity(reference))
     collarReflectance = reference.get("collarReflectanceFinish")
     if collarReflectance is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "CollarRing", collarReflectance, CollarReflectanceIdentity(reference))
@@ -2019,6 +2024,8 @@ def Bake(legacyOrm=None):
     if sleeveFinish is not None:
         details["jointSleeveCoverage"] = sleeveFinish["coverage"]
         details["jointSleeveDetail"] = sleeveFinish["detail"]
+    if sleeveOptical is not None:
+        details["sleeveOpticalDetail"] = sleeveOptical["detail"]
     if collarReflectance is not None:
         details["collarReflectanceCoverage"] = collarReflectance["coverage"]
         details["collarReflectanceDetail"] = collarReflectance["detail"]

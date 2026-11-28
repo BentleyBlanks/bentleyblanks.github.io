@@ -196,6 +196,11 @@ def SleeveJointIdentity(reference):
     }
 
 
+def SleeveOpticalIdentity(reference):
+    finish = json.dumps(reference.get("sleeveJointFinish"), sort_keys=True, separators=(",", ":"))
+    return SleeveJointIdentity(reference) | {"sleeveFinishSha256": sha256(finish.encode("utf-8")).hexdigest()}
+
+
 def CollarReflectanceIdentity(reference):
     previous = json.dumps(reference.get("collarJointFinish"), sort_keys=True, separators=(",", ":"))
     detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
@@ -2720,6 +2725,7 @@ def Main():
         ("reverseReflectionBalance", ReverseReflectionIdentity), ("sleeveReverseFinish", SleeveReverseIdentity),
         ("collarJointFinish", CollarJointIdentity), ("saddleJointFinish", SaddleJointIdentity),
         ("neckJointFinish", NeckJointIdentity), ("sleeveJointFinish", SleeveJointIdentity),
+        ("sleeveOpticalFinish", SleeveOpticalIdentity),
         ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity),
         ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity),
         ("saddleRimFinish", SaddleRimIdentity),

@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 570036,
-      "sha256": "ccdc9861966fa98bc1d5ab45f28681eafaeaaf8613b6f1c0bc3e20be992dc194"
+      "bytes": 570328,
+      "sha256": "49913d1fb9c9939722d59ce0125715ad74e806c709b430761dcf001e76ee720f"
     },
     {
       "channel": "Normal",
@@ -35,34 +35,34 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 85236,
-      "sha256": "ae35b004bd455a7cee0b0b6de1f7836ff9b05c41892bd7168e0879799b5832ec"
+      "bytes": 85436,
+      "sha256": "40efd8d72105c4dc0994ed5c9b03e51b12f3cf757fe2ded55f4659119dbefc47"
     }
   ],
-  "totalBytes": 1046798,
+  "totalBytes": 1047290,
   "metrics": {
     "meanSrgb": [
       0.4537,
-      0.4402,
-      0.4077
+      0.4403,
+      0.4078
     ],
     "luma": 0.4339,
     "lumaStd": 0.1186,
     "sat": 0.1012,
     "clipLow": 0.0,
     "clipHigh": 0.0001,
-    "lowFreq": 0.0977,
-    "seam": 0.127,
+    "lowFreq": 0.0975,
+    "seam": 0.1267,
     "interior": 0.0268,
-    "seamRatio": 4.737,
+    "seamRatio": 4.732,
     "border": 0.72,
-    "swing": 0.1176,
+    "swing": 0.1175,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "6365815194c2d18e18897e3f613cbe4dea522d470ce43f81e518f767056d65ab",
+    "sha256": "8f3fb633e88933762472ee3112ae395d849ea175b49a88b6b38d603748726af4",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -218,6 +218,10 @@
     "jointSleeveDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSleeveJointWear.png",
       "sha256": "e7fe0de4f879aa4dae4beb8002eb95b9a8b947cfd0d4175142b80d5658f2b2e9"
+    },
+    "sleeveOpticalDetail": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSleeveOpticalResponse.png",
+      "sha256": "306f769d1dc1b47d406939d1ccdb3abe9e793023cb997f8771b105af0942a618"
     },
     "collarReflectanceCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherCollarReflectanceCoverage.png",
