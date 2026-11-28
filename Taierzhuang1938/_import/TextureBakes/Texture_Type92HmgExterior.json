@@ -5,13 +5,13 @@
   "preset": null,
   "source": {
     "provider": "procedural",
-    "blenderFile": "Type92Hmg/Exterior_20261128/Model_Type92HmgExterior.blend",
+    "blenderFile": "Type92Hmg/SteelFinish_20261128/Model_Type92HmgExterior.blend",
     "rawPngSha256": {
-      "Base": "8fe9b633d16e93f9ee233a4497ee9cab9aeb9655752a4775d32b953a3a005022",
-      "Normal": "36bb19de29593f929d951228bb036b21a3d232539002b28fb0c245e259c3262c",
-      "Orm": "40081f96e1d1baa7137b3ef0c2ae796f4a9fae1b7b2daf70777eb1bdb120f424"
+      "Base": "fe1361d130a5a8dffacdca77f1da6e8c39786952712612dc89dddd71d715800c",
+      "Normal": "eaff20a580b00b7c812417f51b5dce21ba8b9c7b3436f8f87d24d10c676beb53",
+      "Orm": "b311572f98c9a2dd05bf5ff3877bd0fdca97437bbd1791959ca8a52111345306"
     },
-    "note": "Reference-guided procedural finish; no photographic pixels in the atlas."
+    "note": "Museum-guided blued steel, polished receiver shoulders and different tripod/wood surfaces. Source photographs are comparison evidence."
   },
   "heightSource": null,
   "params": {
@@ -25,44 +25,44 @@
       "file": "Texture_Type92HmgExteriorBase.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 126878,
-      "sha256": "d55eccf5393fc7c0daa32aee5e76cd21c9d8f1589c7bfe49f3d033bbcf448486"
+      "bytes": 133164,
+      "sha256": "47d39dc44ff901de9fbbb0b48b10c6f4c8f0edeb96ebd61be3d4ddfbab517f7e"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type92HmgExteriorNormal.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 85938,
-      "sha256": "f236665f5f6234de0754d4eefc3977cbdfcf8ec23b92c81307d69f4bea1c6093"
+      "bytes": 89136,
+      "sha256": "402b7f5ba641355ebdacd9ea59dc421098977de782ed75a46f4e9876c300fa2a"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type92HmgExteriorOrm.webp",
       "width": 512,
       "height": 512,
-      "bytes": 145716,
-      "sha256": "c672d701510c2ef115ec78d9eeed00de7f7fdd156ae60dbbffdc11005051cd1b"
+      "bytes": 175740,
+      "sha256": "2233591860c1b7a411fc9acde28406fdb8a3bfed64d5c458e2896f8a41f1a82a"
     }
   ],
-  "totalBytes": 358532,
+  "totalBytes": 398040,
   "metrics": {
     "meanSrgb": [
-      0.2338,
-      0.2393,
-      0.2374
+      0.2569,
+      0.2661,
+      0.2556
     ],
-    "luma": 0.2368,
-    "lumaStd": 0.1869,
-    "sat": 0.0229,
-    "clipLow": 0.3794,
+    "luma": 0.2595,
+    "lumaStd": 0.2092,
+    "sat": 0.0392,
+    "clipLow": 0.3788,
     "clipHigh": 0.0,
-    "lowFreq": 0.1067,
-    "seam": 0.1654,
-    "interior": 0.0206,
-    "seamRatio": 8.037,
-    "border": 0.762,
-    "swing": 0.4215,
+    "lowFreq": 0.1383,
+    "seam": 0.2607,
+    "interior": 0.018,
+    "seamRatio": 14.47,
+    "border": 0.876,
+    "swing": 0.4121,
     "texelsPerMeter": null
   },
   "gateProblems": []

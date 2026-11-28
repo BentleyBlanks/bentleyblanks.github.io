@@ -807,11 +807,11 @@
    "name": "Type92Hmg",
    "category": "weapon",
    "file": "Model_Type92Hmg.tzm.json",
-   "triangles": 18914,
+   "triangles": 19514,
    "meshBlocks": 1,
    "nodes": 7,
    "joints": 0,
-   "bytes": 540130,
+   "bytes": 556094,
    "materials": [
     "type92Exterior"
    ],

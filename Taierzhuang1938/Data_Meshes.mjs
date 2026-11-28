@@ -82,7 +82,15 @@ export const TYPE11_EXTERIOR_SURFACE = Object.freeze({
 });
 
 export const TYPE92_HMG_SURFACE = Object.freeze({
-  roughness: 1, metalness: 1, normalScale: 0.32, envMapIntensity: 1.08, aoIntensity: 1,
+  roughness: 1, metalness: 1, normalScale: 0.59, envMapIntensity: 1.32, aoIntensity: 0.84,
+});
+
+export const TYPE92_HMG_VIEW_SURFACE = Object.freeze({
+  ...TYPE92_HMG_SURFACE,
+  // An eye-level reflection covers more pixels in the mounted view. Retain
+  // the edge sheen while broadening it enough to read as satin under raking light.
+  roughness: 1.45,
+  normalScale: 0.39,
 });
 
 export const MESHES = {
@@ -247,15 +255,15 @@ export const MESHES = {
     draws: { high: 1, medium: 1, low: 1 }, note: "源节点 sphere3；民二十年式八二迫击炮（按 Stokes-Brandt 外形认领）。",
   },
   Type92Hmg: {
-    file: "Model_Type92Hmg.tzm.json", category: "weapon", version: "type92-exterior-20261128",
-    triangles: 18914, meshBlocks: 1, nodes: 7, joints: 0,
+    file: "Model_Type92Hmg.tzm.json", category: "weapon", version: "type92-steel-r6-20261128",
+    triangles: 19514, meshBlocks: 1, nodes: 7, joints: 0,
     materials: ["type92Exterior"], mounts: WEAPON_MOUNTS,
     span: [0.56278, 0.53558, 1.156], lengthM: 1.156,
     draws: { high: 1, medium: 1, low: 1 },
     pbrSets: [{ name: "Type92HmgExterior",
-      albedo: "./Texture/Texture_Type92HmgExteriorBase.webp?v=type92-exterior-20261128",
-      normal: "./Texture/Texture_Type92HmgExteriorNormal.webp?v=type92-exterior-20261128",
-      orm: "./Texture/Texture_Type92HmgExteriorOrm.webp?v=type92-exterior-20261128" }],
+      albedo: "./Texture/Texture_Type92HmgExteriorBase.webp?v=type92-steel-r6-20261128",
+      normal: "./Texture/Texture_Type92HmgExteriorNormal.webp?v=type92-steel-r6-20261128",
+      orm: "./Texture/Texture_Type92HmgExteriorOrm.webp?v=type92-steel-r6-20261128" }],
     note: "在 CadNav.com 游戏成品基础上参照澳大利亚战争纪念馆实物和档案照校正，补齐三脚架外形并区分发蓝钢与木质握柄。",
   },
   Type89Tank: {

@@ -11,13 +11,14 @@ import subprocess
 import bmesh
 import bpy
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 from TzmCore import AUTHORED_NORMAL_LAYER, Node
 
 PROJECT = Path(__file__).resolve().parents[1]
 ASSET_ID = "Type92Hmg"
 SOURCE_ROOT = Path(os.environ.get("TZ1938_TYPE92_HMG_SOURCE") or
-                   Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type92Hmg/Exterior_20261128")
+                   Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type92Hmg/SteelFinish_20261128")
 REST_POSE = "Type92HmgExterior"
 ATLAS_UV = "FinishAtlas"
 GAME_TO_BLEND = Matrix(((1, 0, 0), (0, 0, -1), (0, 1, 0)))
@@ -100,6 +101,10 @@ class Exterior:
         edit.from_mesh(mesh)
         bmesh.ops.remove_doubles(edit, verts=edit.verts[:], dist=0.000024)
         bmesh.ops.dissolve_degenerate(edit, edges=edit.edges[:], dist=0.000010)
+        if name in ("Receiver", "ReceiverSideRecess"):
+            # The retained game derivative had inward-facing exterior receiver panels.
+            # Correct their winding before bevel selection and PBR baking.
+            bmesh.ops.recalc_face_normals(edit, faces=list(edit.faces))
         edit.to_mesh(mesh)
         edit.free()
         mesh.validate()
@@ -151,7 +156,7 @@ def PrepareExterior(exterior, baseline):
         if index == 6:   # Loose display item, separated from the exterior.
             continue
         if index == 0:
-            receiver, recess, sleeve = [], [], []
+            receiver, collar, recess, sleeve = [], [], [], []
             for face in group:
                 center = sum((points[i] for i in face), Vector()) / len(face)
                 # Leave the new forward silhouette clear of long triangles from the old muzzle.
@@ -159,11 +164,14 @@ def PrepareExterior(exterior, baseline):
                     continue
                 if center.z < -.296:
                     sleeve.append(face)
+                elif center.z < -.19:
+                    collar.append(face)
                 elif -.161 < center.z < -.062 and center.x > .024 and .033 < center.y < .079:
                     recess.append(face)
                 else:
                     receiver.append(face)
-            exterior.Select("Receiver", "body", "ReceiverSteel", points, receiver)
+            RoundReceiverEdges(exterior.Select("Receiver", "body", "ReceiverSteel", points, receiver))
+            exterior.Select("ReceiverFrontCollar", "body", "CollarSteel", points, collar)
             exterior.Select("ReceiverSideRecess", "body", "RecessSteel", points, recess)
             exterior.Select("CoarseCoolingSleeve", "body", "FinSteel", points, sleeve)
         elif index in (2, 3):
@@ -189,6 +197,50 @@ def PrepareExterior(exterior, baseline):
     exterior.Fins("ForwardRib", -.821, -.729, 23, .0067, .0100, sides=20)
     AddSleeveCrown(exterior)
     AddReceiverBacking(exterior)
+
+
+def RoundReceiverEdges(obj):
+    """Catch a raking highlight on the long exterior shoulders and rails."""
+    mesh = obj.data
+    edit = bmesh.new()
+    edit.from_mesh(mesh)
+    edit.normal_update()
+    # The broad flanks of the retained shell were inverted on both sides.
+    tree = BVHTree.FromBMesh(edit)
+    for side in (-1, 1):
+        direction = Vector((-side, 0, 0))
+        for height in (.038, .050, .062):
+            for length in (.010, .070, .100):
+                origin = Vector((side * .2, -length, height))
+                _, normal, _, _ = tree.ray_cast(origin, direction, .20)
+                if normal is None or normal.x * side < .4:
+                    raise RuntimeError("Type92Hmg: a visible receiver flank faces inwards")
+    finish = edit.faces.layers.int.new("receiver_finish")
+    edges = []
+    for edge in edit.edges:
+        first, second = (vertex.co for vertex in edge.verts)
+        delta = second - first
+        length = delta.length
+        middle = (first + second) * .5
+        if (edge.is_contiguous and edge.is_convex and length > .016
+                and abs(delta.y) > length * .64 and abs(middle.x) > .017 and middle.z > .016
+                and math.radians(27) < edge.calc_face_angle() < math.radians(132)):
+            edges.append(edge)
+    result = bmesh.ops.bevel(edit, geom=edges, offset=.00082, segments=2, affect="EDGES",
+                           profile=.5, clamp_overlap=False)
+    edit.normal_update()
+    for face in edit.faces:
+        center = face.calc_center_median()
+        if (face.normal.z > .51 and .050 < center.z < .106 and abs(center.x) < .067):
+            face[finish] = 1
+    for face in result["faces"]:
+        if face.is_valid:
+            face[finish] = 2
+            face.smooth = True
+    print(f"Receiver finish: {len(edges)} outside edges, {len(result['faces'])} new bevel faces")
+    edit.to_mesh(mesh)
+    edit.free()
+    mesh.set_sharp_from_angle(angle=math.radians(47))
 
 
 def AddSleeveCrown(exterior):
@@ -229,7 +281,7 @@ def AddReceiverBacking(exterior):
     # A recessed visual surface gives the open receiver seams a dark backing at
     # every inspection angle. It sits behind the retained CadNav exterior shells.
     points = [Vector((x, y, z)) for z in (-.300, .144)
-              for x, y in ((-.017, -.021), (.017, -.021), (.017, .043), (-.017, .043))]
+              for x, y in ((-.026, -.021), (.026, -.021), (.026, .066), (-.026, .066))]
     faces = [(3, 2, 1, 0), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5),
              (2, 3, 7, 6), (3, 0, 4, 7)]
     obj = exterior.Mesh("ReceiverShadowBacking", "body", "RecessSteel", points, faces)

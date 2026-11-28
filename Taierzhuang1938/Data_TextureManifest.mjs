@@ -125,7 +125,7 @@ const BLADE_BLOOD_DETAIL_BYTES = 300 * 1024;
 // Type 11 uses a 2K base atlas for the receiver and hopper finish, with 1K normal and ORM.
 const TYPE11_EXTERIOR_BYTES = 980 * 1024;
 // Type 92 atlas: 1K base and normal, 512 packed ORM; loaded with the game model.
-const TYPE92_HMG_EXTERIOR_BYTES = 352 * 1024;
+const TYPE92_HMG_EXTERIOR_BYTES = 400 * 1024;
 export const TEXTURE_BUDGETS = Object.freeze({
   setBytes: 1024 * 1024,             // 非 legacy 的 material / terrainLayer 一套（Base+Normal+Orm）
   singleBytes: 600 * 1024,           // 非 legacy 单张（Base / Normal / Orm）
@@ -468,7 +468,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
   },
   {
     id: "Type92HmgExterior", kind: "material", tier: "lazy", assetBudgetBytes: TYPE92_HMG_EXTERIOR_BYTES,
-    toneClass: null, toneReason: "Authored UV atlas for blued steel, weathered tripod steel and wood grips.",
+    toneClass: null, toneReason: "Museum-guided blued steel, polished receiver edges, weathered tripod steel and wood grips.",
     metersPerTile: null, normalConvention: "gl",
     bake: "_blender/Script_Type92HmgExteriorBake.py", bakeRecord: "_import/TextureBakes/Texture_Type92HmgExterior.json",
     source: { provider: "procedural", date: "2026-11-28", ref: "AWM RELAWM28834.001/.002 and 026540",

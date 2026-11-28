@@ -11,7 +11,7 @@ from Script_BakePbrTexture import Audit, ParseArgs
 
 PROJECT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = Path(os.environ.get("TZ1938_TYPE92_HMG_SOURCE") or
-                      Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type92Hmg/Exterior_20261128")
+                      Path.home() / "OneDrive/AI/Models/Blender/Taierzhuang1938/Type92Hmg/SteelFinish_20261128")
 
 
 def Sha(path):
@@ -43,9 +43,9 @@ def Package(source):
     record["date"] = "2026-11-28"
     record["source"] = {
         "provider": "procedural",
-        "blenderFile": "Type92Hmg/Exterior_20261128/Model_Type92HmgExterior.blend",
+        "blenderFile": "Type92Hmg/SteelFinish_20261128/Model_Type92HmgExterior.blend",
         "rawPngSha256": outputs,
-        "note": "Reference-guided procedural finish; no photographic pixels in the atlas.",
+        "note": "Museum-guided blued steel, polished receiver shoulders and different tripod/wood surfaces. Source photographs are comparison evidence.",
     }
     recordPath.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

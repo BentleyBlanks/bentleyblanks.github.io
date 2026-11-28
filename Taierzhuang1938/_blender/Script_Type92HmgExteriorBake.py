@@ -16,34 +16,38 @@ from Type92HmgExterior import (ASSET_ID, ATLAS_UV, BASE_REV, REST_POSE, Exterior
                                PrepareExterior, ReadBaseline, SourcePath)
 
 SURFACES = {
-    # Linear reflectance, roughness, metalness, bump distance in scene meters.
-    "ReceiverSteel": ((.097, .105, .111), (.170, .178, .183), .51, .72, .00012),
-    "RecessSteel": ((.022, .025, .027), (.043, .049, .051), .66, .56, .00004),
-    "FinSteel": ((.080, .089, .096), (.163, .171, .177), .48, .78, .00012),
-    "ContactSteel": ((.087, .097, .104), (.153, .164, .172), .50, .73, .00010),
-    "TripodSteel": ((.077, .082, .076), (.174, .173, .151), .54, .67, .00020),
-    "HandleWood": ((.072, .036, .018), (.159, .091, .045), .57, .00, .00015),
+    # Linear reflectance of coating and exposed steel, roughness, metalness, micro-relief in metres.
+    "ReceiverSteel": ((.165, .177, .169), (.261, .278, .260), (.342, .353, .332), .43, .70, .000025),
+    "RailSteel": ((.173, .185, .176), (.243, .259, .250), (.344, .360, .344), .382, .84, .000020),
+    "CollarSteel": ((.120, .131, .125), (.225, .239, .227), (.324, .339, .318), .367, .83, .000023),
+    "RecessSteel": ((.022, .025, .024), (.056, .061, .058), (.091, .100, .094), .59, .70, .000013),
+    "FinSteel": ((.114, .129, .132), (.197, .217, .212), (.289, .307, .297), .416, .79, .000023),
+    "ContactSteel": ((.140, .154, .148), (.224, .243, .228), (.317, .335, .316), .385, .83, .000020),
+    "PolishedSteel": ((.163, .177, .166), (.308, .328, .309), (.367, .383, .368), .307, .92, .000014),
+    "TripodSteel": ((.09, .097, .079), (.151, .155, .127), (.206, .218, .191), .55, .66, .000031),
+    "HandleWood": ((.072, .036, .018), (.159, .091, .045), None, .57, .00, .00015),
 }
 
 
 def AssignAtlasUvs(objects):
     """A single unwrap across every visible piece keeps charts from overlapping."""
-    allPoints, allFaces, allMaterials = [], [], []
+    allPoints, allFaces, allMaterials, shading = [], [], [], []
     for obj in objects:
         mesh = obj.data
         first = len(allPoints)
         allPoints.extend(obj.matrix_world @ vertex.co for vertex in mesh.vertices)
         allFaces.extend(tuple(first + i for i in face.vertices) for face in mesh.polygons)
-        allMaterials.extend([obj["FinishSurface"]] * len(mesh.polygons))
+        allMaterials.extend(mesh.materials[polygon.material_index].name for polygon in mesh.polygons)
+        shading.extend(polygon.use_smooth for polygon in mesh.polygons)
     mesh = bpy.data.meshes.new("Mesh_AtlasBake")
     mesh.from_pydata(allPoints, [], allFaces)
     materials = [bpy.data.materials[key] for key in SURFACES]
     for material in materials:
         mesh.materials.append(material)
     indices = {material.name: index for index, material in enumerate(materials)}
-    for polygon, name in zip(mesh.polygons, allMaterials, strict=True):
+    for polygon, name, smooth in zip(mesh.polygons, allMaterials, shading, strict=True):
         polygon.material_index = indices[name]
-        polygon.use_smooth = True
+        polygon.use_smooth = smooth
     mesh.set_sharp_from_angle(angle=math.radians(47))
     obj = bpy.data.objects.new("AtlasBake", mesh)
     bpy.context.scene.collection.objects.link(obj)
@@ -72,7 +76,7 @@ def AssignAtlasUvs(objects):
 
 
 def Surface(name):
-    dark, light, roughness, metalness, bumpDistance = SURFACES[name]
+    dark, light, bare, roughness, metalness, bumpDistance = SURFACES[name]
     isWood = not metalness
     material = bpy.data.materials.new(name)
     material.diffuse_color = (*dark, 1)
@@ -113,23 +117,58 @@ def Surface(name):
         links.new(driver, node.inputs["Fac"])
         return node.outputs["Color"]
 
-    coarse = Noise(18 if isWood else 37, 3, (2.0, .32, 2.0) if isWood else (1, .67, 1))
-    grain = Noise(255 if isWood else 410, 2, (2.3, .062, 2) if isWood else (1, .25, 1))
-    micro = Noise(940, 1, (1, .32, 1) if isWood else (1, .65, 1))
-    finish = Math("ADD", Math("MULTIPLY", coarse, .57), Math("MULTIPLY", grain, .43))
-    if not isWood:
-        edge = Math("MAXIMUM", 0, Math("SUBTRACT", position.outputs["Pointiness"], .52))
-        finish = Math("ADD", finish, Math("MULTIPLY", edge, 1.25))
-    color = Ramp(finish, dark, light, .29, .84)
-    rough = Math("ADD", roughness, Math("MULTIPLY", Math("SUBTRACT", coarse, .5), .22))
+    def Range(value, low, high, toMin=0.0, toMax=1.0):
+        node = nodes.new("ShaderNodeMapRange")
+        node.interpolation_type = "SMOOTHERSTEP"
+        node.clamp = True
+        node.inputs["From Min"].default_value = low
+        node.inputs["From Max"].default_value = high
+        node.inputs["To Min"].default_value = toMin
+        node.inputs["To Max"].default_value = toMax
+        links.new(value, node.inputs["Value"])
+        return node.outputs["Result"]
+
     bump = nodes.new("ShaderNodeBump")
     bump.inputs["Distance"].default_value = bumpDistance
-    bump.inputs["Strength"].default_value = .27 if isWood else .20
-    links.new(Math("ADD", Math("MULTIPLY", grain, .72), Math("MULTIPLY", micro, .28)), bump.inputs["Height"])
+    if isWood:
+        coarse = Noise(18, 3, (2.0, .32, 2.0))
+        grain = Noise(255, 2, (2.3, .062, 2))
+        micro = Noise(940, 1, (1, .32, 1))
+        finish = Math("ADD", Math("MULTIPLY", coarse, .57), Math("MULTIPLY", grain, .43))
+        color = Ramp(finish, dark, light, .29, .84)
+        rough = Math("ADD", roughness, Math("MULTIPLY", Math("SUBTRACT", coarse, .5), .22))
+        height = Math("ADD", Math("MULTIPLY", grain, .72), Math("MULTIPLY", micro, .28))
+        bump.inputs["Strength"].default_value = .27
+        metallic = nodes.new("ShaderNodeValue").outputs[0]
+        metallic.default_value = 0.0
+    else:
+        # Lengthwise machining and smooth oxidation drive colour and reflection at
+        # different scales. Keep relief in the fine striations instead of it
+        # following the much larger tonal changes across each flat steel face.
+        tripod = name == "TripodSteel"
+        oxidation = Noise(42 if tripod else 24, 2, (1.32, .62 if tripod else .30, 1.18))
+        machining = Noise(460, 1, (1.22, .083 if not tripod else .24, 1.54))
+        finish = Math("ADD", Math("MULTIPLY", oxidation, .83), Math("MULTIPLY", machining, .17))
+        coating = Ramp(finish, dark, light, .25, .77)
+
+        abrasion = Range(machining, .57, .83)
+        wear = Math("MULTIPLY", abrasion, .16 if name == "PolishedSteel" else .077)
+        steel = nodes.new("ShaderNodeMixRGB")
+        steel.inputs[2].default_value = (*bare, 1.0)
+        links.new(wear, steel.inputs[0])
+        links.new(coating, steel.inputs[1])
+        color = steel.outputs[0]
+        oxideRoughness = Range(oxidation, .23, .77, .045, -.041)
+        rough = Math("SUBTRACT", Math("ADD", roughness, oxideRoughness), Math("MULTIPLY", wear, .157))
+        metallic = Math("ADD", metalness, Math("MULTIPLY", wear, .98 - metalness))
+        height = machining
+        bump.inputs["Strength"].default_value = .18 if not tripod else .24
+
+    links.new(height, bump.inputs["Height"])
     links.new(color, shader.inputs["Base Color"])
     links.new(rough, shader.inputs["Roughness"])
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    shader.inputs["Metallic"].default_value = metalness
+    links.new(metallic, shader.inputs["Metallic"])
 
     occlusion = nodes.new("ShaderNodeAmbientOcclusion")
     occlusion.samples = 24
@@ -138,7 +177,7 @@ def Surface(name):
     channels.mode = "RGB"
     links.new(Math("ADD", .24, Math("MULTIPLY", occlusion.outputs["AO"], .76)), channels.inputs["Red"])
     links.new(rough, channels.inputs["Green"])
-    channels.inputs["Blue"].default_value = metalness
+    links.new(metallic, channels.inputs["Blue"])
     return material, output, shader, color, channels.outputs[0]
 
 
@@ -239,6 +278,12 @@ def Bake(*, size=1024):
     objects = sorted(model.objects, key=lambda obj: obj.name)
     for item in objects:
         item.data.materials.append(bpy.data.materials[item["FinishSurface"]])
+        finish = item.data.attributes.get("receiver_finish")
+        if finish:
+            item.data.materials.append(bpy.data.materials["RailSteel"])
+            item.data.materials.append(bpy.data.materials["PolishedSteel"])
+            for polygon, finishClass in zip(item.data.polygons, finish.data, strict=True):
+                polygon.material_index = finishClass.value
     bpy.context.view_layer.update()
     atlas = AssignAtlasUvs(objects)
     # The atlas proxy provides both shading and occlusion during baking.
