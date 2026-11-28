@@ -122,6 +122,8 @@
 
 - 外套筒背面按配准后的馆藏照重烘细环纹在不同灯位下的反光，修正底色、切线法线、粗糙度和金属度。独立布光下，环纹明暗信号的相关系数从 0.457 提至 0.580，平均亮度误差从 12.73 降至 11.89 个灰阶。筒身窄亮带以正背两张馆藏照联合校准，独立布光的第 95 百分位亮度从 185.0 提至 191.9，照片为 202.9。复测正面两组布光、斜视、刻印和十个接缝 AO 视角。正面中性灯下共见区的平均亮度误差降低，局部细纹相关系数从 0.342 降至 0.313。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 外套筒两侧分别按第 8 张馆藏照拟合环纹的间隔、明暗与亮缘位置。独立布光下，原先错位较明显一侧的环纹相关系数从 0.188 提至 0.260，整段平均亮度误差从 11.90 降至 11.13 个灰阶。筒身正面共见区按第 1 张照复校磨痕，相关系数从 0.315 提至 0.374。背面窄亮带在近似馆藏布光下达到约 203 个灰阶，独立布光下为约 194，照片为约 203。复测正面斜视、刻印和十个接缝 AO 视角。套筒两侧仍有局部错位，默认正面布光下的平均亮度误差增加约 0.12 个灰阶。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -177,5 +179,6 @@
 - 新斜纹参数保存在 `gripFamilyPhase`。回烘校验侧照、握部材质和接缝 AO，从钢材源图分别生成基准与校准斜纹，再将局部响应合入握部原有磨蚀。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 外套筒背面光学修正保存在 `sleeveOpticalFinish`。16 位图保存材质响应与照片覆盖范围的乘积，烘焙校验既有套筒材质和接缝 AO 后合入底色、粗糙度及金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 筒身背面两组布光的亮度均衡采样保存在 `barrelJointFinish.rearCommonLightCalibration`。修正合入原有 16 位筒身材质图，由正式烘焙脚本生成底色和 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本轮亮带和环纹的采样分别记录在 `barrelJointFinish.sharedHighlightCalibration` 和 `sleeveOpticalFinish.ringAlignment`。两张 16 位材质图由正式脚本生成底色、切线法线及 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV95/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 筒身正背共见区与套筒环纹的采样分别记录在 `barrelJointFinish.sharedHighlightCalibration` 和 `sleeveOpticalFinish.ringAlignment`。两张 16 位材质图由正式脚本生成底色、切线法线及 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 正面磨痕和套筒两侧环纹的复校参数保存在 `barrelJointFinish.wearAndHighlightRefinement` 与 `sleeveOpticalFinish.sideRingCalibration`。底色 WebP 编码质量设为 83.66，使三张源贴图合计低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV96/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
