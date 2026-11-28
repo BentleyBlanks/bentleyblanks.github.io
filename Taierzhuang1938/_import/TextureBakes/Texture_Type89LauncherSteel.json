@@ -19,8 +19,8 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 569888,
-      "sha256": "b255c65fee26568b1f1673a1a9a230273891f64aac5d309c6aebdab11d601464"
+      "bytes": 569966,
+      "sha256": "b9f9dd3a503d52e6e05f212aaeef0e3173855c00be96d4c628b7e450d0ca38b8"
     },
     {
       "channel": "Normal",
@@ -35,16 +35,16 @@
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 85004,
-      "sha256": "6caa4523d638b30e117071e5dd660fd0d6ac041a1cb396a89d79a4e712b7ed5b"
+      "bytes": 85032,
+      "sha256": "2fec9d0b755846481978ae5d2e93f7cb5e556b42ce5930893dea90f9cdf75b18"
     }
   ],
-  "totalBytes": 1041238,
+  "totalBytes": 1041344,
   "metrics": {
     "meanSrgb": [
       0.4537,
       0.4402,
-      0.4078
+      0.4077
     ],
     "luma": 0.4339,
     "lumaStd": 0.1186,
@@ -54,15 +54,15 @@
     "lowFreq": 0.0977,
     "seam": 0.1269,
     "interior": 0.0269,
-    "seamRatio": 4.713,
-    "border": 0.717,
+    "seamRatio": 4.714,
+    "border": 0.72,
     "swing": 0.1176,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "09f8c8bdbc3df571f0e838a372385cd8a12755902e786b948ba41429e3784a1f",
+    "sha256": "10462b880e79fa34318e66b06021b3c7bdde6a12a29120b89ce12e057e5bead7",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -274,6 +274,14 @@
     "gripRearDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherGripRearWear.png",
       "sha256": "696c2ba94989af45938b6c718585ab556f529ca233499b9e8a29b77e6e0f305c"
+    },
+    "saddleRimCoverage": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSaddleRimCoverage.png",
+      "sha256": "f40ef7a9b45cffeaf4d944734a68e3f83203fda8b593b5d1827be547e229033d"
+    },
+    "saddleRimDetail": {
+      "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSaddleRimWear.png",
+      "sha256": "a4d79a4f780ae9857ef98e9341ac04f319ca9addaf2fec90e89f55e3b9bc327e"
     }
   },
   "contactAo": {

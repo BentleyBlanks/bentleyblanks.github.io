@@ -209,6 +209,15 @@ def SaddleReflectanceIdentity(reference):
     }
 
 
+def SaddleRimIdentity(reference):
+    upper = json.dumps(reference.get("saddleReflectanceFinish"), sort_keys=True, separators=(",", ":"))
+    detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
+    return SaddleJointIdentity(reference) | {
+        "upperFinishSha256": sha256(upper.encode("utf-8")).hexdigest(),
+        "contactDetailAoSha256": sha256(detailAo.read_bytes()).hexdigest(),
+    }
+
+
 def BarrelJointIdentity(reference):
     identity = JointSteelIdentity(reference, "Barrel")
     previous = json.dumps(reference.get("reverseReflectionBalance"), sort_keys=True, separators=(",", ":"))
@@ -2708,6 +2717,7 @@ def Main():
         ("neckJointFinish", NeckJointIdentity), ("sleeveJointFinish", SleeveJointIdentity),
         ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity),
         ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity),
+        ("saddleRimFinish", SaddleRimIdentity),
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
         ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
         ("shoulderReflectanceFinish", ShoulderReflectanceIdentity), ("wheelOxideFinish", WheelOxideIdentity),

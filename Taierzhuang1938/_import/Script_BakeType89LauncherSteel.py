@@ -15,7 +15,7 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
     BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripRearIdentity, NeckJointIdentity,
-    ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, ShoulderReflectanceIdentity,
+    ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, SaddleRimIdentity, ShoulderReflectanceIdentity,
     SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity, SurfaceBalanceIdentity, TabReflectanceIdentity,
     WheelOxideIdentity, WideReflectionIdentity,
 )
@@ -1868,6 +1868,9 @@ def Bake(legacyOrm=None):
     saddleReflectance = reference.get("saddleReflectanceFinish")
     if saddleReflectance is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "Saddle", saddleReflectance, SaddleReflectanceIdentity(reference))
+    saddleRim = reference.get("saddleRimFinish")
+    if saddleRim is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "SaddleRim", saddleRim, SaddleRimIdentity(reference))
     tabFinishes = (("Tab", "tabReflectance", reference.get("tabReflectanceFinish")),
                    ("TabBack", "tabBackReflectance", reference.get("tabBackReflectanceFinish")))
     for region, _, finish in tabFinishes:
@@ -1981,6 +1984,9 @@ def Bake(legacyOrm=None):
     if gripRear is not None:
         details["gripRearCoverage"] = gripRear["coverage"]
         details["gripRearDetail"] = gripRear["detail"]
+    if saddleRim is not None:
+        details["saddleRimCoverage"] = saddleRim["coverage"]
+        details["saddleRimDetail"] = saddleRim["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}
