@@ -243,6 +243,27 @@ try {
     const vehicleGroup = page.locator(".model-group").filter({ has: page.getByRole("heading", { name: "载具", exact: true }) });
     const listedVehicles = await vehicleGroup.locator("[data-model]").evaluateAll((rows) => rows.map((row) => row.dataset.model));
     Check("载具栏只列九四式和八九式乙型", listedVehicles.join(",") === vehicleIds.join(","), listedVehicles.join(","));
+    const faction = page.getByRole("group", { name: "阵营筛选" });
+    const listedIds = () => page.locator("[data-model]").evaluateAll((rows) => rows.map((row) => row.dataset.model).sort());
+    for (const [name, side, extras] of [["川军", "nra", ["Type30Hmg"]], ["日军", "ija", vehicleIds]]) {
+      const filter = faction.getByRole("button", { name, exact: true });
+      const expected = assetIds.filter((id) => WEAPONS[id]?.side === side || extras.includes(id)).sort();
+      await filter.click();
+      const visible = await listedIds();
+      Check(`${name}分类显示该阵营装备和数量`, visible.join() === expected.join()
+        && await page.locator("#catalogCount").textContent() === String(expected.length)
+        && await filter.getAttribute("aria-pressed") === "true", visible.join(","));
+    }
+    const search = page.locator("#modelSearch");
+    await search.fill("HanYang");
+    const noMatch = await page.locator(".search-empty").isVisible();
+    await faction.getByRole("button", { name: "川军", exact: true }).click();
+    Check("阵营与搜索叠加，切换分类保留当前预览", noMatch && (await listedIds()).join() === "HanYang"
+      && await page.evaluate(() => window.WeaponInspection.selected === "ZhongZheng")
+      && await page.locator("#modelSide").textContent() === "川军");
+    await search.clear();
+    await faction.getByRole("button", { name: "全部", exact: true }).click();
+    Check("全部分类可恢复完整列表", (await listedIds()).join() === [...assetIds].sort().join());
     const ReadPixels = () => page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
       if (stage.post) {
@@ -716,7 +737,6 @@ try {
       && await page.evaluate(() => !window.WeaponInspection.scene.firstPerson));
     await page.evaluate(() => localStorage.removeItem("tengxian1938_graphics_v1"));
 
-    const search = page.locator("#modelSearch");
     await search.fill("zb26");
     Check("可按编号搜索，过滤仅影响模型列表", await page.locator("[data-model]").count() === 1
       && await page.locator("[data-model]").getAttribute("data-model") === "Zb26");

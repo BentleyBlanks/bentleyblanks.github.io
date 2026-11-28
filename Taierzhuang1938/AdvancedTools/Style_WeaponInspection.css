@@ -30,12 +30,12 @@ button { cursor: pointer; }
   letter-spacing: .1em;
   white-space: nowrap;
 }
-.layout-switch {
+.segmented-switch {
   display: flex;
   border: 1px solid var(--ed-edge);
   background: var(--ed-field);
 }
-.layout-switch button {
+.segmented-switch button {
   min-height: 30px;
   padding: 0 12px;
   border: 0;
@@ -44,9 +44,9 @@ button { cursor: pointer; }
   font-size: 13px;
   white-space: nowrap;
 }
-.layout-switch button + button { border-inline-start: 1px solid var(--ed-rule-2); }
-.layout-switch button:hover { background: var(--ed-sel); color: var(--ed-text-hi); }
-.layout-switch button[aria-pressed="true"] {
+.segmented-switch button + button { border-inline-start: 1px solid var(--ed-rule-2); }
+.segmented-switch button:hover { background: var(--ed-sel); color: var(--ed-text-hi); }
+.segmented-switch button[aria-pressed="true"] {
   background: var(--ed-sel-strong);
   box-shadow: inset 0 -2px 0 var(--ed-gold);
   color: var(--ed-gold-text);
@@ -91,6 +91,8 @@ button { cursor: pointer; }
   letter-spacing: .09em;
 }
 .catalog-header output { color: var(--ed-text-3); font: 400 13px/1.4 var(--ui-font); }
+.catalog-sides { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 10px; }
+.catalog-sides button { padding-inline: 4px; }
 .search { position: relative; margin: 13px 0 14px; }
 .search::before, .search::after {
   content: "";
@@ -564,7 +566,7 @@ button { cursor: pointer; }
 @media (max-width: 620px) {
   .tool-header { gap: 6px; }
   .tool-header h1 { font-size: clamp(14px, 4.2vw, 21px); letter-spacing: .04em; }
-  .layout-switch button { padding-inline: 6px; font-size: 11px; }
+  .tool-header .segmented-switch button { padding-inline: 6px; font-size: 11px; }
   #controlCenter { padding-left: 6px; font-size: 11px; }
   .workspace.edHome, .workspace.edHome:has(.is-comparing) {
     grid-template-columns: minmax(0, 1fr);

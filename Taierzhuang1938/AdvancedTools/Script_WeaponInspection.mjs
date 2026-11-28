@@ -13,7 +13,7 @@ const KIND = {
   throwable: "投掷物", melee: "刀具", mortar: "架设武器", vehicle: "战车",
 };
 const HELD_FIREARM_KINDS = new Set(["boltRifle", "lmg", "pistol"]);
-const SIDE = { nra: "中方", ija: "日方", neutral: "待考" };
+const SIDE = { nra: "川军", ija: "日军", neutral: "待考" };
 const SCALE_METERS = [.001, .002, .005, .01, .02, .05, .1, .2, .5, 1, 2, 5, 10];
 const MIN_SCALE_WIDTH = 56;
 const CLOSEUP_SCALE_WIDTH = 80;
@@ -36,6 +36,7 @@ function LabelNode(parent, tag, text) {
 const canvas = ById("view");
 const list = ById("modelList");
 const search = ById("modelSearch");
+const catalogSideButtons = [...document.querySelectorAll("[data-catalog-side]")];
 const inspector = ById("modelInspector");
 const status = ById("stageStatus");
 const retry = ById("retryLoad");
@@ -60,6 +61,7 @@ const orbitLabel = canvas.getAttribute("aria-label");
 
 let stage;
 let selected = "ZhongZheng";
+let catalogSide = "all";
 let selectionVersion = 0;
 let showMounts = false;
 let firstPersonRequested = false;
@@ -75,7 +77,8 @@ function SyncSelection() {
 function FilterCatalog() {
   const query = search.value.trim().toLocaleLowerCase();
   const matches = Object.values(INSPECTION_MODELS).filter((weapon) =>
-    [weapon.id, weapon.name, weapon.fullName, Kind(weapon)].some((field) => field?.toLocaleLowerCase().includes(query)));
+    (catalogSide === "all" || weapon.side === catalogSide)
+    && [weapon.id, weapon.name, weapon.fullName, Kind(weapon)].some((field) => field?.toLocaleLowerCase().includes(query)));
   list.replaceChildren();
   Text("catalogCount", matches.length);
   if (!matches.length) LabelNode(list, "p", "没有匹配的模型").className = "search-empty";
@@ -401,6 +404,16 @@ back.addEventListener("click", (event) => {
 FilterCatalog();
 BindWeaponReferenceViewport();
 search.addEventListener("input", FilterCatalog);
+for (const button of catalogSideButtons) {
+  button.addEventListener("click", () => {
+    const side = button.dataset.catalogSide;
+    if (side === catalogSide) return;
+    catalogSide = side;
+    for (const item of catalogSideButtons) SetPressed(item, item === button);
+    FilterCatalog();
+    list.scrollTop = 0;
+  });
+}
 SetStatus("loading", "正在载入模型…");
 try {
   stage = new WeaponInspectionScene(canvas, DrawOverlays);

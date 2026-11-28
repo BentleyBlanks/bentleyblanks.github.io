@@ -8,7 +8,7 @@
   <link rel="icon" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261128StudioSky">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261128CatalogSides">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
@@ -17,7 +17,7 @@
 <body class="uiToolSurface edThemedSurface">
   <header class="tool-header">
     <h1>枪械检查台</h1>
-    <div class="layout-switch" role="group" aria-label="视口布局">
+    <div class="segmented-switch" role="group" aria-label="视口布局">
       <button type="button" data-layout="single" aria-pressed="true" aria-controls="inspectionViews">单视口</button>
       <button type="button" data-layout="split" aria-pressed="false" aria-controls="inspectionViews">双视口</button>
     </div>
@@ -30,6 +30,11 @@
         <h2 id="catalogTitle">模型列表</h2>
         <output id="catalogCount" for="modelSearch"></output>
       </header>
+      <div class="segmented-switch catalog-sides" role="group" aria-label="阵营筛选">
+        <button type="button" data-catalog-side="all" aria-pressed="true" aria-controls="modelList">全部</button>
+        <button type="button" data-catalog-side="nra" aria-pressed="false" aria-controls="modelList">川军</button>
+        <button type="button" data-catalog-side="ija" aria-pressed="false" aria-controls="modelList">日军</button>
+      </div>
       <div class="search">
         <input id="modelSearch" type="search" aria-label="搜索模型名称或编号" placeholder="搜索名称或编号" autocomplete="off">
       </div>
