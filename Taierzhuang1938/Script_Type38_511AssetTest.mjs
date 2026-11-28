@@ -66,6 +66,7 @@ assert(wear.diskOutlineRatio>1.035&&wear.diskOutlineRatio<1.135);
 const compactTail=contract.compactTail;
 assert(compactTail.diskClearanceSamples>75_000);
 assert(compactTail.contactImages.length>=5&&compactTail.contactImages.every(index=>aoImages.has(index)));
+assert(compactTail.stackToFace>.59&&compactTail.stackToFace<.66);
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
  node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);
@@ -316,8 +317,9 @@ for(let index=0;index<rearShell.attributes.position.count;index++){
  if(radius>.16&&radius<.19)rimDepth.push(depth);
 }
 assert.equal(rearShell.index.count/3,3168);
-const shellDepth=(shellBox.max.z-shellBox.min.z)/shellRadius;
-assert(shellDepth>.38&&shellDepth<.48,'the rear disk needs a short sidewall relative to its face');
+const sidewallToFace=(shellBox.max.z-shellBox.min.z)/(2*shellRadius);
+assert(sidewallToFace>.35&&sidewallToFace<.40,'the rear disk needs the sidewall depth visible in the overhead reference');
+assert(Math.abs(compactTail.sidewallToFace-sidewallToFace)<1e-5);
 assert(rearBaseRadius>.88&&rearBaseRadius<.96,'the rear disk needs a broad shoulder with a slight taper');
 assert(lowerLeftTip>1.025&&lowerLeftTip<1.135&&upperLeftReach<1,
  'the rear exterior needs a near-circular contour with a small lower-left shoulder');

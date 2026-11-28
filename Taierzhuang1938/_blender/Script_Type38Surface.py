@@ -969,7 +969,7 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     from Script_Type38RearFinish import BakeRearFinish
     from Script_Type38SeatFit import FitStockSeat
     from Script_Type38ServiceWear import FinishServiceWear
-    from Script_Type38TailProfile import CompactRear
+    from Script_Type38TailProfile import ShapeRearProfile
 
     manifest['authorImages'] = len(doc['images'])
     if not author:
@@ -980,7 +980,7 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     manifest['rearContact'] = BakeRearFinish(repo, doc, views)
     manifest['stockSeat'] = FitStockSeat(repo, doc, views)
     manifest['serviceWear'] = FinishServiceWear(repo, doc, views)
-    manifest['compactTail'] = CompactRear(repo, doc, views)
+    manifest['compactTail'] = ShapeRearProfile(repo, doc, views)
     SaveType38Assets(folder, doc, views, manifest, lod, author)
 
 

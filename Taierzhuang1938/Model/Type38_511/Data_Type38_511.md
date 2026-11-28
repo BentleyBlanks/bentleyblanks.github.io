@@ -1,8 +1,8 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v31
+## 当前交付版 v32
 
-游戏使用 `511-compact-tail-31`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-full-tail-32`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
@@ -10,13 +10,17 @@
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
 
-## 栓尾整体外形 · 2026-11-28
+## 尾盘厚度与钢环 · 2026-11-28
+
+以同一支实物的俯视近照读取盘面、侧壁、盘前钢环和覆壳的相对比例，并用侧视与斜侧近照交叉核对。游戏网格把尾盘轴向厚度由盘面直径的 0.215 补至 0.372，覆壳后方的可见段约为盘面直径的 0.623。盘身沿圆角连续接入端面，钢环在覆壳后有清楚的一段外露。 [俯视近照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=38&n=1) · [侧照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=9&n=1) · [斜侧近照](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?p=43&n=1)
+
+沿新轮廓离线重烘后部接触 AO。尾盘与木托及下方钢片的 83,971 次有效表面净空采样均通过。固定机位核对俯视、侧斜、正后与第一人称。局部重建可用 `Script_Type38TailProfile.py --input <v30 资产目录> --output <输出目录>`。 [尾部外形重建](../../_blender/Script_Type38TailProfile.py)
+
+## 栓尾整体外形 · v31
 
 按用户框内的斜后视图对照实物照片。尾盘侧壁收成短鼓形，盘前钢环加宽并靠近覆壳唇边，盘面保留中央凹部与小凸肩。覆壳后缘和尾盘底缘的转折接顺。相对 v30，覆壳后的整体外露长度缩短 42%，尾盘侧壁厚度缩短 43%。 [后视实物照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_(rear_view).JPG) · [侧斜实物照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_action.JPG)
 
 在尾盘三角面内采样，与木托及下方钢片做 82,247 次有效表面净空检查。按新轮廓离线重算接触 AO，沿用 v30 的底色、粗糙度与金属度。固定机位和尺寸核对斜后、侧面、正后与第一人称。 [尾部外形重建](../../_blender/Script_Type38TailProfile.py)
-
-局部重建可用 `Script_Type38TailProfile.py --input <v30 资产目录> --output <输出目录>`。
 
 ## 尾盘轮廓与材质使用痕迹 · v30
 

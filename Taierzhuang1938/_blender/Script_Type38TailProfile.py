@@ -57,12 +57,11 @@ def CheckDiskClearance(doc, views, points, faces):
     return checked
 
 
-def CompactRear(repo, doc, views):
+def ShapeRearProfile(repo, doc, views):
     disk = Track(doc, views, DISK)
     collar = Track(doc, views, COLLAR)
     oldDisk, oldCollar = disk[1][0], collar[1][0]
     anchor = max(Track(doc, views, name)[1][0][:, 2].max() for name in COVER)
-    dock = .59
 
     node = next(item for item in doc['nodes'] if item['extras']['SourceObject']==DISK)
     primitive, = doc['meshes'][node['mesh']]['primitives']
@@ -82,7 +81,11 @@ def CompactRear(repo, doc, views):
     rim = rows[-1]
     assert np.all(np.diff(rows) > 0)
 
-    # The sidewall follows a short drum profile with a rolled front edge.
+    # Use the photographed top and side silhouettes to set the visible proportions.
+    diameter = 2 * faceRadius * 1.035
+    diskFront = anchor + .251 * diameter
+    crownScale = .45
+    wallScale = (.372 * diameter - crownScale * (upper - rim)) / (rim - lower)
     phase = (rows-rows[0])/(rim-rows[0])
     target = faceRadius*(.911+.070*Ramp(.02,.67,phase)-.006*Ramp(.89,1,phase))
     scaleCurve = PchipInterpolator(rows,target/radii)
@@ -96,25 +99,32 @@ def CompactRear(repo, doc, views):
         ratio = scaleCurve(np.clip(z,rows[0],rim))
         join = Ramp(rim-.00038,rim+.00035,z)
         result[:,:2] = middle[:2] + around*(1.045*broad*(ratio*(1-join)+join))[:,None]
-        # Tuck the lower shoulder along the wood line while keeping the rear face round.
-        underside = Ramp(.28,.91,-around[:,1]/faceRadius)
-        shoulder = 1-Ramp(rows[0],rows[0]+.0051,z)
-        result[:,1] += .00445*underside*shoulder
-        face = np.maximum(0,z-rim)
-        result[:,2] = anchor+dock*(z-anchor)-.14*face
+        # Ease the change in axial scale where the curved rim enters the face.
+        offset = z - rim
+        transition = .00022
+        eased = np.clip(offset + transition, 0, 2 * transition)
+        face = np.maximum(0, offset - transition) + eased**2 / (4 * transition)
+        result[:,2] = diskFront + wallScale * (z - lower) + (crownScale - wallScale) * face
         return result
 
     collarCenter = np.array([0,(oldCollar[:,1].min()+oldCollar[:,1].max())*.5])
     collarFront,collarRear = oldCollar[:,2].min(),oldCollar[:,2].max()
+    collarScale = (diskFront + (collarRear - lower) - anchor) / (collarRear - anchor)
 
     def ReshapeCollar(points):
         result = points.copy()
-        phase = (points[:,2]-collarFront)/(collarRear-collarFront)
+        z = points[:,2]
+        phase = (z-collarFront)/(collarRear-collarFront)
         around = points[:,:2]-collarCenter
         swell = .22*Ramp(.12,.89,phase)
         underside = Ramp(.25,.84,-around[:,1]/faceRadius)
-        result[:,:2] = collarCenter+around*(1+swell*(1-underside))[:,None]
-        result[:,2] = anchor+dock*(points[:,2]-anchor)
+        # Fill out the exposed ring and retain the seat on its hidden underside.
+        exposed = Ramp(anchor-.0030,anchor+.00015,z)
+        bulk = exposed*(.30-.13*Ramp(anchor+.00070,collarRear,z))
+        scale = 1+swell*(1-underside)
+        result[:,0] = collarCenter[0]+around[:,0]*(scale+bulk)
+        result[:,1] = collarCenter[1]+around[:,1]*(scale+bulk*(1-underside))
+        result[:,2] = anchor+collarScale*(z-anchor)
         return result
 
     def EaseCoverLip(points):
@@ -129,19 +139,17 @@ def CompactRear(repo, doc, views):
     for name in COVER:
         # Read the current buffer because both authored halves can share a render batch.
         Transform(doc, views, Track(doc, views, name), EaseCoverLip)
-    visible = np.max(moved[:,2])-anchor
-    oldVisible = upper-anchor
+    faceDiameter = np.ptp(moved[:,1])
     profile = {
-        'stackRatio':float(visible/oldVisible),
-        'sidewallRatio':float(np.ptp(moved[:,2])/(upper-lower)),
-        'faceWidthRatio':float(np.ptp(moved[:,1])/np.ptp(oldDisk[:,1])),
+        'stackToFace': float((moved[:,2].max()-anchor)/faceDiameter),
+        'sidewallToFace': float(np.ptp(moved[:,2])/faceDiameter),
         'diskClearanceSamples': CheckDiskClearance(doc, views, moved, disk[0][3]),
     }
-    assert .48<profile['stackRatio']<.64 and profile['faceWidthRatio']>1.025
+    assert .59 < profile['stackToFace'] < .66 and .35 < profile['sidewallToFace'] < .40
 
     ao = BakeRearFinish(repo, doc, views, polishMetal=False, partsFilter=set(COVER) | NEARBY | {DISK, COLLAR})
     profile['contactImages'] = ao['images']
-    doc['asset']['extras']['version'] = 'Type38_CompactTail31'
+    doc['asset']['extras']['version'] = 'Type38_FullTail32'
     print('Rear profile',profile,flush=True)
     return profile
 
@@ -157,5 +165,5 @@ if __name__ == '__main__':
     lod = json.loads((args.input/'Data_Type38NpcLod.json').read_text(encoding='utf8'))
     assert digest == manifest['runtimeSha256'] == lod['sourceSha256']
     assert doc['asset']['extras']['version']=='Type38_ServiceWear30'
-    manifest['compactTail'] = CompactRear(repo,doc,views)
+    manifest['compactTail'] = ShapeRearProfile(repo, doc, views)
     SaveType38Assets(args.output,doc,views,manifest,lod,author=manifest['renderMeshes']==manifest['parts'])
