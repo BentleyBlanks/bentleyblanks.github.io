@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CAMERA } from "../Data_Tuning_Main.mjs";
-import { LoadSavedGraphics } from "../Script_EditorSettings.mjs";
+import { LoadSavedGraphics } from "../Script_PlayerSettings.mjs";
 import { LoadRiggedAssets } from "../Script_RiggedModel.mjs";
 import { Viewmodel } from "../Script_Viewmodel.mjs";
 import { BuildStandardPostOptions } from "../Script_CameraProfile.mjs";

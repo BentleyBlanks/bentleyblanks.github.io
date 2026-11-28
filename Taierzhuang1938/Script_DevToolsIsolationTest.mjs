@@ -27,11 +27,9 @@ import { TOOL_INFO } from "./Data_DevTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 
-// 名字带 Editor 但随玩家设置或第一关正式战役（EncounterPlay + 开场 Timeline）一起发布的纯运行时模块。
-// 名字是历史遗留；它们只许 import 彼此与普通运行时模块，不许碰真正的开发编辑器模块（Script_Editor / Blockout / Timeline / DevTools）。
+// 名字带 Editor 但随第一关正式战役（EncounterPlay + 开场 Timeline）一起发布的运行时模块。
+// 玩家设置页与通用 DOM 控件已于 2026-11-28 正式命名为 Script_PlayerSettings.mjs / Script_UiWidgets.mjs，不再列于此白名单。
 const SHIPPED_EDITOR_MODULES = new Set([
-  "Script_EditorSettings.mjs",
-  "Script_EditorUi.mjs",
   "Script_EditorVolume.mjs",
   "Script_EditorBlockoutBlanket.mjs",
   "Script_EditorBlockoutConfig.mjs",
@@ -151,7 +149,7 @@ Check("标题菜单包从不带 AdvancedTools/ 里的模块", !full.menuInputs.s
 Check("剔除后游戏包换进了 Script_DevToolsStub", stripped.gameInputs.includes("Script_DevToolsStub.mjs"));
 Check("剔除后菜单包换进了 Data_DevToolsStub", stripped.menuInputs.includes("Data_DevToolsStub.mjs"));
 Check("剔除后的菜单包不含开发模块", DevInputs(stripped.menuInputs).length === 0, DevInputs(stripped.menuInputs).join(", "));
-Check("剔除后玩家设置仍在包里", ["Script_SettingsHost.mjs", "Script_EditorSettings.mjs"].every((file) => stripped.gameInputs.includes(file)));
+Check("剔除后玩家设置仍在包里", ["Script_SettingsHost.mjs", "Script_PlayerSettings.mjs", "Script_UiWidgets.mjs"].every((file) => stripped.gameInputs.includes(file)));
 // 线上发布构建（--deploy）：只剔拆分边界，留在游戏里的工具照旧在包里。
 Check("发布构建的游戏包换进了 Script_DevToolsSplitStub、不含 AdvancedTools/", deploy.gameInputs.includes("Script_DevToolsSplitStub.mjs")
   && !deploy.gameInputs.includes("Script_DevToolsSplit.mjs") && !deploy.gameInputs.some((file) => file.startsWith("AdvancedTools/")),

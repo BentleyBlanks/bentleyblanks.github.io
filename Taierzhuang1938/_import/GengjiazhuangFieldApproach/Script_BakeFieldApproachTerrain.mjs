@@ -214,12 +214,8 @@ const preset = {
       shade:[.70,.79,.93],gap:.82,silver:.12}},
     Atmosphere:{enabled:true,params:{mie:3.7,mieG:.75,rayleigh:.67,ozone:1,groundAlbedo:.20,sunIrradiance:8.9,
       skyTint:[.86,.96,1.13],skyFloor:[.75,.83,.95],artGlow:.045,aerialBlend:.51,aerialGain:.31}},
-    Fog:{enabled:true,params:{density:.00158,falloff:21,max:.59,skyColor:[.57,.62,.71],
+    Fog:{enabled:true,params:{profile:"firstLevelBattleDay",density:.00158,falloff:21,max:.59,skyColor:[.57,.62,.71],
       groundColor:[.53,.565,.62],sunGain:.03,desat:.23,flatten:.027}},
-    Grade:{enabled:true,params:{ profile:"firstLevelBattleDay",exposure:1.19,saturation:.88,contrast:.99,
-      contrastCurve:"soft",gain:[1.01,1,.99],lift:[0,0,0],shadowTint:[.97,1,1.06],
-      highlightTint:[1.035,1.008,.97],splitShadow:.18,splitHighlight:.20,bloom:.025,
-      bloomThreshold:1.24,godStrength:0,lensFlare:0}},
   },
 };
 const zones = {

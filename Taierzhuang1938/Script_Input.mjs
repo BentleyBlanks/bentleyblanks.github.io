@@ -45,7 +45,7 @@ const GUIDE = [
 /**
  * 操作说明的对外形状与从前逐字相同（`[{ title, rows: [{ keys, label }] }]`），
  * 只是三个字段改成**读取时**经 T 解析 —— 换语言不用重建这张表，消费方
- * （Script_EditorSettings 的设置页、Script_HudPromptTest / Script_CarryTest 的键位契约）
+ * （Script_PlayerSettings 的设置页、Script_HudPromptTest / Script_CarryTest 的键位契约）
  * 一行都不用改。
  */
 export const CONTROL_GUIDE = Object.freeze(GUIDE.map((group) => Object.freeze({

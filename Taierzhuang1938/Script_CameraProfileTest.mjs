@@ -33,6 +33,7 @@ import {
 import { QUALITY_PRESETS, GRAPHICS_PROFILES } from "./Data_Tuning_Graphics.mjs";
 import { GRADE_DEFAULTS } from "./Data_Tuning_Camera.mjs";
 import { CreateGameGraphics } from "./Script_Tuning_GameGraphics.mjs";
+import { ENV_COMPONENTS, ENV_CATEGORIES } from "./Data_EnvComponents.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
@@ -89,6 +90,10 @@ const Check = (ok, what) => {
     `editorLite.toneMappingExposure(${L.toneMappingExposure}) === standard.exposure * 0.6`);
   Check(CAMERA_PROFILE_RUNTIME_OVERRIDES.includes("dof") && CAMERA_PROFILE_RUNTIME_OVERRIDES.includes("volumetrics"),
     "运行期局部覆写白名单包含 dof 与 volumetrics");
+  Check(!ENV_COMPONENTS.some((c) => c.type === "Grade"), "环境组件表已彻底移除 Grade（曝光与调色）");
+  Check(!ENV_CATEGORIES.some((c) => c.id === "post"), "环境组件分类已彻底移除 post（后期）");
+  Check(ENV_COMPONENTS.find((c) => c.type === "Fog")?.params.some((p) => p.key === "profile" && p.out === "profile"),
+    "时段档案 profile 已迁入 Fog 组件");
 }
 
 // ===========================================================================
@@ -117,7 +122,7 @@ const Check = (ok, what) => {
     setItem: (key, value) => { memory.set(key, String(value)); },
     removeItem: (key) => { memory.delete(key); },
   };
-  const { GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_EditorSettings.mjs");
+  const { GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_PlayerSettings.mjs");
 
   const gfx = CreateGameGraphics({ profile: "high", preset: QUALITY_PRESETS.high });
   const leaked = CAMERA_PROFILE_FROZEN_SETTINGS_KEYS.filter((key) => Object.hasOwn(gfx, key));

@@ -16,7 +16,7 @@ import { CreateGameGraphics } from "../Script_Tuning_GameGraphics.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import { MaterialLibrary } from "../Script_Materials.mjs";
 import { SkyDome, SKY_PRESETS } from "../Script_Sky.mjs";
-import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "../Script_EditorSettings.mjs";
+import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "../Script_PlayerSettings.mjs";
 import { LightRig } from "../Script_Light.mjs";
 import { FirstPersonSelfShadow } from "../Script_FirstPersonSelfShadow.mjs";
 import { FirstPersonReflectionProbe } from "../Script_FirstPersonReflectionProbe.mjs";

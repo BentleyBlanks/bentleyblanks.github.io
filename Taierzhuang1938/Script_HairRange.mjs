@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { ManagedGLTFLoader } from './Script_ModelImports.mjs';
 import { LoadHairGroom, LoadHairAtlas, HairGroom, DisposeHairGroomAsset, HairAssetUrl } from './Script_HairGroom.mjs';
 import { T } from './Script_Text.mjs';
-import { Panel } from './Script_EditorUi.mjs';
+import { Panel } from './Script_UiWidgets.mjs';
 import { HAIR_CAMERA as CAMERA } from './Data_Tuning_Hair.mjs';
 import { HAIR_RANGE_ROWS, HAIR_RANGE_PEDESTAL } from './Data_HairRange.mjs';
 import { XBOT_CHARACTERS } from './Data_XBotCharacters.mjs';

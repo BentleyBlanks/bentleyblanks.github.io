@@ -1,7 +1,8 @@
 // 环境组件的执行逻辑（docs/Data_Environment.md §2）。声明在 Data_EnvComponents，这里一个 type 一份逻辑：
 //
 //   Compose(decl, values, out)        把求值 + 过渡之后的参数写进这一帧的环境参数 out（与 Script_Sky.SKY_PRESETS 同形，
-//                                     天空、灯、反射、雾、后期都认这个形状 —— 渲染侧一行没改，见 Script_EnvApply）
+//                                     天空、灯、反射、雾都认这个形状 —— 渲染侧一行没改，见 Script_EnvApply；
+//                                     后处理由 Data_CameraProfile.mjs 固化，不走环境组件）
 //   FromLegacy(decl, legacy, values)  从一份旧天空预设读回这个组件的参数（预设种子、旧预设当临时覆盖）
 //   Apply(decl, values, host)         可选：值变了就直接改灯 / 材质 / 渲染接口（不走环境参数的能力用，现在是角色光照）
 //
@@ -44,8 +45,7 @@ export function ComposeByPath(decl, values, out) {
 
 /**
  * 旧预设里没写某一项时渲染侧实际用的值（各消费方自己的 `?? 缺省`），读回来要对得上「画面上是什么」：
- * 云层（Script_Sky.Apply）、物理大气（Script_Atmosphere.ATMOSPHERE_PRESET_DEFAULTS）、
- * 调色（Data_Tuning_Camera.GRADE_DEFAULTS，合成 pass 每帧现取）、泛光门槛与镜头光晕（Script_PostBloom / Script_Main）。
+ * 云层（Script_Sky.Apply）、物理大气（Script_Atmosphere.ATMOSPHERE_PRESET_DEFAULTS）。
  */
 const LEGACY_ABSENT = Object.freeze({
   "cloudShape.0": 5.5, "cloudShape.1": 0.445, "cloudShape.2": 0.615, "cloudShape.3": 0,
@@ -59,10 +59,6 @@ const LEGACY_ABSENT = Object.freeze({
   "atmosphere.groundAlbedo": 0.3, "atmosphere.sunIrradiance": 20, "atmosphere.skyTint": [1, 1, 1],
   "atmosphere.skyFloor": [0, 0, 0], "atmosphere.artGlow": 0.35, "atmosphere.sunDiskT": 1, "atmosphere.belowVeil": 0,
   "atmosphere.aerialBlend": 1, "atmosphere.aerialGain": 1,
-  "fog.grade.contrastCurve": "linear", "fog.grade.lift": [0.006, 0.004, 0.012], "fog.grade.gain": [1.02, 1.0, 0.965],
-  "fog.grade.shadowTint": [0.855, 0.975, 1.170], "fog.grade.highlightTint": [1.105, 1.015, 0.880],
-  "fog.grade.shadow": 1, "fog.grade.highlight": 1,
-  bloomThreshold: 1.18, lensFlare: 1, godStrength: 0, bloom: 0,
 });
 
 /** 通用读法：按 out 从旧预设取；没写的取渲染侧缺省（LEGACY_ABSENT），再没有就保留声明默认值。 */
@@ -100,7 +96,14 @@ export const ENV_COMPONENT_LOGIC = Object.freeze({
   Sky: Generic,
   Clouds: Generic,
   Atmosphere: Generic,
-  Fog: Generic,
+  Fog: Object.freeze({
+    Compose: ComposeByPath,
+    FromLegacy(decl, legacy, values, name) {
+      ReadByPath(decl, legacy, values);
+      const known = decl.params.find((p) => p.key === "profile").options.some((o) => o.value === name);
+      if (known) values.profile = name;
+    },
+  }),
   // 角色光照：环境参数里照样写一份（Debug.Lighting.Output 看得到），真正起作用的是 Apply ——
   // 直接改人物材质补丁的全局 uniform（Script_CharacterLight），不经天穹 / 灯。旧天空预设里没有它 = 关（强度 0）。
   CharacterLight: Object.freeze({
@@ -113,14 +116,6 @@ export const ENV_COMPONENT_LOGIC = Object.freeze({
     Compose: ComposeByPath,
     FromLegacy: ReadByPath,
     Apply(decl, values, host) { host.weaponLight?.Set(values); },
-  }),
-  Grade: Object.freeze({
-    Compose: ComposeByPath,
-    FromLegacy(decl, legacy, values, name) {
-      ReadByPath(decl, legacy, values);
-      const known = decl.params.find((p) => p.key === "profile").options.some((o) => o.value === name);
-      if (known) values.profile = name;
-    },
   }),
 });
 

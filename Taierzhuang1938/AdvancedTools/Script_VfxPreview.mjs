@@ -65,8 +65,6 @@ async function Main() {
       SelectLook: (look) => !!environment.SelectLook(look),
     },
     previewStage: {
-      get exposureEv() { return stage.exposureEv; },
-      SetExposureEv: (ev) => stage.SetExposureEv(ev),
       get arenaMode() { return stage.arena.mode; },
       SetArenaMode: (mode) => stage.SetArenaMode(mode),
       SetArenaEffect: (id, flags) => stage.SetArenaEffect(id, flags),

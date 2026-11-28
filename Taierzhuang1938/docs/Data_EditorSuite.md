@@ -47,8 +47,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
   esbuild 插件把两个边界模块换成剔除版，其余代码不动。现在 Pages 发布**默认不剔除**。
 - 宿主拿到 `editor === null` 就按「没有开发工具」跑：不建齿轮、`` ` `` 不响应、菜单不列「Debug工具」「高级工具」
   （`Script_Menu` 看宿主给的 `DevToolsAvailable`），`Debug.OpenEditor` 等取证口回答「没有」。
-- 名字带 Editor 却随包发布的只有两个：`Script_EditorSettings`（设置页的类）、`Script_EditorUi`（控件工具箱）。
-  它们不许 import 任何开发模块。（原来的第三个 `Script_EditorWhiteboxQuality`——白盒画质那一栏——2026-10-31 随白盒画质档一起删了。）
+- 玩家设置页与通用 DOM 控件已于 2026-11-28 正式解耦为运行时模块：`Script_PlayerSettings.mjs`（设置页类）与 `Script_UiWidgets.mjs`（纯 DOM 控件工具箱，原 `Script_EditorUi.mjs` 退为开发编辑器兼容转出壳）。它们不 import 任何开发模块。
 - 样式：菜单栏 / Inspector 停靠只写在 `#edRoot` 下（`Style_Editor.css`「高级工具」两节），控件样式两边共用；
   剔除时 CSS 可原样留着（选择器落空），要瘦身再把 `#edRoot` 专属段落拆出去。
 - 闸门 `Script_DevToolsIsolationTest.mjs`：两对边界模块导出同名；剔除后游戏包与菜单包里没有任何开发模块
@@ -144,9 +143,9 @@ Esc：下拉菜单开着时只收菜单，否则退出高级工具；过场正�
 **它们不是一回事。** 设置改的是玩家自己的偏好、要落盘、与这一局无关；
 编辑器改的是这一局的运行时状态、退出时必须还干净。2026-10-13 起画面 / 声音 / 操作三页
 只从菜单「设置」进，宿主是 `Script_SettingsHost`（标题菜单与游戏共用，画在 `#settingsRoot`），
-高级工具里不再有它们；剔除开发工具后它们照常工作。页面类仍在 `Script_EditorSettings`。
+高级工具里不再有它们；剔除开发工具后它们照常工作。页面类在 `Script_PlayerSettings.mjs`。
 
-### 画质 `Script_EditorSettings.GraphicsSettings`
+### 画质 `Script_PlayerSettings.GraphicsSettings`
 
 TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反射遮蔽及光照/遮挡历史权重；太阳阴影开放深度偏移、法线偏移和覆盖半径。面板仅用短标签与数值，全部即时应用并随偏好保存，恢复出厂同时恢复这些参数与当前档位的阴影分辨率。GI 仍需 medium 及以上档位；low 面板给出一行提示。
 
@@ -177,7 +176,7 @@ TAA 开放当前帧权重、抖动幅度和锐化；GI 开放采样偏移、反�
 - **档位（low/medium/high/ultra）热切不了**：MSAA 采样数、AO 靶比例、泛光级数是
   `PostPipeline` 建靶时定死的。所以那一栏老实带 `?quality=` 刷新，不假装能实时换。
 
-### 音效 `Script_EditorSettings.AudioSettings`
+### 音效 `Script_PlayerSettings.AudioSettings`
 
 存 `tengxian1938_audio_v1`。三条分路音量写的是 `sfxUser` / `musicUser` /
 `ambienceUser` 三个专门的增益节点，**不是 `xxxBus.gain`** —— 那几个是系统自己的

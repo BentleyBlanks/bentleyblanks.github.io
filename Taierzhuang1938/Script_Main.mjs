@@ -27,7 +27,7 @@ import {
   MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
 } from "./Script_MaterialShading.mjs";
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
-import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "./Script_EditorSettings.mjs";
+import { NormalizeGraphicsDetails, LoadSavedGraphics, ApplySavedSettings } from "./Script_PlayerSettings.mjs";
 import { SettingsHost, SETTINGS_PAGE_IDS } from "./Script_SettingsHost.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip } from "./Script_ShadowSkip.mjs";

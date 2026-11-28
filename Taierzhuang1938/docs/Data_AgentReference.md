@@ -279,7 +279,7 @@ CPU 逐系统含子桶 / GPU 逐 pass / 掉帧取证 / GC / 场景节点普查�
   `Script_Materials.CloneShadedMaterial`（它按 `PatchesOf(source)` 重挂，不能抄
   `onBeforeCompile`）。**采样器硬预算 16 个**，预算表与打包手段在 §1.8。
 - **画质旋钮只在 `Data_Tuning_Graphics.mjs` 与各 `Data_Tuning_*`**；
-  `Script_Post` / `Script_Main` / `Script_EditorSettings` 只读，不写。画质档只有 low / medium / high / ultra（2026-10-31 删了「白盒」档：白盒是场景里的材质，不是渲染模式）。
+  `Script_Post` / `Script_Main` / `Script_PlayerSettings` 只读，不写。画质档只有 low / medium / high / ultra（2026-10-31 删了「白盒」档：白盒是场景里的材质，不是渲染模式）。
   `Data_Tuning_TemporalDof` 管「算法怎么算」，`Data_Tuning_Graphics` 管「这台机器画多重」。
 - **两组分辨率**：`post.width/height` 是内部分辨率、`post.outputWidth/outputHeight` 是输出
   分辨率，分界在 `Script_Post.mjs` 的模块内常量 `OUTPUT_DOMAIN_PASSES`（不导出）。

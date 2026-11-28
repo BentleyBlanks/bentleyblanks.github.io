@@ -5,7 +5,7 @@
 // 第一次用（还没存过）时从玩家当前的总音量起步，进出高级工具不会突然变响。
 // 界面：喇叭按钮（点一下静音 / 取消静音）+ 滑条 + 百分比，挂在高级工具菜单栏右侧。
 
-import { El } from "./Script_EditorUi.mjs";
+import { El } from "./Script_UiWidgets.mjs";
 
 export const TOOLS_VOLUME_KEY = "tengxian1938_tools_volume_v1";
 

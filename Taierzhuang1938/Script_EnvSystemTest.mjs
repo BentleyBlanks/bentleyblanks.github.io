@@ -81,7 +81,6 @@ const RENDER_FIELDS = [
   "sunElevation", "sunAzimuth", "lightColor", "lightIntensity", "sunColor", "sunIntensity", "sunSize",
   "zenith", "horizon", "ground", "glow", "glowSpread", "smoke", "smokeColor", "smokeHeight", "stars", "envIntensity",
   "fog.density", "fog.falloff", "fog.max", "fog.sky", "fog.ground", "fog.sunGain", "fog.desat", "fog.flatten",
-  "exposure", "saturation", "contrast", "bloom", "godStrength",
   "atmosphere.mie", "atmosphere.rayleigh", "atmosphere.groundAlbedo", "atmosphere.sunIrradiance", "atmosphere.skyTint", "atmosphere.skyFloor",
   "atmosphere.aerialGain", "atmosphere.artGlow",
 ];
@@ -103,12 +102,11 @@ for (const name of ["firstLevelBattleDay", "dusk", "firstLevelNight", "whiteboxD
     Check(SameDeep(GetPath(composed, field), want), `${name}.${field}：拼回去 ${JSON.stringify(GetPath(composed, field))} ≠ 原 ${JSON.stringify(want)}`);
   }
   if (legacy.cloudDeck) for (const k of Object.keys(legacy.cloudDeck)) Check(SameDeep(composed.cloudDeck[k], legacy.cloudDeck[k]), `${name}.cloudDeck.${k}`);
-  if (legacy.fog.grade) for (const k of Object.keys(legacy.fog.grade)) Check(SameDeep(composed.fog.grade[k], legacy.fog.grade[k]), `${name}.fog.grade.${k}`);
-  Check(composed.profile === name, `${name} 的后期档案`);
+  Check(composed.profile === name, `${name} 的时段档案`);
 }
-// 没写的项按渲染侧缺省读回（白天的 shProbe、夜里的环境底色、没写 lensFlare = 1）
+// 没写的项按渲染侧缺省读回（白天的 shProbe、夜里的环境底色）
 const night = ComposePreset(EnvPresetFromSkyPreset(SKY_PRESETS.night, "night"), 0);
-Check(night.shProbeIntensity === 0.11 && night.ambientIntensity === 0.045 && night.ambientColor === 0x607085 && night.lensFlare === 1, "夜战缺省的天光与镜头光晕");
+Check(night.shProbeIntensity === 0.11 && night.ambientIntensity === 0.045 && night.ambientColor === 0x607085, "夜战缺省的天光与底色");
 
 // --- 5. 校验与写法 ----------------------------------------------------------------------------------------
 const looks = EnvPresetFromLooks("Test", "测试", [
@@ -137,10 +135,10 @@ function MakePreset(id, components) { return NewEnvPreset(id, id, components); }
 const base = MakePreset("Base", {
   Sun: { enabled: true, params: { intensity: { keys: [{ h: 0, v: 0 }, { h: 12, v: 12 }], interp: "linear" } } },
   Fog: { enabled: true, params: { density: 0.01 } },
-  Grade: { enabled: true, params: { exposure: 1 } },
+  Reflection: { enabled: true, params: { intensity: 1 } },
 });
 const local = MakePreset("Local", { Fog: { enabled: true, params: { density: 0.03 } } });
-const full = MakePreset("Full", { Grade: { enabled: true, params: { exposure: 2 } } });
+const full = MakePreset("Full", { Reflection: { enabled: true, params: { intensity: 2 } } });
 const env = new EnvironmentSystem();
 env.SetScene("T", {
   schema: "tengxian-env-scene/1", scene: "T", time: { hour: 6, speed: 1, paused: true },
@@ -154,7 +152,7 @@ const outside = { x: 50, y: 0, z: 50 }, inHut = { x: 1, y: 0, z: 1 }, inCave = {
 let out = env.Update(0, outside);
 Check(Near(out.components.Sun.values.intensity, 6) && out.components.Fog.values.density === 0.01, "兜底区域在 6 点求值");
 Check(out.components.Sky.enabled === false && out.components.Sky.source.id === "Fallback", "完全覆盖的兜底没有的组件取关闭值，来源仍记兜底");
-Check(Near(out.preset.lightIntensity, 6) && out.preset.fog.density === 0.01 && out.preset.exposure === 1, "拼出来的环境参数");
+Check(Near(out.preset.lightIntensity, 6) && out.preset.fog.density === 0.01 && out.preset.envIntensity === 1, "拼出来的环境参数");
 out = env.Update(0, inHut);
 Check(out.components.Fog.source.id === "Hut" && out.components.Sun.source.id === "Fallback", "局部只盖自己有的组件（雾），其余继承兜底");
 Check(Near(out.components.Fog.values.density, 0.01), "刚进区域：从当时的实际表现起步");
@@ -167,24 +165,24 @@ Check(Near(out.components.Fog.values.density, 0.03), "过渡走完");
 env.SetPaused(true);
 out = env.Update(0, inCave);
 out = env.Update(5, inCave);
-Check(out.components.Grade.values.exposure === 2 && out.components.Fog.enabled === false && out.components.Sun.enabled === false, "完全覆盖：没有的组件取关闭值，不继承下层");
+Check(out.components.Reflection.values.intensity === 2 && out.components.Fog.enabled === false && out.components.Sun.enabled === false, "完全覆盖：没有的组件取关闭值，不继承下层");
 Check(out.components.Fog.values.density === 0 && out.components.Sun.values.intensity === 0, "关闭值");
 out = env.Update(0, outside);
-const leavingFrom = out.components.Grade.values.exposure;
+const leavingFrom = out.components.Reflection.values.intensity;
 out = env.Update(0.5, outside);
-Check(leavingFrom === 2 && out.components.Grade.values.exposure < 2 && out.components.Grade.values.exposure > 1, "走出区域按离开那一层的 blendS 过渡回去");
+Check(leavingFrom === 2 && out.components.Reflection.values.intensity < 2 && out.components.Reflection.values.intensity > 1, "走出区域按离开那一层的 blendS 过渡回去");
 out = env.Update(1, outside);
-Check(out.components.Grade.values.exposure === 1, "回到兜底");
+Check(out.components.Reflection.values.intensity === 1, "回到兜底");
 // 临时覆盖
-const handle = env.PushOverride({ id: "Flash", preset: MakePreset("Flash", { Grade: { enabled: true, params: { exposure: 4 } } }), priority: 100, blendS: 0 });
+const handle = env.PushOverride({ id: "Flash", preset: MakePreset("Flash", { Reflection: { enabled: true, params: { intensity: 4 } } }), priority: 100, blendS: 0 });
 out = env.Update(0, outside);
-Check(out.components.Grade.values.exposure === 4 && out.components.Grade.source.kind === "override", "临时覆盖立刻生效（blendS 0）");
-Check(env.Sources()[0].id === "Flash" && env.Sources()[0].providing.includes("Grade"), "总览按优先级排、标出提供了哪些组件");
+Check(out.components.Reflection.values.intensity === 4 && out.components.Reflection.source.kind === "override", "临时覆盖立刻生效（blendS 0）");
+Check(env.Sources()[0].id === "Flash" && env.Sources()[0].providing.includes("Reflection"), "总览按优先级排、标出提供了哪些组件");
 Check(handle.Release(1) && !handle.active, "句柄释放");
 out = env.Update(0.5, outside);
-Check(out.components.Grade.values.exposure < 4 && out.components.Grade.values.exposure > 1, "释放后按给的时长过渡回去");
+Check(out.components.Reflection.values.intensity < 4 && out.components.Reflection.values.intensity > 1, "释放后按给的时长过渡回去");
 out = env.Update(1, outside);
-Check(out.components.Grade.values.exposure === 1 && !env.Sources().some((s) => s.id === "Flash"), "覆盖撤干净");
+Check(out.components.Reflection.values.intensity === 1 && !env.Sources().some((s) => s.id === "Flash"), "覆盖撤干净");
 // 组件关掉 = 不参与（下层接手）
 local.components.Fog.enabled = false;
 env.Touch();
@@ -230,17 +228,17 @@ for (const sceneId of ["FirstLevelWhitebox", "FirstLevel"]) {
     const want = GetPath(SKY_PRESETS.firstLevelBattleDay, field);
     if (want !== undefined) Check(SameDeep(GetPath(day, field), want), `${sceneId} 白天 = firstLevelBattleDay（${field}）`);
   }
-  Check(day.profile === "firstLevelBattleDay", "白天的后期档案");
+  Check(day.profile === "firstLevelBattleDay", "白天的时段档案");
   const dusk = at(18), nightOut = at(22), late = at(2), dawn = at(8);
   Check(dusk.profile === "dusk" && dusk.lightColor === SKY_PRESETS.dusk.lightColor && dusk.sunAzimuth === SKY_PRESETS.dusk.sunAzimuth, `${sceneId} 黄昏`);
-  Check(nightOut.profile === "firstLevelNight" && nightOut.exposure === SKY_PRESETS.firstLevelNight.exposure, `${sceneId} 晚上`);
-  Check(late.exposure === nightOut.exposure && late.lightIntensity === nightOut.lightIntensity, `${sceneId} 夜里 22→4 点保持同一套`);
+  Check(nightOut.profile === "firstLevelNight" && nightOut.lightIntensity === SKY_PRESETS.firstLevelNight.lightIntensity, `${sceneId} 晚上`);
+  Check(late.profile === nightOut.profile && late.lightIntensity === nightOut.lightIntensity, `${sceneId} 夜里 22→4 点保持同一套`);
   Check(dawn.lightIntensity > nightOut.lightIntensity && dawn.lightIntensity < day.lightIntensity, `${sceneId} 早上 8 点在夜与白天之间`);
-  // 画面亮度 ≈ 平行光 × 曝光：过渡中间不许比两头都亮（20 点、8 点、15 点）
-  const lit = (p) => p.lightIntensity * p.exposure;
+  // 曝光已由 CameraProfile.standard 固化；主光强度按对数插，过渡中间单调不越界（20 点、8 点、15 点）
+  const lit = (p) => p.lightIntensity;
   for (const [hour, a, b] of [[20, dusk, nightOut], [8, nightOut, day], [15, day, dusk]]) {
     const m = at(hour);
-    Check(lit(m) <= Math.max(lit(a), lit(b)) + 1e-9 && lit(m) >= Math.min(lit(a), lit(b)) - 1e-9, `${sceneId} ${hour} 点的亮度在两头之间（${lit(m).toFixed(2)}）`);
+    Check(lit(m) <= Math.max(lit(a), lit(b)) + 1e-9 && lit(m) >= Math.min(lit(a), lit(b)) - 1e-9, `${sceneId} ${hour} 点的主光强度在两头之间（${lit(m).toFixed(2)}）`);
   }
   const afternoon = at(15);
   Check(afternoon.sunElevation < day.sunElevation && afternoon.sunElevation > dusk.sunElevation, `${sceneId} 下午 3 点太阳在正午与黄昏之间`);

@@ -311,12 +311,8 @@ const preset = {
       fadeHeight:.127,shade:[.359,.339,.357],gap:.96,silver:0,shapeScale:.96,shapeCover:.61}},
     Atmosphere:{enabled:true,params:{mie:6.4,mieG:.71,rayleigh:.32,ozone:.5,groundAlbedo:.16,sunIrradiance:1.18,
       skyTint:[.48,.46,.47],skyFloor:[.452,.431,.45],artGlow:0,aerialBlend:.09,aerialGain:.15}},
-    Fog:{enabled:true,params:{density:.0204,falloff:7.7,max:.86,skyScale:.51,skyColor:[.134,.121,.123],
+    Fog:{enabled:true,params:{profile:"firstLevelBattleDay",density:.0204,falloff:7.7,max:.86,skyScale:.51,skyColor:[.134,.121,.123],
       groundColor:[.245,.224,.217],sunGain:.015,desat:.43,flatten:.056}},
-    Grade:{enabled:true,params:{profile:"firstLevelBattleDay",exposure:1.12,saturation:.60,contrast:.95,
-      contrastCurve:"soft",gain:[1.02,1,.98],lift:[.009,.008,.008],shadowTint:[.98,1,1.035],
-      highlightTint:[1.036,1,.97],splitShadow:.24,splitHighlight:.17,bloom:.06,
-      bloomThreshold:1.25,godStrength:0,lensFlare:0}},
   },
 };
 const zones = {schema:"tengxian-env-scene/1",scene:id,time:{hour:12,speed:0,paused:true},

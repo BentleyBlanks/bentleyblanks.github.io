@@ -422,6 +422,15 @@
     "Fog": {
       "enabled": true,
       "params": {
+        "profile": {
+          "keys": [
+            {"h": 4, "v": "firstLevelNight", "tag": "night"},
+            {"h": 12, "v": "dusk", "tag": "dusk"},
+            {"h": 17.5, "v": "dusk", "tag": "dusk"},
+            {"h": 22, "v": "firstLevelNight", "tag": "night"}
+          ],
+          "interp": "smooth"
+        },
         "density": {
           "keys": [
             {"h": 4, "v": 0.021, "tag": "night"},
@@ -590,114 +599,6 @@
             {"h": 4, "v": 1, "tag": "night"},
             {"h": 12, "v": 0.6, "tag": "dusk"},
             {"h": 17.5, "v": 0.6, "tag": "dusk"},
-            {"h": 22, "v": 1, "tag": "night"}
-          ],
-          "interp": "smooth"
-        }
-      }
-    },
-    "Grade": {
-      "enabled": true,
-      "params": {
-        "exposure": {
-          "keys": [
-            {"h": 4, "v": 2.7, "tag": "night"},
-            {"h": 12, "v": 0.56, "tag": "dusk"},
-            {"h": 17.5, "v": 0.56, "tag": "dusk"},
-            {"h": 22, "v": 2.7, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "profile": {
-          "keys": [
-            {"h": 4, "v": "firstLevelNight", "tag": "night"},
-            {"h": 12, "v": "dusk", "tag": "dusk"},
-            {"h": 17.5, "v": "dusk", "tag": "dusk"},
-            {"h": 22, "v": "firstLevelNight", "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "saturation": {
-          "keys": [
-            {"h": 4, "v": 0.72, "tag": "night"},
-            {"h": 12, "v": 0.9788, "tag": "dusk"},
-            {"h": 17.5, "v": 0.9788, "tag": "dusk"},
-            {"h": 22, "v": 0.72, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "contrast": {
-          "keys": [
-            {"h": 4, "v": 1.14, "tag": "night"},
-            {"h": 12, "v": 1.0804, "tag": "dusk"},
-            {"h": 17.5, "v": 1.0804, "tag": "dusk"},
-            {"h": 22, "v": 1.14, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "contrastCurve": "linear",
-        "lift": {
-          "keys": [
-            {"h": 4, "v": [0.006, 0.004, 0.012], "tag": "night"},
-            {"h": 12, "v": [0.0059, 0.0039, 0.0118], "tag": "dusk"},
-            {"h": 17.5, "v": [0.0059, 0.0039, 0.0118], "tag": "dusk"},
-            {"h": 22, "v": [0.006, 0.004, 0.012], "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "gain": [1.02, 1, 0.965],
-        "shadowTint": {
-          "keys": [
-            {"h": 4, "v": [0.855, 0.975, 1.17], "tag": "night"},
-            {"h": 12, "v": [0.8565, 0.9751, 1.1682], "tag": "dusk"},
-            {"h": 17.5, "v": [0.8565, 0.9751, 1.1682], "tag": "dusk"},
-            {"h": 22, "v": [0.855, 0.975, 1.17], "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "highlightTint": [1.105, 1.015, 0.88],
-        "splitShadow": {
-          "keys": [
-            {"h": 4, "v": 1, "tag": "night"},
-            {"h": 12, "v": 0.9862, "tag": "dusk"},
-            {"h": 17.5, "v": 0.9862, "tag": "dusk"},
-            {"h": 22, "v": 1, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "splitHighlight": {
-          "keys": [
-            {"h": 4, "v": 1, "tag": "night"},
-            {"h": 12, "v": 0.9852, "tag": "dusk"},
-            {"h": 17.5, "v": 0.9852, "tag": "dusk"},
-            {"h": 22, "v": 1, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "bloom": {
-          "keys": [
-            {"h": 4, "v": 0.85, "tag": "night"},
-            {"h": 12, "v": 0.15, "tag": "dusk"},
-            {"h": 17.5, "v": 0.15, "tag": "dusk"},
-            {"h": 22, "v": 0.85, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "bloomThreshold": 1.18,
-        "godStrength": {
-          "keys": [
-            {"h": 4, "v": 0, "tag": "night"},
-            {"h": 12, "v": 0.15, "tag": "dusk"},
-            {"h": 17.5, "v": 0.15, "tag": "dusk"},
-            {"h": 22, "v": 0, "tag": "night"}
-          ],
-          "interp": "smooth"
-        },
-        "lensFlare": {
-          "keys": [
-            {"h": 4, "v": 1, "tag": "night"},
-            {"h": 12, "v": 0.3, "tag": "dusk"},
-            {"h": 17.5, "v": 0.3, "tag": "dusk"},
             {"h": 22, "v": 1, "tag": "night"}
           ],
           "interp": "smooth"

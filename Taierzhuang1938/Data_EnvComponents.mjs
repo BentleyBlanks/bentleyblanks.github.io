@@ -1,6 +1,7 @@
 // 环境组件的声明表（docs/Data_Environment.md §2）。
 //
-// 组件是环境能力的基本单元：主光、环境光、反射、天空、云层、物理大气、雾、角色光照、曝光与调色各是一种。
+// 组件是环境能力的基本单元：主光、环境光、反射、天空、云层、物理大气、雾、角色光照、武器补光各是一种。
+// 曝光、调色、泛光、颗粒等后处理由 Data_CameraProfile.mjs 统一固化，不再作为环境组件。
 // 这张表只声明「是什么」——名字、分类、图标、参数（类型 / 范围 / 默认值 / 能不能随昼夜变 / 怎么插值 /
 // 写进环境参数的哪一项）、关掉时取什么。执行逻辑在 Script_EnvComponents（同名 type 一个，多数走通用写法）；
 // 框架（Script_EnvSystem）按这张表发现组件、求值、过渡、调度，编辑器（Script_EditorEnvironment*）按它生成
@@ -13,8 +14,8 @@
 //   min / max / step  滑条范围（rgb 是每通道的范围）
 //   default        预设里没写这一项时用它
 //   out            写进环境参数（与 Script_Sky.SKY_PRESETS 同形）的路径，「.」分层，数字段是数组下标
-//   lerp           number / rgb：log = 按对数插值（逐通道）。亮度类的量都按对数插：画面亮度 ≈ 光强 × 曝光，
-//                  白天与夜里差两个数量级，线性插会让过渡中间比两头都亮（光强已经往夜里走了一半、曝光却按对数刚抬起来）
+//   lerp           number / rgb：log = 按对数插值（逐通道）。亮度类的量都按对数插：
+//                  白天与夜里光强/天色差两个数量级，线性插会让过渡中间比两头偏亮
 //   animatable     false = 只能是固定值（不给关键帧）
 //   group          卡片里的小标题
 //   hint           悬停说明
@@ -32,10 +33,9 @@ export const ENV_CATEGORIES = Object.freeze([
   Object.freeze({ id: "fog", label: "雾", icon: "≋" }),
   Object.freeze({ id: "reflection", label: "反射", icon: "◇" }),
   Object.freeze({ id: "character", label: "人物", icon: "♟" }),
-  Object.freeze({ id: "post", label: "后期", icon: "◑" }),
 ]);
 
-/** 后期档案：自动曝光锚点、体积雾参数、胶片颗粒、照明弹的昼夜口径按这个名字查（都是 SKY_PRESETS 的名字）。 */
+/** 时段档案：体积雾参数与照明弹的昼夜口径按这个名字查（都是 SKY_PRESETS 的名字；后处理由 CAMERA_PROFILES.standard 固化）。 */
 export const ENV_PROFILES = Object.freeze([
   Object.freeze({ value: "firstLevelBattleDay", label: "第一关白天" }),
   Object.freeze({ value: "dusk", label: "黄昏" }),
@@ -152,8 +152,9 @@ export const ENV_COMPONENTS = Object.freeze([
   }),
   Object.freeze({
     type: "Fog", label: "雾", category: "fog", icon: "≋",
-    summary: "合成 pass 里的高度雾 + 距离雾 + 按深度去饱和；体积雾的口径按「后期档案」查。",
+    summary: "合成 pass 里的高度雾 + 距离雾 + 按深度去饱和；「时段档案」决定体积雾参数与照明弹昼夜口径。",
     params: Object.freeze([
+      P({ key: "profile", label: "时段档案", kind: "enum", options: ENV_PROFILES, default: "firstLevelBattleDay", out: "profile", group: "体积雾与时段", hint: "决定体积雾参数与照明弹昼夜口径，按就近的关键帧切换（后处理由 CameraProfile.standard 固化）" }),
       P({ key: "density", label: "浓度", kind: "number", min: 0, max: 0.05, step: 0.0001, default: 0.0032, out: "fog.density", group: "量" }),
       P({ key: "falloff", label: "高度衰减", kind: "number", min: 1, max: 600, step: 0.5, default: 45, out: "fog.falloff", group: "量", hint: "米：越大雾越往上走" }),
       P({ key: "max", label: "最浓", kind: "number", min: 0, max: 1, step: 0.01, default: 0.72, out: "fog.max", group: "量" }),
@@ -190,27 +191,5 @@ export const ENV_COMPONENTS = Object.freeze([
       P({ key: "sun", label: "枪受的阳光", kind: "number", min: 0.1, max: 1.5, step: 0.01, default: 1, lerp: "log", out: "weaponLight.sun", group: "环境光", hint: "太阳直射照到枪上的那份乘它（枪口焰、点光不受影响）；1 = 跟场景一样" }),
     ]),
     off: Object.freeze({ fill: 0, spec: 0, ambient: 1, sun: 1 }),
-  }),
-  Object.freeze({
-    type: "Grade", label: "曝光与调色", category: "post", icon: "◑",
-    summary: "曝光、饱和度、对比、泛光与分离调色；「后期档案」决定自动曝光锚点、体积雾与颗粒按哪一档走。",
-    params: Object.freeze([
-      P({ key: "exposure", label: "曝光", kind: "number", min: 0.1, max: 5, step: 0.01, default: 0.78, lerp: "log", out: "exposure", group: "曝光" }),
-      P({ key: "profile", label: "后期档案", kind: "enum", options: ENV_PROFILES, default: "firstLevelBattleDay", out: "profile", group: "曝光", hint: "按就近的关键帧切换" }),
-      P({ key: "saturation", label: "饱和度", kind: "number", min: 0, max: 1.5, step: 0.01, default: 0.92, out: "saturation", group: "色调" }),
-      P({ key: "contrast", label: "对比", kind: "number", min: 0.5, max: 1.5, step: 0.01, default: 1.10, out: "contrast", group: "色调" }),
-      P({ key: "contrastCurve", label: "对比曲线", kind: "enum", options: Object.freeze([Object.freeze({ value: "linear", label: "线性" }), Object.freeze({ value: "soft", label: "S 曲线" })]), default: "linear", out: "fog.grade.contrastCurve", group: "色调" }),
-      P({ key: "lift", label: "暗部抬升", kind: "rgb", min: -0.05, max: 0.05, step: 0.001, default: RGB(0.006, 0.004, 0.012), out: "fog.grade.lift", group: "分离调色" }),
-      P({ key: "gain", label: "增益", kind: "rgb", min: 0.5, max: 1.5, step: 0.005, default: RGB(1.02, 1.0, 0.965), out: "fog.grade.gain", group: "分离调色" }),
-      P({ key: "shadowTint", label: "暗部色", kind: "rgb", min: 0, max: 2, step: 0.005, default: RGB(0.855, 0.975, 1.170), out: "fog.grade.shadowTint", group: "分离调色" }),
-      P({ key: "highlightTint", label: "亮部色", kind: "rgb", min: 0, max: 2, step: 0.005, default: RGB(1.105, 1.015, 0.880), out: "fog.grade.highlightTint", group: "分离调色" }),
-      P({ key: "splitShadow", label: "暗部力度", kind: "number", min: 0, max: 1.5, step: 0.01, default: 1.0, out: "fog.grade.shadow", group: "分离调色" }),
-      P({ key: "splitHighlight", label: "亮部力度", kind: "number", min: 0, max: 1.5, step: 0.01, default: 1.0, out: "fog.grade.highlight", group: "分离调色" }),
-      P({ key: "bloom", label: "泛光", kind: "number", min: 0, max: 1.5, step: 0.01, default: 0.04, out: "bloom", group: "光学" }),
-      P({ key: "bloomThreshold", label: "泛光门槛", kind: "number", min: 0.5, max: 4, step: 0.01, default: 1.18, out: "bloomThreshold", group: "光学" }),
-      P({ key: "godStrength", label: "光束拖影", kind: "number", min: 0, max: 1.5, step: 0.01, default: 0, out: "godStrength", group: "光学", hint: "只在没有体积雾的档位起作用" }),
-      P({ key: "lensFlare", label: "镜头光晕", kind: "number", min: 0, max: 1.5, step: 0.01, default: 0, out: "lensFlare", group: "光学" }),
-    ]),
-    off: Object.freeze({}),
   }),
 ]);

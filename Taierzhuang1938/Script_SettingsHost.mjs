@@ -4,12 +4,12 @@
 // 也要等编辑器构造时才装回去 —— 把开发工具剔掉，玩家设置就跟着没了。现在它们只认这里：
 // 标题菜单（Script_MenuStartup）与游戏宿主（Script_Main）共用同一份，与 Script_DevTools 无关。
 //
-// 页面本身仍是 Script_EditorSettings 的三个类（Enter / Update / Exit 接口，名字是历史遗留）；
+// 页面实现位于 Script_PlayerSettings.mjs（与 Script_UiWidgets.mjs 共用纯 DOM 控件，不依赖开发工具）；
 // 它们画进 #settingsRoot（与开发工具的 #edRoot 分开），样式在 Style_Menu.css。
 //
 // 打开时的副作用（藏菜单、停背景声、回到哪一层）各宿主不同，走 OnOpen / OnClose 交回去。
 
-import { GraphicsSettings, AudioSettings, ControlsSettings } from "./Script_EditorSettings.mjs";
+import { GraphicsSettings, AudioSettings, ControlsSettings } from "./Script_PlayerSettings.mjs";
 
 export const SETTINGS_PAGES = Object.freeze([GraphicsSettings, AudioSettings, ControlsSettings]);
 export const SETTINGS_PAGE_IDS = Object.freeze(SETTINGS_PAGES.map((page) => page.id));

@@ -142,7 +142,7 @@ function generateShadowMapTypeDefine( parameters ) {
 **硬边界（门禁 `Script_CameraProfileTest.mjs` 守护）**：
 1. **昼夜不改后处理**：环境系统与昼夜预设只改天穹、光照、反射与雾/体积雾，不再覆写后处理曝光、调色、泛光或颗粒。
 2. **运行期局部覆写白名单**（`CAMERA_PROFILE_RUNTIME_OVERRIDES`）：仅允许 **DoF（景深 / 近景散焦）**、**体积雾 / 雾** 与 **玩法瞬态生理反馈（受伤 / 压制 / 眩晕 / 震荡 / 闭眼 / 黑场）**。
-3. **玩家画质设置收口**：`Script_EditorSettings.mjs` / `Script_Tuning_GameGraphics.mjs` 不暴露任何冻结后处理旋钮，旧存档中属于 `CAMERA_PROFILE_FROZEN_SETTINGS_KEYS` 的字段在读盘与存盘时自动剔除。
+3. **玩家画质设置收口**：`Script_PlayerSettings.mjs` / `Script_Tuning_GameGraphics.mjs` 不暴露任何冻结后处理旋钮，旧存档中属于 `CAMERA_PROFILE_FROZEN_SETTINGS_KEYS` 的字段在读盘与存盘时自动剔除。
 4. **唯一装配口**：业务与工具代码禁止在 `Script_CameraProfile.mjs` 之外直接 `new PostPipeline(`、直接写 `renderer.toneMapping*` 或调用后处理美术参数 setter。
 
 ### 1.2 帧图（有序 pass 列表，`PostPipeline.passes`）
@@ -643,7 +643,7 @@ SEGMENT encode           EncodeOutput()          ← 输出色彩空间 / 抖动
 * 另有两组独立常量：`HZB`（`maxLevels` / `minSize`）、`VELOCITY`（`clampUv` /
   `skinnedPrev`）。
 
-`Script_Post` / `Script_Main` / `Script_EditorSettings` **只读**这张表。
+`Script_Post` / `Script_Main` / `Script_PlayerSettings` **只读**这张表。
 子系统落地时把自己那一位改成实际档位，并在表里补出处注释。
 
 ### 1.11 怎么新增一个 pass / 一个材质补丁
@@ -2282,7 +2282,7 @@ low 档重构前**完全没有**太阳阴影（`castShadow = false`），现在�
 `Data_Tuning_Graphics` 里只留两位总闸：`csm`（四档全开）与 `contactShadows`
 （medium 及以上）。
 
-画质面板（`Script_EditorSettings`）：
+画质面板（`Script_PlayerSettings`）：
 
 * **阴影** 总开关、**接触阴影** 开关（与档位取与：low 档没编那段 GLSL，
   开了也没用；这一位只决定「跑不跑那一趟 pass」，材质里那段是编译期开关，
@@ -6186,7 +6186,7 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 最后，它构造函数里的 `ApplySavedSettings` 才把存档画质套上。改过任一编译期开关的玩家，预热编出来的全是用不上的
 变体；开局看得见的材质在头几帧现编（被开场盖住），爆炸时才第一次出现的材质就卡在第一颗弹上。
 
-修法：`Script_EditorSettings.LoadSavedGraphics` 只把存档值灌进 `graphics` 表，`Boot` 在第一次 `EnterLevel`
+修法：`Script_PlayerSettings.LoadSavedGraphics` 只把存档值灌进 `graphics` 表，`Boot` 在第一次 `EnterLevel`
 之前调它并 `ApplyGraphics()`；编辑器那次再套是同一组值，`ApplyGraphics` 对编译期开关只在变了时重编，不多花。
 开机最早期（设置套上之前）编过的变体会留在材质自己的变体缓存里，没人用、不卡。
 回归口：`Script_SavedGraphicsWarmTest`（存档关 POM → 没有材质正在用 POM 变体；真扔一颗弹炸死三名日军，

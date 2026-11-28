@@ -148,7 +148,7 @@ try {
     const { SKY_PRESETS } = await import("./Script_Sky.mjs");
     const day = SKY_PRESETS.firstLevelBattleDay;
     const out = L.Output();
-    const fields = ["sunElevation", "sunAzimuth", "lightColor", "lightIntensity", "exposure", "envIntensity", "saturation", "contrast"];
+    const fields = ["sunElevation", "sunAzimuth", "lightColor", "lightIntensity", "envIntensity"];
     const same = fields.every((f) => Math.abs(out[f] - day[f]) < 1e-9) && JSON.stringify(out.fog.sky) === JSON.stringify(day.fog.sky) && out.fog.density === day.fog.density;
     const s = L.State();
     return { active: s.active, scene: s.sceneId, hour: s.clock.hour, profile: s.profile, sources: L.Sources().map((x) => x.id),
@@ -320,7 +320,7 @@ try {
   Check("保存：区域文件带读文件时的版本号", sceneSave?.revision === agentRevision, J(saved));
   Check("存的内容过校验", saves.every((s) => (s.kind === "preset" ? ValidateEnvPreset(s.doc).ok : ValidateSceneEnv(s.doc).ok)), "");
   Check("保存后没有脏标记", (await B(() => window.Tengxian.Debug.Blockout.Environment.State().dirty)).length === 0, "");
-  await B(() => window.Tengxian.Debug.Blockout.Environment.SetParam("FirstLevelWhitebox", "Grade", "bloom", 0.2));
+  await B(() => window.Tengxian.Debug.Blockout.Environment.SetParam("FirstLevelWhitebox", "Fog", "density", 0.02));
   conflictNext = true;
   const conflict = await B(async () => { const E = window.Tengxian.Debug.Blockout.Environment; const r = await E.Save(); return { r, state: E.State(), banner: document.querySelector(".envStatus")?.textContent || "" }; });
   Check("409：不当成存好了，挂冲突横幅（重新读取 / 先不管）", conflict.r.ok === false && !!conflict.state.conflict && conflict.state.dirty.length > 0 && /改过/.test(conflict.banner) && /重新读取/.test(conflict.banner), J({ r: conflict.r, banner: conflict.banner }));
@@ -422,7 +422,7 @@ try {
       const L = window.Tengxian.Debug.Lighting;
       const { SKY_PRESETS } = await import("./Script_Sky.mjs");
       const day = SKY_PRESETS.firstLevelBattleDay, out = L.Output(), s = L.State();
-      const fields = ["sunElevation", "sunAzimuth", "lightColor", "lightIntensity", "exposure", "envIntensity", "saturation", "contrast"];
+      const fields = ["sunElevation", "sunAzimuth", "lightColor", "lightIntensity", "envIntensity"];
       return { active: s.active, kind: s.kind, scene: s.sceneId, profile: s.profile, sources: L.Sources().map((x) => `${x.id}:${x.presetId}`),
         same: fields.every((f) => Math.abs(out[f] - day[f]) < 1e-9) && out.fog.density === day.fog.density, char: L.CharacterLight() };
     });

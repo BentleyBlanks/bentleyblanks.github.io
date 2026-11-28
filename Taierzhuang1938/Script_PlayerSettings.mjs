@@ -21,7 +21,7 @@
 // **不是 xxxBus.gain** —— 那几个是系统自己的配平（每段音乐的 level 由 LoopLayer 施加，
 // duck 会把 duckGain 压下去再放回来），滑杆写在同一个参数上会被抹掉。
 
-import { El, Panel, Section, Slider, Chips, Facts, Note } from "./Script_EditorUi.mjs";
+import { El, Panel, Section, Slider, Chips, Facts, Note } from "./Script_UiWidgets.mjs";
 import { T } from "./Script_Text.mjs";
 import { CONTROL_GUIDE } from "./Script_Input.mjs";
 import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
@@ -123,7 +123,7 @@ export function LoadSavedGraphics(graphics) {
 }
 
 /**
- * 开机时把存下来的设置装回去。EditorSuite 的构造函数调它 ——
+ * 开机时把存下来的设置装回去。SettingsHost / 宿主开机时调它 ——
  * 只在打开面板时才生效的设置不叫设置，那叫开关。
  */
 export function ApplySavedSettings(host, { restoreGraphics = true } = {}) {
@@ -148,7 +148,7 @@ export function ApplySavedSettings(host, { restoreGraphics = true } = {}) {
 // 折叠分组的展开状态：同一会话内重建 / 恢复出厂后保持。
 const OPEN_GFX_GROUPS = new Set();
 
-/** 画面页的开关行：整行是一颗 button.edBtn，左标签右「开 / 关」状态框。接口同 Script_EditorUi.Toggle。 */
+/** 画面页的开关行：整行是一颗 button.edBtn，左标签右「开 / 关」状态框。接口同 Script_UiWidgets.Toggle。 */
 function GfxSwitch(parent, label, value, onChange) {
   let on = !!value;
   const btn = El("button", "edBtn gfxSwitch");

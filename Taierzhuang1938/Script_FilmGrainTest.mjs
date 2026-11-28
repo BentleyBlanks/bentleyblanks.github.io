@@ -325,7 +325,7 @@ try {
 
   // ---- 3. 设置层：CameraProfile 固化后颗粒不再进玩家画质面板与存档 ----
   settings = await page.evaluate(async () => {
-    const { GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_EditorSettings.mjs");
+    const { GraphicsDetailControls, LoadSavedGraphics } = await import("./Script_PlayerSettings.mjs");
     const { CreateGameGraphics } = await import("./Script_Tuning_GameGraphics.mjs");
     const preset = { ...window.Probe.post.preset };
     const Make = () => CreateGameGraphics({ profile: "high", preset });

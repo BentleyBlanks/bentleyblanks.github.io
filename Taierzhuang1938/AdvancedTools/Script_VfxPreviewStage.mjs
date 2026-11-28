@@ -84,7 +84,6 @@ export class VfxPreviewStage {
       this.arena.grid.userData.skipNormalDepth = true;
     }
     this.exposure = CAMERA_PROFILES.standard.exposure;
-    this.exposureEv = 0;
     this.sunDirection = new THREE.Vector3(0.4, 0.8, 0.4).normalize();
     this.sunColor = [...CAMERA_PROFILES.standard.defaultSunColor];
     this.fog = CAMERA_PROFILES.standard.neutralFog;
@@ -160,11 +159,6 @@ export class VfxPreviewStage {
 
   SetArenaEffect(effectId, flags) {
     this.arena.SetEffect(effectId, flags);
-  }
-
-  /** 兼容保留接口：标准 CameraProfile 曝光已固化为 0 EV，不接受外部漂移。 */
-  SetExposureEv() {
-    this.exposureEv = 0;
   }
 
   get OutputExposure() { return CAMERA_PROFILES.standard.exposure; }

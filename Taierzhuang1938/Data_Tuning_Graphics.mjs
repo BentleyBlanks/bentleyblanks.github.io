@@ -9,7 +9,7 @@
 // 跨系统契约见项目 AGENTS.md 第 12 条。
 //
 // 这张表是**渲染帧图唯一的开关与旋钮来源**：`Script_Post.mjs` 的编排器按它决定
-// 每个 pass 建不建靶、跑不跑；`Script_Main.mjs` 与 `Script_EditorSettings.mjs`
+// 每个 pass 建不建靶、跑不跑；`Script_Main.mjs` 与 `Script_PlayerSettings.mjs`
 // 只读，不写。想加一个 pass，先在这里加一位开关（四档都要给值），再去帧图里插一行。
 //
 // ## 为什么值都写死不做插值
@@ -97,7 +97,7 @@
  *   msaa          主 HDR 靶的多重采样数（0 = 关）
  *   motionBlur    合成 pass 里的相机运动模糊
  *   sharpen       末趟锐化强度（FXAA/TAA 之后补回边缘）
- *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
+ *   taa           时域抗锯齿（由 CAMERA_PROFILES.standard 固化开启，不再向玩家暴露热切）
  *   terrainBlend  Soil-only material MRT before prepass; opaque stone contact channels, all tiers.
  *   terrainTrails 地面脚印与痕迹（Script_TerrainTrails：相机中心的环形痕迹靶 + 地形着色）。
  *                 值是 Data_Tuning_TerrainTrails.TERRAIN_TRAIL_TIERS 的档位名；false = 不跑。

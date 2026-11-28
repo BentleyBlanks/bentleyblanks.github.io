@@ -6,7 +6,7 @@ import {CommandRoom} from './Script_CommandRoom.mjs';
 import {CommandRoomPreview} from './Script_CommandRoomPreview.mjs';
 import {BootPaper} from './Script_BootPaper.mjs';
 import {AudioEngine} from './Script_Audio.mjs';
-import {ApplySavedSettings, NormalizeGraphicsDetails} from './Script_EditorSettings.mjs';
+import {ApplySavedSettings, NormalizeGraphicsDetails} from './Script_PlayerSettings.mjs';
 import {SettingsHost, SETTINGS_PAGE_IDS} from './Script_SettingsHost.mjs';
 import {DEV_TOOLS_ENABLED, DEBUG_TOOL_IDS, TOOL_INFO} from './Data_DevTools.mjs';
 import {LoadGraphicsProfile, CreateGraphicsProfileApi} from './Script_GraphicsProfile.mjs';

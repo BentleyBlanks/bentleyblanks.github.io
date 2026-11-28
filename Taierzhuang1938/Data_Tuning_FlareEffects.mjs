@@ -39,7 +39,7 @@ export const FLARE_PHOTOMETRY=Object.freeze({dayScale:.0001,nightScale:1,
   // Two coincident active emitters must also fit the 65504 half-float target.
   coreRadiusSquared:.0025,coreFraction:.9,radianceMax:28000});
 
-// 照明弹昼夜口径：后期档案（环境组件 Grade.profile，即 SKY_PRESETS 的键）是这几档时按夜间算，
+// 照明弹昼夜口径：时段档案（环境组件 Fog.profile，即 SKY_PRESETS 的键）是这几档时按夜间算，
 // 其余按白天。显式元数据，不从曝光或主光强弱去猜。Script_Sky 与独立特效预览窗口共用这一处。
 export const FLARE_NIGHT_PROFILES=Object.freeze(['night','firstLevelNight','flarePreviewNight']);
 export function FlareSceneScaleFor(profile){

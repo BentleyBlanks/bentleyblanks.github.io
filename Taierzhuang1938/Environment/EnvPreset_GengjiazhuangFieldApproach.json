@@ -45,6 +45,7 @@
     "Fog": {
       "enabled": true,
       "params": {
+        "profile": "firstLevelBattleDay",
         "density": 0.00158,
         "falloff": 21,
         "max": 0.59,
@@ -53,26 +54,6 @@
         "sunGain": 0.03,
         "desat": 0.23,
         "flatten": 0.027
-      }
-    },
-    "Grade": {
-      "enabled": true,
-      "params": {
-        "profile": "firstLevelBattleDay",
-        "exposure": 1.19,
-        "saturation": 0.88,
-        "contrast": 0.99,
-        "contrastCurve": "soft",
-        "gain": [1.01, 1, 0.99],
-        "lift": [0, 0, 0],
-        "shadowTint": [0.97, 1, 1.06],
-        "highlightTint": [1.035, 1.008, 0.97],
-        "splitShadow": 0.18,
-        "splitHighlight": 0.2,
-        "bloom": 0.025,
-        "bloomThreshold": 1.24,
-        "godStrength": 0,
-        "lensFlare": 0
       }
     }
   }

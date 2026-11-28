@@ -145,7 +145,7 @@ export class PreviewEnvironment {
     return {
       preset: this.presetId, look: this.lookId, hour: this.hour, profile: this.env?.profile ?? null,
       flareSceneScale: this.flareSceneScale,
-      lightIntensity: this.env?.lightIntensity, exposure: this.env?.exposure,
+      lightIntensity: this.env?.lightIntensity,
     };
   }
 }
