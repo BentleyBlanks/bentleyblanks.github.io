@@ -14467,7 +14467,7 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "061844f3342441bd7f746f036f292b68c0e733b6a58abc0e7d5ad0893b6958cb",
+      "sha256": "a6ecddd6201492f4ee9ac96ea0f994600a8dfb1249d05e2092d0f8d44cefe2d2",
       "scale": 23460,
       "strength": 0.76,
       "fields": [
@@ -14690,6 +14690,20 @@
           0.768626
         ]
       }
+    },
+    "leftEdgeFinishRefinement": {
+      "sourcePlateSha256": "061844f3342441bd7f746f036f292b68c0e733b6a58abc0e7d5ad0893b6958cb",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "strength": 1.43,
+      "registrationAmounts": [
+        0.0,
+        0.53,
+        0.81,
+        1.0
+      ],
+      "fixedOrm": true,
+      "calibratedStampView": true
     }
   },
   "stemJointFinish": {

@@ -142,6 +142,8 @@
 
 - 沿驻钣轮廓重新配准第 8 张照片，并以第 1 张正面照约束折边的亮暗与钢色。三组布光在后缘的共同亮度偏差由 10.43 降至 7.85 个灰阶，独立布光下后缘细纹相关系数由 0.31 提至 0.40。原配准、三种轮廓校正幅度及留出的像素均复测，正面馆藏布光下平均亮度误差增加 0.34 个灰阶。另复测正面斜视、外缘和十个接缝 AO 视角。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 以第 8 张馆藏照的筒身外沿校准左侧钢面的底色与反光方向，并用第 1、7 张照片约束正面亮带和刻印。沿两侧轮廓配准后，三组布光下该段的共同亮度偏差从 17.33 降至 10.26 个灰阶，原配准下从 15.01 降至 8.20 个灰阶。独立布光下亮度误差由 19.76 降至 12.73，局部细纹的位置与馆藏照仍有差异。正面、斜视、窄条、刻印与十个接缝 AO 视角通过复测。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -208,4 +210,5 @@
 - 套筒右侧的分段反差校准保存在 `sleeveOpticalFinish.ringContrastRefinement`。参数关联两张馆藏照与上一版的 16 位采样图。底色 WebP 编码质量设为 83.47，三张源贴图共 1,044,328 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 套筒末段的底色修正保存在 `sleeveOpticalFinish.balancedSleeveLighting`，关联正背两张馆藏照和上一版 16 位采样图。正式脚本重烘的底色、法线和 ORM 合计 1,044,198 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 驻钣后缘的校准保存在 `saddleSurfaceRefinement.edgeFinishRefinement`。记录关联正背两张照片、轮廓配准幅度和上一版 16 位采样图，正式重烘的三张源贴图合计 1,044,330 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV105/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 筒身左侧的校准保存在 `barrelJointFinish.leftEdgeFinishRefinement`。重烘底色和法线时沿用接缝 AO 的 ORM，三张源贴图共 1,044,292 字节。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV106/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
