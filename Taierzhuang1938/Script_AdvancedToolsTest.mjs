@@ -130,15 +130,16 @@ Check("持枪移动观察工具与专用测试已删除", ["Script_EditorFirstPe
     Walk(path.join(toolsDir, entry));
     return [...seen].map((file) => path.basename(file));
   };
-  // 构件库预览是只读可视化：不装游戏主程序、编辑器宿主与工具宿主渲染底座。外部道具加载器（Script_ExternalProps → TengxianCity
-  // → Water → Post…）会把后处理 / 天空等模块静态带进来，但页面只建自己的轻量棚灯，不实例化它们（Script_PropLibraryStage）。
+  // 构件库预览是只读可视化：不装游戏主程序、编辑器宿主与工具宿主渲染底座；
+  // 通过统一标准相机档案与游戏环境光照入口（Script_CameraProfile / Script_EnvironmentProfile）复用正片光影口径。
   {
     const modules = Closure("Script_PropLibrary.mjs");
     const bad = modules.filter((name) => /^Script_(Main|Editor|EditorStage|EditorUi|DevTools\w*|ToolStudio\w*|FrameModes)\.mjs$/.test(name));
     Check(`Tool_PropLibrary.html 的模块图不含游戏主程序 / 编辑器宿主 / 工具宿主（${modules.length} 个模块）`, bad.length === 0, bad.join(", "));
     const stage = fs.readFileSync(path.join(toolsDir, "Script_PropLibraryStage.mjs"), "utf8");
-    Check("构件库三维台接入标准相机档案且不建游戏天空与灯光组",
-      /CreateStandardCameraPost/.test(stage) && !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|VfxSystem|AudioEngine)\b/.test(stage));
+    Check("构件库三维台接入标准相机档案与游戏环境光照入口，不直接实例化重型系统",
+      /CreateStandardCameraPost/.test(stage) && /CreateGameEnvironmentLighting/.test(stage)
+      && !/new (PostPipeline|SkyDome|LightRig|ProbeVolume|VfxSystem|AudioEngine)\b/.test(stage));
   }
   {
     const audioModules = Closure("Script_AudioPreview.mjs");

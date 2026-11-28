@@ -287,14 +287,25 @@ export const STATIC_CASTER_BATCH = {
   reserveScale: 1.5,
 };
 
-/** 画质档名。`SHADOW_PRESETS` 缺档一律退回 high。 */
-export function MakeShadowPreset(quality) {
+/**
+ * 画质档名。`SHADOW_PRESETS` 缺档一律退回 high。
+ * 可选 `cascades`（例如单模型/轻量工具传 `cascades: 1`）：在保留本档滤波口径的前提下裁成 N 级，
+ * 避免轻量场景为一张阴影图另起炉灶。
+ */
+export function MakeShadowPreset(quality, { cascades = 0 } = {}) {
   const name = SHADOW_PRESETS[quality] ? quality : "high";
   const preset = SHADOW_PRESETS[name];
+  const count = cascades > 0 ? Math.max(1, Math.min(preset.cascades, cascades | 0)) : preset.cascades;
+  const maxRadius = preset.maxRadius.slice(0, count);
+  const bakeOrder = count === 1
+    ? [0]
+    : preset.bakeOrder.filter((level) => level < count);
   return {
     ...preset,
-    maxRadius: preset.maxRadius.slice(),
-    bakeOrder: preset.bakeOrder.slice(),
+    cascades: count,
+    pcssLevels: Math.min(preset.pcssLevels, count),
+    maxRadius,
+    bakeOrder: bakeOrder.length ? bakeOrder : [0],
   };
 }
 

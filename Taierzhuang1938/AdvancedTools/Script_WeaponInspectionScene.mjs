@@ -18,13 +18,13 @@ import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import {
   CreateStandardCameraPost, BuildStandardPostOptions, ApplyEditorLiteCameraProfile,
 } from "../Script_CameraProfile.mjs";
+import {
+  CreateGameEnvironmentLighting, DEFAULT_ENVIRONMENT_PRESET_NAME,
+} from "../Script_EnvironmentProfile.mjs";
 import { MarkNoPrepass } from "../Script_Post.mjs";
-import { GLOBAL_SH_PROBE_COEFFICIENTS } from "../Data_GlobalShProbe.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 import { WeaponMaterialPreview } from "./Script_WeaponMaterialPreview.mjs";
-import {
-  BakeInspectionSky, CreateInspectionSkyBackdrop, INSPECTION_ENVIRONMENT_PRESET,
-} from "./Script_WeaponInspectionSky.mjs";
+import { CreateInspectionSkyBackdrop } from "./Script_WeaponInspectionSky.mjs";
 
 const GLB = {
   HanYang: { url: HANYANG_173R.url, Load: LoadHanYang173R, Configure: ConfigureHanYang173R, Instantiate: InstantiateHanYang173R },
@@ -211,39 +211,10 @@ async function LoadMaterials(library) {
   return missing.length;
 }
 
-function CreateLighting(scene, preset, sunDirection) {
-  const key = new THREE.DirectionalLight(preset.lightColor, preset.lightIntensity);
-  key.position.copy(sunDirection);
-  key.castShadow = true;
-  key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-  key.shadow.autoUpdate = false;
-  // With equal depth and width spans, one texel covers curved surfaces' residual depth error.
-  key.shadow.bias = -1 / SHADOW_MAP_SIZE;
-  scene.add(key, key.target);
-
-  const globalProbe = new THREE.LightProbe();
-  globalProbe.sh.fromArray(GLOBAL_SH_PROBE_COEFFICIENTS);
-  globalProbe.intensity = preset.shProbeIntensity ?? 0.34;
-  scene.add(globalProbe);
-
-  const ambient = new THREE.AmbientLight(preset.ambientColor ?? 0x607085, preset.ambientIntensity ?? 0.16);
-  scene.add(ambient);
-  return { key, globalProbe, ambient };
-}
-
-function FitShadow(key, center, extent, sunDirection) {
+function FitShadow(envLighting, center, extent) {
   const radius = Math.max(extent.length() * .55, .001);
-  key.target.position.copy(center);
-  key.position.copy(center).addScaledVector(sunDirection, 2 * radius);
-  const { shadow } = key;
-  const camera = shadow.camera;
-  camera.left = camera.bottom = -radius;
-  camera.right = camera.top = radius;
-  camera.near = radius;
-  camera.far = 3 * radius;
-  camera.updateProjectionMatrix();
   // The model and key light stay still during orbit, pan and zoom.
-  shadow.needsUpdate = true;
+  envLighting.FitShadow(center, radius, { nearScale: 1, farScale: 3 });
 }
 
 function MountPosition(instance, name) {
@@ -303,20 +274,26 @@ export class WeaponInspectionScene {
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
-    const bakedSky = BakeInspectionSky(this.renderer, INSPECTION_ENVIRONMENT_PRESET);
-    this.environmentPresetName = INSPECTION_ENVIRONMENT_PRESET;
-    this.environmentPreset = bakedSky.preset;
-    this.sunDirection = bakedSky.sunDirection;
-    this.skyTarget = bakedSky.target;
+    this.envLighting = CreateGameEnvironmentLighting(this.renderer, this.scene, {
+      preset: DEFAULT_ENVIRONMENT_PRESET_NAME,
+      skyMode: "cube",
+      shadow: {
+        mapSize: SHADOW_MAP_SIZE,
+        // With equal depth and width spans, one texel covers curved surfaces' residual depth error.
+        bias: -1 / SHADOW_MAP_SIZE,
+        autoUpdate: false,
+      },
+    });
+    this.environmentPresetName = this.envLighting.presetName;
+    this.environmentPreset = this.envLighting.preset;
+    this.sunDirection = this.envLighting.sunDirection;
+    this.skyTarget = this.envLighting.skyTarget;
     this.skyBackdrop = CreateInspectionSkyBackdrop(this.skyTarget.texture);
     this.scene.add(this.skyBackdrop);
-    this.scene.environment = this.skyTarget.texture;
-    this.scene.environmentIntensity = bakedSky.preset.envIntensity ?? 1;
-    const { key, globalProbe, ambient } = CreateLighting(this.scene, bakedSky.preset, this.sunDirection);
-    this.keyLight = key;
-    this.globalProbe = globalProbe;
-    this.ambientLight = ambient;
-    this.materialPreview = new WeaponMaterialPreview(this.scene, this.sunDirection);
+    this.keyLight = this.envLighting.sun;
+    this.globalProbe = this.envLighting.globalProbe;
+    this.ambientLight = this.envLighting.ambient;
+    this.materialPreview = new WeaponMaterialPreview(this.envLighting);
     this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
     this.resizeObserver.observe(canvas);
@@ -579,7 +556,7 @@ export class WeaponInspectionScene {
     if (blade?.visible) bounds.union(new THREE.Box3().setFromObject(blade));
     bounds.getCenter(this.center);
     const extent = bounds.getSize(new THREE.Vector3());
-    FitShadow(this.keyLight, this.center, extent, this.sunDirection);
+    FitShadow(this.envLighting, this.center, extent);
     const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const up = this.Direction().cross(right);
     const ProjectionExtent = (axis) => Math.abs(axis.x) * extent.x + Math.abs(axis.y) * extent.y + Math.abs(axis.z) * extent.z;
@@ -661,7 +638,7 @@ export class WeaponInspectionScene {
     this.resizeObserver?.disconnect();
     this.skyBackdrop.geometry.dispose();
     this.skyBackdrop.material.dispose();
-    this.skyTarget.dispose();
+    this.envLighting?.Dispose();
     this.post?.Dispose();
     this.renderer?.dispose();
   }

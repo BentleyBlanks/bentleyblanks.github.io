@@ -16,21 +16,11 @@ export class WeaponInspectionFirstPerson {
   constructor(stage, riggedAssets) {
     this.camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg, FRAME_ASPECT, .06, 80);
     this.scene = new THREE.Scene();
-    this.scene.environment = stage.scene.environment;
-    this.scene.environmentIntensity = stage.scene.environmentIntensity;
     this.sunDirection = stage.sunDirection.clone();
     const backdrop = stage.skyBackdrop.clone();
     backdrop.visible = true;
     this.scene.add(this.camera, backdrop);
-    for (const source of stage.scene.children) {
-      if (!source.isLight) continue;
-      const light = source.clone();
-      if (light.isDirectionalLight) {
-        light.castShadow = false;
-        light.position.copy(this.sunDirection);
-      }
-      this.scene.add(light);
-    }
+    stage.envLighting.CloneLightsTo(this.scene, { sunDistance: 1 });
     this.viewmodel = new Viewmodel(stage.library, {
       fov: 52, depthBudget: 1.22, meshDocs: stage.factory.meshDocs, riggedAssets,
     });

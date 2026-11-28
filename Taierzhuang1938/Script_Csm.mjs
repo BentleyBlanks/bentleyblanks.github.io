@@ -467,19 +467,22 @@ const DIR_SECTION_START = "#if ( NUM_DIR_LIGHTS > 0 ) && defined( RE_Direct )";
 const DIR_SECTION_END = "#if ( NUM_RECT_AREA_LIGHTS > 0 ) && defined( RE_Direct_RectArea )";
 
 let installedQuality = null;
+let installedKey = null;
 let originalLightsBegin = null;
 let originalShadowPars = null;
 
 /**
  * 安装级联阴影的着色器 chunk。**必须在任何材质编译之前调**（LightRig 构造时调）。
- * 同一档位重复调是幂等的；换档位会重生成（换档本来就要重开页面，见画质面板）。
+ * 同一档位（与级数）重复调是幂等的；换档位或级数会重生成（换档本来就要重开页面，见画质面板）。
  *
  * @param {string} quality low | medium | high | ultra
+ * @param {{ cascades?: number }} options cascades > 0 时按指定级数裁剪（如轻量工具 1 级模式）
  * @returns {object} 实际生效的阴影档位（`Data_Tuning_Shadows.MakeShadowPreset`）
  */
-export function InstallCsmShaderChunks(quality = "high") {
-  const preset = MakeShadowPreset(quality);
-  if (installedQuality === quality) return preset;
+export function InstallCsmShaderChunks(quality = "high", { cascades = 0 } = {}) {
+  const preset = MakeShadowPreset(quality, { cascades });
+  const key = `${quality}:c${preset.cascades}`;
+  if (installedKey === key) return preset;
   if (originalLightsBegin === null) {
     originalLightsBegin = THREE.ShaderChunk.lights_fragment_begin;
     originalShadowPars = THREE.ShaderChunk.shadowmap_pars_fragment;
@@ -500,6 +503,7 @@ float gCsmSunVisibility = 1.0;
 ${CsmDirectionalGlsl()}${source.slice(end)}`;
   THREE.ShaderChunk.shadowmap_pars_fragment = `${originalShadowPars}\n${CsmParsGlsl(preset)}`;
   installedQuality = quality;
+  installedKey = key;
   return preset;
 }
 
@@ -685,10 +689,10 @@ const _altUp = new THREE.Vector3(0, 0, 1);
  * 消费方，那些引用一个都不许断）；1..N-1 是同方向、零强度的阴影图容器。
  */
 export class CsmRig {
-  constructor(scene, { quality = "high", mapSize = 0 } = {}) {
+  constructor(scene, { quality = "high", mapSize = 0, cascades = 0 } = {}) {
     this.scene = scene;
     this.quality = quality;
-    this.preset = InstallCsmShaderChunks(quality);
+    this.preset = InstallCsmShaderChunks(quality, { cascades });
     this.count = Math.min(CSM_MAX_CASCADES, this.preset.cascades);
     this.mapSize = mapSize || this.preset.mapSize;
     this.defaultMapSize = this.preset.mapSize;
@@ -1024,6 +1028,29 @@ export class CsmRig {
       this.lastFitCenter[level].copy(origin);
       this._ApplyBias(level, radius);
     }
+  }
+
+  /**
+   * 1 级 / 单物体包围球拟合（给轻量验收工具与固定舞台用，无需透视视锥切片）。
+   * 把第 0 级正交阴影框直接包住 `(center, radius)` 并标脏待烘。
+   */
+  FitBounds(center, radius, sunDirection, { nearScale = 0.5, farScale = 3.5 } = {}) {
+    if (!this.active || !this.lights.length) return;
+    const r = Math.max(Number(radius) || 0.05, 0.001);
+    const light = this.lights[0];
+    const cam = light.shadow.camera;
+    cam.left = -r; cam.right = r;
+    cam.top = r; cam.bottom = -r;
+    cam.near = r * nearScale;
+    cam.far = r * farScale;
+    cam.updateProjectionMatrix();
+    light.target.position.copy(center);
+    light.position.copy(center).addScaledVector(sunDirection, r * 2);
+    light.target.updateMatrixWorld();
+    this.radii[0] = r;
+    this.lastFitCenter[0].copy(center);
+    this.dirty[0] = true;
+    this._ApplyBias(0, r);
   }
 
   /**

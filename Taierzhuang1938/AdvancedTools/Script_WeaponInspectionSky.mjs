@@ -1,25 +1,4 @@
 import * as THREE from "three";
-import { SkyDome } from "../Script_Sky.mjs";
-
-export const INSPECTION_ENVIRONMENT_PRESET = "firstLevelBattleDay";
-
-export function BakeInspectionSky(renderer, presetName = INSPECTION_ENVIRONMENT_PRESET) {
-  const sky = new SkyDome(renderer, { radius: 32, atmosphere: true, environment: false });
-  const scene = new THREE.Scene();
-  const target = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
-  scene.add(sky.mesh);
-  try {
-    const preset = sky.Apply(presetName);
-    const sunDirection = sky.sunDirection.clone().normalize();
-    new THREE.CubeCamera(.1, 64, target).update(renderer, scene);
-    return { target, preset, sunDirection };
-  } catch (error) {
-    target.dispose();
-    throw error;
-  } finally {
-    sky.Dispose();
-  }
-}
 
 export function CreateInspectionSkyBackdrop(texture) {
   const material = new THREE.ShaderMaterial({

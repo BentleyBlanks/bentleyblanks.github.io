@@ -67,7 +67,7 @@ export class LightRig {
    *   级联要的阴影口径（`BasicShadowMap` + `autoUpdate = false`）。**强烈建议传** ——
    *   采样器类型必须与 `Script_Csm.SHADOW_MAP_TYPE` 一致，不一致是未定义行为。
    */
-  constructor(scene, { quality = "high", shadowExtent = 62, renderer = null } = {}) {
+  constructor(scene, { quality = "high", shadowExtent = 62, renderer = null, cascades = 0, shadowMapSize = 0 } = {}) {
     this.scene = scene;
     this.shadowExtent = shadowExtent;
     this.quality = quality;
@@ -75,7 +75,7 @@ export class LightRig {
 
     // 级联阴影。`csm.lights[0]` 就是 `this.sun`：外部（Script_Gi 取太阳色、
     // 画质面板读 mapSize、ApplyGraphics 写 bias）拿的都是它，那些引用不许断。
-    this.csm = new CsmRig(scene, { quality });
+    this.csm = new CsmRig(scene, { quality, cascades, mapSize: shadowMapSize });
     this.sun = this.csm.sun;
     this.defaultShadowSize = this.csm.defaultMapSize;
     // 重构前 low 档**完全没有**太阳阴影（castShadow = false，靠雾盖）。级联之后
@@ -318,6 +318,11 @@ export class LightRig {
    */
   UpdateShadowFrustum(focus, forward, camera = null) {
     this.csm.Update(camera || this.viewCamera || null, this.sunDirection, focus, forward);
+  }
+
+  /** 1 级 / 单模型舞台按包围球拟合第 0 级太阳阴影框。 */
+  FitShadowBounds(center, radius, options = {}) {
+    this.csm.FitBounds(center, radius, this.sunDirection, options);
   }
 
   /**

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "../vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { CreateStandardCameraPost, BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
+import { CreateGameEnvironmentLighting } from "../Script_EnvironmentProfile.mjs";
 
 function DisposeModel(object) {
   const materials = new Set(), textures = new Set(), geometry = new Set();
@@ -20,10 +21,12 @@ export async function OpenViewer(container, url, signal) {
   const response = await fetch(url, { signal });
   if (!response.ok) throw Error("GLB 读取失败");
   const { scene: object } = await new GLTFLoader().parseAsync(await response.arrayBuffer(), "./");
-  let renderer, post, observer;
+  let renderer, post, envLighting, observer;
   function Close() {
     observer?.disconnect();
     DisposeModel(object);
+    envLighting?.Dispose();
+    envLighting = null;
     post?.Dispose();
     post = null;
     if (!renderer) return;
@@ -41,11 +44,8 @@ export async function OpenViewer(container, url, signal) {
     canvas.setAttribute("aria-label", "可旋转的三维模型预览");
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#434740");
-    scene.add(object, new THREE.HemisphereLight(0xfff7df, 0x768395, 3.8));
-    const key = new THREE.DirectionalLight(0xffedda, 4.4);
-    const keyDir = new THREE.Vector3(4, 7, 5).normalize();
-    key.position.set(4, 7, 5);
-    scene.add(key);
+    scene.add(object);
+    envLighting = CreateGameEnvironmentLighting(renderer, scene, { skyMode: "pmrem", shadow: false });
     const fit = new THREE.Box3().setFromObject(object).getBoundingSphere(new THREE.Sphere());
     if (fit.isEmpty() || !Number.isFinite(fit.radius)) throw Error("GLB 中没有可显示的几何");
     const radius = Math.max(fit.radius, .0001);
@@ -56,7 +56,7 @@ export async function OpenViewer(container, url, signal) {
       camera.position.copy(position.setFromSpherical(orbit).add(fit.center));
       camera.lookAt(fit.center);
       camera.updateMatrixWorld(true);
-      post.Render(scene, camera, BuildStandardPostOptions({ sunDirection: keyDir, dt: 1 / 60, steadyView: true }));
+      post.Render(scene, camera, BuildStandardPostOptions({ sunDirection: envLighting.sunDirection, dt: 1 / 60, steadyView: true }));
     }
     function Zoom(multiplier) {
       orbit.radius = THREE.MathUtils.clamp(orbit.radius * multiplier, .55 * radius, 22 * radius);

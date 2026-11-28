@@ -15,12 +15,11 @@ import { LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl } from "../Script_Meshes.mjs";
 import { InstantiateExternalProp } from "../Script_ExternalProps.mjs";
 import { CreateStandardCameraPost, BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
+import { CreateGameEnvironmentLighting } from "../Script_EnvironmentProfile.mjs";
 import { MarkNoPrepass } from "../Script_Post.mjs";
 import { BuildPlaceableVisual } from "./Script_PlaceableCatalog.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 
-const KEY_LIGHT_DIRECTION = new THREE.Vector3(-3, 5, 4).normalize();
-const STUDIO_EXPOSURE_COMPENSATION = 2.3;
 const SHADOW_MAP_SIZE = 2048;
 const PBR_LANES = 8;
 const PERSON_HEIGHT = 1.7;
@@ -35,41 +34,6 @@ export const VIEWS = Object.freeze({
 export const LENSES = Object.freeze({ wide: 58, normal: 38, tele: 20 });
 
 const NextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
-
-function CreateLighting(renderer, scene) {
-  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x8e9aa4, 1.15 * STUDIO_EXPOSURE_COMPENSATION));
-  const key = new THREE.DirectionalLight(0xfff3e0, 2.5 * STUDIO_EXPOSURE_COMPENSATION);
-  key.castShadow = true;
-  key.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-  key.shadow.autoUpdate = false;
-  key.shadow.bias = -2 / SHADOW_MAP_SIZE;
-  key.shadow.radius = 0.8;
-  // 第一帧就要有阴影图：投影接收地面在没有构件时也会采样它，没建过的阴影图会被当成普通纹理绑上去。
-  key.shadow.needsUpdate = true;
-  scene.add(key, key.target);
-  for (const [color, intensity, x, y, z] of [
-    [0xd6eaff, 1.05 * STUDIO_EXPOSURE_COMPENSATION, 3, 1.2, 3],
-    [0xffffff, 1.5 * STUDIO_EXPOSURE_COMPENSATION, 2, 3, -5],
-  ]) {
-    const light = new THREE.DirectionalLight(color, intensity);
-    light.position.set(x, y, z);
-    scene.add(light);
-  }
-  const room = new THREE.Scene();
-  room.background = new THREE.Color(0x7d858b);
-  for (const [x, y, z, color] of [[-4, 6, 4, 0xfff6e7], [3, 2, -5, 0xd6eaff]]) {
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(7, 4), new THREE.MeshBasicMaterial({ color }));
-    card.position.set(x, y, z);
-    card.lookAt(0, 0, 0);
-    room.add(card);
-  }
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(room, 0.025).texture;
-  scene.environmentIntensity = STUDIO_EXPOSURE_COMPENSATION;
-  pmrem.dispose();
-  for (const card of room.children) { card.geometry.dispose(); card.material.dispose(); }
-  return key;
-}
 
 function CountTriangles(root) {
   let meshes = 0, triangles = 0;
@@ -97,7 +61,18 @@ export class PropLibraryStage {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x464a46);
     this.camera = new THREE.PerspectiveCamera(LENSES.normal, 1, 0.05, 500);
-    this.keyLight = CreateLighting(this.renderer, this.scene);
+    this.envLighting = CreateGameEnvironmentLighting(this.renderer, this.scene, {
+      skyMode: "pmrem",
+      shadow: {
+        mapSize: SHADOW_MAP_SIZE,
+        bias: -2 / SHADOW_MAP_SIZE,
+        radius: 0.8,
+        autoUpdate: false,
+        // 第一帧就要有阴影图：投影接收地面在没有构件时也会采样它，没建过的阴影图会被当成普通纹理绑上去。
+        needsUpdate: true,
+      },
+    });
+    this.keyLight = this.envLighting.sun;
 
     const groundMat = new THREE.ShadowMaterial({ opacity: 0.32 });
     MarkNoPrepass(groundMat);
@@ -275,17 +250,11 @@ export class PropLibraryStage {
 
   FitShadow(box) {
     const radius = Math.max(box.getSize(new THREE.Vector3()).length() * 0.6, 0.05);
-    const key = this.keyLight;
-    key.target.position.copy(this.center);
-    key.position.copy(this.center).addScaledVector(KEY_LIGHT_DIRECTION, 2 * radius);
-    const camera = key.shadow.camera;
-    camera.left = camera.bottom = -radius;
-    camera.right = camera.top = radius;
-    camera.near = radius * 0.5;
-    camera.far = radius * 3.5;
-    camera.updateProjectionMatrix();
-    key.shadow.normalBias = 2 * radius / SHADOW_MAP_SIZE;
-    key.shadow.needsUpdate = true;
+    this.envLighting.FitShadow(this.center, radius, {
+      nearScale: 0.5,
+      farScale: 3.5,
+      normalBias: 2 * radius / SHADOW_MAP_SIZE,
+    });
   }
 
   Orbit(dx, dy) {
@@ -354,7 +323,7 @@ export class PropLibraryStage {
     camera.lookAt(this.center);
     camera.updateProjectionMatrix();
     this.post.Render(this.scene, camera, BuildStandardPostOptions({
-      sunDirection: KEY_LIGHT_DIRECTION,
+      sunDirection: this.envLighting.sunDirection,
       dt: 1 / 60,
       steadyView: true,
     }));

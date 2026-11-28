@@ -2,22 +2,12 @@ import * as THREE from "three";
 import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 
 export class WeaponMaterialPreview {
-  constructor(studio, sunDirection) {
+  constructor(envLighting) {
     this.scene = new THREE.Scene();
-    this.scene.environment = studio.environment;
-    this.scene.environmentIntensity = studio.environmentIntensity;
     this.camera = new THREE.OrthographicCamera(-1.18, 1.18, 1.18, -1.18, .1, 10);
     this.camera.position.set(0, .23, 4);
     this.camera.lookAt(0, 0, 0);
-    for (const source of studio.children) {
-      if (!source.isLight) continue;
-      const light = source.clone();
-      if (light.isDirectionalLight) {
-        light.castShadow = false;
-        light.position.copy(sunDirection).multiplyScalar(6);
-      }
-      this.scene.add(light);
-    }
+    envLighting.CloneLightsTo(this.scene, { sunDistance: 6 });
     const geometry = new THREE.SphereGeometry(1, 48, 32);
     const uv = geometry.getAttribute("uv");
     for (const name of ["uv1", "uv2", "uv3"]) geometry.setAttribute(name, uv);
