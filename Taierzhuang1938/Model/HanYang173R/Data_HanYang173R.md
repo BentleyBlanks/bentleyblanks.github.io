@@ -258,9 +258,15 @@ The rear exterior cover sits beneath the receiver at its leading overlap. Its af
 
 Run `python Taierzhuang1938/_import/Script_HanYangFitCleanup.py <R38-directory> <fitted-stage>`. Open the fitted export with BlenderMCP and bake contact visibility with `_blender/Script_HanYangContactAtlases.py`. Then run `python Taierzhuang1938/_import/Script_HanYangFitContact.py <fitted-stage> <contact-bake-directory> <R35-GLB> <finished-stage>`. This composites the new contact bake at the repaired joins with the timber's material occlusion in the existing ORM red channel.
 
+### R40 wood abrasion and handling polish
+
+The wrist, receiver shoulder, stock flank and both pieces of forewood have localized finish wear. Tapered scuffs follow the shape of the wood, with dark older cuts, torn pale fibres and smoother contact patches. The existing stock colour is the basis for the wear. [Steven Lu, stock comparison](https://armsofchina.com/wp-content/uploads/2026/04/145.jpg) · [Te Papa DM000453, forewood](https://media.tepapa.govt.nz/collection/131438/full)
+
+Run `python Taierzhuang1938/_import/Script_HanYangStockWear.py <R39-directory> <staged-output>` to rebuild the three wood finishes. The projected brush profiles drive Base Color, Roughness, tangent-space Normal and local AO. The two existing oil-film maps follow the rubbed and exposed patches. The red ORM channel carries the original contact AO multiplied by the new cavity mask. The bake verifies the exact mesh streams and the bytes of every atlas outside the wood materials.
+
 ### Rebuild and inspect
 
-The review opens on `Review_Band` with the packed materials, studio world and scene lights enabled. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
+The archived R40 review opens on `Review_StockFlank` with the packed materials, studio world and scene lights enabled. Use `Review_Band` to inspect the front band. Use `Review_Receiver` for the wood-to-steel junction, `Review_ForeWood` and `Review_UnderWood` for the feedback regions, or `Review_Side` for the full silhouette. `gameAssetSha256` identifies the inspected GLB. The band relief and broken finish are an interpretation of visible wear, not a recovered serial number. The Te Papa close-up is the material reference; the [National Museum of China catalogue photograph](https://www.chnmuseum.cn/zp/zpml/gmww/202104/t20210402_249522.shtml) is an additional specimen, not a colour standard or a template for its wear marks.
 
 Additional cameras `Review_Knob`, `Review_RearSeam`, `Review_ButtCap` and `Review_FrontSeam` let an artist inspect the macro finishes and the original feedback regions directly.
 

@@ -35,7 +35,7 @@ try{
   roof.name='HanYangLightingShadowFixture';roof.position.copy(g.player.position);roof.position.y+=4;roof.castShadow=true;roof.visible=false;g.scene.add(roof);window.__hyRoof=roof;
   return result;
  });
- assert.equal(evidence.identity.version,'173R-20261128R39');assert.equal(evidence.identity.triangles,79513);
+ assert.equal(evidence.identity.version,'173R-20261128R40');assert.equal(evidence.identity.triangles,79513);
  assert.equal(evidence.identity.worldTriangles,79513);assert.equal(evidence.identity.parts,44);assert(evidence.identity.privateGeometry);
  assert.equal(evidence.identity.drawMeshes,13);
  assert.equal(evidence.identity.worldDrawMeshes,13);

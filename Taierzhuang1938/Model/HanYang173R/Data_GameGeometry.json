@@ -1,6 +1,6 @@
 {
   "sourceSha256": "3f380317c1930c7c141f6f0c0abb415a336354e25b78f24cc7bb9aa8c650a38c",
-  "gameSha256": "764dc7be2781ecf100601e13488b7d02d8ee353bf3615d02dd4513cbef37862b",
+  "gameSha256": "2b1b0dd0947a9c1abade821b4347253995e33558c58d0cdb76d1dbe2b089d919",
   "triangles": 79513,
   "repairedTangents": 45491,
   "parts": [
@@ -885,64 +885,64 @@
     {
       "name": "FrontWood_ContinuousOval_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "2347aec6ea009a8f8137cad9c81aa01609f36a43bf52aa67c772ae2d329c9967",
-      "sourceSha256": "96501ec7eb91db5703f272d80982676ac855aebefa726a603a1b5fca3e70cd36",
+      "sha256": "16b13572a8c38dd7e67e52f7868d3cda0a987722063f920c07c8a3d375a842df",
+      "sourceSha256": "604817bff049dbadc1c2e6dd5d57d00b54ef35ec47bc79f32b6b279e1e16a2bb",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_ORM",
       "mimeType": "image/webp",
-      "sha256": "58c9bf1bccfa85452be429aa10725efaa0fb4ac726be45086b74f03894fd5886",
-      "sourceSha256": "7629ddd351f0cbcfe091a384c66478f64871ade20a0e0a88e4beb0649c71dd31",
+      "sha256": "8d73ec233a96a3fe2f1a7680608caade97b878a8fa1bb54590e0caabfb1f0efe",
+      "sourceSha256": "c86fa0de65cb9954a92afb4ed3548df311265cddccbeadb7bee9439dabcb6ec9",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_Normal",
       "mimeType": "image/webp",
-      "sha256": "a134b03992b662900386f999e1fbe6e2db23256ca7df6da95263e327ed96ffa6",
-      "sourceSha256": "b74ec3bda175a0be895cbd9dc41ca69b56298921af2416fd418d9311cb2d4be0",
+      "sha256": "157bf98322c065981262ada37dbb92c4ee760cb85c5efca40d8eaf143b9da278",
+      "sourceSha256": "a2e6acc424902311581f34811994d4cfc76bd83e24942ab999352f56c8be5e93",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "FrontWood_ContinuousOval_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "534f3b7a05c44320cc87a418071a283f68071598bfb232091de24436b8cdd7d6",
-      "sourceSha256": "569e13a24ccd492bd37ac1389ac7350d68eca50606f3508c1b4b2eb712a95fc4",
+      "sha256": "97e99ffa472e4131e590ec2172489f25c8771a451af6ba7cb9da8f6bf64c4e58",
+      "sourceSha256": "06552bcc596093efc560b7c14852791d7041fa1e0b63dc0a627c590d31c6d13f",
       "islandCoverage": 0.261859,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "9024d8dccc81a5003d54ec42b3c0cbed166efce261c95dd60bcbdd7db74a807a",
-      "sourceSha256": "f3b0dadab283aef63b82a860589f55aad1cc777ad250f439750148b4bc9bbfba",
+      "sha256": "f1dda1fdcfcc6ff31bbdf12a65adb5f3c23a00d5e4aef34b60f1f1e9140341cc",
+      "sourceSha256": "d96ebff62ac595a0645329d0cdbe676233960b9bf2198c0289d9abc64b3c597f",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_ORM",
       "mimeType": "image/webp",
-      "sha256": "234a278549b7fcb7c2194bc9162b58bb4e3b50e7f02cfe6b60e3cdfaaf689dd3",
-      "sourceSha256": "28a817cfdf5a0bab1886dd7b8e9178ed74ee68477c1f1259d9a10a943a4e6fbc",
+      "sha256": "1a64b70f60ba00e7c05e8cf4062f115860c624b93024e1ce0ce6cdf46631ba63",
+      "sourceSha256": "84d165d4ec6885a12b61f0582c6af875a0a8b588b536539492d49423b97ca9f4",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_Normal",
       "mimeType": "image/webp",
-      "sha256": "8b0d46ff67e89b7fd493dffaa68eeb500dbffbde9aed9e0e258136a1d79819d4",
-      "sourceSha256": "f80880a8a78cce4c625a29c78123d59763ce6fea3b7948e2646843b47db9261e",
+      "sha256": "fb893ea33c99bad1c93f9bf9d1b5347f9d4a5f606d7acaa3c5eef2f76d4f3d9f",
+      "sourceSha256": "7056009c62b69df71d4cef34ac5c58254d73571eb9ede47be30f90ec53f76ac2",
       "islandCoverage": 0.175897,
       "rebake": true
     },
     {
       "name": "MainWood_ContinuousLowerShoulder_OilFilm",
       "mimeType": "image/webp",
-      "sha256": "703f933ab196253528cac31803277715793dcf8ea9e2cd276880cfc00137a460",
-      "sourceSha256": "3f3bc9496cf6189cc053a6e901c549d5fb27528dcb2d44e65d9a952d41bbb325",
+      "sha256": "06ba55287139a6264d4c004249b26758391cb310bd6324634999de97c19fefd0",
+      "sourceSha256": "e1f0135caa33b2980ab0c9d6e6e7c55fa6b7110d2bcebd1d368be48f924371f6",
       "islandCoverage": 0.175897,
       "rebake": true
     },
@@ -973,30 +973,30 @@
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
       "mimeType": "image/webp",
-      "sha256": "c4ce985f6e726a27e22db85122f44a60c53cb872cc65418298bf5d93c2ccd4dd",
-      "sourceSha256": "03a1cc47e9b09b82a96706327beb6ad509beec1a2d84076538bf3b88e3e5455b",
+      "sha256": "df93f5a9f7d11581b67420e3c9686bf25d814c4a8f503b7528489d0a811491dc",
+      "sourceSha256": "88a9ab21780cb3d0c9790c9ce2c6ba3589316837b0c4468ddb4e366f069ab160",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM",
       "mimeType": "image/webp",
-      "sha256": "3a796cc037c7f117599a28dd98e744194345d698fa743ec5513e947b2c73f2a3",
-      "sourceSha256": "3d5d221c70923e86c9f825184d233e1cc13d20c7c6425feb20996bf47f35e81b",
+      "sha256": "e32dd5ea823c8d0ce64fa913fb5103a34536dab940642eb76ad0690b89118458",
+      "sourceSha256": "71f142b32ce3c773bcff72b20a29b96652bc1e6c359f3e87a26c7e5f0d0be1d4",
       "islandCoverage": 0.32717,
       "rebake": true
     },
     {
       "name": "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
       "mimeType": "image/webp",
-      "sha256": "0fadaeeb7f36669f7ca2aa3fc86ab16371f76e26e712ce597933023748082073",
-      "sourceSha256": "44a401d09e44dc2b988703b7cc63b878f68addf591142e91fceea4ac085b35ba",
+      "sha256": "6c9c57839f813408ebcdd2562680062e21c0b2aad928c4bc3c00d0cfbcdbd17a",
+      "sourceSha256": "d0bda19a62d00879d2e02569b4531f909b50049b394a766dbab5a899277d8b9a",
       "islandCoverage": 0.32717,
       "rebake": true
     }
   ],
   "textureFill": "Closest occupied atlas texel, independently per part, using the rasterized UV mask; lossless WebP. sourceSha256 hashes the final decoded RGB.",
-  "rebake": "R39: seated rear cover lips and eased wood around the sight seat.",
+  "rebake": "R40: hand-placed wood abrasion, torn fibres and handling polish baked into the three wood finishes.",
   "surfaceRepair": {
     "band": {
       "maximumDisplacementMm": 8.83437220917257,
@@ -1264,7 +1264,7 @@
     ]
   },
   "materialMatch": {
-    "version": "173R-20261128R39",
+    "version": "173R-20261128R40",
     "woodParts": [
       "FrontWood_ContinuousOval",
       "MainWood_ContinuousLowerShoulder",
@@ -1471,7 +1471,7 @@
   },
   "runtimeLosslessPacking": "Per-image WebP lossless; round-trip RGB equality checked.",
   "exteriorFinish": {
-    "version": "173R-20261128R39",
+    "version": "173R-20261128R40",
     "baseline": "6f302b5dd315a7cec8b5bcebfcf0421302740de45609b2768afcdde4133c068d",
     "newCharts": [
       "ButtCap_LimitedProfileBlend",
@@ -2267,6 +2267,58 @@
         "MainWood_ContinuousLowerShoulder_ORM": 5189,
         "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM": 164138
       }
+    },
+    "stockWear": {
+      "baseSha256": "764dc7be2781ecf100601e13488b7d02d8ee353bf3615d02dd4513cbef37862b",
+      "parts": {
+        "FrontWood_ContinuousOval": {
+          "regions": 4,
+          "strokes": 11,
+          "coverageAt24": {
+            "matte": 0.1209,
+            "polish": 0.15489,
+            "fibre": 0.01652,
+            "cavity": 0.01317
+          },
+          "oilFilm": true
+        },
+        "MainWood_ContinuousLowerShoulder": {
+          "regions": 12,
+          "strokes": 35,
+          "coverageAt24": {
+            "matte": 0.09004,
+            "polish": 0.13646,
+            "fibre": 0.01109,
+            "cavity": 0.00871
+          },
+          "oilFilm": true
+        },
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront": {
+          "regions": 4,
+          "strokes": 11,
+          "coverageAt24": {
+            "matte": 0.08872,
+            "polish": 0.0964,
+            "fibre": 0.01207,
+            "cavity": 0.00966
+          },
+          "oilFilm": false
+        }
+      },
+      "changedAtlases": [
+        "FrontWood_ContinuousOval_BaseColor",
+        "FrontWood_ContinuousOval_Normal",
+        "FrontWood_ContinuousOval_ORM",
+        "FrontWood_ContinuousOval_OilFilm",
+        "MainWood_ContinuousLowerShoulder_BaseColor",
+        "MainWood_ContinuousLowerShoulder_Normal",
+        "MainWood_ContinuousLowerShoulder_ORM",
+        "MainWood_ContinuousLowerShoulder_OilFilm",
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_BaseColor",
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_Normal",
+        "UpperWood_Rebuilt_ShortRearShoulder_ContinuousFront_ORM"
+      ],
+      "placement": "Surface-projected strokes and rub masks shared by colour, roughness, relief, material AO and oil film."
     }
   },
   "batching": {

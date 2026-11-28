@@ -393,6 +393,25 @@ const usage=report.exteriorFinish.usageWear;
 assert.equal(usage.tailPlate,D.stockReturn);
 assert.deepEqual([...usage.wood].sort(),[...D.wood].sort());
 assert.deepEqual(Object.keys(report.exteriorFinish.materialOcclusion.parts).sort(),[...D.wood].sort());
+const stockWear=report.exteriorFinish.stockWear;
+assert.equal(report.exteriorFinish.version,D.version);
+assert.equal(doc.asset.extras.materialMatch,D.version);
+assert.deepEqual(Object.keys(stockWear.parts).sort(),[...D.wood].sort());
+const stockAtlases=[];
+for(const [name,finish] of Object.entries(stockWear.parts)){
+ const node=doc.nodes.find(node=>node.name===name);
+ const material=doc.materials[doc.meshes[node.mesh].primitives[0].material];
+ const pbr=material.pbrMetallicRoughness;
+ const film=material.extensions?.KHR_materials_clearcoat?.clearcoatTexture;
+ assert.equal(finish.oilFilm,!!film);
+ assert(finish.regions>=4&&finish.strokes>=10,name+' has placed handling marks');
+ const {matte,polish,fibre,cavity}=finish.coverageAt24;
+ assert(matte>.05&&polish>.05&&fibre>.005&&cavity>.004,name+' has visible paint and relief coverage');
+ const slots=[pbr.baseColorTexture,pbr.metallicRoughnessTexture,material.normalTexture,...(film?[film]:[])];
+ for(const slot of slots)stockAtlases.push(doc.images[doc.textures[slot.index].extensions.EXT_texture_webp.source].name);
+}
+assert.equal(new Set(stockAtlases).size,11);
+assert.deepEqual(stockAtlases.sort(),stockWear.changedAtlases);
 const contactNodes=doc.nodes.filter(node=>node.mesh!==undefined&&node.name!==D.trigger);
 const fixedAoRoles=new Set(['body','frontSight','rearSight']);
 assert.equal(contactNodes.length,43);
