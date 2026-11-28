@@ -181,6 +181,11 @@ def GripRearIdentity(reference):
     }
 
 
+def GripFamilyPhaseIdentity(reference):
+    finish = json.dumps(reference.get("gripRearFinish"), sort_keys=True, separators=(",", ":"))
+    return GripRearIdentity(reference) | {"gripFinishSha256": sha256(finish.encode("utf-8")).hexdigest()}
+
+
 def SleeveJointIdentity(reference):
     previous = json.dumps(reference.get("sleeveReverseFinish"), sort_keys=True, separators=(",", ":"))
     detailAo = JOINT_AO.with_name("Texture_Type89LauncherContactDetailAo.png")
@@ -2721,7 +2726,7 @@ def Main():
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
         ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
         ("shoulderReflectanceFinish", ShoulderReflectanceIdentity), ("wheelOxideFinish", WheelOxideIdentity),
-        ("gripRearFinish", GripRearIdentity))]
+        ("gripRearFinish", GripRearIdentity), ("gripFamilyPhase", GripFamilyPhaseIdentity))]
     barrel = BarrelFinish(args.photos, prior.get("Barrel", {}), evidence=args.barrel_evidence,
                           responseEvidence=args.barrel_response_evidence, finishEvidence=args.barrel_finish_evidence,
                           materialEvidence=args.barrel_material_evidence, markEvidence=args.barrel_mark_evidence,

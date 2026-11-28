@@ -14,10 +14,10 @@ from scipy.ndimage import gaussian_filter, gaussian_filter1d, map_coordinates
 
 from Script_BakePbrTexture import GaussianPeriodic, LinearToSrgb, NormalFromHeight, Sha256, SrgbToLinear
 from Script_MeasureType89LauncherSteel import (
-    BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripRearIdentity, NeckJointIdentity,
-    ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, SaddleRimIdentity, ShoulderReflectanceIdentity,
-    SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity, SurfaceBalanceIdentity, TabReflectanceIdentity,
-    WheelOxideIdentity, WideReflectionIdentity,
+    BarrelJointIdentity, CollarJointIdentity, CollarReflectanceIdentity, GripFamilyPhaseIdentity, GripRearIdentity,
+    NeckJointIdentity, ReverseReflectionIdentity, SaddleJointIdentity, SaddleReflectanceIdentity, SaddleRimIdentity,
+    ShoulderReflectanceIdentity, SleeveJointIdentity, SleeveReverseIdentity, StemJointIdentity,
+    SurfaceBalanceIdentity, TabReflectanceIdentity, WheelOxideIdentity, WideReflectionIdentity,
 )
 
 
@@ -578,7 +578,7 @@ def EyeWear(reference, xx, vv):
     return frontWear, reverseWear
 
 
-def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
+def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None, knurlFamily=None):
     sourceIndex, metalColor, oxideColor, coverage, roughness, metalness, strength = FINISHES[name]
     width, height = size
     padding = ATLAS["padding"]
@@ -817,6 +817,9 @@ def BakeRegion(name, sample, size, index, reference, *, barrelSampling=None):
         angular = knurl["angularCycles"] * xx
         axial = knurl["axialCycles"] * vv
         angular, axial = RegisterKnurlFlankPattern(knurl, angular, axial, xx, vv)
+        if knurlFamily is not None:
+            offset = KnurlFamilyOffset(xx, vv, knurlFamily)
+            angular, axial = angular + .5 * offset, axial + .5 * offset
         phaseA, phaseB = angular + axial, angular - axial
         left, right = np.mod(phaseA, 1), np.mod(phaseB, 1)
         flankTone, flankWarmth, flankCoverage = PhotographicGrain(flank, xx, vv)
@@ -1221,12 +1224,25 @@ def ResizeChart(maps, width, height):
     return output
 
 
-def BakeKnurl(quadrants, width, height, index, reference):
+def KnurlFamilyOffset(u, v, phase):
+    first, last = ATLAS["knurlSourceV"]
+    displayV = (v - first) / (last - first)
+    loU, hiU, loV, hiV = phase["bounds"]
+    fadeLoU, fadeHiU, fadeLoV, fadeHiV = phase["featherWidths"]
+    feather = (SmoothRamp((u - loU) / fadeLoU) * SmoothRamp((hiU - u) / fadeHiU)
+               * SmoothRamp((displayV - loV) / fadeLoV) * SmoothRamp((hiV - displayV) / fadeHiV))
+    centerU, centerV = phase["origin"]
+    across, along = phase["frequencyShift"]
+    return feather * (across * (u - centerU) + along * (displayV - centerV) + phase["phaseOffset"])
+
+
+def BakeKnurl(quadrants, width, height, index, reference, *, phase=None):
     # The grip chart now covers just the patterned bands. Evaluate the finish
     # in the original coordinates so the measured diamond pitch stays fixed.
     pad = ATLAS["padding"]
     sourceWidth, sourceHeight = 2 * (width - pad), 2 * (height - pad)
-    maps = list(BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, reference))
+    sourceSize = (sourceWidth, sourceHeight)
+    maps = list(BakeRegion("Knurl", quadrants, sourceSize, index, reference, knurlFamily=phase))
     knurl = reference["knurl"]
     flank = knurl["flankWear"]
     if "patternRegistration" in flank or "grooveFinish" in flank:
@@ -1235,7 +1251,7 @@ def BakeKnurl(quadrants, width, height, index, reference):
         originalFlank = {key: value for key, value in flank.items()
                          if key not in ("patternRegistration", "grooveFinish")}
         originalReference = reference | {"knurl": knurl | {"flankWear": originalFlank}}
-        originalNormal = BakeRegion("Knurl", quadrants, (sourceWidth, sourceHeight), index, originalReference)[1]
+        originalNormal = BakeRegion("Knurl", quadrants, sourceSize, index, originalReference, knurlFamily=phase)[1]
         u = (np.arange(sourceWidth) - pad) / (sourceWidth - 2 * pad)
         footprint = flank["footprint"]
         distance = abs(u - footprint["uCenter"]) - footprint["uHalfSpan"]
@@ -1257,6 +1273,17 @@ def BakeKnurl(quadrants, width, height, index, reference):
         WrapKnurlPadding(tile)
         output.append(np.rint(tile).astype(np.uint8))
     return output
+
+
+def BakeKnurlMaterial(quadrants, width, height, index, reference, visibility, seam, *, phase=None):
+    tile = BakeKnurl(quadrants, width, height, index, reference, phase=phase)
+    knurl = reference["knurl"]
+    if (calibration := knurl.get("responseCalibration")) is not None:
+        ApplyKnurlResponse(tile, knurl, calibration)
+    flank = knurl["flankWear"]
+    if "surfaceCalibration" in flank:
+        ApplyKnurlFlankResponse(tile, flank, visibility, seam)
+    return tile
 
 
 def SampleShoulder(pixels, u, v):
@@ -1657,7 +1684,7 @@ def ApplyCollarPackedRoughness(packed, original, balance):
     ApplyPackedRoughness(packed, original, "CollarRing", roughness * coverage)
 
 
-def BuildAtlas(reference, contactAo=None, seamAo=None):
+def ReadSteelQuadrants():
     with Image.open(SOURCE) as image:
         source = image.convert("RGB")
     side = min(source.size) // 2
@@ -1666,7 +1693,11 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
     for index in range(4):
         x, y = index % 2 * side, index // 2 * side
         quadrants.append(source.crop((x + margin, y + margin, x + side - margin, y + side - margin)))
+    return quadrants
 
+
+def BuildAtlas(reference, contactAo=None, seamAo=None):
+    quadrants = ReadSteelQuadrants()
     size = ATLAS["size"]
     closeups = reference["closeups"]
     tab = closeups["Tab"]
@@ -1707,13 +1738,10 @@ def BuildAtlas(reference, contactAo=None, seamAo=None):
             sourceSize = (width, ATLAS["saddleBackSourceHeight"])
             tile = ResizeChart(BakeRegion(name, quadrants, sourceSize, index, reference), width, height)
         elif name == "Knurl":
-            tile = BakeKnurl(quadrants, width, height, index, reference)
-            knurl = reference["knurl"]
-            if (calibration := knurl.get("responseCalibration")) is not None:
-                ApplyKnurlResponse(tile, knurl, calibration)
-            if "surfaceCalibration" in flank:
-                seam = None if seamVisibility is None else seamVisibility[y:y + height, x:x + width]
-                ApplyKnurlFlankResponse(tile, flank, visibility[y:y + height, x:x + width], seam)
+            region = np.s_[y:y + height, x:x + width]
+            contact = visibility[region] if visibility is not None else None
+            seam = seamVisibility[region] if seamVisibility is not None else None
+            tile = BakeKnurlMaterial(quadrants, width, height, index, reference, contact, seam)
         elif name == "Shoulder":
             tile = BakeShoulder(quadrants, width, height, index, reference)
             if "reflectionBalance" in shoulder:
@@ -1815,6 +1843,33 @@ def EncodeLegacyOrm(pixels, visibility):
         return image.convert("RGB")
 
 
+def ApplyGripFamilyPhase(maps, packed, reference, phase, contactAo, seamAo):
+    if any(phase.get(key) != value for key, value in GripFamilyPhaseIdentity(reference).items()):
+        raise ValueError("The grip diagonal calibration must match the current finish and contact AO")
+    size = ATLAS["size"]
+    x, y, width, height = ATLAS["regions"]["Knurl"]
+    region = np.s_[y:y + height, x:x + width]
+    visibility, seam = (np.asarray(Image.fromarray(array).resize((size, size), Image.Resampling.BILINEAR),
+                                   dtype=float)[region] / 255. for array in (contactAo, np.minimum(contactAo, seamAo)))
+    quadrants = ReadSteelQuadrants()
+    index = list(ATLAS["regions"]).index("Knurl")
+    before = BakeKnurlMaterial(quadrants, width, height, index, reference, visibility, seam)
+    after = BakeKnurlMaterial(quadrants, width, height, index, reference, visibility, seam, phase=phase)
+    if not np.array_equal(maps[1][region], before[1]):
+        raise ValueError("The grip normal map differs from the diagonal calibration's source")
+
+    # Transfer the changed ridge pattern over the photographed wear in the live atlas.
+    originalColor, retunedColor = (SrgbToLinear(tile[0].astype(float) / 255.) for tile in (before, after))
+    gain = np.clip((retunedColor + .020) / (originalColor + .020), .58, 1.66)
+    base = SrgbToLinear(maps[0][region].astype(float) / 255.)
+    maps[0][region] = np.rint(255 * LinearToSrgb(np.clip(base * gain, 0, 1))).astype(np.uint8)
+    maps[1][region] = after[1]
+    surface = packed[y // 2:(y + height) // 2, x // 2:(x + width) // 2, 1:]
+    old, new = (np.asarray(Image.fromarray(tile[2]).resize((width // 2, height // 2), Image.Resampling.BOX),
+                           dtype=np.int16)[..., 1:] for tile in (before, after))
+    surface[:] = np.clip(surface.astype(np.int16) + new - old, 0, 255).astype(np.uint8)
+
+
 def Bake(legacyOrm=None):
     reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
     calibrationVisibility, contact = ReadContactAo()
@@ -1886,6 +1941,8 @@ def Bake(legacyOrm=None):
     gripRear = reference.get("gripRearFinish")
     if gripRear is not None:
         ApplyCoveredPhotoFinish(maps, pixels, "Knurl", gripRear, GripRearIdentity(reference))
+    if (gripFamily := reference.get("gripFamilyPhase")) is not None:
+        ApplyGripFamilyPhase(maps, pixels, reference, gripFamily, calibrationVisibility, seamVisibility)
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):

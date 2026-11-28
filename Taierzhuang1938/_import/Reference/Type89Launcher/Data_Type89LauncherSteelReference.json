@@ -26038,5 +26038,47 @@
       "V91GuardRear/Matched": "e59f6c59b80053f5d320e9c29d94143d2868293ea6b7ab897dd03158bed255b1",
       "V91GuardRear/Broad": "f7774186ea226b620caa69b504c367512510ee7fd5e133ec2e471cecd9f30644"
     }
+  },
+  "gripFamilyPhase": {
+    "frontPhotoSha256": "c103f84006b83c5001480363dfd3da2b2d1e0a9407f4c8e05cd3aedcefed92fb",
+    "frontFitSha256": "c2ba0c7302eff3dd82c427e40a301d55cec8f4899208c9a2b905ca64e8823e9e",
+    "rawSteelSha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8",
+    "atlasSha256": "d0e4227f0fd65b12a075d58f6b43ae04abb8217d5afc9f0666408e679fb45627",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "gripFitSha256": "edd9c7fce7431a8a2b3851cd7b4a722f3500b0abad941ac9772dab853bc2b3ad",
+    "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+    "gripFinishSha256": "7044a0593eab7e5859743d47a797eeb4f3a887346f6b3405b5dc26fa07c63f6c",
+    "origin": [
+      0.746,
+      0.515
+    ],
+    "frequencyShift": [
+      4.504880481231245,
+      0.6992697952501419
+    ],
+    "phaseOffset": 0.17660000278379703,
+    "bounds": [
+      0.652,
+      0.839,
+      0.115,
+      0.907
+    ],
+    "featherWidths": [
+      0.03,
+      0.026,
+      0.09,
+      0.081
+    ],
+    "revision": "45b31357119d0339f5fd697a5116139051ac53bd",
+    "lightRigSha256": "8d5f7fe681cc11b9ca6f588deb9cad0397449c926b2e21e849cd203f97a54345",
+    "firstTrialResponseSha256": "48917294ac33cf4964f13d005f1ed36c2744b9920add8a110e90e7026bbf3c3d",
+    "sourceFrames": {
+      "V92PublishedClose/UV": "616655cdc114526f0dcb63eae5fe11f2d0303bdc537ddea3681e701cb19e0b22",
+      "V92PublishedClose/Matched": "c399d30cef1e142c2b29100bf3a49c60f61b6b85afbcff028ac8c63e5cf5a00e",
+      "V92PublishedClose/Independent": "51e4fc7339b78547e10b5dcff451b4ffa481e1a3c7f9bd7d2addb684ad809673",
+      "V92GuardClose/Matched": "112ca916446be266cdcd3d539874606eaa89ce6ab8bafebf75835ac1d81dc65d",
+      "V92GuardClose/Independent": "91376b666970c271d2c3e4fa67c24e9410a832a228d4322df8e97d3d640d5b79",
+      "V92DeliveryRake/Independent": "cd11fa2eb13280d06fc7ca82528aded4b076882fb69d349704037d0bbd7d04e4"
+    }
   }
 }
