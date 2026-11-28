@@ -226,7 +226,7 @@ try {
     const independent = await page.evaluate(() => ({
       name: window.name, opener: window.opener?.location.pathname, models: document.querySelectorAll("[data-model]").length,
       standalone: !window.ToolStudio && !window.Tengxian && !document.querySelector(".edMenuBar, .edPanel"),
-      noWrites: !document.querySelector("form, input:not([type=search], #referenceFiles[type=file]), [contenteditable]"),
+      noWrites: !document.querySelector("form, input:not([type=search], #referenceFiles[type=file], #environmentLight[type=range]), [contenteditable]"),
     }));
     Check("控制中心启动有独立窗口名的只读枪械检查台",
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
@@ -368,6 +368,27 @@ try {
     const restoredBeauty = await ReadPixels();
     Check("切回完整材质恢复同一画面", MeanSampleDiff(restoredBeauty, rendered.beauty) < 4,
       `diff=${MeanSampleDiff(restoredBeauty, rendered.beauty).toFixed(2)}`);
+    const environmentLight = page.getByRole("slider", { name: "环境光" });
+    const defaultLight = await environmentLight.inputValue();
+    const SetEnvironment = (value) => environmentLight.evaluate((input, percent) => {
+      input.value = percent;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }, value);
+    const MeanBrightness = ({ sample }) => {
+      const values = sample.filter((value) => value >= 0);
+      return values.reduce((sum, value) => sum + value, 0) / values.length;
+    };
+    await SetEnvironment("100");
+    const originalLight = await ReadPixels();
+    const lift = MeanBrightness(restoredBeauty) - MeanBrightness(originalLight);
+    Check("默认环境补光提亮模型，滑杆同时更新材质球",
+      defaultLight === "180" && lift > 8 && await environmentLight.getAttribute("aria-valuetext") === "100%"
+      && await page.evaluate(() => {
+        const stage = window.WeaponInspection.scene;
+        return stage.materialPreview.scene.environmentIntensity === stage.scene.environmentIntensity;
+      }), `显示亮度变化=${lift.toFixed(2)}`);
+    await Channel("shadow");
+    Check("环境光强度不改变主灯 Shadow 诊断", (await ReadPixels()).hash === rendered.shadow.hash);
 
     const SampleTimber = () => page.evaluate(async () => {
       const { Raycaster, Vector3 } = await import("three");
@@ -406,6 +427,7 @@ try {
         });
       });
     });
+    // The reference wood finish was calibrated in the original 100% studio light.
     const timber = { albedo: [], roughness: [], reflection: [] };
     for (const yaw of [0, Math.PI]) {
       await page.evaluate(angle => window.WeaponInspection.scene.SetView(angle, .10), yaw);
@@ -423,6 +445,7 @@ try {
       && SpreadOf(timber.roughness, 0) < 24
       && timber.reflection.every(([r, g, b]) => r > 3 && g > 3 && b > 3 && Math.max(r, g, b) < 62)
       && SpreadOf(timber.reflection, 2) < 28, JSON.stringify([timber.roughness, timber.reflection]));
+    await SetEnvironment(defaultLight);
 
     await Inspect("Dadao");
     await Channel("shadow");
@@ -433,7 +456,8 @@ try {
     Check("大刀正面保持受光和局部遮挡，背面没有密集阴影条纹",
       litBlade.count > 2500 && litBlade.dark > 10 && (litBlade.dark + litBlade.midtone) < litBlade.count * .06
       && shadowedBlade.count > 2500 && shadowedBlade.dark > shadowedBlade.count * .9,
-      JSON.stringify({ lit: litBlade, shadowed: shadowedBlade }));
+      JSON.stringify({ lit: { count: litBlade.count, dark: litBlade.dark, midtone: litBlade.midtone },
+        shadowed: { count: shadowedBlade.count, dark: shadowedBlade.dark } }));
     await page.evaluate(([yaw, pitch]) => window.WeaponInspection.scene.SetView(yaw, pitch), beforeChannels);
     await Channel("ao");
     await Inspect("ZhongZheng");
@@ -656,10 +680,11 @@ try {
       const { viewmodel, camera } = stage.firstPerson;
       const muzzle = viewmodel.rig.group.localToWorld(viewmodel.rig.muzzle.clone()).project(camera);
       return { fov: camera.fov, aspect: camera.aspect, forearms: viewmodel.riggedArms?.root.visible,
-        muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera };
+        muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera,
+        environment: stage.firstPerson.scene.environmentIntensity === stage.scene.environmentIntensity };
     });
     Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面",
-      held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent
+      held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent && held.environment
       && held.muzzle[0] > .05 && held.muzzle.every((coordinate) => Math.abs(coordinate) < 1)
       && await page.locator("#firstPersonInfo").textContent() === "FOV 67° · 16:9", JSON.stringify(held));
     if (shots) await page.locator(".stage").screenshot({ path: path.join(shotDir, "WeaponInspectionFirstPerson.png") });

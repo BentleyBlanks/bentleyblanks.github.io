@@ -8,7 +8,7 @@
   <link rel="icon" href="./Icon_TabSeal32.png">
   <link rel="stylesheet" data-interface-theme href="./Style_Interface.css?v=20261124TimedGrenade">
   <link rel="stylesheet" href="./Style_Editor.css?v=20261125ToolsDecouple">
-  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261127FullWidth">
+  <link rel="stylesheet" href="./AdvancedTools/Style_WeaponInspection.css?v=20261128EnvironmentLight">
   <script type="importmap">
     { "imports": { "three": "./vendor/three/build/three.module.js" } }
   </script>
@@ -94,6 +94,11 @@
           <button type="button" class="edBtn" id="wireframeToggle" aria-pressed="false">线框</button>
           <button type="button" class="edBtn" id="mountToggle" aria-pressed="false">挂点</button>
           <button type="button" class="edBtn" id="bayonetToggle" aria-pressed="false" hidden>刺刀预览</button>
+        </div>
+        <div class="environment-control">
+          <label for="environmentLight">环境光</label>
+          <input id="environmentLight" type="range" min="0" max="250" step="5" value="180" disabled>
+          <output id="environmentLightValue" for="environmentLight" aria-hidden="true"></output>
         </div>
         <div id="viewHint">
           <span><kbd>左键</kbd> 旋转</span>

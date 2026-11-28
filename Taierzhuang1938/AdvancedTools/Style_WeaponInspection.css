@@ -196,6 +196,19 @@ button { cursor: pointer; }
   padding-top: 10px;
 }
 .overlays { gap: 5px; }
+.environment-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border: 1px solid var(--ed-rule-2);
+  background: var(--ed-field);
+  color: var(--ed-text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.environment-control input { width: 80px; height: 20px; margin: 0; accent-color: var(--ed-gold); }
+.environment-control output { min-width: 4ch; color: var(--ed-gold-text); text-align: end; font-variant-numeric: tabular-nums; }
 #viewHint { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--ed-text-3); font-size: 12px; }
 #viewHint span { white-space: nowrap; }
 #viewHint kbd {

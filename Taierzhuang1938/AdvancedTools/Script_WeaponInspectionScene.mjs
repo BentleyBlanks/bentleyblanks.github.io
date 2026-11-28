@@ -205,7 +205,8 @@ async function LoadMaterials(library) {
 const STUDIO_EXPOSURE_COMPENSATION = 2.3;
 
 function CreateLighting(renderer, scene) {
-  scene.add(new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * STUDIO_EXPOSURE_COMPENSATION));
+  const fill = new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * STUDIO_EXPOSURE_COMPENSATION);
+  scene.add(fill);
   const key = new THREE.DirectionalLight(0xfff5e7, 2.4 * STUDIO_EXPOSURE_COMPENSATION);
   key.position.copy(KEY_LIGHT_DIRECTION);
   key.castShadow = true;
@@ -241,7 +242,7 @@ function CreateLighting(renderer, scene) {
     card.geometry.dispose();
     card.material.dispose();
   }
-  return key;
+  return { key, fill };
 }
 
 function FitShadow(key, center, extent) {
@@ -316,7 +317,9 @@ export class WeaponInspectionScene {
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
-    this.keyLight = CreateLighting(this.renderer, this.scene);
+    const { key, fill } = CreateLighting(this.renderer, this.scene);
+    this.keyLight = key;
+    this.environmentFill = fill;
     this.materialPreview = new WeaponMaterialPreview(this.scene.environment);
     this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
@@ -503,6 +506,15 @@ export class WeaponInspectionScene {
 
   SetFirstPerson(preview) {
     this.firstPerson = preview;
+    this.post.NotifyCameraCut();
+    this.RequestDraw();
+  }
+
+  SetEnvironmentLight(scale) {
+    const intensity = STUDIO_EXPOSURE_COMPENSATION * scale;
+    this.scene.environmentIntensity = intensity;
+    this.environmentFill.intensity = 1.25 * intensity;
+    this.materialPreview.SetEnvironmentLight(intensity);
     this.post.NotifyCameraCut();
     this.RequestDraw();
   }
