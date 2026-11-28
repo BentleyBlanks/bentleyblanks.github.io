@@ -14484,7 +14484,7 @@
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
     },
-    "baseQuality": 83.48,
+    "baseQuality": 83.66,
     "frontLightCalibration": {
       "previousDetailSha256": "2bd56a5997021cc3880ecb656c3d5966ac3666388f09f223b94be81a920d6194",
       "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
@@ -16627,15 +16627,31 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherStemJointWear.png",
-      "sha256": "bc83084c0f288c78fad9eae4d3c63877d3d1a069cdf9bf53ba2c48b3c8292c8c",
+      "sha256": "24a216171ba3a4147a25326a485aacb74071f8d71b36727e60a7251e7f4a90ed",
       "fields": [
         "gain",
         "tintRed",
-        "tintBlue"
+        "tintBlue",
+        "tilt",
+        "tiltV",
+        "roughness",
+        "metalness"
       ],
-      "scale": 49000,
+      "scale": 43269,
       "strength": 0.78,
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
+    },
+    "projectedFinishCalibration": {
+      "sourceRevision": "23b814e131292e588520682d090c35922cd1667e",
+      "previousDetailSha256": "bc83084c0f288c78fad9eae4d3c63877d3d1a069cdf9bf53ba2c48b3c8292c8c",
+      "rearCaptureSha256": "0dc975edd45ca639790fcb67c62f1833ab769858b13d095cf9344491f3351424",
+      "frontGallerySha256": "c2fed2e9d1c71fb797242aaac1cb1838cb2581feb4da9e673d74eaed1b319bf1",
+      "frontGallery": {
+        "energy": 3.432,
+        "sceneFill": 5.7
+      },
+      "adjustmentStrength": 1.15,
+      "reviewSha256": "9e25f05f984f88621ddfa747a2c8a34817a39a1be4b5d4053688b14f84bf838a"
     },
     "rearFrames": {
       "UV": "6f0e1faf7e7a48418bf98e64f9999f47c58cceaefc09c5acf36442ecb5beff49",
@@ -26148,8 +26164,8 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "b8308e5229dce23207137c66192292078c0da726567f3d1382bcd005d0710487",
-      "scale": 25080,
+      "sha256": "9c2a0081b23c01a2954230ceefe37a29df9a17f85cfcf9350784cf87c659fbde",
+      "scale": 24819,
       "strength": 1.0,
       "fields": [
         "gain",
@@ -26193,6 +26209,17 @@
       "profileFitSha256": "f412ccf951390bdc974c137edd640ac87543df1e829562cdd7775a2d4687abf2",
       "adjustmentStrength": 1.26,
       "reviewSha256": "3d07b41d7b92ab058471e5d1e6ed3e2993c75d672a9a215e02bfdb7ee72cd1c6"
+    },
+    "rightSideFinishCalibration": {
+      "sourceRevision": "23b814e131292e588520682d090c35922cd1667e",
+      "previousDetailSha256": "b8308e5229dce23207137c66192292078c0da726567f3d1382bcd005d0710487",
+      "rearCaptureSha256": "4d4e1b7d96cc2ea76421ede6e2a0cb9a56cced8f145cec8d85c8793dabe872ae",
+      "phaseResponseCaptureSha256": "020c14e7e1e19399cc7f2e89a8a119d0819e1b633819e9346e992e93cc3332b5",
+      "fitDiagnosticsSha256": "16fa698fe5cfdcaaa25db2775e5f66930c75045b88f1d1ed115bdacbea6e8d77",
+      "surfaceStrength": 1.14,
+      "phaseStrength": 1.04,
+      "endToneStrength": 0.49,
+      "reviewSha256": "9e25f05f984f88621ddfa747a2c8a34817a39a1be4b5d4053688b14f84bf838a"
     },
     "contactAoRetouch": {
       "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
