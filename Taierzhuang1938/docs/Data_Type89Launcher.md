@@ -120,6 +120,8 @@
 
 - 筒身背面以第 8 张馆藏照校准两组灯下同时存在的亮度和色差，按第 1 张照的正面可见区渐收修正。发布格式下，近似馆藏布光的平均亮度误差从 6.15 降至 4.42 个灰阶，独立布光从 8.38 降至 7.10，独立布光的细纹相关系数从 0.768 提至 0.809。正面及斜视的亮度平均变化均小于 0.31 个灰阶，第 7 张照片对应的刻印和十个接缝 AO 视角通过复测。独立布光下，馆藏照的窄亮带仍更强。 [筒身采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 外套筒背面按配准后的馆藏照重烘细环纹在不同灯位下的反光，修正底色、切线法线、粗糙度和金属度。独立布光下，环纹明暗信号的相关系数从 0.457 提至 0.580，平均亮度误差从 12.73 降至 11.89 个灰阶。筒身窄亮带以正背两张馆藏照联合校准，独立布光的第 95 百分位亮度从 185.0 提至 191.9，照片为 202.9。复测正面两组布光、斜视、刻印和十个接缝 AO 视角。正面中性灯下共见区的平均亮度误差降低，局部细纹相关系数从 0.342 降至 0.313。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -174,5 +176,6 @@
 - 驻钣卷边校准保存在 `saddleRimFinish`。16 位图记录覆盖和细纹，烘焙校验上表面材质及接缝 AO 后合入底色、粗糙度和金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 新斜纹参数保存在 `gripFamilyPhase`。回烘校验侧照、握部材质和接缝 AO，从钢材源图分别生成基准与校准斜纹，再将局部响应合入握部原有磨蚀。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 外套筒背面光学修正保存在 `sleeveOpticalFinish`。16 位图保存材质响应与照片覆盖范围的乘积，烘焙校验既有套筒材质和接缝 AO 后合入底色、粗糙度及金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 筒身背面最近一轮的布光与采样记录保存在 `barrelJointFinish.rearCommonLightCalibration`。修正合入原有 16 位筒身材质图，由正式烘焙脚本生成底色和 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV94/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 筒身背面两组布光的亮度均衡采样保存在 `barrelJointFinish.rearCommonLightCalibration`。修正合入原有 16 位筒身材质图，由正式烘焙脚本生成底色和 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本轮亮带和环纹的采样分别记录在 `barrelJointFinish.sharedHighlightCalibration` 和 `sleeveOpticalFinish.ringAlignment`。两张 16 位材质图由正式脚本生成底色、切线法线及 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV95/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
