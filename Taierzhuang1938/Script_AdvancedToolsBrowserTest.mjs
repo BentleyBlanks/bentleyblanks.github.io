@@ -20,7 +20,7 @@ import { CreateEncounterCodexHandler } from "../scripts/Script_EncounterCodexSer
 import { TOOL_INFO } from "./Data_DevTools.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { CAMERA_PROFILES } from "./Data_CameraProfile.mjs";
-import { STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS } from "./AdvancedTools/Data_AdvancedTools.mjs";
+import { STUDIO_TOOLS, STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS } from "./AdvancedTools/Data_AdvancedTools.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -102,8 +102,10 @@ try {
       && info.cards.some((entry) => entry.id === "props" && entry.href.includes("Tool_PropLibrary.html"))
       && !info.cards.some((entry) => entry.id === "squadMarch"), String(info.cards.length));
     const card = (id) => info.cards.find((entry) => entry.id === id);
-    Check("游戏工具文案取 TOOL_INFO 的 label / hint", info.cards.filter((entry) => !STANDALONE_TOOLS.some((tool) => tool.id === entry.id))
+    const centerOnlyIds = new Set([...STUDIO_TOOL_IDS, ...STANDALONE_TOOLS.map((tool) => tool.id)]);
+    Check("游戏工具文案取 TOOL_INFO 的 label / hint", info.cards.filter((entry) => !centerOnlyIds.has(entry.id))
       .every((entry) => entry.name === TOOL_INFO[entry.id].label && entry.hint === TOOL_INFO[entry.id].hint));
+    Check("摄影棚工具文案取 STUDIO_TOOLS 的 label / hint", STUDIO_TOOLS.every((tool) => card(tool.id)?.name === tool.label && card(tool.id)?.hint === tool.hint));
     for (const id of WINDOW_TOOL_IDS) {
       const expected = new URL(TOOL_INFO[id].window.url, `http://127.0.0.1:${port}/Taierzhuang1938/`).href;
       Check(`${id} 卡片以新标签页开自己的页面`, card(id).href === expected && card(id).target === TOOL_INFO[id].window.name

@@ -14,8 +14,8 @@ import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
 import { BlockoutEntry } from "../Script_EditorBlockoutEntry.mjs";
 import { TimelineEditor } from "../Script_EditorTimeline.mjs";
 import {
-  STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl, GameToolUrl, GAME_PAGE,
-} from "./Data_AdvancedTools.mjs?v=20261128AudioStandalone";
+  STUDIO_TOOLS, STUDIO_TOOL_IDS, WINDOW_TOOL_IDS, GAME_TOOL_IDS, STANDALONE_TOOLS, StudioToolUrl, GameToolUrl, GAME_PAGE,
+} from "./Data_AdvancedTools.mjs?v=20261128StudioStandalone";
 
 /** 控制中心的名字（页面标题与顶栏）。 */
 export const CONTROL_CENTER_TITLE = "AdvancedTool ControlCenter";
@@ -31,11 +31,14 @@ const GAME_ENTRY = { blockout: BlockoutEntry, timeline: TimelineEditor };
 export function ControlCenterCards(pageHref = globalThis.location?.href || "http://localhost/Taierzhuang1938/AdvancedTools/ControlCenter.html") {
   const gameIndex = new URL(GAME_PAGE, pageHref).href;
   const cards = [];
+  const Studio = (menu, slot) => STUDIO_TOOLS.filter((tool) => tool.group === menu.id && tool.slot === slot)
+    .map((tool) => ({ group: menu.id, groupLabel: menu.label, id: tool.id, kind: "studio", label: tool.label, hint: tool.hint,
+      href: new URL(StudioToolUrl(tool.id), pageHref).href, target: STUDIO_WINDOW_NAME }));
   const Standalone = (menu, slot) => STANDALONE_TOOLS.filter((tool) => tool.group === menu.id && tool.slot === slot)
     .map((tool) => ({ group: menu.id, groupLabel: menu.label, id: tool.id, kind: "window", label: tool.label, hint: tool.hint,
       href: new URL(tool.window.url, pageHref).href, target: tool.window.name }));
   for (const menu of TOOL_MENUS) {
-    cards.push(...Standalone(menu, "lead"));
+    cards.push(...Studio(menu, "lead"), ...Standalone(menu, "lead"));
     for (const id of menu.items) {
       const info = TOOL_INFO[id];
       if (!info) throw new Error(`TOOL_MENUS 里的工具 ${id} 在 TOOL_INFO 里没有登记`);
@@ -54,7 +57,7 @@ export function ControlCenterCards(pageHref = globalThis.location?.href || "http
       }
       cards.push(card);
     }
-    cards.push(...Standalone(menu, "tail"));
+    cards.push(...Studio(menu, "tail"), ...Standalone(menu, "tail"));
   }
   return cards;
 }

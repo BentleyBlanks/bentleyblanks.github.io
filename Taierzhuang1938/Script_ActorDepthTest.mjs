@@ -28,34 +28,31 @@ page.on("console", (message) => {
 let result = null;
 try {
   await page.goto(
-    `http://127.0.0.1:${port}/Taierzhuang1938/?quality=medium&scale=small&phase=5&menu=0&gi=0`,
+    `http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Studio.html?tool=actor&quality=medium&scale=small&manual=1&audio=0`,
     { waitUntil: "load", timeout: 120000 },
   );
-  await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 240000 });
-  await page.click(".edGear");
-  await page.click('#edRoot .edMenu[data-menu="character"] > .edMenuTitle');
-  await page.click('[data-editor="actor"]');
   await page.waitForFunction(() => {
-    const active = window.Taierzhuang?.editor?.active;
-    return active?.actors?.[0]?.characterRig;
-  }, null, { timeout: 180000 });
+    const active = window.ToolStudio?.editor;
+    return window.ToolStudio?.ready && active?.actors?.[0]?.characterRig;
+  }, null, { timeout: 240000 });
 
   result = await page.evaluate(() => {
-    const T = window.Taierzhuang;
-    const active = T.editor.active;
+    const S = window.ToolStudio;
+    const base = S.base;
+    const active = S.editor;
     active.kindList.Select("nra", true);
     active.animationMode = "imported";
     active.SetClip("RifleRun");
     active.playing = false;
-    T.post.SetTaaEnabled(false);
-    T.StepFrames(30);
+    base.post.SetTaaEnabled(false);
+    S.StepFrames(30);
 
     const actors = active.actors.filter((actor) => actor.characterRig);
-    const target = T.post.targets.normalDepth;
+    const target = base.post.targets.normalDepth;
     const ReadDepth = () => {
-      T.StepFrames(4);
+      S.StepFrames(4);
       const pixels = new Uint16Array(target.width * target.height * 4);
-      T.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, pixels);
+      base.renderer.readRenderTargetPixels(target, 0, 0, target.width, target.height, pixels);
       return pixels;
     };
 
@@ -117,7 +114,7 @@ try {
       skinnedMeshes,
       meshTriangles,
       skipped: actors.some((actor) => actor.characterRig.root.userData.skipNormalDepth === true),
-      glError: T.renderer.getContext().getError(),
+      glError: base.renderer.getContext().getError(),
     };
   });
 } catch (error) {

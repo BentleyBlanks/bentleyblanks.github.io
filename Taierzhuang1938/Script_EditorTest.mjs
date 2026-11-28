@@ -146,6 +146,7 @@ const afterGear = await page.evaluate(() => {
     menus: [...document.querySelectorAll("#edRoot .edMenuTitle")].map((el) => el.textContent),
     barVisible: !!document.querySelector("#edRoot .edMenuBar")?.getClientRects().length,
     squadMarch: !!document.querySelector('#edRoot .edMenuBar [data-editor="squadMarch"]'),
+    actor: !!document.querySelector('#edRoot .edMenuBar [data-editor="actor"]'),
     facial: !!document.querySelector('#edRoot .edMenuBar [data-editor="facial"]'),
     textures: !!document.querySelector('#edRoot .edMenuBar [data-editor="textures"]'),
     audio: !!document.querySelector('#edRoot .edMenuBar [data-editor="audio"]'),
@@ -163,11 +164,11 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出高级工具", afterGear.panelOpen && afterGear.capturing && afterGear.barVisible && afterGear.emptyInspector,
   `进游戏时指针锁=${locked}`);
-// 菜单栏有六组高级工具、右侧 Debug工具；入口数同 TOOL_MENUS（构件库、资产规范、音效音乐只在控制中心，不进游戏菜单）。
+// 菜单栏有六组高级工具、右侧 Debug工具；入口数同 TOOL_MENUS（构件库、资产规范、音效音乐、人物动作与面部只在控制中心，不进游戏菜单）。
 const menuToolCount = TOOL_MENUS.flatMap((menu) => menu.items).length;
 Check("菜单栏列出全部编辑器入口", afterGear.entries === menuToolCount
   && afterGear.menus.join(",") === "场景,关卡,角色,武器,特效与声音,资产,Debug工具"
-  && !afterGear.squadMarch && !afterGear.audio && afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
+  && !afterGear.squadMarch && !afterGear.audio && !afterGear.actor && !afterGear.facial && afterGear.textures && afterGear.sceneEditor && !afterGear.orchestration && afterGear.blockout,
   `条目=${afterGear.entries}，菜单=${afterGear.menus.join("/")}，白盒关卡编辑器=${afterGear.blockout}`);
 Check("设置三页不在高级工具里", !afterGear.settingsInBar);
 Check("Debug工具八项在音量条旁的下拉里，不混进编辑器条目",
@@ -227,7 +228,7 @@ if(process.argv.includes('--launcher-only')){
 }
 
 // 菜单栏右端（2026-11-05）：没有「游戏」菜单、菜单栏 ×、⏻；只有「返回主菜单」。关工具用工作窗自己的 ×
-await ClickTool("actor");
+await page.evaluate(() => { window.Taierzhuang.editor.Open("vfx", { harness: true }); });
 await Step(1);
 await page.click("#edRoot .edPanel.work .edX");
 const afterCloseTool = await page.evaluate(() => ({
@@ -926,18 +927,41 @@ const baseline = await page.evaluate(() => {
 });
 
 // ---------------------------------------------------------------------------
-// 2) 人物动作编辑器
+// 2) 人物动作 / 人物面部已迁至控制中心独立工具宿主（Tool_Studio.html）：
+//    先核对游戏内 EditorSuite 已移除这两个工具，再在独立工具宿主里执行完整人物动作回归。
 // ---------------------------------------------------------------------------
-await ClickTool("actor");
-await Step(20);
-const actor = await page.evaluate(() => {
-  const editor = window.Taierzhuang.editor;
-  const active = editor.active;
+{
+  const removedStudio = await page.evaluate(() => ({
+    actor: window.Taierzhuang.editor.Open("actor"),
+    facial: window.Taierzhuang.editor.Open("facial"),
+    active: window.Taierzhuang.editor.ActiveId,
+  }));
+  Check("游戏内 EditorSuite 已彻底移除人物动作与人物面部",
+    removedStudio.actor === null && removedStudio.facial === null && removedStudio.active === null,
+    JSON.stringify(removedStudio));
+}
+const actorPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+actorPage.on("pageerror", (error) => errors.push(`ACTOR_PAGEERROR ${String(error).slice(0, 240)}`));
+actorPage.on("console", (message) => {
+  if (message.type() !== "error") return;
+  const loc = message.location()?.url || "";
+  if (/fonts\.(googleapis|gstatic)\.com/.test(loc)) return;
+  errors.push(`ACTOR_CONSOLE ${message.text().slice(0, 240)}`);
+});
+await actorPage.goto(
+  `http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Studio.html?tool=actor&quality=medium&scale=small&manual=1&audio=0`,
+  { waitUntil: "load", timeout: 120000 },
+);
+await actorPage.waitForFunction(() => window.ToolStudio?.ready && window.ToolStudio.editor?.actors?.[0]?.characterRig, null, { timeout: 240000 });
+await actorPage.evaluate(() => window.ToolStudio.StepFrames(20));
+const actor = await actorPage.evaluate(() => {
+  const S = window.ToolStudio;
+  const active = S.editor;
   const importedActions = active.clipList.root.querySelectorAll(".it").length;
   // 用户反馈的正是编辑器默认站姿：旧测试只验枪轴，哪怕 Biped 手骨尾端落在
   // 掌外 8-10 cm，枪从张开的手掌旁边穿过去也会是绿的。固定复现该姿态。
   active.SetClip("AdvanceFire");
-  window.Taierzhuang.StepFrames(45);
+  S.StepFrames(45);
   const one = active.actors.length;
   const kind = active.actors[0] ? active.actors[0].kind : null;
   const source = active.actors[0] ? active.actors[0].meshSource : null;
@@ -1028,7 +1052,7 @@ const actor = await page.evaluate(() => {
       // StandFireCrouch 是最容易把枪翻到掌外的一条：旧 shortest-arc 方案实测
       // weapon-up · torso-up = -0.31。切过去再量一次完整姿态框架。
       active.SetClip("StandFireCrouch");
-      window.Taierzhuang.StepFrames(45);
+      S.StepFrames(45);
       primary.root.updateWorldMatrix(true, true);
       const bodyLow = primary.characterRig.bones.pelvis.getWorldPosition(new Vector3());
       const bodyHigh = (primary.characterRig.bones.neck || primary.characterRig.bones.chest)
@@ -1040,7 +1064,7 @@ const actor = await page.evaluate(() => {
   // CrouchIdle 的源定格前倾约 59°、双手和枪拖地；正式播放必须改走同骨架
   // RifleIdle 的自然单膝姿，而不能只把列表中文名换掉。
   active.SetClip("CrouchIdle");
-  window.Taierzhuang.StepFrames(45);
+  S.StepFrames(45);
   primary.root.updateWorldMatrix(true, true);
   {
     const Vector3 = primary.root.position.constructor;
@@ -1057,14 +1081,14 @@ const actor = await page.evaluate(() => {
   // 走真实下拉 change 事件，不只调内部方法：用户反馈的正是面板里换枪不生效。
   active.weaponSelect.root.value = "Type38";
   active.weaponSelect.root.dispatchEvent(new Event("change"));
-  window.Taierzhuang.StepFrames(10);
+  S.StepFrames(10);
   const singleWeaponReplaced = active.actors.length === 1
     && active.actors[0].weaponId === "Type38"
     && active.weaponId === "Type38";
   active.SetWeaponChoice("__source_default__");
   active.lineup = true;
   active.Rebuild();
-  window.Taierzhuang.StepFrames(10);
+  S.StepFrames(10);
   const lineupCount = active.actors.length;
   const nraLineupSourceDefaults = active.actors.length === 3
     && active.actors.map(a=>a.characterRig?.modelId).join(',') === 'TengxianNra02,TengxianNra05,TengxianNra05'
@@ -1074,7 +1098,7 @@ const actor = await page.evaluate(() => {
     && active.actors[2]?.weaponId === null;
   active.weaponSelect.root.value = "Zb26";
   active.weaponSelect.root.dispatchEvent(new Event("change"));
-  window.Taierzhuang.StepFrames(10);
+  S.StepFrames(10);
   const lineupWeaponsReplaced = active.actors.length === 3
     && active.actors.every((previewActor) => previewActor.weaponId === "Zb26");
   active.SetWeaponChoice("__source_default__");
@@ -1082,7 +1106,7 @@ const actor = await page.evaluate(() => {
   active.kindList.Select("ija", true);
   active.lineup = true;
   active.Rebuild();
-  window.Taierzhuang.StepFrames(10);
+  S.StepFrames(10);
   // 【2026-10-12 改数据】2026-09-24 用户批准 IJA06（Data_CharacterSelection 的 ija 表加了序号 5，
   // 主力匿名日军外观、日兵甲的脸），本阵营对比从「三兵一官」变成「四兵一官」；这里原来还按四个人数。
   const ijaLineupSourceDefaults = active.actors.length === 5
@@ -1118,25 +1142,25 @@ const actor = await page.evaluate(() => {
   active.manual = false;
   active.FillActionList();
   active.SetClip("dead");
-  window.Taierzhuang.StepFrames(30);
+  S.StepFrames(30);
   const ragdoll = !!(active.actors[0] && active.actors[0].ragdollState);
   active.kindList.Select("civilian", true);
-  window.Taierzhuang.StepFrames(10);
+  S.StepFrames(10);
   const civilianUnarmed = active.kind === "civilian"
     && active.weaponId === null
     && active.actors[0]?.weaponId === null
     && active.weaponSelect.Value() === "__source_default__";
   return {
-    id: editor.ActiveId, one, lineupCount, importedActions, kind, source,
+    id: S.activeId, one, lineupCount, importedActions, kind, source,
     ragdoll, civilianUnarmed, rigidShadingSolid, socketDirectionDot,
     rightGripError, leftHandWeaponGap, rightHandWeaponGap,
     fingerGripSources, legacySocketSeparation, weaponRollDot,
     correctedCrouchPlayback, correctedCrouchLeanDeg, correctedCrouchStance, correctionDisclosed,
     sourceDefault, singleWeaponReplaced, nraLineupSourceDefaults,
     ijaLineupSourceDefaults, ijaLineup, lineupWeaponsReplaced,
-    studio: editor.studio.Active,
-    worldHidden: !window.Taierzhuang.battlefield.meshes.some((m) => m.visible),
-    viewmodelHidden: window.Taierzhuang.viewmodel.root.visible === false,
+    studio: S.studio.studio.Active,
+    worldHidden: S.studio.studio.Active && S.base.viewmodel.root.visible === false,
+    viewmodelHidden: S.base.viewmodel.root.visible === false,
   };
 });
 Check("人物编辑器打开", actor.id === "actor" && actor.studio, `kind=${actor.kind}`);
@@ -1188,9 +1212,9 @@ Check("百姓切换后自动空手", actor.civilianUnarmed);
 // 画布没开 preserveDrawingBuffer，readPixels 必须与 StepFrames 在同一个 JS 任务里，
 // 让出去一次就清了。medium 档默认开 TAA，所以每张先推几帧让历史收敛。
 // ---------------------------------------------------------------------------
-const drawn = await page.evaluate(() => {
-  const T = window.Taierzhuang;
-  const active = T.editor.active;
+const drawn = await actorPage.evaluate(() => {
+  const S = window.ToolStudio;
+  const active = S.editor;
   active.kindList.Select("nra", true);
   active.animationMode = "programmatic";
   active.manual = false;
@@ -1199,12 +1223,12 @@ const drawn = await page.evaluate(() => {
   // 停表再拍。待机也有呼吸起伏，两张之间人本身就动了几百像素，
   // 那个数会混进"线框画了多少"里，让这一条断言变得什么都证明不了。
   active.playing = false;
-  T.StepFrames(45);              // 姿态弹簧收敛 + TAA 历史收敛
-  const gl = T.renderer.getContext();
+  S.StepFrames(45);              // 姿态弹簧收敛 + TAA 历史收敛
+  const gl = S.base.renderer.getContext();
   const width = gl.drawingBufferWidth;
   const height = gl.drawingBufferHeight;
   const Shot = () => {
-    T.StepFrames(8);
+    S.StepFrames(8);
     const buffer = new Uint8Array(width * height * 4);
     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, buffer);
     return buffer;
@@ -1231,17 +1255,17 @@ const drawn = await page.evaluate(() => {
   // 3) 卧姿要换成卧姿胶囊（尺寸表是 Script_Ai.CAPSULE，与 Rapier 同一套）
   active.playing = true;
   active.SetClip("prone");
-  T.StepFrames(60);
+  S.StepFrames(60);
   const proneStance = active.gizmos[0] ? active.gizmos[0].stance : -1;
   active.SetClip("idle");
-  T.StepFrames(60);
+  S.StepFrames(60);
   const standStance = active.gizmos[0] ? active.gizmos[0].stance : -1;
   return {
     bodyPixels, gizmoPixels, proneStance, standStance,
     total: width * height,
     gizmos: active.gizmos.length,
     // 摄影棚开着的时候合批必须是关的，人物分件必须留在第 0 层（= 自己出画）
-    batchOff: T.actorBatch.enabled === false,
+    batchOff: S.base.actorBatch.enabled === false,
     onLayerZero: active.actors.every((a) => {
       let ok = true;
       a.root.traverse((o) => { if (o.isMesh && o.layers.mask !== 1) ok = false; });
@@ -1252,6 +1276,7 @@ const drawn = await page.evaluate(() => {
       g.hitMaterial.allowOverride === false && g.capMaterial.allowOverride === false),
   };
 });
+await actorPage.close();
 // 1280×720 上一个 3.4 m 外的人大约占两三万像素；给一个不可能靠噪点凑出来的下限。
 Check("川军步兵在摄影棚里真的画出了像素", drawn.bodyPixels > 6000,
   `${drawn.bodyPixels} px / ${drawn.total}`);
@@ -1493,7 +1518,7 @@ await page.waitForFunction(() => window.Taierzhuang !== undefined
 const menuToEditor = await page.evaluate(() => {
   const T = window.Taierzhuang;
   // 主菜单会把编辑器根节点隐藏；走真实的编辑器打开入口后，必须先收起它。
-  T.editor.Open("actor");
+  T.editor.Open("vfx", { harness: true });
   return {
     menu: T.state.menu,
     menuVisible: !document.getElementById("menu").classList.contains("off"),
@@ -1502,7 +1527,7 @@ const menuToEditor = await page.evaluate(() => {
   };
 });
 Check("从主菜单打开编辑器会交还菜单相机",
-  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "actor"
+  !menuToEditor.menu && !menuToEditor.menuVisible && menuToEditor.editor === "vfx"
     && menuToEditor.capturing, JSON.stringify(menuToEditor));
 await page.evaluate(() => window.Taierzhuang.editor.Close());
 const returnedToMenu = await page.evaluate(() => ({

@@ -19,7 +19,7 @@ page.on("pageerror", (error) => errors.push(String(error)));
 page.on("console", (entry) => { if (entry.type() === "error") errors.push(entry.text()); });
 async function CheckContinuousGait(kind) {
   const evidence = await page.evaluate((kind) => {
-    const instance = window.Tengxian.editor.active.cartPreview;
+    const instance = window.ToolStudio.editor.cartPreview;
     const prefix = kind === "ox" ? "Ox" : "Horse";
     const stride = kind === "ox" ? 1.05 : 1.25;
     const duty = kind === "ox" ? .64 : .62;
@@ -88,30 +88,28 @@ async function CheckContinuousGait(kind) {
   console.log(`${kind} continuous gait:`,JSON.stringify(evidence));
 }
 try {
-  // The action editor is level-independent. A small range avoids loading the
-  // full campaign terrain and story actors just to inspect two draft animals.
-  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?range=1&menu=0&manual=1&quality=high&scale=small`,
+  // 人物动作编辑器已迁至控制中心独立工具宿主 Tool_Studio.html。
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/AdvancedTools/Tool_Studio.html?manual=1&quality=high&scale=small&audio=0`,
     { timeout: 180000 });
-  await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
-  await page.click("#bootStart");
+  await page.waitForFunction(() => window.ToolStudio?.ready, null, { timeout: 180000 });
   const baseline = await page.evaluate(() => {
-    const game = window.Tengxian;
-    return { position: game.camera.position.toArray(), fov: game.camera.fov };
+    const cam = window.ToolStudio.base.camera;
+    return { position: cam.position.toArray(), fov: cam.fov };
   });
-  await page.evaluate(() => window.Tengxian.editor.Open("actor"));
+  await page.evaluate(() => window.ToolStudio.Open("actor"));
   await page.locator(".edChip").filter({ hasText: /^牛马车$/ }).click();
-  await page.waitForFunction(() => window.Tengxian.editor.active?.cartPreview?.parts?.deck,
+  await page.waitForFunction(() => window.ToolStudio.editor?.cartPreview?.parts?.deck,
     null, { timeout: 30000 });
   const before = await page.evaluate(() => {
-    const editor = window.Tengxian.editor.active;
+    const editor = window.ToolStudio.editor;
     return { mode: editor.previewMode, kind: editor.cartKind,
       // 肩关节藏在躯干里、幅度小；看得见的那根腿柱从肘（ElbowPivot）起摆。
       leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftElbowPivot").rotation.x,
       wheel: editor.cartPreview.cartRoot.getObjectByName("WheelLeft").rotation.x };
   });
-  await page.evaluate(() => window.Tengxian.StepFrames(15));
+  await page.evaluate(() => window.ToolStudio.StepFrames(15));
   const after = await page.evaluate(() => {
-    const editor = window.Tengxian.editor.active;
+    const editor = window.ToolStudio.editor;
     let meshes = 0, skinned = 0;
     editor.cartPreview.root.traverse((object) => {
       if (object.isMesh) meshes += 1;
@@ -132,12 +130,12 @@ try {
   assert.match(after.fact, /Blender Walk/);
   await CheckContinuousGait("ox");
   await page.screenshot({ path: path.join(shots, "Texture_OxCartEditor.png") });
-  let previousCamera = await page.evaluate(() => window.Tengxian.camera.position.toArray());
+  let previousCamera = await page.evaluate(() => window.ToolStudio.base.camera.position.toArray());
   for (const [view, label] of [["side", "正侧"], ["front", "正面"], ["rear", "车后"]]) {
     await page.locator(".edChip").filter({ hasText: new RegExp(`^${label}$`) }).click();
-    await page.evaluate(() => window.Tengxian.StepFrames(12));
-    assert.equal(await page.evaluate(() => window.Tengxian.editor.active.cartView), view);
-    const camera = await page.evaluate(() => window.Tengxian.camera.position.toArray());
+    await page.evaluate(() => window.ToolStudio.StepFrames(12));
+    assert.equal(await page.evaluate(() => window.ToolStudio.editor.cartView), view);
+    const camera = await page.evaluate(() => window.ToolStudio.base.camera.position.toArray());
     assert.notDeepEqual(camera, previousCamera, `${view} has a distinct inspection camera`);
     previousCamera = camera;
     await page.screenshot({ path: path.join(shots, `Texture_OxCart_${view}.png`) });
@@ -145,30 +143,30 @@ try {
   await page.locator(".edChip").filter({ hasText: /^斜侧$/ }).click();
 
   await page.locator(".edPanel .it").filter({ hasText: /马车 · 同款民用板车/ }).click();
-  await page.waitForFunction(() => window.Tengxian.editor.active?.cartPreview?.animalRoot
+  await page.waitForFunction(() => window.ToolStudio.editor?.cartPreview?.animalRoot
     .getObjectByName("HorseFrontLeftPivot"), null, { timeout: 30000 });
-  await page.evaluate(() => window.Tengxian.StepFrames(15));
+  await page.evaluate(() => window.ToolStudio.StepFrames(15));
   await page.screenshot({ path: path.join(shots, "Texture_HorseCartEditor.png") });
   await page.locator(".edChip").filter({ hasText: /^正侧$/ }).click();
-  await page.evaluate(() => window.Tengxian.StepFrames(12));
+  await page.evaluate(() => window.ToolStudio.StepFrames(12));
   await page.screenshot({ path: path.join(shots, "Texture_HorseCart_side.png") });
-  const horse = await page.evaluate(() => ({ kind: window.Tengxian.editor.active.cartKind,
-    meshes: Object.values(window.Tengxian.editor.active.cartPreview.parts).every((mesh) => mesh.isMesh) }));
+  const horse = await page.evaluate(() => ({ kind: window.ToolStudio.editor.cartKind,
+    meshes: Object.values(window.ToolStudio.editor.cartPreview.parts).every((mesh) => mesh.isMesh) }));
   assert.deepEqual(horse, { kind: "horse", meshes: true });
   await CheckContinuousGait("horse");
-  const wheelAtStop = await page.evaluate(() => window.Tengxian.editor.active.cartPreview.cartRoot
+  const wheelAtStop = await page.evaluate(() => window.ToolStudio.editor.cartPreview.cartRoot
     .getObjectByName("WheelLeft").rotation.x);
   await page.locator(".edChip").filter({ hasText: /^停驻姿态$/ }).click();
-  await page.evaluate(() => window.Tengxian.StepFrames(15));
-  const stopped = await page.evaluate(() => ({ wheel: window.Tengxian.editor.active.cartPreview.cartRoot
-    .getObjectByName("WheelLeft").rotation.x, action: window.Tengxian.editor.active.cartAction }));
+  await page.evaluate(() => window.ToolStudio.StepFrames(15));
+  const stopped = await page.evaluate(() => ({ wheel: window.ToolStudio.editor.cartPreview.cartRoot
+    .getObjectByName("WheelLeft").rotation.x, action: window.ToolStudio.editor.cartAction }));
   assert.equal(stopped.action, "idle");
   assert.ok(Math.abs(stopped.wheel - wheelAtStop) < 1e-6, "the parked cart wheel holds its last angle");
   // 真实体型：鲁西黄牛与华北挽马肩高都在 1.4 米上下（1.7 米的人齐肩），马昂着头耳尖约 1.9 米；
   // 旧模型肩高 2 米多、耳尖 2.7 米。合批后整匹马的皮毛是一只蒙皮网格，量它（含头耳）的最高点。
   const horseTop = await page.evaluate(async () => {
     const THREE = await import("three");
-    const editor = window.Tengxian.editor.active;
+    const editor = window.ToolStudio.editor;
     const mesh = editor.cartPreview.parts.draftBody;
     mesh.updateWorldMatrix(true, false);
     mesh.computeBoundingBox();
@@ -177,7 +175,7 @@ try {
   });
   assert.ok(horseTop > 1.75 && horseTop < 2.05, `horse ear tips at ${horseTop.toFixed(2)} m, want ~1.9 m`);
   const contact = await page.evaluate(() => {
-    const instance = window.Tengxian.editor.active.cartPreview;
+    const instance = window.ToolStudio.editor.cartPreview;
     const hoof = instance.animalRoot.getObjectByName("HorseFrontLeftHoofPivot");
     const position = () => {
       instance.root.updateMatrixWorld(true);
@@ -200,14 +198,14 @@ try {
     "a horse support hoof tracks the cart's .2 m travel");
   assert.equal(contact.parked, contact.parkedAgain, "a stationary wheel does not keep turning");
   await page.locator(".edChip").filter({ hasText: /^人物$/ }).click();
-  await page.waitForFunction(() => window.Tengxian.editor.active?.actors?.[0]?.meshSource,
+  await page.waitForFunction(() => window.ToolStudio.editor?.actors?.[0]?.meshSource,
     null, { timeout: 30000 });
-  assert.equal(await page.evaluate(() => window.Tengxian.editor.active.previewMode), "actor");
-  await page.evaluate(() => window.Tengxian.editor.Close());
+  assert.equal(await page.evaluate(() => window.ToolStudio.editor.previewMode), "actor");
+  await page.evaluate(() => window.ToolStudio.Close());
   const restored = await page.evaluate(() => {
-    const game = window.Tengxian;
-    return { position: game.camera.position.toArray(), fov: game.camera.fov,
-      active: game.editor.activeId };
+    const cam = window.ToolStudio.base.camera;
+    return { position: cam.position.toArray(), fov: cam.fov,
+      active: window.ToolStudio.activeId };
   });
   assert.deepEqual(restored.position, baseline.position);
   assert.equal(restored.fov, baseline.fov);

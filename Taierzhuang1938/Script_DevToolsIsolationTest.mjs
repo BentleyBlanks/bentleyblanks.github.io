@@ -86,7 +86,7 @@ for (const [real, stub] of Object.entries({ ...DEV_TOOL_STUBS, ...SPLIT_TOOL_STU
   Check("拆分边界：剔除版声明拆出去的工具不在，开发版在", stub.SPLIT_TOOLS_AVAILABLE === false && real.SPLIT_TOOLS_AVAILABLE === true);
   const stubClasses = await import("./Script_DevToolsSplitStub.mjs"), realClasses = await import("./Script_DevToolsSplit.mjs");
   Check("拆分边界：剔除版是空数组", Array.isArray(stubClasses.SPLIT_TOOL_CLASSES) && stubClasses.SPLIT_TOOL_CLASSES.length === 0);
-  Check("拆分边界：开发版 13 个类与 TOOL_INFO 里 split 的条目一一对应",
+  Check("拆分边界：开发版 11 个类与 TOOL_INFO 里 split 的条目一一对应",
     JSON.stringify(realClasses.SPLIT_TOOL_CLASSES.map((Editor) => Editor.id).sort()) === JSON.stringify([...SPLIT_IDS].sort()), SPLIT_IDS.join(","));
 }
 
@@ -129,7 +129,7 @@ Check("完整包含高级工具（剔除前提成立）", full.gameInputs.includ
 Check("完整包含设置宿主", full.gameInputs.includes("Script_SettingsHost.mjs"));
 Check("标题菜单包从不带开发模块", DevInputs(full.menuInputs).filter((file) => !["Data_DevTools.mjs", "Data_DevToolsSplit.mjs"].includes(file)).length === 0,
   DevInputs(full.menuInputs).join(", "));
-Check("完整包含拆分进 AdvancedTools/ 的工具（拆分前提成立）", full.gameInputs.includes("AdvancedTools/Script_EditorActor.mjs") && full.gameInputs.includes("Script_DevToolsSplit.mjs"));
+Check("完整包含拆分进 AdvancedTools/ 的工具（拆分前提成立）", full.gameInputs.includes("AdvancedTools/Script_EditorVfx.mjs") && full.gameInputs.includes("Script_DevToolsSplit.mjs"));
 Check("标题菜单包从不带 AdvancedTools/ 里的模块", !full.menuInputs.some((file) => file.startsWith("AdvancedTools/")));
 {
   const leaked = DevInputs(stripped.gameInputs);
@@ -163,8 +163,8 @@ Check("发布构建里留在游戏里的工具仍在（Script_Editor、白盒入
 Check("游戏宿主通过入口调用 PCG 独立工具", !full.gameInputs.some((file) => /Script_Editor(Splines|PropPcg)/.test(file)));
 Check("发布包隔离 PCG 验证界面，保留生产生成器", !deploy.gameInputs.some((file) => /Script_Editor(Splines|PropPcg)/.test(file))
   && deploy.gameInputs.includes("Script_PropPcg.mjs") && deploy.gameInputs.includes("Script_RoadSpline.mjs"));
-Check("完整包已删除持枪移动观察工具，且不拉入音效音乐独立工具",
-  !full.gameInputs.some((file) => /FirstPersonMotion|Script_EditorAudio|Script_AudioPreview/.test(file)));
+Check("完整包已删除持枪移动观察工具，且不拉入音效音乐、人物动作与人物面部独立工具",
+  !full.gameInputs.some((file) => /FirstPersonMotion|Script_EditorAudio|Script_AudioPreview|Script_EditorActor|Script_EditorFacial|Script_FacialReview/.test(file)));
 Check("发布构建比完整包小", deploy.gameInputs.length < full.gameInputs.length, `${full.gameInputs.length} → ${deploy.gameInputs.length} 个模块`);
 {
   // 发布副本：目录整个不在、import map 不残留指向它的条目、范围白名单也不放行
@@ -259,11 +259,16 @@ if (process.argv.includes("--browser")) {
         await page.waitForFunction(() => window.Tengxian.state.running, null, { timeout: 20000 });
         const bar = await page.evaluate(() => ({ ids: [...document.querySelectorAll("#edRoot .edMenuItem[data-editor]")].map((item) => item.dataset.editor),
           groups: [...document.querySelectorAll("#edRoot .edMenu[data-menu]")].map((menu) => menu.dataset.menu), editor: !!window.Tengxian.editor }));
-        Check("发布构建：游戏内高级工具菜单栏里这 13 项消失、留在游戏里的 2 项照旧",
+        Check("发布构建：游戏内高级工具菜单栏里这 11 项消失、留在游戏里的 2 项照旧",
           bar.editor && SPLIT_IDS.every((id) => !bar.ids.includes(id)) && KEPT.every((id) => bar.ids.includes(id)), bar.ids.join(","));
         Check("发布构建：高级工具只保留关卡组和 Debug工具", bar.groups.join(",") === "level,debug", bar.groups.join(","));
-        const opened = await page.evaluate(() => { const result = window.Tengxian.editor.Open("actor"); return { active: window.Tengxian.editor.ActiveId, result: result === null }; });
-        Check("发布构建：直接 Open 已拆出的工具 id 不抛错、也不会打开", opened.result && opened.active === null);
+        const opened = await page.evaluate(() => {
+          const rActor = window.Tengxian.editor.Open("actor");
+          const rFacial = window.Tengxian.editor.Open("facial");
+          const rVfx = window.Tengxian.editor.Open("vfx");
+          return { active: window.Tengxian.editor.ActiveId, result: rActor === null && rFacial === null && rVfx === null };
+        });
+        Check("发布构建：直接 Open 已拆出/移出的工具 id 不抛错、也不会打开", opened.result && opened.active === null);
         await page.evaluate(() => window.Tengxian.Debug.Pause());
       } else {
         await page.waitForFunction(() => window.Tengxian.Debug.Menu().open, null, { timeout: 60000 });
@@ -271,7 +276,7 @@ if (process.argv.includes("--browser")) {
       await page.evaluate(() => window.Tengxian.Debug.MenuAct("settings"));
       await page.click('[data-setting="tools"]');
       const rows = await page.evaluate(() => [...document.querySelectorAll(".mnToolItem")].map((row) => row.dataset.toolId));
-      Check(`发布构建 ${fixture.name}：设置 → 高级工具里这 13 项消失、留在游戏里的 2 项照旧`,
+      Check(`发布构建 ${fixture.name}：设置 → 高级工具里这 11 项消失、留在游戏里的 2 项照旧`,
         SPLIT_IDS.every((id) => !rows.includes(id)) && ["blockout", "timeline"].every((id) => rows.includes(id)), rows.join(","));
       Check(`发布构建 ${fixture.name}：没有页面错误`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await page.close();

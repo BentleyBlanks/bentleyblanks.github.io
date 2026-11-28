@@ -28,24 +28,23 @@ try {
       empty: !document.querySelector("#edRoot .edInspectorEmpty").hidden,
       cards: document.querySelectorAll("#edRoot .edHomeTool").length,
       hasAudio: !!document.querySelector('#edRoot .edHomeTool[data-home-tool="audio"]'),
+      hasActor: !!document.querySelector('#edRoot .edHomeTool[data-home-tool="actor"]'),
+      hasFacial: !!document.querySelector('#edRoot .edHomeTool[data-home-tool="facial"]'),
     }));
     assert.deepEqual(state.phases, ["ToolsHome"], "工具首页不建任何关卡");
-    assert.ok(state.home && !state.empty && state.cards === 15 && !state.hasAudio, JSON.stringify(state));
+    assert.ok(state.home && !state.empty && state.cards === 13 && !state.hasAudio && !state.hasActor && !state.hasFacial, JSON.stringify(state));
     const fits = await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
     assert.ok(fits, "首页无横向滚动");
     await page.screenshot({ path: path.join(out, `Home${name}.png`) });
 
     if (name === "Desktop") {
-      // 摄影棚工具直接开；Esc 回首页
-      await page.click('#edRoot .edHomeTool[data-home-tool="actor"]');
-      await page.waitForSelector("#edRoot .edPanel.work");
-      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), "actor");
-      assert.equal(await page.locator("#edRoot .edHome").isHidden(), true);
-      await page.evaluate(() => window.Tengxian.StepFrames?.(5));
-      await page.screenshot({ path: path.join(out, "ActorFromHome.png") });
-      await page.keyboard.press("Escape");
-      assert.equal(await page.evaluate(() => window.Tengxian.editor.ActiveId), null);
-      assert.equal(await page.locator("#edRoot .edHome").isVisible(), true, "Esc 先回首页");
+      // 人物动作 / 人物面部已移至控制中心独立工具宿主，游戏内不再注册
+      const removed = await page.evaluate(() => ({
+        actor: window.Tengxian.editor.Open("actor"),
+        facial: window.Tengxian.editor.Open("facial"),
+        active: window.Tengxian.editor.ActiveId,
+      }));
+      assert.deepEqual(removed, { actor: null, facial: null, active: null }, "游戏宿主已彻底移出 actor 与 facial");
 
       const fpReady = page.waitForEvent("popup");
       await page.click('#edRoot .edHomeTool[data-home-tool="firstPerson"]');

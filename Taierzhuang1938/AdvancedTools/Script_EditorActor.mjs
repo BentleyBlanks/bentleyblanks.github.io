@@ -34,7 +34,9 @@ import {
   IsLugouAnimationAllowed,
 } from "../Script_CharacterModel.mjs";
 import { LoadDraftCartAssets, CreateDraftCartInstance } from "../Script_DraftCartModel.mjs";
-import { TOOL_INFO } from "../Data_DevTools.mjs";
+import { STUDIO_TOOLS } from "./Data_AdvancedTools.mjs";
+
+const ACTOR_TOOL = STUDIO_TOOLS.find((tool) => tool.id === "actor");
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
@@ -373,8 +375,8 @@ function ImportedClipStance(clipId, action = null) {
 
 export class ActorEditor {
   static id = "actor";
-  static label = TOOL_INFO.actor.label;
-  static hint = TOOL_INFO.actor.hint;
+  static label = ACTOR_TOOL.label;
+  static hint = ACTOR_TOOL.hint;
 
   constructor(host) {
     this.host = host;

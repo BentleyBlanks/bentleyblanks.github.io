@@ -9,23 +9,32 @@
 import { El, Panel, Note } from "../Script_EditorUi.mjs";
 import { Studio, FlyCam, ViewportInput } from "../Script_EditorStage.mjs";
 import { LoadToolsVolume, ToolsVolumeControl, ToolsVolumeLevel } from "../Script_EditorVolume.mjs";
-import { TOOL_INFO, TOOL_MENUS } from "../Data_DevTools.mjs";
+import { TOOL_INFO } from "../Data_DevTools.mjs";
 import { CreateStudioBase, MAX_FRAME_DT } from "./Script_ToolStudioRenderBase.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
 import { FacialEditor } from "./Script_EditorFacial.mjs";
-import { CONTROL_CENTER_URL, STANDALONE_TOOLS } from "./Data_AdvancedTools.mjs";
+import { CONTROL_CENTER_URL, STANDALONE_TOOLS, STUDIO_TOOLS } from "./Data_AdvancedTools.mjs";
 
-/** 在这一页里跑的工具（Data_DevTools 里的 id）。其余拆出去的是独立窗口页（含特效预览、音效音乐），不在这里。 */
+/** 在这一页里跑的工具（Data_AdvancedTools.STUDIO_TOOLS）。其余拆出去的是独立窗口页，不在这里。 */
 export const STUDIO_EDITORS = Object.freeze([
   ActorEditor, FacialEditor,
 ]);
 
-/** 菜单分组：从 Data_DevTools.TOOL_MENUS 中筛选摄影棚类工具，空组不列。 */
+/** 菜单分组：按 Data_AdvancedTools.STUDIO_TOOLS 分组，不再依赖游戏内 Data_DevTools.TOOL_MENUS。 */
 export function StudioMenus(editors = STUDIO_EDITORS) {
   const editorById = new Map(editors.map((Editor) => [Editor.id, Editor]));
-  return TOOL_MENUS
-    .map((menu) => ({ id: menu.id, label: menu.label, items: menu.items.filter((id) => editorById.has(id)).map((id) => editorById.get(id)) }))
-    .filter((menu) => menu.items.length);
+  const groups = new Map();
+  for (const tool of STUDIO_TOOLS) {
+    const Editor = editorById.get(tool.id);
+    if (!Editor) continue;
+    let group = groups.get(tool.group);
+    if (!group) {
+      group = { id: tool.group, label: tool.groupLabel || tool.group, items: [] };
+      groups.set(tool.group, group);
+    }
+    group.items.push(Editor);
+  }
+  return [...groups.values()];
 }
 
 export class ToolStudio {
@@ -151,8 +160,8 @@ export class ToolStudio {
         button.type = "button";
         button.setAttribute("role", "menuitemcheckbox");
         button.appendChild(El("span", "edMenuCheck"));
-        button.appendChild(El("span", "edMenuLabel", TOOL_INFO[Editor.id].label));
-        button.title = TOOL_INFO[Editor.id].hint;
+        button.appendChild(El("span", "edMenuLabel", Editor.label || Editor.id));
+        button.title = Editor.hint || "";
         button.dataset.editor = Editor.id;
         button.dataset.group = menu.id;
         button.addEventListener("click", () => { this.OpenMenu(null); this.Toggle(Editor.id); });
@@ -259,7 +268,7 @@ export class ToolStudio {
       this.base.audio?.SetPaused?.(silenceBackground);
     }
     if (this.status) {
-      const label = this.active ? (TOOL_INFO[this.activeId]?.label || this.activeId) : "未选择工具";
+      const label = this.active ? (this.active.constructor?.label || this.activeId) : "未选择工具";
       this.status.textContent = `${label} · 独立工具宿主`;
     }
     this.SyncToolsVolume();

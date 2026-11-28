@@ -7,15 +7,16 @@ import { SelectP012CompanionCast } from '../Script_FirstLevelP012Cast.mjs';
 import { GetLugouCharacterVariantEntries } from '../Script_CharacterModel.mjs';
 import { BuildSpeechEnvelope,SampleSpeechEnvelope } from '../Script_SpeechEnvelope.mjs';
 import { FACIAL_REVIEW_DEFAULTS,FACIAL_REVIEW_STORAGE,FacialLineAt,BuildFacialReviewSamples,SampleFacialKeys,ValidateFacialReview } from './Script_FacialReview.mjs';
-import { TOOL_INFO } from "../Data_DevTools.mjs";
+import { STUDIO_TOOLS } from "./Data_AdvancedTools.mjs";
 
+const FACIAL_TOOL = STUDIO_TOOLS.find((tool) => tool.id === "facial");
 const Name=who=>MISSION_VOICE_CAST[who]?.[0]||who;
 const Fields=[['jawGain','口型幅度',2],['wide','展唇',1],['round','圆唇',1],['brow','抬眉',1],['blink','闭眼',1]];
 
 export class FacialEditor {
   static id='facial';
-  static label = TOOL_INFO.facial.label;
-  static hint = TOOL_INFO.facial.hint;
+  static label = FACIAL_TOOL.label;
+  static hint = FACIAL_TOOL.hint;
   constructor(host) {
     this.host=host;this.studio=host.studio;this.cameraMode='studio';
     this.who='luo';this.time=0;this.rate=1;this.keys=[];this.note='';this.drafts={};

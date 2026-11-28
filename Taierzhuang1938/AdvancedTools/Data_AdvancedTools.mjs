@@ -1,7 +1,7 @@
 // AdvancedTool ControlCenter 的目录表：纯值、零依赖（不 import 任何模块，node 测试与控制中心页都能直接读）。
 //
 // 分四类：
-//   · studio：共享独立工具宿主 Tool_Studio.html?tool=<id>（新标签页）；
+//   · studio：只在控制中心出现、共享独立工具宿主 Tool_Studio.html?tool=<id>（不进游戏菜单与拆分边界）；
 //   · window：独立工具页（页面地址与标签页目标名在 Data_DevTools.TOOL_INFO.window，均以普通浏览器标签页打开）；
 //   · game：留在游戏里的工具（白盒关卡与 Timeline），控制中心只列一张「游戏内」卡片链到游戏现有入口；
 //   · standalone：只在控制中心出现的独立页面，文案与目标名就写在这里。
@@ -9,9 +9,15 @@
 //
 // 路径口径：下面的地址都以 AdvancedTools/ 目录里的页面为基准（`./` = AdvancedTools/，`../` = Taierzhuang1938/）。
 
-export const STUDIO_TOOL_IDS = Object.freeze([
-  "actor", "facial",
+/** 只在控制中心与 Tool_Studio.html 出现的摄影棚工具：已彻底切出游戏内 EditorSuite 与 Data_DevTools。 */
+export const STUDIO_TOOLS = Object.freeze([
+  Object.freeze({ id: "actor", group: "character", groupLabel: "角色", slot: "lead",
+    label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换" }),
+  Object.freeze({ id: "facial", group: "character", groupLabel: "角色", slot: "lead",
+    label: "人物面部", hint: "配套对白、口型与表情近景检查" }),
 ]);
+
+export const STUDIO_TOOL_IDS = Object.freeze(STUDIO_TOOLS.map((tool) => tool.id));
 
 export const WINDOW_TOOL_IDS = Object.freeze(["sceneEditor", "levelFlow", "mixamoPreview", "motionCompare", "motionWorkbench", "weapon", "firstPerson", "vfx", "textures", "splines", "propPcg"]);
 

@@ -553,7 +553,7 @@ async function CheckInterface() {
     const listed=await page.evaluate(()=>[...document.querySelectorAll('.mnToolItem')].map(el=>el.dataset.toolId));
     const {TOOL_MENUS}=await import('./Data_DevTools.mjs');
     const expected=TOOL_MENUS.flatMap(menu=>menu.items);
-    Check('高级工具右栏按分组列出全部工具，数量与顺序同 TOOL_MENUS',expected.length===15&&!expected.includes('props')&&!expected.includes('assetStandards')&&!expected.includes('audio')&&listed.join()===expected.join(),listed.join());
+    Check('高级工具右栏按分组列出全部工具，数量与顺序同 TOOL_MENUS',expected.length===13&&!expected.includes('props')&&!expected.includes('assetStandards')&&!expected.includes('audio')&&!expected.includes('actor')&&!expected.includes('facial')&&listed.join()===expected.join(),listed.join());
     Check('新标签页与先选关卡工具带标签',await page.evaluate(()=>['sceneEditor','mixamoPreview','textures'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='新标签页 ↗')
       &&['splines','propPcg'].every(id=>document.querySelector(`.mnToolItem[data-tool-id="${id}"] .mnToolTag`)?.textContent==='先选关卡')));
     await page.screenshot({path:path.join(outDir,'Scene_InterfaceToolsPane.png')});
@@ -1399,12 +1399,11 @@ async function CheckMissionList() {
   }
   await page.evaluate(() => window.Taierzhuang.Debug.CloseEditor());
 
-  // 实际复现玩家路径：暂停 → 设置 → 摄影棚类工具（原为构件库预览，2026-11-25 拆出游戏后改用人物动作）。过去只有场景/地形工具会
-  // 收起暂停菜单，摄影棚类编辑器会把「继续 / 设置 / 调试选项」叠在背景里。
+  // 实际复现玩家路径：暂停 → 设置 → 游戏内编辑器（原为构件库预览，2026-11-28 人物动作与面部移出游戏后改用 vfx harness）。
   // 所有编辑器接管后都必须整层隐藏菜单；关闭工具后再回原暂停层，不能恢复战斗。
   await page.evaluate(() => {
     window.Taierzhuang.Debug.MenuAct("settings");
-    window.Taierzhuang.Debug.OpenEditor("actor");
+    window.Taierzhuang.editor.Open("vfx", { harness: true });
   });
   await page.evaluate(() => window.Taierzhuang.StepFrames(4));
   const propEditorOpen = await page.evaluate(() => ({
@@ -1414,7 +1413,7 @@ async function CheckMissionList() {
     running: window.Taierzhuang.state.running,
   }));
   Check("摄影棚编辑器打开时暂停菜单整层隐藏",
-    propEditorOpen.editor.active === "actor" && !propEditorOpen.menu.open
+    propEditorOpen.editor.active === "vfx" && !propEditorOpen.menu.open
       && propEditorOpen.menuDisplay === "none" && !propEditorOpen.running,
     JSON.stringify(propEditorOpen));
   await page.screenshot({ path: path.join(outDir, "Menu_PropEditorFromPause.png") });

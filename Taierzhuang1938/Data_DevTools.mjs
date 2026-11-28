@@ -30,8 +30,6 @@ export const TOOL_INFO = Object.freeze({
   timeline: { label: "Timeline 过场", hint: "过场时间轴：第一关开场 01-1…02-3（白盒预演、试玩播的就是这一份），走白盒编辑器的预演播放器（打开后整页切换）" },
   levelFlow: { label: "Encounter Designer", hint: "多视口同步预演剧情，截图标注并通过本机会话提交修改需求", split: true,
     window: { url: "./AdvancedTools/Tool_LevelFlow.html", name: "TengxianLevelFlow" } },
-  actor: { label: "人物动作", hint: "预览十套原模型、骨骼动作与连续姿态切换", split: true },
-  facial: { label: "人物面部", hint: "配套对白、口型与表情近景检查", split: true },
   mixamoPreview: { label: "Mixamo 动作预览", hint: "在新标签页打开：Mixamo 通用动作按分类与端枪 / 空手预览，角色默认带已配置的头发胡子及项目道具", split: true,
     window: { url: "./AdvancedTools/Tool_MixamoAnimationPreview.html?v=20261113earclearance", name: "TengxianMixamoPreview" } },
   motionCompare: { label: "动作衔接对比", hint: "在新标签页打开：左右同步分屏对比 3C 动作系统优化前后（2D 混合 / 朝向扭曲 / 原地转身 / Blender 9 帧 Aim Offset / 开火叠加 / 第一人称横移）", split: true,
@@ -52,7 +50,7 @@ export const TOOL_INFO = Object.freeze({
 const TOOL_MENU_DEFS = [
   { id: "scene", label: "场景", items: ["sceneEditor", "splines", "propPcg"] },
   { id: "level", label: "关卡", items: ["blockout", "timeline", "levelFlow"] },
-  { id: "character", label: "角色", items: ["actor", "facial", "mixamoPreview", "motionCompare", "motionWorkbench"] },
+  { id: "character", label: "角色", items: ["mixamoPreview", "motionCompare", "motionWorkbench"] },
   { id: "weapon", label: "武器", items: ["weapon", "firstPerson"] },
   { id: "media", label: "特效与声音", items: ["vfx"] },
   { id: "assets", label: "资产", items: ["textures"] },
