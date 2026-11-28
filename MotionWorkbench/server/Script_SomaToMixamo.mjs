@@ -50,17 +50,14 @@ export const SOMA_TO_MIXAMO = Object.freeze((() => {
 })());
 
 // Child reference used for rest-pose 1D swing alignment when bone has a single anatomical axis.
-// Note: Neck & Head are intentionally omitted because both SOMA-77 and Mixamo X Bot have level,
-// +Z-facing rest heads; aligning dummy leaf offsets (HeadEnd -7.5° vs HeadTop_End +18.7°) injects
-// a bogus ~26° pitch offset and causes severe Neck/Head opposing-kink jaw/cheek distortion.
+// Note: Spine/Spine1/Spine2, LeftShoulder/RightShoulder, and Neck/Head are intentionally omitted:
+// - Mixamo X Bot has an artificial -8.5°/-7° backward rest lordosis on Spine/Spine1/Spine2, while
+//   SOMA-77 has a sternum-forward clavicle offset (-21° vs -12°) and dummy head leaf offsets.
+//   Aligning those rest vectors injects +6~15° of forward torso hunch and clavicle retraction/shrug,
+//   causing the neck/head to jut out of the collar on crouched characters (especially child rigs like Nier).
 const SWING_CHILD_PAIR = Object.freeze((() => {
-  const pairs = {
-    Spine: ["Spine2", "Spine1"],
-    Spine1: ["Chest", "Spine2"],
-    Spine2: ["Neck1", "Neck"],
-  };
+  const pairs = {};
   for (const side of ["Left", "Right"]) {
-    pairs[`${side}Shoulder`] = [`${side}Arm`, `${side}Arm`];
     pairs[`${side}Arm`] = [`${side}ForeArm`, `${side}ForeArm`];
     pairs[`${side}ForeArm`] = [`${side}Hand`, `${side}Hand`];
     pairs[`${side}UpLeg`] = [`${side}Shin`, `${side}Leg`];
@@ -501,16 +498,38 @@ export function retargetSomaGlbToMixamo({
   const spine2Idx = boneNames.indexOf("Spine2");
   const neckIdx = boneNames.indexOf("Neck");
   const headIdx = boneNames.indexOf("Head");
+  const somaHipsMapIdx = mixamoToSomaIdx.get("Hips");
+  const somaSpine2MapIdx = mixamoToSomaIdx.get("Spine2");
   const somaHeadIdx = mixamoToSomaIdx.get("Head");
-  const restSpine2ToHead =
-    neckIdx >= 0 && headIdx >= 0
-      ? xbotBones[neckIdx].localQ.clone().multiply(xbotBones[headIdx].localQ).normalize()
-      : new THREE.Quaternion();
-  const restSpine2ToHeadInv = restSpine2ToHead.clone().invert();
+  const neckRestInv = neckIdx >= 0 ? xbotBones[neckIdx].localQ.clone().invert() : new THREE.Quaternion();
+  const headRestInv = headIdx >= 0 ? xbotBones[headIdx].localQ.clone().invert() : new THREE.Quaternion();
   const identityQ = new THREE.Quaternion();
   const headDesiredWorldQ = new THREE.Quaternion();
   const neckDeltaQ = new THREE.Quaternion();
   const totalHeadDeltaQ = new THREE.Quaternion();
+  const clavicleDeltaQ = new THREE.Quaternion();
+  const clavicleScaledQ = new THREE.Quaternion();
+  const rawParentWorldQ = new THREE.Quaternion();
+  const rawBoneWorldQ = new THREE.Quaternion();
+  const rawHipsWorldQ = new THREE.Quaternion();
+  const rawSpine2WorldQ = new THREE.Quaternion();
+  const relSpine2Q = new THREE.Quaternion();
+  const spineExtQ = new THREE.Quaternion();
+  const spineFlexEuler = new THREE.Euler(0, 0, 0, "XYZ");
+  const spineUpVec = new THREE.Vector3();
+  const xAxis = new THREE.Vector3(1, 0, 0);
+  const restHipsToSpine2Inv =
+    xbotHipsIdx >= 0 && spine2Idx >= 0
+      ? xbotBones[xbotHipsIdx].worldQ.clone().invert().multiply(xbotBones[spine2Idx].worldQ).invert()
+      : new THREE.Quaternion();
+  const SPINE_RELIEF_WEIGHT = { Spine: 0.45, Spine1: 0.35, Spine2: 0.2 };
+  const clavicleRestInv = new Map();
+  for (const b of xbotBones) {
+    if (b.name === "LeftShoulder" || b.name === "RightShoulder") {
+      clavicleRestInv.set(b.name, b.localQ.clone().invert());
+    }
+  }
+  const MAX_CLAVICLE_RAD = (18 * Math.PI) / 180;
 
   // Compute source frame-0 horizontal center so character starts centered at X=0, Z=0
   let originX = 0;
@@ -560,6 +579,46 @@ export function retargetSomaGlbToMixamo({
       if (ry < minFootY) minFootY = ry;
     }
 
+    // Precompute anatomical crouch hunch relief for this frame:
+    // Monocular 45°-down cameras cause GEM-X SOMA-77 to exaggerate lumbar/thoracic forward flexion during deep
+    // crouches (pushing Spine2/collar to ~55-60° forward while Hips is only ~13°). We only relieve when BOTH
+    // Hips->Spine2 local forward flexion > 20° AND Spine2 world tilt > 30°, so standing, upright sitting,
+    // and prone dives (where Hips itself tilts 80-90° with straight spine) remain 100% untouched.
+    let spineReliefRad = 0;
+    const hasRawSpineRef =
+      somaHipsMapIdx !== undefined &&
+      somaSpine2MapIdx !== undefined &&
+      xbotHipsIdx >= 0 &&
+      spine2Idx >= 0 &&
+      corrections[xbotHipsIdx] &&
+      corrections[spine2Idx];
+    if (hasRawSpineRef) {
+      rawHipsWorldQ
+        .copy(worldTurnY180)
+        .multiply(somaWorldQ[somaHipsMapIdx])
+        .multiply(corrections[xbotHipsIdx])
+        .normalize();
+      rawSpine2WorldQ
+        .copy(worldTurnY180)
+        .multiply(somaWorldQ[somaSpine2MapIdx])
+        .multiply(corrections[spine2Idx])
+        .normalize();
+      relSpine2Q
+        .copy(rawHipsWorldQ)
+        .invert()
+        .multiply(rawSpine2WorldQ)
+        .premultiply(restHipsToSpine2Inv)
+        .normalize();
+      spineFlexEuler.setFromQuaternion(relSpine2Q, "XYZ");
+      const localFlexDeg = (spineFlexEuler.x * 180) / Math.PI;
+      spineUpVec.set(0, 1, 0).applyQuaternion(rawSpine2WorldQ);
+      const worldTiltDeg = (Math.acos(Math.min(1, Math.max(-1, spineUpVec.y))) * 180) / Math.PI;
+      if (localFlexDeg > 20 && worldTiltDeg > 30) {
+        const reliefDeg = Math.min((localFlexDeg - 20) * 0.55, (worldTiltDeg - 30) * 0.55, 18);
+        spineReliefRad = (reliefDeg * Math.PI) / 180;
+      }
+    }
+
     // 2. Retarget each X Bot bone in parent-first order
     for (let bi = 0; bi < xbotBones.length; bi++) {
       const b = xbotBones[bi];
@@ -567,17 +626,44 @@ export function retargetSomaGlbToMixamo({
       const parentQ = b.parent >= 0 ? xbotWorldQ[b.parent] : rootParentQ;
 
       if (
+        (b.name === "Spine" || b.name === "Spine1" || b.name === "Spine2") &&
+        sIdx !== undefined &&
+        corrections[bi] &&
+        b.parent >= 0
+      ) {
+        const pSIdx = mixamoToSomaIdx.get(xbotBones[b.parent].name);
+        if (pSIdx !== undefined && corrections[b.parent]) {
+          rawParentWorldQ
+            .copy(worldTurnY180)
+            .multiply(somaWorldQ[pSIdx])
+            .multiply(corrections[b.parent])
+            .normalize();
+          rawBoneWorldQ
+            .copy(worldTurnY180)
+            .multiply(somaWorldQ[sIdx])
+            .multiply(corrections[bi])
+            .normalize();
+          tmpQ.copy(rawParentWorldQ).invert().multiply(rawBoneWorldQ).normalize();
+          if (spineReliefRad > 1e-5) {
+            spineExtQ.setFromAxisAngle(xAxis, -spineReliefRad * SPINE_RELIEF_WEIGHT[b.name]);
+            tmpQ.multiply(spineExtQ).normalize();
+          }
+          xbotWorldQ[bi].copy(parentQ).multiply(tmpQ).normalize();
+        } else {
+          xbotWorldQ[bi].copy(worldTurnY180).multiply(somaWorldQ[sIdx]).multiply(corrections[bi]).normalize();
+          tmpQ.copy(parentQ).invert().multiply(xbotWorldQ[bi]).normalize();
+        }
+      } else if (
         b.name === "Neck" &&
         spine2Idx >= 0 &&
         headIdx >= 0 &&
         somaHeadIdx !== undefined &&
         corrections[headIdx]
       ) {
-        // SOMA-77 uses a 2-segment neck (Neck1+Neck2) that can crane +60° forward while Head counter-pitches -45°.
-        // Dumping that opposing S-bend onto Mixamo's single Neck/Head (which share lower-face/jaw skin weights)
-        // stretches the chin and cheeks. Instead, compute the exact desired world Head orientation and distribute
-        // the Spine2->Head delta smoothly (35% Neck, 65% Head) along the shortest arc so Head gaze is 100% exact
-        // with zero opposing kink across the face.
+        // SOMA-77 uses a 2-segment neck (Neck1+Neck2) that can crane forward while Head counter-pitches.
+        // Compute the exact desired world Head orientation and distribute the Spine2->Head delta smoothly
+        // (72% Neck, 28% Head) in Neck local space so the neck rises naturally upright inside the collar
+        // during deep crouches while keeping Head gaze 100% exact with zero chin/cheek distortion.
         headDesiredWorldQ
           .copy(worldTurnY180)
           .multiply(somaWorldQ[somaHeadIdx])
@@ -587,13 +673,36 @@ export function retargetSomaGlbToMixamo({
           .copy(parentQ)
           .invert()
           .multiply(headDesiredWorldQ)
-          .premultiply(restSpine2ToHeadInv)
+          .premultiply(neckRestInv)
+          .multiply(headRestInv)
           .normalize();
         if (totalHeadDeltaQ.w < 0) {
           totalHeadDeltaQ.set(-totalHeadDeltaQ.x, -totalHeadDeltaQ.y, -totalHeadDeltaQ.z, -totalHeadDeltaQ.w);
         }
-        neckDeltaQ.copy(identityQ).slerp(totalHeadDeltaQ, 0.35).normalize();
+        neckDeltaQ.copy(identityQ).slerp(totalHeadDeltaQ, 0.72).normalize();
         tmpQ.copy(b.localQ).multiply(neckDeltaQ).normalize();
+        xbotWorldQ[bi].copy(parentQ).multiply(tmpQ).normalize();
+      } else if (
+        (b.name === "LeftShoulder" || b.name === "RightShoulder") &&
+        sIdx !== undefined &&
+        corrections[bi]
+      ) {
+        // Measure clavicle delta relative to raw SOMA Chest (independent of spine hunch relief),
+        // then smoothly damp & clamp (65% weight, max 18° from Mixamo rest) so collars stay snug around the neck
+        // while preserving exact LeftArm/RightArm world orientations downstream.
+        rawBoneWorldQ.copy(worldTurnY180).multiply(somaWorldQ[sIdx]).multiply(corrections[bi]).normalize();
+        const refParentQ = hasRawSpineRef ? rawSpine2WorldQ : parentQ;
+        tmpQ.copy(refParentQ).invert().multiply(rawBoneWorldQ).normalize();
+        clavicleDeltaQ.copy(clavicleRestInv.get(b.name)).multiply(tmpQ).normalize();
+        if (clavicleDeltaQ.w < 0) {
+          clavicleDeltaQ.set(-clavicleDeltaQ.x, -clavicleDeltaQ.y, -clavicleDeltaQ.z, -clavicleDeltaQ.w);
+        }
+        const halfAngle = Math.acos(Math.min(1, Math.max(-1, clavicleDeltaQ.w)));
+        const angle = halfAngle * 2;
+        const dampedAngle = Math.min(MAX_CLAVICLE_RAD, angle * 0.65);
+        const factor = angle > 1e-5 ? dampedAngle / angle : 0;
+        clavicleScaledQ.copy(identityQ).slerp(clavicleDeltaQ, factor).normalize();
+        tmpQ.copy(b.localQ).multiply(clavicleScaledQ).normalize();
         xbotWorldQ[bi].copy(parentQ).multiply(tmpQ).normalize();
       } else if (sIdx !== undefined && corrections[bi]) {
         xbotWorldQ[bi].copy(worldTurnY180).multiply(somaWorldQ[sIdx]).multiply(corrections[bi]).normalize();
@@ -655,7 +764,7 @@ export function retargetSomaGlbToMixamo({
     outPath: outGlbPath,
     sizeBytes: stat.size,
     qa: {
-      retargetVersion: 3,
+      retargetVersion: 4,
       targetSkeleton: "Mixamo X Bot (65 骨)",
       mappedBones: mappedCount,
       totalTargetBones: boneNames.length,
