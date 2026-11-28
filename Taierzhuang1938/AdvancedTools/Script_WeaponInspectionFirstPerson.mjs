@@ -4,16 +4,22 @@ import { LoadSavedGraphics } from "../Script_PlayerSettings.mjs";
 import { LoadRiggedAssets } from "../Script_RiggedModel.mjs";
 import { Viewmodel } from "../Script_Viewmodel.mjs";
 import { BuildStandardPostOptions } from "../Script_CameraProfile.mjs";
+import { LoadGameEnvironmentPreset } from "../Script_EnvironmentProfile.mjs";
+import { FirstPersonSelfShadow } from "../Script_FirstPersonSelfShadow.mjs";
 
 const FRAME_ASPECT = 16 / 9;
 
 export class WeaponInspectionFirstPerson {
   static async Create(stage) {
-    const riggedAssets = await LoadRiggedAssets();
-    return new WeaponInspectionFirstPerson(stage, riggedAssets);
+    const [riggedAssets, { doc, preset }] = await Promise.all([
+      LoadRiggedAssets(),
+      LoadGameEnvironmentPreset(),
+    ]);
+    const weaponLight = doc.components.WeaponLight?.enabled === false ? null : preset.weaponLight;
+    return new WeaponInspectionFirstPerson(stage, riggedAssets, weaponLight);
   }
 
-  constructor(stage, riggedAssets) {
+  constructor(stage, riggedAssets, weaponLight) {
     this.camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg, FRAME_ASPECT, .06, 80);
     this.scene = new THREE.Scene();
     this.sunDirection = stage.sunDirection.clone();
@@ -25,12 +31,16 @@ export class WeaponInspectionFirstPerson {
       fov: 52, depthBudget: 1.22, meshDocs: stage.factory.meshDocs, riggedAssets,
     });
     this.camera.add(this.viewmodel.root);
+    // 持枪预览复用材质补光，保留现有的无自阴影预览照明。
+    this.weaponLight = new FirstPersonSelfShadow(stage.renderer, this.scene, this.camera, this.viewmodel.root);
+    this.weaponLight.SetWeaponLight(weaponLight);
   }
 
   Equip({ id, variant, glbAsset }) {
     const { camera, viewmodel } = this;
-    const graphics = { fov: CAMERA.baseFovDeg };
+    const graphics = { fov: CAMERA.baseFovDeg, firstPersonWeaponLight: true };
     LoadSavedGraphics(graphics);
+    this.weaponLight.SetWeaponLightEnabled(graphics.firstPersonWeaponLight !== false);
     camera.fov = graphics.fov;
     camera.updateProjectionMatrix();
     if (id === "HanYang") viewmodel.hanYang173R = glbAsset;
@@ -39,6 +49,7 @@ export class WeaponInspectionFirstPerson {
       viewmodel.Equip(id, variant, { instant: true });
     }
     viewmodel.Update(1 / 60, { elapsed: 0 });
+    this.weaponLight.Sync();
   }
 
   Draw(renderer, width, height, post = null) {

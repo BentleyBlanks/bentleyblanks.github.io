@@ -700,7 +700,10 @@ try {
     const held = await page.evaluate(() => {
       const stage = window.WeaponInspection.scene;
       stage.Draw();
-      const { viewmodel, camera } = stage.firstPerson;
+      const { viewmodel, camera, weaponLight } = stage.firstPerson;
+      const light = weaponLight.Status();
+      const litMeshes = weaponLight.meshes.filter((mesh) => [mesh.material].flat()
+        .some((material) => material.userData.weaponLightOn?.value > 0));
       const muzzle = viewmodel.rig.group.localToWorld(viewmodel.rig.muzzle.clone()).project(camera);
       const copy = document.createElement("canvas");
       copy.width = stage.canvas.width;
@@ -714,23 +717,40 @@ try {
         muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera,
         environment: stage.firstPerson.scene.environment === stage.scene.environment
           && stage.firstPerson.scene.getObjectByName("InspectionSky")?.visible,
-        letterboxed, topAlpha: AlphaAt(.5, .02), centerAlpha: AlphaAt(.5, .5), bottomAlpha: AlphaAt(.5, .98) };
+        letterboxed, topAlpha: AlphaAt(.5, .02), centerAlpha: AlphaAt(.5, .5), bottomAlpha: AlphaAt(.5, .98),
+        light: light.weaponLight.slice(0, 2), shadows: light.renderedFrames,
+        gunOnly: litMeshes.length > 0 && litMeshes.every((mesh) => !mesh.isSkinnedMesh) };
     });
     Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面且不拉伸",
       held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent && held.environment
       && held.muzzle[0] > .05 && held.muzzle.every((coordinate) => Math.abs(coordinate) < 1)
       && held.centerAlpha === 255 && (!held.letterboxed || (held.topAlpha === 0 && held.bottomAlpha === 0))
       && await page.locator("#firstPersonInfo").textContent() === "FOV 67° · 16:9", JSON.stringify(held));
+    Check("第一人称只给枪身应用游戏白天补光", held.light[0] === .55 && held.light[1] === .25
+      && held.gunOnly && held.shadows === 0, JSON.stringify(held.light));
     if (shots) await page.locator(".stage").screenshot({ path: path.join(shotDir, "WeaponInspectionFirstPerson.png") });
     await orbitPreset.click();
     await page.waitForFunction(() => !document.querySelector("#viewScale").hidden);
     Check("切回外观恢复原来的缩放、位置和通道",
       (await CameraState()).join() === orbitBeforeFirstPerson.join() && await activeChannel.getAttribute("data-channel") === "beauty"
       && await page.locator("#gridToggle").isEnabled());
+    await page.evaluate(() => localStorage.setItem("tengxian1938_graphics_v1", JSON.stringify({ firstPersonWeaponLight: false })));
     await firstPersonPreset.click();
     await WaitFirstPerson("HanYang");
+    Check("第一人称预览读取武器补光存档开关", await page.evaluate(() => {
+      const { weaponLight } = window.WeaponInspection.scene.firstPerson;
+      const [fill, spec] = weaponLight.Status().weaponLight;
+      return fill === 0 && spec === 0;
+    }));
+    await page.evaluate(() => localStorage.removeItem("tengxian1938_graphics_v1"));
     await Inspect("ServicePistol");
     await WaitFirstPerson("ServicePistol");
+    Check("换枪后补光应用到新武器材质", await page.evaluate(() => {
+      const { weaponLight } = window.WeaponInspection.scene.firstPerson;
+      const [fill, spec] = weaponLight.Status().weaponLight;
+      return fill > 0 && spec > 0 && weaponLight.meshes.some((mesh) => [mesh.material].flat()
+        .some((material) => material.userData.weaponLightOn?.value > 0));
+    }));
     await Inspect("Type94Tankette");
     Check("换手持枪械保留第一人称，换载具自动回到外观",
       await firstPersonPreset.isDisabled() && await orbitPreset.getAttribute("aria-pressed") === "true"
