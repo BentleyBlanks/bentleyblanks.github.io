@@ -1081,12 +1081,19 @@ function SightBlockedByTerrain(from,to,objects) {
   for(const object of objects) if(RayHitsCover3D(from,to,object)) return true;
   return false;
 }
-const campTankScreen=encounterScene.objects.filter(object=>object.id==="Encounter_TankApproachScreen");
+// 2026-11-28: All 6 artificial green spawn-screen walls are replaced by natural Lunan
+// terrain & rural ruins (Li family cypress cemetery ridge LiGrove_*, ruined eastern
+// threshing yard RuinsEastYard_*, northern field shrine FieldShrineNorth_*, western
+// family grave dike FieldGraveWest_*, and forward military-crest mound FrontPitGrave_*).
+const campTankScreen=encounterScene.objects.filter(object=>/^LiGrove_(NorthWall|GraveMound)/.test(object.id));
+assert.ok(campTankScreen.length>=4,"Li family cemetery ridge walls and grave mounds replace the artificial TankApproachScreen");
+assert.ok(!encounterScene.objects.some(object=>/^Encounter_(TankApproachScreen|NorthSpawnWall|EastSpawnWall|NorthPursuitSpawn|WestPursuit|PitPursuitScreen)/.test(object.id)),
+  "artificial green spawn-screen boxes are removed from FirstLevelEncounter");
 for(const id of ["GroundWest","GroundEast"]) {
   const group=defaults.groups.find(entry=>entry.id===id);
   for(let index=0;index<group.count;index++) {
     const origin=[group.area.center[0]+group.spawnOffsets[index][0],group.area.center[1]+group.spawnOffsets[index][1]];
-    assert.ok(origin[1]<75,`${id}_${index} originates north of TankApproachScreen`);
+    assert.ok(origin[1]<75,`${id}_${index} originates north of the Li family cemetery ridge`);
     for(const observer of [[25,71],[30,86],[35,116],[35,131],[35,141.5],[46,149],[55,154],[57,127],[66,129],[68.6,128.6],[72,137],[84,145],[86.4,143.2]]) {
       const eye=[observer[0],encounterTerrain.heightAt(...observer)+1.65,observer[1]];
       for(const height of [0.3,1.0,1.8]) {
@@ -1095,6 +1102,63 @@ for(const id of ["GroundWest","GroundEast"]) {
       }
     }
   }
+}
+// Verify natural landscape occluders in FirstLevelEncounter also conceal Fork, Corner,
+// RearPursuit, TrafficFlank, Rim, and the 05a tank convoy with zero artificial green walls.
+{
+  const naturalScreens=encounterScene.objects.filter(o=>o.solid!==false && /^(LiGrove_|RuinsEastYard_|FieldShrineNorth_|FieldGraveWest_|FrontPitGrave_)/.test(o.id));
+  assert.ok(naturalScreens.every(o=>!o.cover && !o.meta?.planning),"natural landscape occluders are not tagged as glowing green cover walls");
+  for(const elapsed of [0,0.5,1]) {
+    const frame=EvaluateFlow(BeatById("05a").start+elapsed);
+    for(const id of convoyIds) {
+      const actor=frame.actors.find(entry=>entry.id===id);
+      for(const observer of [frame.player,[35,141.5],[46,149],[55,154],[79,147]]) {
+        const eye=[observer[0],encounterTerrain.heightAt(...observer)+1.65,observer[1]];
+        assert.ok(SightBlockedByTerrain(eye,[actor.p[0],encounterTerrain.heightAt(...actor.p)+1.8,actor.p[1]],campTankScreen),
+          `${id} is concealed behind LiGrove natural ridge at 05a+${elapsed}s`);
+      }
+    }
+  }
+  for(const id of ["Fork","Corner"]) {
+    const g=Group(id),fr=EvaluateFlow(g.start);
+    for(const actor of fr.actors.filter(a=>a.groupId===id)) {
+      for(const obs of [fr.player,[25,65.7],[39,65.5],[46,65.6],[61.8,65.6]]) {
+        const eye=[obs[0],encounterTerrain.heightAt(...obs)+1.65,obs[1]];
+        for(const h of [0.3,1.0,1.8]) {
+          assert.ok(SightBlockedByTerrain(eye,[actor.p[0],encounterTerrain.heightAt(...actor.p)+h,actor.p[1]],naturalScreens),
+            `${actor.id} concealed behind ruined eastern threshing yard from [${obs}] h=${h}`);
+        }
+      }
+    }
+  }
+  for(const id of ["RearPursuit","TrafficFlank"]) {
+    const g=Group(id);
+    for(const life of g.lives) {
+      const fr=EvaluateFlow(life.born+0.01);
+      const actor=fr.actors.find(a=>a.groupId===id && a.born===life.born);
+      const eye=[fr.player[0],encounterTerrain.heightAt(...fr.player)+1.65,fr.player[1]];
+      for(const h of [0.3,1.0,1.8]) {
+        assert.ok(SightBlockedByTerrain(eye,[actor.p[0],encounterTerrain.heightAt(...actor.p)+h,actor.p[1]],naturalScreens),
+          `${actor.id} concealed behind rural terrain/ruins in FirstLevelEncounter h=${h}`);
+      }
+    }
+  }
+  // Verify 3-tier fortification structure & forward military crest terrain profile in FirstLevelEncounter
+  assert.ok(encounterTerrain.preAt(0,-10) > encounterTerrain.preAt(0,-60) + 1.8, "forward military crest commands the northern valley by >1.8m");
+  assert.ok(encounterTerrain.preAt(0,-10) > encounterTerrain.preAt(0,55) + 1.1, "tier-2 support swale sits in genuine reverse-slope defilade behind the forward military crest");
+  assert.ok(encounterTerrain.preAt(35,129) > encounterTerrain.preAt(35,64) + 2.5, "tier-3 topographical crest retains the +3m uphill climb");
+  for(const reqId of ["FrontWest","FrontMid","FrontEast","FrontEastRoadblock","SupportWest","SupportEastBreach","CrestWestReserve","CrestEastLink","OutpostWestPit","OutpostEastPit"]) {
+    assert.ok(encounterScene.trenches.segments.some(s=>s.id===reqId), `FirstLevelEncounter contains 3-tier fortification segment ${reqId}`);
+  }
+  for(const removedId of ["ForwardObservationSap","EastListeningSap","AssemblyWestLink","CounterattackWestSteps","FrontWestReturn","FrontEastReturn"]) {
+    assert.ok(!encounterScene.trenches.segments.some(s=>s.id===removedId), `obsolete WWI/floating segment ${removedId} removed from FirstLevelEncounter`);
+  }
+  const fw=encounterScene.trenches.segments.find(s=>s.id==="FrontWest");
+  const fe=encounterScene.trenches.segments.find(s=>s.id==="FrontEast");
+  assert.ok(Math.min(...fw.points.map(p=>p[0])) <= -114, "FrontWest anchors west into the Jinpu railway embankment");
+  assert.ok(Math.max(...fe.points.map(p=>p[0])) >= 144, "FrontEast anchors east onto the Guandao corridor");
+  assert.ok(encounterScene.trenches.segments.find(s=>s.id==="Traffic").floorW <= 3.2, "Traffic narrowed to realistic 2.8-3.2m dragging corridor");
+  assert.ok(encounterScene.trenches.segments.find(s=>s.id==="Traffic2").floorW <= 2.2, "Traffic2 narrowed to realistic 1.8-2.2m communication trench");
 }
 // While approaching north of z=82 behind the northern berm, flanking squads stay silent (no firing through the berm).
 for(let stamp=BeatById("03h").start;stamp<BeatById("04a").start;stamp+=0.5) {

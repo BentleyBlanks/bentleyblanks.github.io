@@ -846,7 +846,7 @@ for (const spec of ENCOUNTER_VARIANTS) {
   for (const cluster of [
     "DugoutNorth", "NorthPursuit", "TrafficFlank", "DragWest", "CrestEast",
     "CampWest", "LaneNorth", "LaneMiddle",
-    "FrontStepLeft", "FrontStepWest", "FrontStepEast", "FrontStepRight",
+    "EastBreach", "WestRailAnchor", "SupportWestEnd", "CrestWestEnd",
   ]) {
     assert.ok(baseSlopeBlocks.some((o) => o.id.startsWith(`SlopeBlock_${cluster}_`)), `缺少斜坡封堵簇 SlopeBlock_${cluster}_*`);
   }

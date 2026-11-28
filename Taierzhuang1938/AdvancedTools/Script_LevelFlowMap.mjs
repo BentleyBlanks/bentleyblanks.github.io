@@ -83,7 +83,9 @@ export function BuildEncounterMap(scene, options = {}) {
   const roads = [
     { id: "TankGroundRoad", points: FLOW_GROUND.road, width: 5 },
     ...ramps,
-    { points: front.L0105_ROAD.map(Point), width: front.L0105_ROAD_WIDTH_M },
+    ...(scene.surface
+      ? [{ id: "ReverseSlopeSupplyTrack", points: [[58.2, 156.8], [76, 154.5], [94, 149], [108, 143]], width: 2.8, kind: "villageAlley" }]
+      : [{ points: front.L0105_ROAD.map(Point), width: front.L0105_ROAD_WIDTH_M }]),
     { points: [...front.L0105_NORTH_ROAD].reverse().map(Point), width: 5 },
     { points: front.L0105_POST_ROAD_SOUTH.map(Point), width: 5 },
     ...(hasGengjiazhuang ? [
