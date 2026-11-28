@@ -26184,5 +26184,45 @@
       "V93FrontGuardDefault/beauty": "cc9c5ea88b122e2fd2cabd71b40fe140c82b4c7dc1e431f8bdabcbd480ca9d08",
       "V93FrontGuardDefault/GainPlus": "d4591aaf1162f0d68d01c4f9e055a766c0c6d49da86edf8d039a1e9357f8930f"
     }
+  },
+  "saddleSurfaceRefinement": {
+    "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+    "frontFitSha256": "f77f6757a1456bafe24938d804c2fdd08ba7806163517495312b0db585608767",
+    "rawSteelSha256": "2a67d46d3302013c8f259552ab72aeb950c50fc618d7408a81825f87d7a834b8",
+    "atlasSha256": "d0e4227f0fd65b12a075d58f6b43ae04abb8217d5afc9f0666408e679fb45627",
+    "jointAoSha256": "682efa6452fb155a8b13e6881c88d46b92fc66ba247b2b46ab58235f81776da7",
+    "upperFinishSha256": "ef3e82fb406a4becf508c9de0d212260a50898046d8604aa24f3b692d47d5c33",
+    "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+    "source": {
+      "file": "Mariners8.jpg"
+    },
+    "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+    "detail": {
+      "file": "Texture_Type89LauncherSaddleSurfaceResponse.png",
+      "sha256": "95aa2453495964eb32313ed0ed8b5d5f91efbc3f7c2768947f88765cdba39fd4",
+      "fields": [
+        "gain",
+        "tilt",
+        "tiltV",
+        "roughness",
+        "metalness",
+        "tintRed",
+        "tintBlue"
+      ],
+      "scale": 58000,
+      "strength": 1.0,
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
+    },
+    "calibrationStrength": 1.14,
+    "sourceRevision": "5aa550c08efb3923740a8442ddefb1ffead4446d",
+    "rearCaptureSha256": "07b86737b4a5225114186dbab05d7689e9a6309aee094ab0aef9e23f4bf234d8",
+    "frontGallerySha256": "28061f4962742d271e856b5b668d8610c4053598f410662b45da07a66352210c",
+    "rearRegistrationSha256": "b80f316d7b43275947c24f3d650b84b0d3c234e277f4a78a48620c3dae40cc5c",
+    "reviewSha256": "798f208d66e7118a1cd36e9980b0924eeb3863a0f8362abd631b13dbde3572c4",
+    "frontGallery": {
+      "energy": 5.984,
+      "sceneFill": 3.306
+    }
   }
 }

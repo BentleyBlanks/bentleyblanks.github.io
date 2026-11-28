@@ -1948,6 +1948,9 @@ def Bake(legacyOrm=None):
         ApplyCoveredPhotoFinish(maps, pixels, "Knurl", gripRear, GripRearIdentity(reference))
     if (gripFamily := reference.get("gripFamilyPhase")) is not None:
         ApplyGripFamilyPhase(maps, pixels, reference, gripFamily, calibrationVisibility, seamVisibility)
+    saddleSurface = reference.get("saddleSurfaceRefinement")
+    if saddleSurface is not None:
+        ApplyCoveredPhotoFinish(maps, pixels, "Saddle", saddleSurface, SaddleRimIdentity(reference))
     baseQuality = (collarReflectance or {}).get("baseQuality", 84)
     baseQuality = (barrelFinish or {}).get("baseQuality", baseQuality)
     for channel, image in zip(("Base", "Normal"), maps[:2]):
@@ -2051,6 +2054,8 @@ def Bake(legacyOrm=None):
     if saddleRim is not None:
         details["saddleRimCoverage"] = saddleRim["coverage"]
         details["saddleRimDetail"] = saddleRim["detail"]
+    if saddleSurface is not None:
+        details["saddleSurfaceResponse"] = saddleSurface["detail"]
     for key, detail in details.items():
         record["reference"][key] = {"path": REFERENCE.with_name(detail["file"]).relative_to(HERE.parent).as_posix(),
                                     "sha256": detail["sha256"]}

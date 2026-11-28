@@ -2728,7 +2728,7 @@ def Main():
         ("sleeveOpticalFinish", SleeveOpticalIdentity),
         ("collarReflectanceFinish", CollarReflectanceIdentity), ("barrelJointFinish", BarrelJointIdentity),
         ("stemJointFinish", StemJointIdentity), ("saddleReflectanceFinish", SaddleReflectanceIdentity),
-        ("saddleRimFinish", SaddleRimIdentity),
+        ("saddleRimFinish", SaddleRimIdentity), ("saddleSurfaceRefinement", SaddleRimIdentity),
         ("tabReflectanceFinish", lambda current: TabReflectanceIdentity(current, "Tab")),
         ("tabBackReflectanceFinish", lambda current: TabReflectanceIdentity(current, "TabBack")),
         ("shoulderReflectanceFinish", ShoulderReflectanceIdentity), ("wheelOxideFinish", WheelOxideIdentity),
