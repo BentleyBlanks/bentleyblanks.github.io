@@ -26373,7 +26373,7 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSaddleSurfaceResponse.png",
-      "sha256": "95aa2453495964eb32313ed0ed8b5d5f91efbc3f7c2768947f88765cdba39fd4",
+      "sha256": "17bb6df797ca13ad7ff6fd5590e341381b882cbe9953182c9b1581cc3c2a881d",
       "fields": [
         "gain",
         "tilt",
@@ -26383,7 +26383,7 @@
         "tintRed",
         "tintBlue"
       ],
-      "scale": 58000,
+      "scale": 41182,
       "strength": 1.0,
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
@@ -26397,6 +26397,18 @@
     "frontGallery": {
       "energy": 5.984,
       "sceneFill": 3.306
+    },
+    "edgeFinishRefinement": {
+      "sourcePlateSha256": "95aa2453495964eb32313ed0ed8b5d5f91efbc3f7c2768947f88765cdba39fd4",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "strength": 1.29,
+      "alignmentAmounts": [
+        0.76,
+        1.0,
+        1.17
+      ],
+      "frontCalibrated": true
     }
   }
 }
