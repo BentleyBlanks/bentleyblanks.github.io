@@ -14467,7 +14467,7 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "a6ecddd6201492f4ee9ac96ea0f994600a8dfb1249d05e2092d0f8d44cefe2d2",
+      "sha256": "9af6dae326e62b28ae8886f8d751c4a8aa3cde82a4e603597bf164d1757603da",
       "scale": 23460,
       "strength": 0.76,
       "fields": [
@@ -14704,6 +14704,85 @@
       ],
       "fixedOrm": true,
       "calibratedStampView": true
+    },
+    "leftSurfaceGrainRefinement": {
+      "sourcePlateSha256": "a6ecddd6201492f4ee9ac96ea0f994600a8dfb1249d05e2092d0f8d44cefe2d2",
+      "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
+      "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
+      "strength": 0.95,
+      "axisFilterSigmas": {
+        "longitudinal": [
+          5.8,
+          0.78
+        ],
+        "acrossWidth": [
+          1.0,
+          4.2
+        ]
+      },
+      "alignmentSamples": [
+        [
+          0.0,
+          0.0
+        ],
+        [
+          0.53,
+          0.0
+        ],
+        [
+          0.81,
+          0.0
+        ],
+        [
+          1.0,
+          0.0
+        ],
+        [
+          0.53,
+          1.5
+        ],
+        [
+          0.81,
+          1.5
+        ],
+        [
+          1.0,
+          1.5
+        ],
+        [
+          0.53,
+          3.15
+        ],
+        [
+          0.81,
+          3.15
+        ],
+        [
+          1.0,
+          3.15
+        ],
+        [
+          0.81,
+          -1.0
+        ]
+      ],
+      "fixedOrm": true,
+      "frontLightBalance": {
+        "views": [
+          "Front",
+          "Photo",
+          "Rake"
+        ],
+        "filterSigmas": [
+          6.3,
+          5.2
+        ],
+        "referenceFraction": [
+          0.14,
+          0.075,
+          0.0
+        ]
+      }
     }
   },
   "stemJointFinish": {
