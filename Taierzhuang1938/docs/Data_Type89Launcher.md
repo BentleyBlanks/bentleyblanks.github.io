@@ -128,6 +128,8 @@
 
 - 筒身背面以平均钢色和两组灯之间的反光差共同拟合材质。宽光下的平均亮度误差从 5.42 降至 3.79 个灰阶，第三组布光下的窄亮带从约 194 提至约 196 个灰阶，照片约为 203。外套筒用低频材质响应校准背面的整体明暗，独立布光下的平均亮度误差从 11.12 降至 9.89。外套筒中段环纹相关系数从 0.742 降至 0.724，默认灯下正面平均亮度误差约增加 0.30 个灰阶。接头底缘在远景压缩中变浅的局部暗缝已补强，复测正面、刻印、驻钣及十个接缝 AO 视角。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 以第 8 张馆藏照分段拟合外套筒环纹的亮暗幅度和相位，并以第 1 张照片的正面共见区约束材质响应。独立布光下，中段环纹的相关系数从 0.724 提至 0.758，右侧从 0.258 提至 0.315，中段亮暗幅度约为照片的 96%。筒身独立布光下的窄亮带从约 196 提至 199 个灰阶，照片约为 203。补强远景中支柱的局部贴合暗缝，复测十个接缝 AO 视角。外套筒背面的整体亮度误差增加约 0.25 个灰阶。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -187,4 +189,5 @@
 - 正面磨痕和套筒两侧环纹的复校参数保存在 `barrelJointFinish.wearAndHighlightRefinement` 与 `sleeveOpticalFinish.sideRingCalibration`。底色 WebP 编码质量设为 83.66，使三张源贴图合计低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 驻钣大面材质复校保存在 `saddleSurfaceRefinement`。正式脚本核对已有钢面、两张馆藏照的采样记录及接缝 AO，再将 16 位响应图合入钢面的底色、法线、粗糙度和金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 筒身的方向性反光和外套筒背面的整体明暗分别记录在 `barrelJointFinish.directionalResponseCalibration` 和 `sleeveOpticalFinish.rearToneCalibration`。接头底缘按 `contactAoRetouch` 中的接缝 UV 诊断调整 ORM 红通道，回烘时核对原接触遮蔽图的哈希。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV98/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 外套筒环纹反差与筒身窄亮带的复校记录在 `sleeveOpticalFinish.ringContrastCalibration` 和 `barrelJointFinish.glintProfileCalibration`。底色编码质量设为 83.48，使三张源贴图合计低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV99/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

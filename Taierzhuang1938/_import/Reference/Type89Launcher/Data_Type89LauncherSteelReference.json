@@ -14467,8 +14467,8 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "165ef6f60f6d6b73c9aa754a3c6253a32690ac121ce2d39c2427a38bb81b5daf",
-      "scale": 24212,
+      "sha256": "061844f3342441bd7f746f036f292b68c0e733b6a58abc0e7d5ad0893b6958cb",
+      "scale": 23460,
       "strength": 0.76,
       "fields": [
         "gain",
@@ -14484,7 +14484,7 @@
       "frontPhotoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
       "rearPhotoSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347"
     },
-    "baseQuality": 83.66,
+    "baseQuality": 83.48,
     "frontLightCalibration": {
       "previousDetailSha256": "2bd56a5997021cc3880ecb656c3d5966ac3666388f09f223b94be81a920d6194",
       "photoSha256": "2712f8d90757525e3d3ecd9f349bdfd7fdeb1e435a1cddc604756fbddd896301",
@@ -14637,6 +14637,14 @@
       "frontGallerySha256": "1bdb37dd8af4b73ea7b7dbabdaea5f1cd527e6f1c02c62c0e38eb3997d39fb8a",
       "adjustmentStrength": 1.08,
       "reviewSha256": "f94f35978f4577194a77faa3b2c6261c4d97c99e90961b8e720d20d7f7277c86"
+    },
+    "glintProfileCalibration": {
+      "sourceRevision": "983c9ee300af0527b9bc7644b72d4a27f4571160",
+      "previousDetailSha256": "165ef6f60f6d6b73c9aa754a3c6253a32690ac121ce2d39c2427a38bb81b5daf",
+      "rearCaptureSha256": "bc2ff60b86ce07a359678fbf25cd803c5a61ce819aac5decce6ff08515d901b3",
+      "frontGallerySha256": "93548121d85b9d075a5b22464e7af76136de9e10e98554d68f54a9c8e0c76da9",
+      "adjustmentStrength": 1.12,
+      "reviewSha256": "3d07b41d7b92ab058471e5d1e6ed3e2993c75d672a9a215e02bfdb7ee72cd1c6"
     },
     "currentRearFit": {
       "sourceRevision": "72b5efbcae8bc8bc2945805f9df4b96162621fe1",
@@ -26140,8 +26148,8 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "a61d8b7b560f6a2df66c1480cb8ad8e47c1984f0fa47978bec4996559e28774f",
-      "scale": 27191,
+      "sha256": "b8308e5229dce23207137c66192292078c0da726567f3d1382bcd005d0710487",
+      "scale": 25080,
       "strength": 1.0,
       "fields": [
         "gain",
@@ -26178,24 +26186,46 @@
       "adjustmentStrength": 1.2,
       "reviewSha256": "f94f35978f4577194a77faa3b2c6261c4d97c99e90961b8e720d20d7f7277c86"
     },
+    "ringContrastCalibration": {
+      "sourceRevision": "983c9ee300af0527b9bc7644b72d4a27f4571160",
+      "previousDetailSha256": "a61d8b7b560f6a2df66c1480cb8ad8e47c1984f0fa47978bec4996559e28774f",
+      "rearCaptureSha256": "ed437c25f98d51b1a77e5f36ecc2c29c03ce9eb080e4069eaa4ddd15a0f94607",
+      "profileFitSha256": "f412ccf951390bdc974c137edd640ac87543df1e829562cdd7775a2d4687abf2",
+      "adjustmentStrength": 1.26,
+      "reviewSha256": "3d07b41d7b92ab058471e5d1e6ed3e2993c75d672a9a215e02bfdb7ee72cd1c6"
+    },
     "contactAoRetouch": {
       "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
       "probeFrames": {
         "Whole_ContactHi.png": "11ab037f9bf68a23f1abcafe27edeb56d1aedb5080523b745420ef55f7e3d31a",
         "Whole_ContactLo.png": "12eab08169f9ba93ae4d082b1bfd679fb0f4632115eb5c4e80a78cc4b9164831"
       },
-      "spot": {
-        "region": "BaseNeck",
-        "center": [
-          835.75,
-          530.82
-        ],
-        "radius": [
-          7.5,
-          4.8
-        ],
-        "darken": 12.0
-      }
+      "spots": [
+        {
+          "region": "BaseNeck",
+          "center": [
+            835.75,
+            530.82
+          ],
+          "radius": [
+            7.5,
+            4.8
+          ],
+          "darken": 12.0
+        },
+        {
+          "region": "Stem",
+          "center": [
+            654.9,
+            660.1
+          ],
+          "radius": [
+            7.1,
+            5.5
+          ],
+          "darken": 15.0
+        }
+      ]
     },
     "revision": "1f65f4b2adc9e221c056534afa93a58a91d2b2cf",
     "rearRigSha256": "0bc867bac19421a9eacffe0c84e4a1e6efdf3023b13d8d034436c982a16bcf87",

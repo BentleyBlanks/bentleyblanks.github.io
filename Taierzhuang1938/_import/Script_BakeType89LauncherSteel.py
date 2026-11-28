@@ -1659,18 +1659,19 @@ def ApplyCoveredPhotoFinish(maps, packed, region, finish, identity, *, includeWe
 def ApplyContactAoRetouch(packed, retouch, detailAoSha256):
     if retouch["contactDetailAoSha256"] != detailAoSha256:
         raise ValueError("The contact shadow retouch requires its original detail AO bake")
-    spot = retouch["spot"]
-    left, top, width, height = CONTACT_ATLAS["regions"][spot["region"]]
-    x, y = spot["center"]
-    radiusX, radiusY = spot["radius"]
-    if (not (0 < radiusX and left <= x - radiusX < x + radiusX <= left + width)
-            or not (0 < radiusY and top <= y - radiusY < y + radiusY <= top + height)
-            or not 0 < spot["darken"] <= 255):
-        raise ValueError("The contact shadow retouch falls outside its AO chart")
-    rows, cols = np.ogrid[top:top + height, left:left + width]
-    radiusSquared = ((cols + .5 - x) / radiusX) ** 2 + ((rows + .5 - y) / radiusY) ** 2
-    occlusion = packed[top:top + height, left:left + width, 0]
-    occlusion[:] = np.rint(np.maximum(0., occlusion - spot["darken"] * SmoothRamp(1. - radiusSquared)))
+    spots = retouch["spots"] if "spots" in retouch else (retouch["spot"],)
+    for spot in spots:
+        left, top, width, height = CONTACT_ATLAS["regions"][spot["region"]]
+        x, y = spot["center"]
+        radiusX, radiusY = spot["radius"]
+        if (not (0 < radiusX and left <= x - radiusX < x + radiusX <= left + width)
+                or not (0 < radiusY and top <= y - radiusY < y + radiusY <= top + height)
+                or not 0 < spot["darken"] <= 255):
+            raise ValueError("The contact shadow retouch falls outside its AO chart")
+        rows, cols = np.ogrid[top:top + height, left:left + width]
+        radiusSquared = ((cols + .5 - x) / radiusX) ** 2 + ((rows + .5 - y) / radiusY) ** 2
+        occlusion = packed[top:top + height, left:left + width, 0]
+        occlusion[:] = np.rint(np.maximum(0., occlusion - spot["darken"] * SmoothRamp(1. - radiusSquared)))
 
 
 def ApplySleeveJointFinish(maps, packed, reference):

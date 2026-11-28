@@ -19,50 +19,50 @@
       "file": "Texture_Type89LauncherSteelBase.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 568816,
-      "sha256": "776303dc98355f9afcb62eecbcec532e5fd35e0325d95a4b68a1a31c799f0d04"
+      "bytes": 563726,
+      "sha256": "04786c6b3b1670b0d415b58fa6bb2ee4e1040910028cf91781591254d98c381f"
     },
     {
       "channel": "Normal",
       "file": "Texture_Type89LauncherSteelNormal.webp",
       "width": 2048,
       "height": 2048,
-      "bytes": 391950,
-      "sha256": "468f0457123b50a18666f23af0831ce93211812bb53eb24c61e465fb151f47df"
+      "bytes": 391790,
+      "sha256": "e130058a180165a03c85d638e8fda2c61575ec883566c8bcf735b1566ba04175"
     },
     {
       "channel": "Orm",
       "file": "Texture_Type89LauncherSteelOrm.webp",
       "width": 1024,
       "height": 1024,
-      "bytes": 87444,
-      "sha256": "ad97f8b7de2a1ef5e6c12d079b12250be5951fb5919163be44726db232770833"
+      "bytes": 87840,
+      "sha256": "c145a9918536af978db9c45ee5c9818e15f67f36ba90254f0e12b65ef65c8a71"
     }
   ],
-  "totalBytes": 1048210,
+  "totalBytes": 1043356,
   "metrics": {
     "meanSrgb": [
-      0.4542,
-      0.4398,
-      0.4072
+      0.4541,
+      0.4399,
+      0.4071
     ],
     "luma": 0.4337,
-    "lumaStd": 0.1198,
-    "sat": 0.1034,
+    "lumaStd": 0.12,
+    "sat": 0.1035,
     "clipLow": 0.0,
     "clipHigh": 0.0002,
     "lowFreq": 0.0981,
     "seam": 0.1278,
     "interior": 0.0269,
-    "seamRatio": 4.755,
+    "seamRatio": 4.76,
     "border": 0.715,
-    "swing": 0.1119,
+    "swing": 0.1117,
     "texelsPerMeter": null
   },
   "gateProblems": [],
   "reference": {
     "path": "_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json",
-    "sha256": "b115605b1e4debf47f5bf4e728ca744c56d02ec8f0fedb17d5b106efaa0d62dc",
+    "sha256": "b97a1afb910a6f6766135b3080347425579100b5c8cfce8a019156688a72f750",
     "barrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelDetail.png",
       "sha256": "c38e7aa2508ccebf16394a3b51a9a2cbaefa4a52e0a40dcc9fb90db974fc7b78"
@@ -221,7 +221,7 @@
     },
     "sleeveOpticalDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "a61d8b7b560f6a2df66c1480cb8ad8e47c1984f0fa47978bec4996559e28774f"
+      "sha256": "b8308e5229dce23207137c66192292078c0da726567f3d1382bcd005d0710487"
     },
     "collarReflectanceCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherCollarReflectanceCoverage.png",
@@ -237,7 +237,7 @@
     },
     "jointBarrelDetail": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "165ef6f60f6d6b73c9aa754a3c6253a32690ac121ce2d39c2427a38bb81b5daf"
+      "sha256": "061844f3342441bd7f746f036f292b68c0e733b6a58abc0e7d5ad0893b6958cb"
     },
     "jointStemCoverage": {
       "path": "_import/Reference/Type89Launcher/Texture_Type89LauncherStemJointCoverage.png",
