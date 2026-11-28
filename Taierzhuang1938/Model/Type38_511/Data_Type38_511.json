@@ -1,9 +1,9 @@
 {
   "schema": "Type38_511RuntimeSource",
-  "version": 43,
+  "version": 45,
   "generator": "_blender/Script_Type38Surface.py",
   "sourceSha256": "1abb1e89443bd420b1ff86eba80584ee20c87ce68a2969c7c4739cc038fd6f82",
-  "runtimeSha256": "8ca4700fdf0dfc67cc271d7b23157f802a20572f354cea0ca7647989204a3eae",
+  "runtimeSha256": "0e2957a263510673e84af4e67f7cd6ce4e169fb96d7b1984e99a2ad94b7a26e5",
   "sourceTriangles": 473796,
   "approvedReductionTriangles": 69454,
   "triangles": 79894,
@@ -40,38 +40,38 @@
     {
       "index": 1,
       "name": "Texture_Type38_BodyBatch01_baseColorTexture",
-      "bytes": 2693482,
-      "sha256": "fec4f5da447948dc1b5335d30651339cc47badd0cb0075919c1e1c90875d7197"
+      "bytes": 2708034,
+      "sha256": "46b3af02ed565a0164c3fece18be01ea8f4a7db74d45599bb961dc962d83cfa9"
     },
     {
       "index": 2,
       "name": "Texture_Type38_BodyBatch01_metallicRoughnessTexture",
-      "bytes": 2494163,
-      "sha256": "aa59bcd68c3587f8173921454cd47cc811473dbdc33b4d6c9029ea7d0d595dd8"
+      "bytes": 2494324,
+      "sha256": "96f3cc929d3ddc701f165378c823af3632f77f3fd0f8249d95c0167c4918111e"
     },
     {
       "index": 3,
       "name": "Texture_Type38_BodyBatch02_baseColorTexture",
-      "bytes": 2664842,
-      "sha256": "0fe1d0fb5566cfc404077729b6fa2a15b723855423afdade321d7f96c43922b9"
+      "bytes": 2709079,
+      "sha256": "d576097a732445c2ceb642bfd18051164352c190fca6eaf04f444a7cab972ff9"
     },
     {
       "index": 4,
       "name": "Texture_Type38_BodyBatch02_metallicRoughnessTexture",
-      "bytes": 2480908,
-      "sha256": "419074d654a8902fbfc115da62d9eeacb9c6b1a116baa72f72a3d11fcec7afd5"
+      "bytes": 2478854,
+      "sha256": "234214a1127353849e8ca5194c8ba301213f7e4f07de5461c91d863666bdc56d"
     },
     {
       "index": 5,
       "name": "Texture_Type38_BodyBatch03_baseColorTexture",
-      "bytes": 1450705,
-      "sha256": "80213b5ee27b31e5c14041eb4dfd24509a4738eaf9c64f96c3312867e129e5e3"
+      "bytes": 1463826,
+      "sha256": "70c6d7436eceeff4862392042cf63e6924ac727e162a22857a1eb7b8b6e03fd4"
     },
     {
       "index": 6,
       "name": "Texture_Type38_BodyBatch03_metallicRoughnessTexture",
-      "bytes": 1534668,
-      "sha256": "0e3f47a8007e4c3a3597fd71fefccf8423eebc6da9b7553a5521dde07ef165f6"
+      "bytes": 1535983,
+      "sha256": "d84af4ab008d25a2f8134b9a185af279c371ff18da3bd696d519889d1a9ec49f"
     },
     {
       "index": 7,
@@ -88,8 +88,8 @@
     {
       "index": 9,
       "name": "Texture_Type38Sample03Orm",
-      "bytes": 523272,
-      "sha256": "3deb365f8db0f3f224a16ea9985c401dfd9d4204c48279ed4a4b515507fcde64"
+      "bytes": 532307,
+      "sha256": "54cad26af90eb70d30d23933a2856f3c2c611e471cb574f59319b43e01473e88"
     },
     {
       "index": 10,
@@ -100,14 +100,14 @@
     {
       "index": 11,
       "name": "Texture_Type38Sample04Base",
-      "bytes": 299962,
-      "sha256": "b214ede881297f3f30704ca1957f89f5ffd11d41b5ffb3c340f22b0277522f02"
+      "bytes": 314043,
+      "sha256": "75de8e9dbc7d433cb675e82287020b54aa046d4e45f8eb1056d5866e3a87024e"
     },
     {
       "index": 12,
       "name": "Texture_Type38Sample04Orm",
-      "bytes": 369741,
-      "sha256": "8153f7a8d71202f808d063a4e679b28cd05c147227e6ebeaba392bd5f511b2d9"
+      "bytes": 356966,
+      "sha256": "7b2f7a715d0186c48c2f2d98367aede196af886ca4cfa015c23e4fecca00d27b"
     },
     {
       "index": 13,
@@ -118,8 +118,8 @@
     {
       "index": 14,
       "name": "Texture_Type38Sample05Surface",
-      "bytes": 555909,
-      "sha256": "43672d914dd5bf81c2d2dd9116aae56c8d6c9533a0f4a374048b1d8968b30835"
+      "bytes": 585723,
+      "sha256": "cf5324357f178b53a9da75c150e0493005f2fe31fa4aefe54cbc9da0849b7a33"
     },
     {
       "index": 15,
@@ -160,8 +160,8 @@
     {
       "index": 21,
       "name": "Texture_Type38_BodyBatch07_metallicRoughnessTexture",
-      "bytes": 318099,
-      "sha256": "c691382a2cf4ff49ddaffad44af4e877fc869bcea7b5f54e288fdf32fa19e69d"
+      "bytes": 319727,
+      "sha256": "b5355e3cf767a29abf47cd61c2346b75b1bf8ac72a65c945f76a8985a60f4ea5"
     },
     {
       "index": 22,
@@ -244,14 +244,14 @@
     {
       "index": 35,
       "name": "Texture_Type38_CoverBatch14_baseColorTexture",
-      "bytes": 1226916,
-      "sha256": "07f0467480af830b023555ab3e78209d6756e39705c9a525d4b9d1416d3a5680"
+      "bytes": 1278652,
+      "sha256": "6de0d114923e6fe97019a29aa7fee5524dcd4b23939190e9bd218da971fc47da"
     },
     {
       "index": 36,
       "name": "Texture_Type38_CoverBatch14_metallicRoughnessTexture",
-      "bytes": 1344435,
-      "sha256": "c1f76b5581517c12c3bf461ea8e73c9d32cbcb1a16af35105d0db639718d24f5"
+      "bytes": 1349516,
+      "sha256": "2bd3ef91862693c4b20046f54d4cb73d3a8c52ffe83dde03e6c9a10d284bee72"
     },
     {
       "index": 37,
@@ -292,14 +292,14 @@
     {
       "index": 43,
       "name": "Texture_Type38Sample35Base",
-      "bytes": 207898,
-      "sha256": "b433b3f42a3ee8b5535561efd9e407a61bd8ed4644f50ad07d0c0924bab5abe5"
+      "bytes": 209801,
+      "sha256": "5b46f4e3b0d820481cb3b164094ba2d39d1d8a788d28c97a64d0af0a7ee5245e"
     },
     {
       "index": 44,
       "name": "Texture_Type38Sample35Orm",
-      "bytes": 253707,
-      "sha256": "b285cc9c674fe89ff2126ae1f0162a8382fb13f4bb8cea4e221db1946e29fa8b"
+      "bytes": 253286,
+      "sha256": "03c72fb2c648c74a4d5262a0ebe9ba60425907f00cec039678cd6d8ef6342099"
     },
     {
       "index": 45,
@@ -316,8 +316,8 @@
     {
       "index": 47,
       "name": "Texture_Type38Sample36Orm",
-      "bytes": 693180,
-      "sha256": "fce82b01a4b668bb6a95ed0878fba2884866ef39b2c1376acc1df89991bc7b66"
+      "bytes": 693171,
+      "sha256": "fc48810045e74d28c03ab337c5d056d62d2c8786e8252607669051507ff14c3c"
     },
     {
       "index": 48,
@@ -334,26 +334,26 @@
     {
       "index": 50,
       "name": "Texture_Type38Sample37Normal",
-      "bytes": 259503,
-      "sha256": "5dc4147f0f674c7a9bdee8dbe332530baef43eca47fdea1e5af6fd7bc7485294"
+      "bytes": 261724,
+      "sha256": "6460c7304eb9e6da83a505f13ab6c64f3ef4b84571f1c0f2b468eee659908cc8"
     },
     {
       "index": 51,
       "name": "Texture_Type38Sample37Base",
-      "bytes": 173237,
-      "sha256": "ffadcae49239f580ebd1acfbe216a94b51c1184dc8c03482c4b8df62d5a92820"
+      "bytes": 172753,
+      "sha256": "b2b37aac933f9351275aaca645e0453ca22cf1691234d4c7e4e49d7a0b6abbc2"
     },
     {
       "index": 52,
       "name": "Texture_Type38Sample37Orm",
-      "bytes": 226003,
-      "sha256": "79bba4d8c6805822b34f3a4638ec9efad83d2066271b9a9e0693c43a985ef8f6"
+      "bytes": 225121,
+      "sha256": "4dbfff4527e9c02d9e23a5980042f2b149ea2ff4fea722355a55baeca0b2752d"
     },
     {
       "index": 53,
       "name": "Texture_Type38Sample38Surface",
-      "bytes": 2247125,
-      "sha256": "8d085cb732b7760084114fd8dc79dd521ca42ed2aad069f6222434b9f1b726e7"
+      "bytes": 2263320,
+      "sha256": "f01ecd49e0a7ddd5571eb2f601b4a693ea85f11e875781e93d948197323a22cf"
     },
     {
       "index": 54,
@@ -364,20 +364,20 @@
     {
       "index": 55,
       "name": "Texture_Type38Sample38Normal",
-      "bytes": 2414553,
-      "sha256": "7479b848ef412cbb2e084ac3e3419e4456c36506539647dfc5d0c3e0dc8ab2ae"
+      "bytes": 2414461,
+      "sha256": "18b2bdd4e4a163b7da460e25bc8ded8a6f2fb9ce083042651b3d9b4801906095"
     },
     {
       "index": 56,
       "name": "Texture_Type38Sample38Base",
-      "bytes": 2367548,
-      "sha256": "cd1e58fba0f6d3132be23bfba74332b86260870e30876807e29f39ff0bba4485"
+      "bytes": 2367495,
+      "sha256": "69fcc377019af59746a5c47981c8559e878fc891e7500f2b484f12f8db7377fd"
     },
     {
       "index": 57,
       "name": "Texture_Type38Sample38Orm",
-      "bytes": 2479650,
-      "sha256": "e45cd9b90eb176583609bb626caefe37824b1c3c7adc4f001ddbb93b4a2e0e7e"
+      "bytes": 2479516,
+      "sha256": "424a954d72c21ad7848ad756b95a9b7a0e1a099fbd0fc38aabc803cf73589b8b"
     },
     {
       "index": 58,
@@ -1090,17 +1090,6 @@
     ]
   },
   "albumExterior": {
-    "shoulderDepthToDisk": 0.18773327441084622,
-    "shoulderVertices": 63,
-    "diskClearanceSamples": 84427,
-    "contactImages": [
-      6,
-      36,
-      44,
-      47,
-      52,
-      57
-    ],
     "images": [
       1,
       2,
@@ -1108,6 +1097,52 @@
       4,
       11,
       12,
+      50,
+      51,
+      52,
+      53,
+      55,
+      56,
+      57,
+      64,
+      65
+    ],
+    "contactImages": [
+      6,
+      36,
+      44,
+      47,
+      52,
+      57
+    ]
+  },
+  "photoFinish": {
+    "lobeReach": 1.195999232391605,
+    "sidewallToFace": 0.37200552589672153,
+    "diskClearanceSamples": 83433,
+    "rounded": {
+      "T38_460G_WoodGroove_VisualCandidate": 907,
+      "Exterior_Guard02": 84,
+      "T38_433E_VisibleSideBlockRimInset": 90,
+      "T38_407F_VisualSkin_Exterior_FrontBandLowerStep78": 35,
+      "T38_430B_IndependentLeftCoverSkin": 18,
+      "T38_430B_RetainedRightCoverHalf": 125,
+      "Wood_UpperFittedCrown05": 910
+    },
+    "images": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      9,
+      11,
+      12,
+      14,
+      21,
+      35,
+      36,
       43,
       44,
       50,
@@ -1119,6 +1154,14 @@
       57,
       64,
       65
+    ],
+    "contactImages": [
+      6,
+      36,
+      44,
+      47,
+      52,
+      57
     ]
   }
 }

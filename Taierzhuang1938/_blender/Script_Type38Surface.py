@@ -949,7 +949,7 @@ def FinishSteelAtlas(doc, views, source, load, store):
 def SaveType38Assets(folder, doc, views, manifest, lod, author=False):
     folder.mkdir(exist_ok=True,parents=True)
     digest = WriteGlb(folder/'Model_Type38_511.glb',doc,views)
-    versions = ('edgeHighlights','rearContact','stockSeat','serviceWear','compactTail','albumExterior')
+    versions = ('edgeHighlights','rearContact','stockSeat','serviceWear','compactTail','albumExterior','photoFinish')
     version = 30 + 2 * sum(key in manifest for key in versions) + int(not author)
     manifest.update(version=version,runtimeSha256=digest,renderMeshes=len(doc['meshes']),
                     images=len(doc['images']))
@@ -970,7 +970,7 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     from Script_Type38SeatFit import FitStockSeat
     from Script_Type38ServiceWear import FinishServiceWear
     from Script_Type38TailProfile import ShapeRearProfile
-    from Script_Type38AlbumFinish import FinishAlbumExterior
+    from Script_Type38PhotoFinish import FinishPhotoAppearance
 
     manifest['authorImages'] = len(doc['images'])
     if not author:
@@ -982,7 +982,7 @@ def WriteType38Assets(repo, folder, doc, views, manifest, lod, author=False):
     manifest['stockSeat'] = FitStockSeat(repo, doc, views)
     manifest['serviceWear'] = FinishServiceWear(repo, doc, views)
     manifest['compactTail'] = ShapeRearProfile(repo, doc, views)
-    manifest['albumExterior'] = FinishAlbumExterior(repo, doc, views)
+    manifest['albumExterior'], manifest['photoFinish'] = FinishPhotoAppearance(repo, doc, views)
     SaveType38Assets(folder, doc, views, manifest, lod, author)
 
 

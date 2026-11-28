@@ -68,10 +68,13 @@ assert(compactTail.diskClearanceSamples>75_000);
 assert(compactTail.contactImages.length>=5&&compactTail.contactImages.every(index=>aoImages.has(index)));
 assert(compactTail.stackToFace>.59&&compactTail.stackToFace<.66);
 const album=contract.albumExterior;
-assert(album.shoulderDepthToDisk>.15&&album.shoulderDepthToDisk<.23);
-assert(album.shoulderVertices>45&&album.diskClearanceSamples>80_000);
 assert(album.contactImages.length>=5&&album.contactImages.every(index=>aoImages.has(index)));
 assert(album.images.length>=12&&album.images.every(index=>doc.images[index]));
+const photo=contract.photoFinish;
+assert(photo.lobeReach>1.16&&photo.lobeReach<1.25&&photo.diskClearanceSamples>80_000);
+assert(photo.contactImages.length>=5&&photo.contactImages.every(index=>aoImages.has(index)));
+assert(photo.images.length>=19&&photo.images.every(index=>doc.images[index]));
+assert(Object.values(photo.rounded).length===7&&Object.values(photo.rounded).every(count=>count>5));
 const atlasParts=['T38_430B_ContinuousLowerFacing_VisualOnly','T38_340_VisibleStaticSkin_Nonfunctional','T38_349_OpaqueExteriorWeb_VisualOnly'];
 const insetPrimitives=atlasParts.map(part=>doc.meshes[doc.nodes.find(node=>node.extras?.SourceObject===part||
  node.extras?.SourceRanges?.some(section=>section.part===part)).mesh].primitives[0]);
@@ -323,18 +326,22 @@ assert.equal(rearShell.index.count/3,3168);
 const sidewallToFace=(shellBox.max.z-shellBox.min.z)/(2*shellRadius);
 assert(sidewallToFace>.35&&sidewallToFace<.40,'the rear disk needs the sidewall depth visible in the overhead reference');
 assert(Math.abs(compactTail.sidewallToFace-sidewallToFace)<1e-5);
+assert(Math.abs(photo.sidewallToFace-sidewallToFace)<1e-5);
 assert(rearBaseRadius>.88&&rearBaseRadius<.96,'the rear disk needs a broad shoulder with a slight taper');
-function FaceDepthAt(u,v){
- const uv=rearShell.attributes.uv,xyz=rearShell.attributes.position;
- let closest=Infinity,depth=0;
+function FaceIndexAt(u,v){
+ const uv=rearShell.attributes.uv;
+ let closest=Infinity,match=0;
  for(let index=0;index<uv.count;index++){
   const distance=(uv.getX(index)-u)**2+(uv.getY(index)-v)**2;
-  if(distance<closest){closest=distance;depth=xyz.getZ(index);}
+  if(distance<closest){closest=distance;match=index;}
  }
- return depth;
+ return match;
 }
-const relief=(FaceDepthAt(.577,.171)-FaceDepthAt(.239,.171))/(shellBox.max.z-shellBox.min.z);
-assert(relief>.12&&relief<.25,'the outer disk needs the visible crescent recess of the album specimen');
+const rearPosition=rearShell.attributes.position;
+const relief=(rearPosition.getZ(FaceIndexAt(.577,.171))-rearPosition.getZ(FaceIndexAt(.239,.171)))/(shellBox.max.z-shellBox.min.z);
+const lobe=(rearPosition.getX(FaceIndexAt(.408,.48))-shellBox.min.x)/shellRadius;
+assert(Math.abs(relief)<.045&&lobe>1.16&&lobe<1.25,
+ 'the photographed rear disk has a continuous face and a raised edge lobe');
 assert(surfaceDepth.length&&rimDepth.length&&Math.max(...rimDepth)-Math.max(...surfaceDepth)>shellRadius*.023,
  'central depression and rim must exist in vertex positions, independent of the normal map');
 const stock=inspectionParts.find(mesh=>mesh.userData.type38Part==='T38_460G_WoodGroove_VisualCandidate').geometry;

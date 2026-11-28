@@ -21,13 +21,14 @@ def Unit(values):
     return values / np.maximum(np.linalg.norm(values, axis=-1, keepdims=True), 1e-10)
 
 
-def Part(doc, views, name):
+def Part(doc, views, name, *, allowTranslation=False):
     for node in doc['nodes']:
         extra = node['extras']
         span = next((row for row in extra.get('SourceRanges', []) if row['part'] == name), None)
         if extra.get('SourceObject') != name and span is None:
             continue
-        assert 'matrix' not in node and 'rotation' not in node and 'translation' not in node
+        assert 'matrix' not in node and 'rotation' not in node
+        assert allowTranslation or 'translation' not in node
         primitive, = doc['meshes'][node['mesh']]['primitives']
         attributes = primitive['attributes']
         arrays = [Attribute(doc, views, attributes[key], width) for key,width in zip(AXES,(3,3,4))]

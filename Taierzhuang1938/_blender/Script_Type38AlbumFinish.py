@@ -103,7 +103,7 @@ def ShapeAlbumTail(doc, views):
     }
 
 
-def FacetedFace(doc, views):
+def FacetedFace(doc, views, *, flaredRim=False):
     primitive, material, _ = Surface(doc, DISK)
     pbr = material['pbrMetallicRoughness']
     colorIndex, color = Texture(doc, views, pbr['baseColorTexture'])
@@ -118,9 +118,11 @@ def FacetedFace(doc, views):
     y = (.48 - v) / .40
     radius = np.hypot(x, y)
     angle = np.arctan2(y, x)
+    if flaredRim:
+        radius /= 1 + RearOutline(angle) * Ramp(.42, .93, radius)
     face = padded & (u < .742) & (radius < 1.16)
     weight = (Ramp(.191, .273, radius) * (1 - Ramp(.981, 1.10, radius)) * face).astype('f')
-    scoop = Recess(x, y) * face
+    scoop = np.zeros_like(radius) if flaredRim else Recess(x, y) * face
     diamonds = weight * (1 - Ramp(.06, .48, scoop))
     center = (1 - Ramp(.135, .215, radius)) * face
 
@@ -148,8 +150,11 @@ def FacetedFace(doc, views):
     base += (41 * relief)[..., None] * np.array([1.04, 1, .93])
     base *= (1 - .22 * scoop)[..., None]
     tintWeight = np.maximum(weight, scoop)
+    if flaredRim:
+        base += (15 * diamonds)[..., None] * np.array([1, .97, .91])
     rgb = color[:, :, :3] * (1 - tintWeight[..., None]) + base * tintWeight[..., None]
-    color[:, :, :3] = np.rint(np.clip(rgb * (1 - .30 * center[..., None]), 0, 255))
+    centerShade = .21 if flaredRim else .30
+    color[:, :, :3] = np.rint(np.clip(rgb * (1 - centerShade * center[..., None]), 0, 255))
 
     shading = LowPass(normal[:, :, :3]) / 127.5 - 1
     shading[:, :, 0] -= 2.68 * du
@@ -458,14 +463,19 @@ def ContactWear(doc, views, part, contrast):
     return [colorIndex, ormIndex]
 
 
+def BakeAlbumBody(doc, views):
+    images = StockFinish(doc, views)
+    images += SightFinish(doc, views) + HeelPlateFinish(doc, views)
+    images += ContactWear(doc, views, 'Mesh_Type38_adsNear_3', .86)
+    images += ContactWear(doc, views, 'Exterior_HandleOval08', .81)
+    return images
+
+
 def FinishAlbumExterior(repo, doc, views):
     evidence = ShapeAlbumTail(doc, views)
     ShapeAlbumBody(doc, views)
     ao = BakeRearFinish(repo, doc, views, polishMetal=False, partsFilter=set(COVER) | NEARBY | {DISK, COLLAR})
-    images = FacetedFace(doc, views) + CollarFinish(doc, views) + StockFinish(doc, views)
-    images += SightFinish(doc, views) + HeelPlateFinish(doc, views)
-    images += ContactWear(doc, views, 'Mesh_Type38_adsNear_3', .86)
-    images += ContactWear(doc, views, 'Exterior_HandleOval08', .81)
+    images = FacetedFace(doc, views) + CollarFinish(doc, views) + BakeAlbumBody(doc, views)
     evidence.update(contactImages=ao['images'], images=sorted(set(images)))
     doc['asset']['extras']['version'] = 'Type38_PhotoAlbum33'
     print('Album exterior', evidence, flush=True)

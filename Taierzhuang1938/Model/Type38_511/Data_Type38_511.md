@@ -1,8 +1,8 @@
 # Dots Type38 511 runtime integration
 
-## 当前交付版 v33
+## 当前交付版 v34
 
-游戏使用 `511-album-finish-33`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
+游戏使用 `511-photo-bevels-34`。近景 79,894 三角，普通 NPC 75,286 三角。游戏 GLB 有 23 个渲染子网格和 68 张内嵌贴图。枪身仅保留刻度线和刻度数字。下方修订记录对应各版产物。
 
 | 用途 | 入口 |
 | --- | --- |
@@ -10,7 +10,15 @@
 | 重建与核对 | [外观重建脚本](../../_blender/Script_Type38Surface.py) · [子网格与贴图合并](../../_blender/Script_Type38RenderBatches.py) · [资产清单与 SHA-256](Data_Type38_511.json) |
 | 回归测试 | [资产检查](../../Script_Type38_511AssetTest.mjs) · [第一人称与 NPC 实机检查](../../Script_Type38_511BrowserTest.mjs) |
 
-## 名古屋实物相册对标 · 2026-11-28
+## 尾部金属与木钢圆角 · 2026-11-28
+
+尾部以 Ca.garcia.s 的实物后视照为准。尾盘左下做出带滚花的凸耳，盘面连续转到滚边。覆壳后唇用窄亮边，钢环用较宽的灰色缎面，柄颈用细长反光，柄头用圆面反光。显露的高光由底色、法线和粗糙度共同表现。 [维基后视照](https://commons.wikimedia.org/wiki/File:Arisaka_Type_38_rifle_%28rear_view%29.JPG)
+
+Badger 相册第 7、9、19、21、39、50 张用于核对中箍木边、照门、护圈、托底板、覆壳后唇和木钢过渡。校顺木托、护木及金属外边的网格，在木面圆角重烘清漆粗糙度，在钢边按曲率重烘磨光。用固定机位和两侧掠射光检查反光连续性，尾盘净空在最终网格上通过 83,433 次有效采样。 [Badger 实物相册](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?n=0)
+
+可从 v32 资产目录使用 `Script_Type38PhotoFinish.py --input <v32 资产目录> --output <输出目录>` 重建。 [尾部及圆角重建脚本](../../_blender/Script_Type38PhotoFinish.py)
+
+## 名古屋实物相册对标 · v33
 
 使用同一件实物的 46 张外观照片核对整枪两侧、俯视、斜侧和局部。照片编号采用相册显示的序号。 [Badger 实物相册](https://imageevent.com/badgerdog/japaneseservicerifles/type38japaneserifle48508?n=0)
 
