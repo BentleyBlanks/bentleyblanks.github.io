@@ -46,7 +46,6 @@ const bladeButton = ById("bayonetToggle");
 const orbitPreset = ById("orbitPreset");
 const firstPersonPreset = ById("firstPersonPreset");
 const firstPersonInfo = ById("firstPersonInfo");
-const environmentLight = ById("environmentLight");
 const viewHint = ById("viewHint");
 const scale = ById("viewScale");
 const channelButtons = [...document.querySelectorAll("[data-channel]")];
@@ -133,7 +132,6 @@ function SyncViewControls() {
   firstPersonPreset.disabled = !ready || !CanPreviewFirstPerson();
   firstPersonPreset.title = CanPreviewFirstPerson() ? "站立持枪的游戏视角" : "当前模型没有手持枪械视角";
   for (const button of viewButtons) button.disabled = !ready || firstPersonRequested;
-  environmentLight.disabled = !ready;
   viewHint.hidden = firstPersonRequested;
   canvas.setAttribute("aria-label", firstPersonRequested ? "第一人称站立持枪预览" : orbitLabel);
 }
@@ -235,14 +233,6 @@ async function Select(id, variant = 0) {
 }
 
 function BindViewport() {
-  const SyncEnvironmentLight = () => {
-    const percent = `${environmentLight.value}%`;
-    environmentLight.setAttribute("aria-valuetext", percent);
-    Text("environmentLightValue", percent);
-    stage.SetEnvironmentLight(environmentLight.valueAsNumber / 100);
-  };
-  SyncEnvironmentLight();
-  environmentLight.addEventListener("input", SyncEnvironmentLight);
   const panAxis = new THREE.Vector3();
   const Rotate = (dx, dy) => {
     stage.yaw -= dx * .009;

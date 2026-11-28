@@ -14,16 +14,16 @@ export class WeaponInspectionFirstPerson {
   }
 
   constructor(stage, riggedAssets) {
-    this.stage = stage;
     this.camera = new THREE.PerspectiveCamera(CAMERA.baseFovDeg, FRAME_ASPECT, .06, 80);
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x525448);
     this.scene.environment = stage.scene.environment;
-    this.scene.add(this.camera);
+    this.scene.environmentIntensity = stage.scene.environmentIntensity;
+    const backdrop = stage.skyBackdrop.clone();
+    backdrop.visible = true;
+    this.scene.add(this.camera, backdrop);
     for (const source of stage.scene.children) {
       if (!source.isLight) continue;
       const light = source.clone();
-      if (source === stage.environmentFill) this.environmentFill = light;
       light.castShadow = false;
       this.scene.add(light);
     }
@@ -48,8 +48,6 @@ export class WeaponInspectionFirstPerson {
   }
 
   Draw(renderer, width, height, post = null) {
-    this.scene.environmentIntensity = this.stage.scene.environmentIntensity;
-    this.environmentFill.intensity = this.stage.environmentFill.intensity;
     const frameWidth = Math.min(width, height * FRAME_ASPECT);
     const frameHeight = frameWidth / FRAME_ASPECT;
     const left = (width - frameWidth) / 2;

@@ -4,15 +4,16 @@ import { ApplyEditorLiteCameraProfile } from "../Script_CameraProfile.mjs";
 const STUDIO_EXPOSURE_COMPENSATION = 2.3;
 
 export class WeaponMaterialPreview {
-  constructor(environment) {
+  constructor(studio, fill) {
     this.scene = new THREE.Scene();
-    this.scene.environment = environment;
-    this.scene.environmentIntensity = STUDIO_EXPOSURE_COMPENSATION;
+    this.scene.environment = studio.environment;
+    this.scene.environmentIntensity = studio.environmentIntensity;
     this.camera = new THREE.OrthographicCamera(-1.18, 1.18, 1.18, -1.18, .1, 10);
     this.camera.position.set(0, .23, 4);
     this.camera.lookAt(0, 0, 0);
-    this.environmentFill = new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.05 * STUDIO_EXPOSURE_COMPENSATION);
-    this.scene.add(this.environmentFill);
+    const previewFill = fill.clone();
+    previewFill.intensity *= 1.05 / 1.25;
+    this.scene.add(previewFill);
     const key = new THREE.DirectionalLight(0xfff6e7, 2.55 * STUDIO_EXPOSURE_COMPENSATION);
     key.position.set(-3, 4, 4);
     const rim = new THREE.DirectionalLight(0xcddfff, 1.3 * STUDIO_EXPOSURE_COMPENSATION);
@@ -25,25 +26,17 @@ export class WeaponMaterialPreview {
     this.sphere.rotation.y = -.4;
     this.scene.add(this.sphere);
     this.viewport = new THREE.Vector4();
-    this.preview = null;
-    this.pending = false;
+    this.pending = null;
   }
 
   Set(material, canvas) {
-    this.preview = canvas ? { material, canvas } : null;
-    this.pending = !!this.preview;
-  }
-
-  SetEnvironmentLight(intensity) {
-    this.scene.environmentIntensity = intensity;
-    this.environmentFill.intensity = 1.05 * intensity;
-    this.pending = !!this.preview;
+    this.pending = canvas ? { material, canvas } : null;
   }
 
   Draw(renderer) {
     if (!this.pending) return;
-    const { material, canvas } = this.preview;
-    this.pending = false;
+    const { material, canvas } = this.pending;
+    this.pending = null;
     const source = renderer.domElement;
     const size = Math.min(canvas.width, source.width, source.height);
     const viewportSize = size / renderer.getPixelRatio();

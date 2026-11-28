@@ -20,6 +20,7 @@ import {
 import { MarkNoPrepass } from "../Script_Post.mjs";
 import { PBR_SETS } from "./Data_ToolStudioPbrSets.mjs";
 import { WeaponMaterialPreview } from "./Script_WeaponMaterialPreview.mjs";
+import { BakeInspectionSky, CreateInspectionSkyBackdrop } from "./Script_WeaponInspectionSky.mjs";
 
 const GLB = {
   HanYang: { url: HANYANG_173R.url, Load: LoadHanYang173R, Configure: ConfigureHanYang173R, Instantiate: InstantiateHanYang173R },
@@ -88,7 +89,7 @@ function AttachInspectionChannels(material, channel) {
   // A GLB can omit UVs or tangents. Constant zero attributes leave those parts neutral in Tangent.
   material.defaultAttributeValues = { ...material.defaultAttributeValues, uv: [0, 0], tangent: [0, 0, 0, 1] };
   const inspection = MakePatch({
-    key: packedAo ? "inspectionChannels2Orm" : "inspectionChannels2",
+    key: packedAo ? "inspectionChannels3Orm" : "inspectionChannels3",
     defines: { USE_UV: "" },
     uniforms: (uniforms) => { uniforms.uInspectionChannel = channel; },
     vertex: [
@@ -162,8 +163,8 @@ function AttachInspectionChannels(material, channel) {
             #ifdef USE_CLEARCOAT
               reflection = reflection * (1.0 - material.clearcoat * Fcc) + material.clearcoat * clearcoatSpecularIndirect;
             #endif
-            // Lift the isolated specular term for inspection of matte surfaces.
-            reflection *= 6.0;
+            // Lift the isolated daylight reflection enough to read matte surfaces.
+            reflection *= 2.25;
             #ifdef TONE_MAPPING
               reflection = toneMapping(reflection);
             #endif
@@ -203,9 +204,10 @@ async function LoadMaterials(library) {
 }
 
 const STUDIO_EXPOSURE_COMPENSATION = 2.3;
+const STUDIO_ENVIRONMENT_INTENSITY = 3.2;
 
-function CreateLighting(renderer, scene) {
-  const fill = new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * STUDIO_EXPOSURE_COMPENSATION);
+function CreateLighting(scene) {
+  const fill = new THREE.HemisphereLight(0xfff6e7, 0x9caebe, 1.25 * 1.8 * STUDIO_EXPOSURE_COMPENSATION);
   scene.add(fill);
   const key = new THREE.DirectionalLight(0xfff5e7, 2.4 * STUDIO_EXPOSURE_COMPENSATION);
   key.position.copy(KEY_LIGHT_DIRECTION);
@@ -222,25 +224,6 @@ function CreateLighting(renderer, scene) {
     const light = new THREE.DirectionalLight(color, intensity);
     light.position.set(x, y, z);
     scene.add(light);
-  }
-  const room = new THREE.Scene();
-  room.background = new THREE.Color(0x818990);
-  for (const [x, y, z, color] of [
-    [-4, 6, 4, 0xfff6e7], [3, 2, -5, 0xd6eaff],
-  ]) {
-    const card = new THREE.Mesh(new THREE.PlaneGeometry(7, 4), new THREE.MeshBasicMaterial({ color }));
-    card.position.set(x, y, z);
-    card.lookAt(0, 0, 0);
-    room.add(card);
-  }
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const environment = pmrem.fromScene(room, 0.025);
-  scene.environment = environment.texture;
-  scene.environmentIntensity = STUDIO_EXPOSURE_COMPENSATION;
-  pmrem.dispose();
-  for (const card of room.children) {
-    card.geometry.dispose();
-    card.material.dispose();
   }
   return { key, fill };
 }
@@ -284,7 +267,6 @@ export class WeaponInspectionScene {
     this.canvas = canvas;
     this.onDraw = onDraw;
     this.scene = new THREE.Scene();
-    this.studioBackground = new THREE.Color(0x282b2e);
     this.camera = new THREE.OrthographicCamera();
     this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: "high-performance" });
     this.renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -317,10 +299,14 @@ export class WeaponInspectionScene {
     this.pendingFrame = 0;
     this.channel = { value: CHANNELS.beauty };
     this.inspectionMaterials = new WeakSet();
-    const { key, fill } = CreateLighting(this.renderer, this.scene);
+    this.skyTarget = BakeInspectionSky(this.renderer, KEY_LIGHT_DIRECTION);
+    this.skyBackdrop = CreateInspectionSkyBackdrop(this.skyTarget.texture);
+    this.scene.add(this.skyBackdrop);
+    this.scene.environment = this.skyTarget.texture;
+    this.scene.environmentIntensity = STUDIO_ENVIRONMENT_INTENSITY;
+    const { key, fill } = CreateLighting(this.scene);
     this.keyLight = key;
-    this.environmentFill = fill;
-    this.materialPreview = new WeaponMaterialPreview(this.scene.environment);
+    this.materialPreview = new WeaponMaterialPreview(this.scene, fill);
     this.renderer.shadowMap.enabled = true;
     this.resizeObserver = new ResizeObserver(() => this.Resize());
     this.resizeObserver.observe(canvas);
@@ -510,15 +496,6 @@ export class WeaponInspectionScene {
     this.RequestDraw();
   }
 
-  SetEnvironmentLight(scale) {
-    const intensity = STUDIO_EXPOSURE_COMPENSATION * scale;
-    this.scene.environmentIntensity = intensity;
-    this.environmentFill.intensity = 1.25 * intensity;
-    this.materialPreview.SetEnvironmentLight(intensity);
-    this.post.NotifyCameraCut();
-    this.RequestDraw();
-  }
-
   SetChannel(name) {
     const mode = CHANNELS[name];
     if (!Number.isInteger(mode) || mode === this.channel.value) return;
@@ -621,8 +598,8 @@ export class WeaponInspectionScene {
     camera.position.copy(this.center).addScaledVector(this.Direction(), 15);
     camera.lookAt(this.center);
     camera.updateProjectionMatrix();
+    this.skyBackdrop.visible = !this.wireframe && this.channel.value === CHANNELS.beauty;
     if (this.wireframe) {
-      this.scene.background = null;
       this.renderer.setRenderTarget(null);
       this.renderer.setClearColor(0x000000, 0);
       for (const { object, wire } of this.meshMaterials) object.material = wire;
@@ -632,7 +609,6 @@ export class WeaponInspectionScene {
     } else if (this.channel.value !== CHANNELS.beauty) {
       // 诊断通道（法线/切线/底色/粗糙/金属/AO/反射/阴影）直接输出数值，不经标准后处理；
       // 反射通道单独启用 editorLite ACESFilmic 映射，用完还原线性态。
-      this.scene.background = null;
       this.renderer.setRenderTarget(null);
       this.renderer.setClearColor(0x000000, 0);
       const savedTone = this.renderer.toneMapping;
@@ -647,22 +623,20 @@ export class WeaponInspectionScene {
         this.renderer.outputColorSpace = savedSpace;
       }
     } else {
-      this.scene.background = this.studioBackground;
-      try {
-        this.post.Render(this.scene, camera, BuildStandardPostOptions({
-          sunDirection: KEY_LIGHT_DIRECTION,
-          dt: 1 / 60,
-          steadyView: true,
-        }));
-      } finally {
-        this.scene.background = null;
-      }
+      this.post.Render(this.scene, camera, BuildStandardPostOptions({
+        sunDirection: KEY_LIGHT_DIRECTION,
+        dt: 1 / 60,
+        steadyView: true,
+      }));
     }
     this.onDraw?.();
   }
 
   Dispose() {
     this.resizeObserver?.disconnect();
+    this.skyBackdrop.geometry.dispose();
+    this.skyBackdrop.material.dispose();
+    this.skyTarget.dispose();
     this.post?.Dispose();
     this.renderer?.dispose();
   }

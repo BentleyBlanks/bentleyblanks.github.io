@@ -226,7 +226,7 @@ try {
     const independent = await page.evaluate(() => ({
       name: window.name, opener: window.opener?.location.pathname, models: document.querySelectorAll("[data-model]").length,
       standalone: !window.ToolStudio && !window.Tengxian && !document.querySelector(".edMenuBar, .edPanel"),
-      noWrites: !document.querySelector("form, input:not([type=search], #referenceFiles[type=file], #environmentLight[type=range]), [contenteditable]"),
+      noWrites: !document.querySelector("form, input:not([type=search], #referenceFiles[type=file]), [contenteditable]"),
     }));
     Check("控制中心启动有独立窗口名的只读枪械检查台",
       page.url() === `${base}Tool_WeaponInspection.html` && independent.name === TOOL_INFO.weapon.window.name
@@ -298,7 +298,11 @@ try {
           count += 1;
         }
       }
-      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, dark, midtone, chromatic, hash, sample,
+      const background = [.10, .90].map((height) => {
+        const offset = (Math.floor(height * copy.height) * copy.width + Math.floor(copy.width * .05)) * 4;
+        return [...data.subarray(offset, offset + 4)];
+      });
+      return { count, left: minX / copy.width, right: maxX / copy.width, min, max, dark, midtone, chromatic, hash, sample, background,
         triangles: stage.model.triangles, quiet: stage.model.blade?.visible === false };
     });
     const MeanSampleDiff = (a, b) => {
@@ -316,6 +320,16 @@ try {
       pixels.count > 2500 && pixels.left > .03 && pixels.right < .97 && pixels.right - pixels.left > .60
       && pixels.triangles === 6703 && pixels.quiet,
       JSON.stringify({ count: pixels.count, left: pixels.left, right: pixels.right, triangles: pixels.triangles, quiet: pixels.quiet }));
+    const sky = await page.evaluate(() => {
+      const stage = window.WeaponInspection.scene;
+      const environment = stage.scene.environment;
+      return { visible: stage.skyBackdrop.visible, cube: environment?.isCubeTexture,
+        shared: stage.skyBackdrop.material.uniforms.uSky.value === environment && stage.materialPreview.scene.environment === environment,
+        fill: stage.scene.children.find(light => light.isHemisphereLight)?.intensity };
+    });
+    Check("完整模式默认绘制天空盒，同一立方体提供环境反射和材质球照明",
+      sky.visible && sky.cube && sky.shared && sky.fill > 0 && pixels.background.every((pixel) => pixel[3] === 255)
+      && Math.abs(pixels.background[0][2] - pixels.background[1][2]) > 12, JSON.stringify({ sky, background: pixels.background }));
     if (shots) await page.screenshot({ path: path.join(shotDir, "WeaponInspection.png") });
 
     const canvas = page.locator("#view");
@@ -364,31 +378,12 @@ try {
       [rendered.normal, rendered.tangent, rendered.albedo, rendered.reflection].every((view) => view.chromatic > 1000)
       && [rendered.roughness, rendered.metallic, rendered.shadow].every((view) => view.chromatic === 0 && view.max - view.min > 10)
       && rendered.shadow.min < 128 && rendered.shadow.max === 255);
+    Check("法线与 Shadow 诊断保持透明背景", [rendered.normal, rendered.shadow].every((view) =>
+      view.background.every((pixel) => pixel[3] === 0)));
     await Channel("beauty");
     const restoredBeauty = await ReadPixels();
     Check("切回完整材质恢复同一画面", MeanSampleDiff(restoredBeauty, rendered.beauty) < 4,
       `diff=${MeanSampleDiff(restoredBeauty, rendered.beauty).toFixed(2)}`);
-    const environmentLight = page.getByRole("slider", { name: "环境光" });
-    const defaultLight = await environmentLight.inputValue();
-    const SetEnvironment = (value) => environmentLight.evaluate((input, percent) => {
-      input.value = percent;
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    }, value);
-    const MeanBrightness = ({ sample }) => {
-      const values = sample.filter((value) => value >= 0);
-      return values.reduce((sum, value) => sum + value, 0) / values.length;
-    };
-    await SetEnvironment("100");
-    const originalLight = await ReadPixels();
-    const lift = MeanBrightness(restoredBeauty) - MeanBrightness(originalLight);
-    Check("默认环境补光提亮模型，滑杆同时更新材质球",
-      defaultLight === "180" && lift > 8 && await environmentLight.getAttribute("aria-valuetext") === "100%"
-      && await page.evaluate(() => {
-        const stage = window.WeaponInspection.scene;
-        return stage.materialPreview.scene.environmentIntensity === stage.scene.environmentIntensity;
-      }), `显示亮度变化=${lift.toFixed(2)}`);
-    await Channel("shadow");
-    Check("环境光强度不改变主灯 Shadow 诊断", (await ReadPixels()).hash === rendered.shadow.hash);
 
     const SampleTimber = () => page.evaluate(async () => {
       const { Raycaster, Vector3 } = await import("three");
@@ -427,7 +422,6 @@ try {
         });
       });
     });
-    // The reference wood finish was calibrated in the original 100% studio light.
     const timber = { albedo: [], roughness: [], reflection: [] };
     for (const yaw of [0, Math.PI]) {
       await page.evaluate(angle => window.WeaponInspection.scene.SetView(angle, .10), yaw);
@@ -445,7 +439,6 @@ try {
       && SpreadOf(timber.roughness, 0) < 24
       && timber.reflection.every(([r, g, b]) => r > 3 && g > 3 && b > 3 && Math.max(r, g, b) < 62)
       && SpreadOf(timber.reflection, 2) < 28, JSON.stringify([timber.roughness, timber.reflection]));
-    await SetEnvironment(defaultLight);
 
     await Inspect("Dadao");
     await Channel("shadow");
@@ -681,7 +674,8 @@ try {
       const muzzle = viewmodel.rig.group.localToWorld(viewmodel.rig.muzzle.clone()).project(camera);
       return { fov: camera.fov, aspect: camera.aspect, forearms: viewmodel.riggedArms?.root.visible,
         muzzle: muzzle.toArray(), source: viewmodel.rigSource, cameraParent: viewmodel.root.parent === camera,
-        environment: stage.firstPerson.scene.environmentIntensity === stage.scene.environmentIntensity };
+        environment: stage.firstPerson.scene.environment === stage.scene.environment
+          && stage.firstPerson.scene.getObjectByName("InspectionSky")?.visible };
     });
     Check("第一人称预设复用武器和双臂，按游戏 FOV 投影到 16:9 画面",
       held.fov === 67 && held.aspect === 16 / 9 && held.source === "model+riggedArms" && held.forearms && held.cameraParent && held.environment
