@@ -210,6 +210,8 @@
 
 ## 条目
 
+- **川军大刀刀面与纤维细节（2026-11-28）**。刀面按自身范围排 UV，重烘钢面顺向细磨痕、局部浅坑与粗糙度。布柄补搭接压缩、织线和磨毛变化，尾环加深缠绕和线股交叠。成品 9,896 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
+
 - **川军大刀卷环与布柄贴图（2026-11-28）**。重展护手内外卷面、整段布柄和尾环侧壁的 UV，清除卷环亮色条带与尾环粉白串色。重烘经纬法线、搭接压缝和孔内接触 AO。成品 9,896 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
 
 - **川军大刀布带搭接与尾环红纱（2026-11-28）**。布柄沿护手轮廓收口，重做布带的搭接起伏、斜织纹和压缝遮蔽。尾环重做不等粗的交错纱束和孔边接触阴影。成品 9,896 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)

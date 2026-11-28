@@ -13,8 +13,8 @@ from mathutils.bvhtree import BVHTree
 from mathutils.geometry import delaunay_2d_cdt
 
 from TzmCore import AUTHORED_NORMAL_LAYER, Node
-from Script_YangYunfengDadaoUv import (FACES, GRIP, RIMS, RIM_DEPTH, AtlasUv, ClosestOnRim,
-                                    FaceBounds, GripRange, PhotoPosition, Plane, RimPaths)
+from Script_YangYunfengDadaoUv import (BLADE_FACE, FACES, GRIP, RIMS, RIM_DEPTH, AtlasUv,
+                                    ClosestOnRim, FaceBounds, GripRange, PhotoPosition, Plane, RimPaths)
 
 
 FIT_FILE = Path(__file__).with_name("Data_YangYunfengDadaoFit.json")
@@ -31,27 +31,23 @@ def FromPhoto(frame, x, y, depth=0):
     return World(frame, u, v, depth)
 
 
-def StudioUv(fit, position, strip):
+def BladeUv(mesh, fit):
     frame, atlas = fit["frame"], fit["atlas"]
-    x, y, z = position
-    scale = frame["scale"]
-    u = (z - frame["zMin"]) / scale + frame["left"]
-    v = y / scale + frame["center"]
-    across = (v - atlas["top"]) / (atlas["bottom"] - atlas["top"]) if strip <= 1 else .5 + x / (144 * scale)
-    along = (u - atlas["left"]) / (atlas["right"] - atlas["left"])
-    return ((16 + 992 * along) / 1024, 1 - (strip * 256 + 20 + 216 * across) / 1024)
-
-
-def ApplyUv(mesh, fit, sideThreshold=.035):
+    left, right, top, bottom = FaceBounds(fit, "Blade")
     bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
     mesh.normal_update()
     layer = mesh.loops.layers.uv.new()
     for face in mesh.faces:
         nx, ny, _ = face.normal
-        strip = 0 if abs(nx) >= sideThreshold else (2 if ny < 0 else 3)
+        strip = 0 if abs(nx) >= .035 else (2 if ny < 0 else 3)
         for loop in face.loops:
-            loop[layer].uv = StudioUv(fit, loop.vert.co, strip)
-    return mesh
+            u, v, depth = PhotoPosition(frame, loop.vert.co)
+            if strip == 0:
+                loop[layer].uv = AtlasUv(BLADE_FACE, (u - left) / (right - left), (v - top) / (bottom - top))
+            else:
+                rect = (16, strip * 256 + 20, 992, 216)
+                along = (u - atlas["left"]) / (atlas["right"] - atlas["left"])
+                loop[layer].uv = AtlasUv(rect, along, .5 + depth / 144)
 
 
 def Inside(x, y, loop):
@@ -197,9 +193,9 @@ def BuildPlate(fit, name):
         for i in used:
             u, v = Plane(frame, *coordinates[i])
             theta = math.atan2(v - centerV, 1.12 * (u - centerU))
-            roll = .5 + .5 * math.cos(13 * theta + 1.3 * math.sin(4 * theta) + .6 * math.sin(9 * theta))
+            roll = (.5 + .5 * math.cos(13 * theta + 1.3 * math.sin(4 * theta) + .6 * math.sin(9 * theta))) ** 1.38
             yarn = min(1, max(0, (u - left + 9) / 22))
-            depths[i] *= 1 - .069 * yarn * roll
+            depths[i] *= 1 - .108 * yarn * roll
     front = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], depths[i])) for i in used}
     back = {i: mesh.verts.new(FromPhoto(frame, *coordinates[i], -depths[i])) for i in used}
     boundaries = Counter(tuple(sorted((a, b))) for face in shell for a, b in zip(face, face[1:] + face[:1]))
@@ -213,7 +209,7 @@ def BuildPlate(fit, name):
                 edgeFace.smooth = name != "Blade"
                 wall.append(edgeFace)
     if name == "Blade":
-        ApplyUv(mesh, fit)
+        BladeUv(mesh, fit)
         SmoothBladeWall(mesh, wall)
     else:
         bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))

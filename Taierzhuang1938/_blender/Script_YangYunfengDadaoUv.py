@@ -5,6 +5,7 @@ import math
 
 
 ATLAS_SIZE = 1024
+BLADE_FACE = (16, 20, 992, 216)
 GRIP = (16, 276, 608, 216)
 FACES = {"Guard": (640, 276, 128, 216), "Pommel": (784, 276, 224, 216)}
 RIMS = {
