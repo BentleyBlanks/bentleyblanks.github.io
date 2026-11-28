@@ -13,7 +13,7 @@ from Script_BuildYangYunfengDadao import BuildParts
 
 SIZE = 1024
 RADIUS = .024
-RAY_COUNT = 32
+RAY_COUNT = 48
 
 
 def Rasterize(meshes):
@@ -21,7 +21,7 @@ def Rasterize(meshes):
     positions, smoothNormals, faceNormals = (
         np.zeros((SIZE, SIZE, 3), dtype=np.float32) for _ in range(3)
     )
-    views = ((0, 1), (0, -1), (1, -1), (1, 1))
+    views = ((0, 1), (0, 1), (1, -1), (1, 1))
     for mesh in meshes:
         mesh.calc_loop_triangles()
         vertices = np.array([tuple(vertex.co) for vertex in mesh.vertices])
@@ -43,7 +43,7 @@ def Rasterize(meshes):
             weights = np.stack((1 - b - c, b, c), axis=-1)
             region = np.s_[minY:maxY, minX:maxX]
             surface = weights @ vertices[list(tri.vertices)]
-            # The atlas uses projections. Retain the outer surface where the parts overlap.
+            # Use one side on shared face charts and keep the outer surface in rim projections.
             strip = min(3, int((points[:, 1].mean() + .5) / (SIZE // 4)))
             axis, sign = views[strip]
             score = sign * surface[..., axis]

@@ -514,7 +514,7 @@ export const TEXTURE_MANIFEST = Object.freeze([
     bake: "_import/Script_BakeYangYunfengDadaoPbr.py",
     bakeRecord: "_import/TextureBakes/Texture_Dadao.json",
     source: { provider: "openaiImageApi", date: "2026-11-27",
-      ref: "杨云峰大刀照片提供钢面、布带搭接和尾环纹理。沿每圈布带和红纱束的走向重映射纤维样片。正反面共用材质，接触遮蔽由 Blender 烘焙。",
+      ref: "杨云峰大刀照片提供钢面、布带搭接和尾环参考。布柄按周向展开，卷环和尾环按轮廓展开内外侧。OpenAI API 样片提供钢面与经纬细节，接触遮蔽由 Blender 烘焙。",
       prompt: "_import/Reference/SichuanDadao/Prompt_YangYunfengTextiles.txt" },
     consumers: [{ file: "Script_Main.mjs", token: "Texture_DadaoBase" },
       { file: "AdvancedTools/Data_ToolStudioPbrSets.mjs", token: "Texture_DadaoBase" }],

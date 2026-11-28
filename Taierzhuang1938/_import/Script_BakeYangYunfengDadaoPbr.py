@@ -1,17 +1,21 @@
-"""Bake photo color, fiber relief and mesh contact shadows for the Dadao atlas."""
+"""Bake the Dadao atlas from the reference, material swatches and Blender contact shadows."""
 
 import argparse
 import hashlib
 import json
 from pathlib import Path
+import sys
 
 import cv2
 import numpy as np
 from PIL import Image, ImageOps
 from scipy.ndimage import distance_transform_edt, gaussian_filter
 
-from Script_BakeDadaoPbr import BASE_SIZE, DATA_SIZE, LUMA, Save, Smoothstep
+from Script_BakeDadaoPbr import BASE_SIZE, DATA_SIZE, LUMA, PackStrips, Smoothstep
 from Script_TraceYangYunfengDadao import DEFAULT_FIT, PartMasks, ReadReference, ROOT
+
+sys.path.insert(0, str(ROOT / "_blender"))
+from Script_YangYunfengDadaoUv import FACES, GRIP, RIMS, FaceBounds, GripRange, Plane, RimPaths
 
 
 REFERENCE = ROOT / "_import/Reference/SichuanDadao"
@@ -19,6 +23,7 @@ STEEL = REFERENCE / "Texture_YangYunfengSteel03.webp"
 TEXTILES = REFERENCE / "Texture_YangYunfengTextiles.webp"
 DIFFUSE_FIT = REFERENCE / "Texture_YangYunfengDiffuseFit.png"
 GEOMETRY_AO = REFERENCE / "Texture_YangYunfengGeometryAo.png"
+FILLS = ((.49, .47, .44), (.5, .5, 1), (1, .74, .64))
 
 
 def LinearSrgb(image):
@@ -29,371 +34,36 @@ def EncodeSrgb(image):
     return np.where(image <= .0031308, 12.92 * image, 1.055 * image ** (1 / 2.4) - .055)
 
 
-def Project(photo, labels, fit, shape):
-    atlas, frame = fit["atlas"], fit["frame"]
+def Sample(image, shape, center=(.5, .5)):
+    return np.asarray(ImageOps.fit(image, shape, Image.Resampling.LANCZOS, centering=center), dtype=np.float32) / 255
+
+
+def PhotoMaps(fit, u, v):
+    frame = fit["frame"]
+    return (frame["cos"] * u - frame["sin"] * v).astype(np.float32), (frame["sin"] * u + frame["cos"] * v).astype(np.float32)
+
+
+def Remap(image, x, y):
+    return cv2.remap(image, x.astype(np.float32), y.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
+
+
+def PartColor(photo, mask):
+    interior = cv2.erode(mask.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)
+    donor = distance_transform_edt(~interior, return_distances=False, return_indices=True)
+    return photo[tuple(donor)].astype(np.float32) / 255
+
+
+def BladeProjection(photo, labels, fit, shape):
+    atlas = fit["atlas"]
     u = np.linspace(atlas["left"], atlas["right"], shape[0], dtype=np.float32)[None, :]
     v = np.linspace(atlas["top"], atlas["bottom"], shape[1], dtype=np.float32)[:, None]
-    x = frame["cos"] * u - frame["sin"] * v
-    y = frame["sin"] * u + frame["cos"] * v
-    tag = cv2.remap(labels, x, y, cv2.INTER_NEAREST)
-    visible = tag > 0
-    # Bleed genuine in-object color out into the UV margins.
-    interior = cv2.erode(np.uint8(labels > 0), np.ones((3, 3), np.uint8)).astype(np.float32)
+    x, y = PhotoMaps(fit, u, v)
+    visible = cv2.remap(labels, x, y, cv2.INTER_NEAREST).astype(bool)
+    interior = cv2.erode(labels, np.ones((3, 3), np.uint8)).astype(np.float32)
     accumulated = cv2.remap(photo.astype(np.float32) * interior[..., None], x, y, cv2.INTER_LINEAR)
     weight = cv2.remap(interior, x, y, cv2.INTER_LINEAR)
-    reliable = (weight > .16) & visible
-    donor = distance_transform_edt(~reliable, return_distances=False, return_indices=True)
-    color = accumulated / np.maximum(weight[..., None], 1e-8) / 255
-    color = color[donor[0], donor[1]]
-    tags = tag[donor[0], donor[1]]
-    return color, tags, visible
-
-
-def MaterialRegions(color, tags):
-    textile = tags >= 3
-    green = textile & (color[..., 1] > .96 * color[..., 0]) & (color[..., 1] > color[..., 2] + .02)
-    red = (tags == 4) & ~green
-    linen = textile & ~green & ~red
-    return textile, green, red, linen
-
-
-def Sample(image, shape, position):
-    fit = ImageOps.fit(image, shape, Image.Resampling.LANCZOS, centering=position)
-    return np.asarray(fit, dtype=np.float32) / 255
-
-
-def TextileSample(image, width, height, position, *, continuous=False):
-    tile = Sample(image, (width // 3, height if continuous else height // 2), position)
-    row = np.concatenate((tile, tile[:, ::-1]), axis=1)
-    if continuous:
-        return np.tile(row, (1, 2, 1))[:, :width]
-    mirror = np.concatenate((row, row[::-1]), axis=0)
-    return np.tile(mirror, (2, 2, 1))[:height, :width]
-
-
-def TextileDetails(guide, tags, samples, strip):
-    cloth, _, red, _ = MaterialRegions(guide, tags)
-    height, width = cloth.shape
-    position = (.5, (.19, .44, .68, .82)[strip])
-    linen, cord = (TextileSample(source, width, height, position, continuous=strip >= 2) @ LUMA
-                   for source in samples[1:])
-    scale = width / 992
-    linen = gaussian_filter(linen, .32 * scale) - gaussian_filter(linen, 1.85 * scale)
-    cord = gaussian_filter(cord, .32 * scale) - gaussian_filter(cord, 1.85 * scale)
-    # The red swatch is also mapped along each winding below. Keep its flat projection subtle.
-    fibers = np.where(red, .28 * cord, .56 * linen)
-    # The photographed wrapping supplies the irregular lap edges between the yarns.
-    luma = guide @ LUMA
-    narrow = gaussian_filter(luma, (.95 * scale, .78 * scale))
-    broad = gaussian_filter(luma, (1.7 * scale, 3.7 * scale))
-    return cloth, np.clip(fibers, -.14, .14), np.clip(narrow - broad, -.15, .13)
-
-
-def MergeUnseen(color, tags, samples, strip):
-    steel, linen, cord = samples
-    height, width = color.shape[:2]
-    cloth, green, red, tan = MaterialRegions(color, tags)
-    # Match the reference palette while using the generated fiber and steel grain on the narrow rims.
-    result = gaussian_filter(color, (2.0, 2.5, 0))
-    groups = ((~cloth, steel), (tan, linen), (red, cord), (green, linen))
-    for i, (mask, source) in enumerate(groups):
-        if not np.any(mask):
-            continue
-        position = (.5, (.19, .44, .68, .82)[strip])
-        field = TextileSample(source, width, height, position, continuous=True) if i else Sample(source, (width, height), position)
-        if i:
-            weave = field - gaussian_filter(field, (2.2, 2.2, 0))
-            result[mask] = color[mask] + .45 * weave[mask]
-            continue
-        center = np.median(field.reshape(-1, 3), axis=0)
-        observed = np.median(color[mask], axis=0)
-        synthetic = observed + .77 * (field - center)
-        result[mask] += .49 * (synthetic[mask] - result[mask])
-    return np.clip(result, 0, 1)
-
-
-def CleanClothEdges(fabric, tags, visible, factor):
-    _, green, _, _ = MaterialRegions(fabric, tags)
-    chroma = np.ptp(fabric, axis=-1) / np.maximum(fabric.max(axis=-1), .0001)
-    green &= ((green & visible & (chroma > .19)).sum(axis=0) >= 2 * factor)[None, :]
-    red, linen = (tags == 4) & ~green, (tags == 3) & ~green
-    finish, rimColors = fabric.copy(), fabric.copy()
-    height, width = visible.shape
-    y = np.arange(height)[:, None]
-    for layer in (linen, green, red):
-        valid = layer & visible
-        diffuse = valid & (chroma > .19)
-        if not diffuse.any():
-            diffuse = valid
-        if not diffuse.any():
-            continue
-        fallback = np.median(fabric[diffuse], axis=0)
-        tones = np.broadcast_to(fallback, (width, 3)).copy()
-        for col in np.flatnonzero(diffuse.any(axis=0)):
-            rows = np.flatnonzero(diffuse[:, col])
-            trim = len(rows) // 5
-            tones[col] = np.median(fabric[rows[trim:len(rows) - trim], col], axis=0)
-
-        # At an oblique view the projected edge of either broad face is visible
-        # beside the rim. Both need the same diffuse fabric at the join.
-        top, bottom = np.argmax(valid, axis=0), height - 1 - np.argmax(valid[::-1], axis=0)
-        distance = np.maximum(0, np.minimum(y - top, bottom - y))
-        span = np.maximum(1, bottom - top + 1)
-        start = np.minimum(13 * factor, .20 * span)
-        end = np.minimum(28 * factor, .43 * span)
-        weight = 1 - Smoothstep(start, end, distance)
-        # Lift the longitudinal shading inherited from the flat projection while
-        # keeping the high-frequency texture of the individual wrapping layers.
-        sigma = (1.55 * factor, 1.3 * factor)
-        support = gaussian_filter(valid.astype(np.float32), sigma)
-        low = gaussian_filter(fabric * valid[..., None], (*sigma, 0)) / np.maximum(support[..., None], .0001)
-        fine = np.clip(fabric - low, -.055, .045)
-        detail = Smoothstep(2 * factor, 9 * factor, distance)
-        rimColors[layer] = np.broadcast_to(tones, fabric.shape)[layer]
-        matte = rimColors[layer] + .65 * detail[layer, None] * fine[layer]
-        finish[layer] += weight[layer, None] * (matte - finish[layer])
-    return finish, rimColors
-
-
-def EdgeProjection(color, tags, visible, fromBottom, fabric):
-    height = visible.shape[0]
-    known = distance_transform_edt(~visible.any(axis=0), return_distances=False, return_indices=True)[0]
-    first = np.argmax(visible, axis=0)
-    last = height - 1 - np.argmax(visible[::-1], axis=0)
-    inset = np.minimum(5, np.maximum(0, (last - first) // 3))
-    edge = (last - inset if fromBottom else first + inset)[known]
-    paint = np.where(tags[edge, known, None] >= 3, fabric[edge, known], color[edge, known])
-    return (np.broadcast_to(paint, color.shape),
-            np.broadcast_to(tags[edge, known], tags.shape))
-
-
-def TidyTailProjection(color, tags, fit, factor):
-    height, width = tags.shape
-    atlas, frame = fit["atlas"], fit["frame"]
-    size = np.array((atlas["right"] - atlas["left"], atlas["bottom"] - atlas["top"]))
-    low = np.array((atlas["left"], atlas["top"]))
-    rotation = np.array(((frame["cos"], -frame["sin"]), (frame["sin"], frame["cos"])))
-    holes = [np.array(loop) @ rotation for loop in fit["parts"]["Pommel"]["loops"][1:]]
-    aperture = np.zeros(tags.shape, dtype=np.uint8)
-    for loop in holes:
-        pixels = (loop - low) / size * (width - 1, height - 1)
-        cv2.fillPoly(aperture, [np.rint(pixels).astype(np.int32)], 1)
-
-    r, g, b = np.moveaxis(color, -1, 0)
-    thread = (tags == 4) & (r - g > .25) & (g < .21) & (b < .24)
-    distance = distance_transform_edt(aperture == 0)
-    close = 1 - Smoothstep(11 * factor, 24 * factor, distance)
-    pale = (tags == 4) * close * Smoothstep(.18, .36, np.minimum(g, b))
-    nearby = distance_transform_edt(~thread, return_distances=False, return_indices=True)
-    # Continue the dyed fibres around the hole, including highlights carried over
-    # from the reference background. The opening remains in the mesh.
-    finish = color + pale[..., None] * (.87 * color[tuple(nearby)] - color)
-
-    along = np.linspace(atlas["left"], atlas["right"], width)[None, :]
-    gripEnd = fit["grip"][-1][0]
-    opening = min(loop[:, 0].min() for loop in holes)
-    cloth = (tags == 3) & (along < gripEnd - 51) & (r - b > .15) & (g > .39)
-    sample = distance_transform_edt(~cloth, return_distances=False, return_indices=True)
-    shift = round(57 * (width - 1) / size[0])
-    sourceColumns = np.maximum(0, np.arange(width) - shift)
-    weave = color[tuple(sample)][:, sourceColumns]
-    # Continue the cloth into the overlap using the grain from its interior.
-    # The baked contact AO supplies the small shadow where the layers meet.
-    lap = (tags == 3) * Smoothstep(gripEnd - 69, gripEnd - 23, along)
-    hem = (tags == 4) * (1 - Smoothstep(opening - 4, opening, along)) * (1 - Smoothstep(.13, .28, r - g))
-    finish += lap[..., None] * (.93 * weave - finish)
-    finish += .56 * hem[..., None] * (.68 * weave - finish)
-    return finish.astype(np.float32)
-
-
-def Tiles(photo, labels, fit, size, samples, balanced=None):
-    factor = size // DATA_SIZE
-    shape = (992 * factor, 216 * factor)
-    color, tags, visible = Project(photo, labels, fit, shape)
-    front = Project(balanced, labels, fit, shape)[0] if balanced is not None else color
-    if size == BASE_SIZE:
-        detail = front - gaussian_filter(front, (.9, .9, 0))
-        front = np.clip(front + .32 * detail, 0, 1)
-    front = TidyTailProjection(front, tags, fit, factor)
-    front, rimCloth = CleanClothEdges(front, tags, visible, factor)
-    guide = np.where(tags[..., None] >= 3, front, color)
-    yield 0, front, tags, guide
-    for strip, opposite in ((2, False), (3, True)):
-        edge, kind = EdgeProjection(color, tags, visible, opposite, rimCloth)
-        yield strip, MergeUnseen(edge, kind, samples, strip), kind, edge
-
-
-def MirrorRim(tile):
-    # The lower half of the rim chart meets the photographed face at positive X.
-    half = tile[len(tile) // 2:]
-    return np.concatenate((half[::-1], half), axis=0)
-
-
-def MatchRimMetal(tile, textile):
-    return np.where(textile[..., None], tile, MirrorRim(tile))
-
-
-def WrapRimCloth(color, guide, tags, coverage, factor):
-    cloth, green, red, _ = MaterialRegions(guide, tags)
-    h, w = tags.shape
-    y, x = np.indices((h, w), dtype=np.float32)
-    cross = y - (h - 1) / 2
-    halfWidth = np.maximum(1, np.max(np.abs(cross) * coverage, axis=0))
-    arc = np.clip(cross / halfWidth, -1, 1)
-    # Continue the existing wrap bands across the rounded rim. The shift tapers
-    # to zero at both UV joins so the band's ends meet the broad-face texture.
-    shift = (1 - arc * arc) ** 2 * (5.2 + 3.0 * arc) * factor
-    layer = cloth.astype(np.uint8) + green + 2 * red
-    sample = np.clip(np.rint(x + shift).astype(int), 0, w - 1)
-    sameLayer = layer[y.astype(int), sample] == layer
-    wrapX = x + np.where(cloth & sameLayer, shift, 0).astype(np.float32)
-    return tuple(cv2.remap(tile, wrapX, y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
-                 for tile in (color, guide))
-
-
-def BaseTile(color, details):
-    textile, fibers, _ = details
-    adjusted = color.copy()
-    adjusted[textile] *= 1 + .68 * fibers[textile, None]
-    return np.clip(adjusted, 0, 1)
-
-
-def ClothCoordinates(fit, shape, strip, coverage):
-    height, width = shape
-    atlas = fit["atlas"]
-    u = np.linspace(atlas["left"], atlas["right"], width, dtype=np.float32)[None, :]
-    v = np.linspace(atlas["top"], atlas["bottom"], height, dtype=np.float32)[:, None]
-    if not strip:
-        return u, v
-
-    rows = np.asarray(fit["grip"])
-    low = np.interp(u, rows[:, 0], rows[:, 1])
-    high = np.interp(u, rows[:, 0], rows[:, 2])
-    frame = fit["frame"]
-    outline = np.asarray(fit["parts"]["Pommel"]["loops"][0])
-    guide = outline @ np.array(((frame["cos"], -frame["sin"]), (frame["sin"], frame["cos"])))
-    for i in np.flatnonzero(u[0] >= guide[:, 0].min()):
-        x = u[0, i]
-        edge = [a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0])
-                for a, b in zip(guide, np.roll(guide, -1, axis=0)) if min(a[0], b[0]) <= x < max(a[0], b[0])]
-        if edge:
-            low[0, i], high[0, i] = min(edge), max(edge)
-    y = np.arange(height, dtype=np.float32)[:, None] - (height - 1) / 2
-    extent = np.maximum(1, np.max(np.abs(y) * coverage, axis=0))
-    arc = np.sqrt(np.maximum(0, 1 - np.minimum(1, np.abs(y) / extent) ** 2))
-    return u, (high + low) / 2 + (-1 if strip == 2 else 1) * (high - low) * arc / 2
-
-
-def LinenStructure(fit, u, v, linen, sample):
-    across = v - fit["frame"]["center"]
-    relief = np.zeros(linen.shape, dtype=np.float32)
-    tone = np.zeros_like(relief)
-    contact = np.zeros_like(relief)
-    lay = np.zeros_like(relief)
-    bias = np.zeros_like(relief)
-    for center, pitch, bow, width, rise in fit.get("clothLaps", ()):
-        distance = (u - center - pitch * across - bow * across * across) / width
-        brokenEdge = .11 * np.sin(.23 * across + center) + .07 * np.cos(.64 * across - center)
-        seam = np.exp(-((distance + brokenEdge - .18) / .5) ** 2)
-        roll = np.exp(-((distance + 1.12) / 1.13) ** 2)
-        underlap = np.exp(-((distance + brokenEdge - .66) / 1.12) ** 2)
-        uneven = .73 + .27 * np.cos(across * .082 + center)
-        profile = rise * uneven
-        relief += linen * profile * (2.2 * roll - 2.6 * seam)
-        tone += linen * profile * (.38 * roll - .41 * seam - .57 * underlap)
-        contact += linen * profile * (.98 * seam + .97 * underlap)
-        crossover = Smoothstep(-.55, .40, distance)
-        lay += crossover * (1.1 + .63 * np.sin(center))
-        bias += crossover * (.032 * np.cos(center))
-
-    # Each overlap shifts the phase of the warp. The raised floats and crossing
-    # weft vary in height where the cotton has been rubbed or compressed.
-    weft = across + lay + .37 * np.sin(u * .094) + .22 * np.cos(u * .31)
-    herringbone = np.abs(np.mod(weft, 15.1) - 7.55)
-    warp = u + .59 * herringbone + .11 * across + .41 * np.sin(weft * .28)
-    twill = np.cos(2 * np.pi * warp / 6.0)
-    cross = np.cos(2 * np.pi * (weft + .23 * np.sin(u * .55)) / 4.9)
-    grain = .78 + .14 * np.sin(u * .075 + across * .14) + .08 * np.cos(u * .173 - across * .22)
-    swatch = np.asarray(sample, dtype=np.float32) @ LUMA / 255
-    sx = (u - 1250 - (.19 + bias) * across + 2.4 * lay) * 2.55
-    sy = (weft + 82 + .05 * (u - 1250) + 2.8 * np.sin(u * .049)) * 2.52
-    weave = cv2.remap(gaussian_filter(swatch, .78).astype(np.float32), sx.astype(np.float32),
-                     sy.astype(np.float32), cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
-    thread = np.clip(weave - gaussian_filter(weave, 1.55), -.15, .15)
-    relief += linen * grain * (.105 * twill + (.033 - .014 * twill) * cross + 2.65 * thread)
-    tone += linen * grain * (.022 * twill + .014 * cross + .94 * thread)
-    contact += linen * .092 * Smoothstep(.016, .112, -thread)
-    return relief, tone, contact
-
-
-def YarnWindings(fit, u, v, guide, tags, redSample):
-    frame = fit["frame"]
-    holes = np.concatenate([np.asarray(loop) for loop in fit["parts"]["Pommel"]["loops"][1:]])
-    hinge = holes @ np.array(((frame["cos"], -frame["sin"]), (frame["sin"], frame["cos"])))
-    centerU, centerV = (hinge.max(axis=0) + hinge.min(axis=0)) / 2
-    x, y = 1.12 * (u - centerU), v - centerV
-    theta, radius = np.arctan2(y, x), np.hypot(x, y)
-    spacing = theta + .091 * np.sin(5 * theta + .7) + .029 * np.sin(11 * theta - .6)
-    bend = 1.85 * np.sin(6 * theta + radius * .077) + .51 * np.sin(13 * theta - radius * .141)
-    winding = 49 * spacing + bend
-    strand = .5 + .5 * np.cos(winding)
-    twist = np.cos(117 * spacing + 2.38 * bend + 1.06 * np.sin(radius * .47 + 11 * theta))
-
-    # Some groups cross the windings where they lead back through the aperture.
-    overlap = Smoothstep(.30, .92, np.cos(3 * theta - .6))
-    overlap *= 1 - Smoothstep(20, 55, radius)
-    slant = winding + radius * .28 + 2 * np.sin(4 * theta - radius * .047)
-    crossing = (.5 + .5 * np.cos(slant)) ** 2.2
-
-    swatch = np.asarray(redSample, dtype=np.float32) @ LUMA / 255
-    along = (radius * 4.1 + 37 * np.sin(theta) + 22 * np.cos(3 * theta)).astype(np.float32)
-    across = swatch.shape[0] / 2 + 160 * np.sin(spacing) + 63 * np.cos(2 * spacing + .25)
-    across = (across + 2.84 * bend + 13 * crossing * overlap).astype(np.float32)
-    rotated = cv2.remap(swatch.astype(np.float32), along, across, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101)
-    short = np.clip(rotated - gaussian_filter(rotated, 1.55), -.13, .13)
-    r, g, b = np.moveaxis(guide, -1, 0)
-    yarn = (tags == 4) * Smoothstep(.09, .24, np.minimum(r - g, r - b))
-    prominence = .71 + .17 * np.cos(theta * 8 - .6) + .12 * np.sin(theta * 3 + radius * .09)
-    upper = overlap * Smoothstep(.25, .84, crossing)
-    rounded = strand ** 1.58 - .40
-    relief = yarn * (.52 * prominence * rounded + .13 * twist + 1.38 * short + .29 * upper)
-    tone = yarn * (.18 * prominence * rounded + .049 * twist + 1.04 * short + .076 * upper)
-    contact = yarn * (.23 * prominence * (1 - Smoothstep(.022, .38, strand)) + .11 * upper * (1 - strand))
-    return relief, tone, contact
-
-
-def FibreStructure(fit, guide, tags, strip, coverage, linenSample, redSample):
-    u, v = ClothCoordinates(fit, tags.shape, strip, coverage)
-    linen = LinenStructure(fit, u, v, tags == 3, linenSample)
-    yarn = YarnWindings(fit, u, v, guide, tags, redSample)
-    return tuple(a + b for a, b in zip(linen, yarn))
-
-
-def GuardGrain(color, tags, steel):
-    guard = tags == 2
-    if not guard.any():
-        return color
-    height, width = guard.shape
-    swatch = Sample(steel, (width, height), (.57, .45)) @ LUMA
-    grain = swatch - gaussian_filter(swatch, (1.9, 2.3))
-    updated = color.copy()
-    updated[guard] *= 1 + .51 * np.clip(grain[guard, None], -.16, .14)
-    return np.clip(updated, 0, 1)
-
-
-def ApplyPatinaColor(color, tags):
-    # Retain the photographed brightness and texture while shifting green cloth
-    # to worn brown and olive-colored steel stains to muted gray-brown.
-    lab = cv2.cvtColor(color.astype(np.float32), cv2.COLOR_RGB2LAB)
-    a, b = lab[..., 1], lab[..., 2]
-    chroma = Smoothstep(3, 9.5, np.hypot(a, b))
-    green = 1 - Smoothstep(-2.2, 1.0, a)
-    olive = Smoothstep(4, 14, b) * (1 - Smoothstep(.04, .30, a / np.maximum(1, np.abs(b))))
-    amount = chroma * np.maximum(green, olive)
-    target = np.where(tags[..., None] >= 3, (5.5, 12.0), (1.65, 3.9))
-    lab[..., 1:] += amount[..., None] * (target - lab[..., 1:])
-    corrected = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
-    return np.where(amount[..., None] > .001, corrected, color)
+    donor = distance_transform_edt(~((weight > .16) & visible), return_distances=False, return_indices=True)
+    return (accumulated / np.maximum(weight[..., None], 1e-8) / 255)[tuple(donor)], visible
 
 
 def Valley(field, axis, distance):
@@ -404,7 +74,6 @@ def Valley(field, axis, distance):
 
 
 def SteelCavities(luma):
-    # A recess is darker than both shoulders. Broad patina stays in the base color.
     band = gaussian_filter(luma, (.64, 3.2))
     groove = np.maximum(Valley(band, 0, 3), .68 * Valley(band, 0, 6))
     detail = gaussian_filter(luma, .52)
@@ -412,27 +81,292 @@ def SteelCavities(luma):
     return Smoothstep(.009, .049, groove), Smoothstep(.010, .063, pits)
 
 
-def DataTiles(color, details, geometryAo, fibreRelief, fibreContact):
-    textile, fibers, folds = details
-    luma = color @ LUMA
-    haze = gaussian_filter(luma, (3.0, 6.0))
-    fine = gaussian_filter(luma, .55) - haze
-    groove, pits = SteelCavities(luma)
-    steelRelief = .51 * fine - .08 * groove - .06 * pits
-    relief = np.where(textile, .42 * fine + 1.20 * folds + 1.31 * fibers, steelRelief) + fibreRelief
-    dy, dx = np.gradient(relief)
+def Patina(color):
+    lab = cv2.cvtColor(np.clip(color, 0, 1).astype(np.float32), cv2.COLOR_RGB2LAB)
+    a, b = lab[..., 1], lab[..., 2]
+    chroma = Smoothstep(3, 9.5, np.hypot(a, b))
+    green = 1 - Smoothstep(-2.2, 1.0, a)
+    olive = Smoothstep(4, 14, b) * (1 - Smoothstep(.04, .30, a / np.maximum(1, np.abs(b))))
+    amount = chroma * np.maximum(green, olive)
+    lab[..., 1:] += amount[..., None] * (np.array((1.65, 3.9)) - lab[..., 1:])
+    corrected = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+    return np.where(amount[..., None] > .001, corrected, color)
+
+
+def Normal(height):
+    dy, dx = np.gradient(height)
     direction = np.stack((-dx, dy, np.ones_like(dx)), axis=2)
-    normal = .5 + .5 * direction / np.linalg.norm(direction, axis=2, keepdims=True)
-    age = 1 - Smoothstep(.40, .82, luma)
-    fabricRoughness = np.clip(.90 + .06 * age - .20 * fibers, .85, .99)
-    rough = np.where(textile, fabricRoughness, .44 + .23 * age)
-    metal = np.where(textile, 0, .91 - .24 * age)
-    lapShade = Smoothstep(.010, .073, -folds)
-    yarnShade = Smoothstep(.008, .085, -fibers)
-    clothAo = np.clip(1 - .39 * lapShade - .13 * yarnShade - fibreContact, .32, 1)
-    steelAo = 1 - .48 * groove - .25 * pits
-    occlusion = np.maximum(.16, geometryAo ** 1.58 * np.where(textile, clothAo, steelAo))
-    return normal, np.stack((occlusion, rough, metal), axis=2)
+    return .5 + .5 * direction / np.linalg.norm(direction, axis=2, keepdims=True)
+
+
+def Pad(tiles, fills, coverage, factor=1):
+    distance, nearest = distance_transform_edt(~coverage, return_indices=True)
+    weight = (1 - Smoothstep(5 * factor, 11 * factor, distance))[..., None]
+    return tuple(fill + weight * (tile[tuple(nearest)] - fill) for tile, fill in zip(tiles, fills))
+
+
+def BladeAtlas(photo, raw, labels, fit, steel, geometry, factor):
+    width, height = 992 * factor, 216 * factor
+    masks = []
+    for strip in range(4):
+        y = strip * 256 + 20
+        mask = (geometry[y:y + 216, 16:1008, 1] > 127).copy()
+        # Fitting walls use the empty space beyond the blade's projected rims.
+        mask[:, 692:] = False
+        masks.append(mask)
+    color, visible = BladeProjection(raw if factor == 1 else photo, labels, fit, (width, height))
+    if factor > 1:
+        color = np.clip(color + .32 * (color - gaussian_filter(color, (.9, .9, 0))), 0, 1)
+    atlases = [[] for _ in range(2 if factor == 1 else 1)]
+    known = distance_transform_edt(~visible.any(axis=0), return_distances=False, return_indices=True)[0]
+    for strip in range(4):
+        if strip == 1:
+            for atlas, fill in zip(atlases, FILLS[1:] if factor == 1 else FILLS[:1]):
+                atlas.append(np.broadcast_to(fill, (height, width, 3)))
+            continue
+        paint = color
+        mask = masks[strip]
+        ambient = geometry[strip * 256 + 20:strip * 256 + 236, 16:1008, 0].astype(np.float32) / 255
+        if strip:
+            mask |= mask[::-1].copy()
+            first, last = np.argmax(visible, axis=0), height - 1 - np.argmax(visible[::-1], axis=0)
+            inset = np.minimum(5, np.maximum(0, (last - first) // 3))
+            edge = (last - inset if strip == 3 else first + inset)[known]
+            projected = np.broadcast_to(color[edge, known], (height, width, 3))
+            grain = Sample(steel, (width, height), (.5, .68 if strip == 2 else .82))
+            center = np.median(grain.reshape(-1, 3), axis=0)
+            observed = np.median(projected.reshape(-1, 3), axis=0)
+            smooth = gaussian_filter(projected, (2.0, 2.5, 0))
+            paint = np.clip(.51 * smooth + .49 * (observed + .77 * (grain - center)), 0, 1)
+            if factor > 1:
+                paint = gaussian_filter(paint, (.69, .69, 0))
+            paint = np.concatenate((paint[height // 2:][::-1], paint[height // 2:]), axis=0)
+            ambient = np.concatenate((ambient[108:][::-1], ambient[108:]), axis=0)
+        if factor > 1:
+            high = np.repeat(np.repeat(mask, factor, axis=0), factor, axis=1)
+            atlases[0].extend(Pad((Patina(paint),), FILLS[:1], high, factor))
+            continue
+        luma = paint @ LUMA
+        groove, pits = SteelCavities(luma)
+        micro = gaussian_filter(luma, .55) - gaussian_filter(luma, (3.0, 6.0))
+        normal = Normal(.51 * micro - .08 * groove - .06 * pits)
+        age = 1 - Smoothstep(.40, .82, luma)
+        ao = np.maximum(.16, ambient ** 1.58 * (1 - .48 * groove - .25 * pits))
+        orm = np.stack((ao, .44 + .23 * age, .91 - .24 * age), axis=2)
+        for atlas, tile in zip(atlases, Pad((normal, orm), FILLS[1:], mask)):
+            atlas.append(tile)
+    return tuple(PackStrips(atlas, DATA_SIZE * factor).astype(np.float32) for atlas in atlases)
+
+
+def Grid(rect, factor):
+    _, _, width, height = rect
+    x = (np.arange(width * factor, dtype=np.float32) + .5) / (width * factor)
+    y = (np.arange(height * factor, dtype=np.float32) + .5) / (height * factor)
+    return np.meshgrid(x, y)
+
+
+def ClothLaps(fit, u, v):
+    across = v - fit["frame"]["center"]
+    height = np.zeros_like(u)
+    contact = np.zeros_like(u)
+    lay = np.zeros_like(u)
+    for center, pitch, bow, width, rise in fit.get("clothLaps", ()):
+        distance = (u - center - pitch * across - bow * across * across) / width
+        edge = .12 * np.sin(.23 * across + center) + .06 * np.cos(.64 * across - center)
+        seam = np.exp(-((distance + edge - .18) / .40) ** 2)
+        shoulder = np.exp(-((distance + 1.07) / 1.23) ** 2)
+        underlap = np.exp(-((distance + edge - .61) / 1.11) ** 2)
+        profile = rise * (.76 + .24 * np.cos(across * .079 + center))
+        height += profile * (3.4 * shoulder - 4.5 * seam)
+        contact += profile * (1.55 * seam + .78 * underlap)
+        lay += Smoothstep(-.52, .41, distance) * (1.2 + .74 * np.sin(center))
+    return height, contact, lay
+
+
+def Cotton(fit, grid, dyedCloth, swatch, factor):
+    along, around = grid
+    lo, hi = GripRange(fit)
+    u = lo + along * (hi - lo)
+    theta = 2 * np.pi * (around + .25)
+    rows = np.asarray(fit["grip"])
+    low = np.interp(u, rows[:, 0], rows[:, 1])
+    high = np.interp(u, rows[:, 0], rows[:, 2])
+    radius = np.clip((high - low) * .5, 44, 82)
+    v = np.clip((high + low) * .5, 88, 108) + radius * np.sin(theta)
+    source = Remap(dyedCloth, *PhotoMaps(fit, u, v))
+    folds, contact, lay = ClothLaps(fit, u, v)
+
+    # Alternate raised warp and weft floats at glancing light. The phase shifts
+    # and yarn tension vary by overlap, and both sides meet at the wrap seam.
+    tension = .86 + .09 * np.sin(theta * 3 + u * .029) + .07 * np.cos(u * .136 - theta * 5)
+    across = 64 * around + lay * .40 + .14 * np.sin(theta * 11 + u * .070)
+    length = (u - .12 * (v - 100) + .65 * np.sin(u * .125 + theta) + .73 * np.sin(u * .065 - theta * 6) + .44 * lay) / 4.0
+    chevrons = np.abs(np.mod(across + 8, 16) - 8)
+    floatArc = .5 + .5 * np.cos((length + chevrons) * (np.pi / 2))
+    warp = (.5 + .5 * np.cos(2 * np.pi * length)) ** 1.5 * (.31 + .69 * floatArc)
+    weft = (.5 + .5 * np.cos(2 * np.pi * across)) ** 1.5 * (1 - .70 * floatArc)
+    floats = np.maximum(warp, .91 * weft)
+    swatchLuma = swatch @ LUMA
+    sx = 2.78 * (u - lo - .15 * (v - 100) + 1.1 * lay)
+    sy = around * swatch.shape[0] + 2.8 * np.sin(theta * 3) + 10 * lay
+    thread = cv2.remap(swatchLuma.astype(np.float32), sx.astype(np.float32), sy.astype(np.float32),
+                       cv2.INTER_LINEAR, borderMode=cv2.BORDER_WRAP)
+    fine = np.clip(thread - gaussian_filter(thread, (1.55 * factor, 1.80 * factor), mode=("wrap", "nearest")), -.13, .13)
+    floats = gaussian_filter(floats, .36 * factor, mode=("wrap", "nearest"))
+    height = folds + tension * (1.14 * floats + 2.9 * fine)
+
+    sourceLuma = source @ LUMA
+    dye = np.clip(gaussian_filter(sourceLuma, (3.6 * factor, 4.9 * factor), mode=("wrap", "nearest")) - .59, -.17, .10)
+    shade = .56 * dye + .041 * (floats - .37) + .67 * fine
+    base = np.array((.698, .553, .396), dtype=np.float32) + shade[..., None] * (.94, .86, .73)
+    enclosed = Smoothstep(.05, .27, .46 - floats) * Smoothstep(.007, .088, -fine)
+    fabricAo = 1 - contact - .125 * gaussian_filter(enclosed, .47 * factor) * tension
+    roughness = np.clip(.955 + .025 * (1 - floats) - .10 * fine, .91, .99)
+    return base, height, fabricAo, roughness, np.zeros_like(u)
+
+
+def RingFrame(fit):
+    holes = [Plane(fit["frame"], *p) for loop in fit["parts"]["Pommel"]["loops"][1:] for p in loop]
+    vertices = np.asarray(holes)
+    return (vertices.max(axis=0) + vertices.min(axis=0)) / 2
+
+
+def RedYarn(fit, u, v, color, swatch, factor, side=None):
+    thread, linen = swatch
+    centerU, centerV = RingFrame(fit)
+    dx, dy = 1.12 * (u - centerU), v - centerV
+    theta, radius = np.arctan2(dy, dx), np.hypot(dx, dy)
+    spacing = theta + .087 * np.sin(5 * theta + .57) + .026 * np.sin(11 * theta - .64)
+    bend = 1.8 * np.sin(6 * theta + radius * .077) + .50 * np.sin(13 * theta - radius * .14)
+    wind = 47 * spacing + bend + 1.17 * np.sin(radius * .091 - 7 * theta)
+    turn = 0 if side is None else 1 - Smoothstep(.12, .65, np.abs(side))
+    wind += 1.7 * turn * np.cos(5 * theta)
+    bundle = (.5 + .5 * np.cos(wind)) ** 1.47
+    ply = .5 + .5 * np.cos(113 * spacing + 2.6 * bend + 1.07 * np.sin(radius * .49 + 11 * theta))
+    cross = (.5 + .5 * np.cos(wind + radius * .32 + 1.6 * np.sin(4 * theta))) ** 2
+    cross *= (1 - Smoothstep(16, 58, radius)) * Smoothstep(.19, .92, np.cos(3 * theta - .60))
+    sx = radius * 3.5 + 37 * np.sin(theta) + 24 * np.cos(3 * theta)
+    sx += 21 * turn
+    sy = thread.shape[0] * .5 + 156 * np.sin(spacing) + 61 * np.cos(2 * spacing + .25) + 3.3 * bend + 9 * cross
+    luma = Remap(thread @ LUMA, sx, sy)
+    fibres = np.clip(luma - gaussian_filter(luma, 1.22 * factor), -.16, .16)
+    height = .49 * bundle + .15 * ply + 2.57 * fibres + .37 * cross
+    # Only intersections and troughs occlude. Preserve the lit thread ridges.
+    valleys = Smoothstep(.20, .67, 1 - bundle) * Smoothstep(.017, .102, -fibres)
+    yarnAo = 1 - .15 * gaussian_filter(valleys, .52 * factor) - .18 * cross * (1 - bundle)
+    r, g, b = np.moveaxis(color, -1, 0)
+    dyed = np.maximum(Smoothstep(.10, .29, r - g), Smoothstep(centerU - 7, centerU + 2, u))
+    shade = np.clip(gaussian_filter(r, 2.0 * factor) - .57, -.24, .20)
+    yarn = np.array((.597, .067, .108), dtype=np.float32) + shade[..., None] * (.46, .05, .09)
+    knot = 1 - Smoothstep(20, 38, radius)
+    looseDye = knot * np.clip(r - gaussian_filter(r, 2.5 * factor), -.12, .12)
+    yarn += (.69 * fibres + .064 * (bundle - .37) + .024 * (ply - .5) + .38 * looseDye)[..., None] * (1, .29, .32)
+    # The cloth emerging from beneath the ring shares the grip's brown palette.
+    weave = Remap(linen @ LUMA, 2.6 * u, 2.7 * v)
+    linenDetail = np.clip(weave - gaussian_filter(weave, 1.04 * factor), -.13, .13)
+    underlay = np.array((.361, .272, .186), dtype=np.float32)
+    underlay = underlay + (.26 * (color @ LUMA - .36) + .52 * linenDetail)[..., None] * (1., .86, .72)
+    base = underlay + dyed[..., None] * (yarn - underlay)
+    roughness = np.clip(.947 - .047 * dyed - .17 * fibres, .85, .98)
+    return base, height * dyed + 1.95 * linenDetail * (1 - dyed), 1 - dyed * (1 - yarnAo), roughness, np.zeros_like(u)
+
+
+def GuardSteel(fit, v, color, steel, factor, side=None):
+    height, width = color.shape[:2]
+    swatch = Sample(steel, (width, height), (.57 if side is None else .38, .44)) @ LUMA
+    grain = gaussian_filter(swatch, .52 * factor) - gaussian_filter(swatch, 2.2 * factor)
+    pits = Smoothstep(.012, .105, np.minimum(Valley(swatch, 0, factor), Valley(swatch, 1, factor)))
+    color = Patina(color)
+    luma = color @ LUMA
+    _, _, top, bottom = FaceBounds(fit, "Guard")
+    curl = 1 - Smoothstep(39, 72, np.minimum(v - top, bottom - v))
+    smooth = gaussian_filter(luma, (.9 * factor, 2.1 * factor))
+    # Match the shoulders of each curl to its wall and remove photographed glints before lighting.
+    match = .20 + .69 * curl if side is None else .76 + .13 * curl
+    tone = .395 + .62 * np.clip(smooth - .395, -.26, .28)
+    base = color + match[..., None] * (tone[..., None] * (1.046, 1, .950) - color)
+    base += (.76 * grain - .044 * pits)[..., None]
+    rust = 1 - Smoothstep(.28, .60, luma + .49 * grain)
+    surfaceHeight = .91 * grain - .36 * pits
+    if side is None:
+        surfaceHeight += .65 * (gaussian_filter(luma, .60 * factor) - gaussian_filter(luma, 2.5 * factor))
+    return base, surfaceHeight, 1 - .24 * pits, .46 + .22 * rust - .24 * grain, .91 - .30 * rust
+
+
+def FitFace(fit, name, grid, source, swatch, factor):
+    x, y = grid
+    left, right, top, bottom = FaceBounds(fit, name)
+    u, v = left + x * (right - left), top + y * (bottom - top)
+    color = Remap(source, *PhotoMaps(fit, u, v))
+    if name == "Guard":
+        return GuardSteel(fit, v, color, swatch, factor)
+    return RedYarn(fit, u, v, color, swatch, factor)
+
+
+def FitRim(fit, name, pathIndex, grid, source, swatch, factor):
+    station, width = grid
+    points, distance = tuple(RimPaths(fit, name))[pathIndex]
+    a, b = np.asarray(points, dtype=np.float32), np.roll(np.asarray(points, dtype=np.float32), -1, axis=0)
+    distance = np.asarray(distance, dtype=np.float32)
+    samples = station * distance[-1]
+    i = np.minimum(len(a) - 1, np.searchsorted(distance, samples, side="right") - 1)
+    vector = b - a
+    span = np.diff(distance)
+    part = (samples - distance[i]) / span[i]
+    centre = a[i] + vector[i] * part[..., None]
+    sign = np.sign(np.sum(a[:, 0] * b[:, 1] - b[:, 0] * a[:, 1])) * (-1 if pathIndex else 1)
+    inward = vector[i][..., ::-1] * (-1, 1) / span[i][..., None] * sign
+    side = 2 * width - 1
+    inset = 4.5 + 2.0 * (1 - side * side)
+    u, v = np.moveaxis(centre + inward * inset[..., None], -1, 0)
+    color = Remap(source, *PhotoMaps(fit, u, v))
+    if name == "Guard":
+        return GuardSteel(fit, v, color, swatch, factor, side)
+    # Match the yarn phase at the bevel before bending the fibres across the wall.
+    u, v = np.moveaxis(centre + 1.05 * inward, -1, 0)
+    return RedYarn(fit, u, v, color, swatch, factor, side)
+
+
+def Place(atlas, rect, tile, scale, periodic=None):
+    x, y, w, h = (value * scale for value in rect)
+    pad = 5 * scale
+    tile = np.pad(tile, ((pad, pad), (0, 0), (0, 0)), mode="wrap" if periodic == 0 else "edge")
+    tile = np.pad(tile, ((0, 0), (pad, pad), (0, 0)), mode="wrap" if periodic == 1 else "edge")
+    atlas[y - pad:y + h + pad, x - pad:x + w + pad] = tile
+
+
+def Finish(geometry, rect, channels, factor):
+    x, y, w, h = rect
+    embedded = geometry[y:y + h, x:x + w]
+    coverage = embedded[..., 1] > 127
+    if not coverage.any():
+        raise ValueError(f"Missing Blender coverage for atlas chart {rect}")
+    base, height, reliefAo, roughness, metallic = channels
+    if factor != 1:
+        scaled = np.repeat(np.repeat(coverage, factor, axis=0), factor, axis=1)
+        return Pad((np.clip(base, 0, 1),), FILLS[:1], scaled, factor)
+    ambient = embedded[..., 0].astype(np.float32) / 255
+    orm = np.stack((np.maximum(.21, ambient ** 1.32 * reliefAo), roughness, metallic), axis=2)
+    return Pad((Normal(height), np.clip(orm, 0, 1)), FILLS[1:], coverage)
+
+
+def BakeFittings(atlases, photo, masks, fit, swatches, geometry, factor):
+    steel, linen, red = swatches
+    cloth = PartColor(photo, masks["Grip"])
+    tiles = Finish(geometry, GRIP, Cotton(fit, Grid(GRIP, factor), cloth, linen, factor), factor)
+    for atlas, tile in zip(atlases, tiles):
+        Place(atlas, GRIP, tile, factor, periodic=0)
+
+    for name, swatch in (("Guard", steel), ("Pommel", (red, linen))):
+        source = PartColor(photo, masks[name])
+        rect = FACES[name]
+        face = FitFace(fit, name, Grid(rect, factor), source, swatch, factor)
+        for atlas, tile in zip(atlases, Finish(geometry, rect, face, factor)):
+            Place(atlas, rect, tile, factor)
+        for index, rect in enumerate(RIMS[name]):
+            edge = FitRim(fit, name, index, Grid(rect, factor), source, swatch, factor)
+            for atlas, tile in zip(atlases, Finish(geometry, rect, edge, factor)):
+                Place(atlas, rect, tile, factor, periodic=1)
 
 
 def ExportGeometryAo(trace, output):
@@ -448,22 +382,24 @@ def ExportGeometryAo(trace, output):
         if not mask.any():
             raise ValueError(f"The Blender occlusion bake has no surface samples in UV strip {strip}")
         strength = 1 - values[region]
-        support = gaussian_filter(mask.astype(np.float32), .70)
-        smoothed = gaussian_filter(strength * mask, .70) / np.maximum(support, .00001)
+        support = gaussian_filter(mask.astype(np.float32), .61)
+        smoothed = gaussian_filter(strength * mask, .61) / np.maximum(support, .00001)
         distance, nearest = distance_transform_edt(~mask, return_indices=True)
-        shaded = (.40 * strength + .60 * smoothed)[tuple(nearest)]
+        shaded = (.43 * strength + .57 * smoothed)[tuple(nearest)]
         result[region] -= np.where(distance <= 4, shaded, 0)
     output.parent.mkdir(parents=True, exist_ok=True)
     channels = np.stack((np.uint8(np.round(result * 255)), np.uint8(coverage) * 255), axis=-1)
     Image.fromarray(channels).save(output, optimize=True)
 
 
-def PadTiles(tiles, fills, coverage, factor=1):
-    # Bleed from the real UV islands before simplifying the unused pixels.
-    distance, nearest = distance_transform_edt(~coverage, return_indices=True)
-    weight = (1 - Smoothstep(5 * factor, 13 * factor, distance))[..., None]
-    return tuple(fill + weight * (tile[tuple(nearest)] - fill)
-                 for tile, fill in zip(tiles, fills))
+def SaveAtlas(atlas, output, quality, *, levels=None):
+    pixels = np.rint(atlas * 255)
+    if levels is not None:
+        origin, step = levels
+        pixels = origin + np.rint((pixels - origin) / step) * step
+    pixels = np.uint8(np.clip(pixels, 0, 255))
+    Image.fromarray(pixels).save(output, "WEBP", quality=quality, method=6, lossless=levels is not None)
+    print(output.name, pixels.shape[:2], f"{output.stat().st_size:,} bytes")
 
 
 def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_AO):
@@ -471,71 +407,36 @@ def Bake(reference, fitFile, textileSource, diffuseFit, out, aoSource=GEOMETRY_A
     if hashlib.sha256(reference.read_bytes()).hexdigest() != fit["reference"]["sha256"]:
         raise ValueError("Trace the approved reference before baking the project UVs")
     photo = ReadReference(reference)
-    labels = np.zeros(photo.shape[:2], dtype=np.uint8)
-    for i, mask in enumerate(PartMasks(photo).values(), 1):
-        labels[mask] = i
-    balanced = None
+    masks = PartMasks(photo)
+    balanced = photo
     if diffuseFit.is_file():
         with Image.open(diffuseFit) as image:
-            stored = np.asarray(image.convert("RGB").resize((photo.shape[1], photo.shape[0]), Image.Resampling.BILINEAR),
-                                dtype=np.float32)
+            stored = np.asarray(image.convert("RGB").resize((photo.shape[1], photo.shape[0]), Image.Resampling.BILINEAR), dtype=np.float32)
         gain = np.exp2((stored - 128) / 128)
         balanced = 255 * EncodeSrgb(np.clip(LinearSrgb(photo.astype(np.float32) / 255) * gain, 0, 1))
     with Image.open(STEEL) as image:
         steel = image.convert("RGB")
     with Image.open(textileSource) as image:
-        textile = image.convert("RGB")
-        width, height = textile.size
-        linen = textile.crop((26, 14, round(width * .639), height - 14))
-        red = textile.crop((round(width * .691), 14, width - 24, height - 14))
-    samples = (steel, linen, red)
+        w, h = image.size
+        linen = np.asarray(image.convert("RGB").crop((26, 14, round(w * .639), h - 14)), dtype=np.float32) / 255
+        red = np.asarray(image.convert("RGB").crop((round(w * .691), 14, w - 24, h - 14)), dtype=np.float32) / 255
+    swatches = (steel, linen, red)
     with Image.open(aoSource) as image:
         if image.size != (DATA_SIZE, DATA_SIZE):
             raise ValueError("The geometry AO must have the same resolution as ORM")
         geometry = np.asarray(image.convert("LA"))
-    occlusion = geometry[..., 0].astype(np.float32) / 255
-    regions = [np.s_[strip * 256 + 20:strip * 256 + 236, 16:1008] for strip in range(4)]
-    coverage = [geometry[region][..., 1] > 127 for region in regions]
-    coverage[0] |= coverage[1]
-    for strip in (2, 3):
-        coverage[strip] |= coverage[strip][::-1].copy()
 
-    base = {}
-    factor = BASE_SIZE // DATA_SIZE
-    for strip, color, tags, guide in Tiles(photo, labels, fit, BASE_SIZE, samples, balanced):
-        highCoverage = np.repeat(np.repeat(coverage[strip], factor, axis=0), factor, axis=1)
-        if strip:
-            color, guide = WrapRimCloth(color, guide, tags, highCoverage, factor)
-        color = GuardGrain(color, tags, steel)
-        tile = BaseTile(color, TextileDetails(guide, tags, samples, strip))
-        _, dye, _ = FibreStructure(fit, guide, tags, strip, highCoverage, linen, red)
-        tile = np.clip(tile * (1 + dye[..., None]), 0, 1)
-        if strip:
-            tile = MatchRimMetal(gaussian_filter(tile, (.69, .69, 0)), tags >= 3)
-        tile = ApplyPatinaColor(tile, tags)
-        # Match the photographed warm cloth under the inspector lights.
-        tile[tags == 3] *= (.951, .906, .855)
-        base[strip], = PadTiles((tile,), ((.49, .47, .44),), highCoverage, factor)
-
-    data = {}
-    for strip, color, tags, guide in Tiles(photo, labels, fit, DATA_SIZE, samples):
-        ambient = occlusion[regions[strip]]
-        if strip:
-            color, guide = WrapRimCloth(color, guide, tags, coverage[strip], 1)
-            color = MatchRimMetal(color, tags >= 3)
-            ambient = np.where(tags >= 3, ambient, MirrorRim(ambient))
-        color = GuardGrain(color, tags, steel)
-        details = TextileDetails(guide, tags, samples, strip)
-        relief, _, contact = FibreStructure(fit, guide, tags, strip, coverage[strip], linen, red)
-        layers = DataTiles(color, details, ambient, relief, contact)
-        data[strip] = PadTiles(layers, ((.5, .5, 1), (1, .74, .64)), coverage[strip])
-
-    # Both broad faces use the same input values in the existing UV layout.
-    strips = (0, 0, 2, 3)
     out.mkdir(parents=True, exist_ok=True)
-    Save([base[strip] for strip in strips], BASE_SIZE, out / "Texture_DadaoBase.webp", 89)
-    Save([data[strip][0] for strip in strips], DATA_SIZE, out / "Texture_DadaoNormal.webp", 87, lossless=True)
-    Save([data[strip][1] for strip in strips], DATA_SIZE, out / "Texture_DadaoOrm.webp", 85, lossless=True)
+    factor = BASE_SIZE // DATA_SIZE
+    base = BladeAtlas(balanced, photo, masks["Blade"].astype(np.uint8), fit, steel, geometry, factor)
+    BakeFittings(base, balanced, masks, fit, swatches, geometry, factor)
+    SaveAtlas(base[0], out / "Texture_DadaoBase.webp", 84)
+    data = BladeAtlas(balanced, photo, masks["Blade"].astype(np.uint8), fit, steel, geometry, 1)
+    BakeFittings(data, photo, masks, fit, swatches, geometry, 1)
+    # Keep finer precision for tangent direction and contact AO than for the
+    # largely flat normal Z, roughness and metalness channels.
+    SaveAtlas(data[0], out / "Texture_DadaoNormal.webp", 89, levels=((128, 128, 255), (6, 6, 12)))
+    SaveAtlas(data[1], out / "Texture_DadaoOrm.webp", 89, levels=((255, 0, 0), (3, 10, 15)))
 
 
 if __name__ == "__main__":

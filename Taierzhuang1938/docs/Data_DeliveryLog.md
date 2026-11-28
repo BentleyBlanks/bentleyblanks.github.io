@@ -202,6 +202,8 @@
 
 ## 条目
 
+- **川军大刀卷环与布柄贴图（2026-11-28）**。重展护手内外卷面、整段布柄和尾环侧壁的 UV，清除卷环亮色条带与尾环粉白串色。重烘经纬法线、搭接压缝和孔内接触 AO。成品 9,896 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
+
 - **川军大刀布带搭接与尾环红纱（2026-11-28）**。布柄沿护手轮廓收口，重做布带的搭接起伏、斜织纹和压缝遮蔽。尾环重做不等粗的交错纱束和孔边接触阴影。成品 9,896 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)
 
 - **川军大刀护手与布柄近景（2026-11-28）**。圆润护手卷口，在布柄两端按照片斜边收口并把端盖藏入接合处。补织纹、粗糙度和接触 AO，尾环的淡色斑点用相邻红线补色，布边延续原布纹。同机位复测法线、布柄、护手和尾环，成品 9,632 三角。 [材质与模型重建记录](../_import/Reference/SichuanDadao/Data_SichuanDadaoReferences.md)

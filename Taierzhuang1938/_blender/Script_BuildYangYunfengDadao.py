@@ -13,14 +13,12 @@ from mathutils.bvhtree import BVHTree
 from mathutils.geometry import delaunay_2d_cdt
 
 from TzmCore import AUTHORED_NORMAL_LAYER, Node
+from Script_YangYunfengDadaoUv import (FACES, GRIP, RIMS, RIM_DEPTH, AtlasUv, ClosestOnRim,
+                                    FaceBounds, GripRange, PhotoPosition, Plane, RimPaths)
 
 
 FIT_FILE = Path(__file__).with_name("Data_YangYunfengDadaoFit.json")
 TRIANGLE_LIMIT = 10_000
-
-
-def Plane(frame, x, y):
-    return x * frame["cos"] + y * frame["sin"], -x * frame["sin"] + y * frame["cos"]
 
 
 def World(frame, u, v, depth=0):
@@ -50,7 +48,7 @@ def ApplyUv(mesh, fit, sideThreshold=.035):
     layer = mesh.loops.layers.uv.new()
     for face in mesh.faces:
         nx, ny, _ = face.normal
-        strip = (0 if nx > 0 else 1) if abs(nx) >= sideThreshold else (2 if ny < 0 else 3)
+        strip = 0 if abs(nx) >= sideThreshold else (2 if ny < 0 else 3)
         for loop in face.loops:
             loop[layer].uv = StudioUv(fit, loop.vert.co, strip)
     return mesh
@@ -113,11 +111,14 @@ def SmoothBladeWall(mesh, wall):
         if any(face in rim for face in faces):
             edge.smooth = (len(faces) == 2 and all(face in rim for face in faces)
                            and faces[0].normal.dot(faces[1].normal) >= .74)
-    # Record Blender's split corner normals for the TZM exporter, including the
-    # transition between the broad faces and the side wall.
+    StoreCornerNormals(mesh)
+
+
+def StoreCornerNormals(mesh):
+    # Retain Blender's corner weighting after the exporter triangulates the bevels.
     mesh.faces.index_update()
     mesh.verts.index_update()
-    proxy = bpy.data.meshes.new("Dadao Rim Normals")
+    proxy = bpy.data.meshes.new("Dadao Corner Normals")
     try:
         mesh.to_mesh(proxy)
         normals = proxy.corner_normals
@@ -132,13 +133,47 @@ def SmoothBladeWall(mesh, wall):
 
 
 def RoundFitting(mesh, wall, scale, segments):
-    rim = set(wall)
+    mesh.faces.index_update()
+    indices = {face.index for face in wall}
+    tag = mesh.faces.layers.int.new("FittingRim")
+    rim = {face for face in mesh.faces if face.index in indices}
     edges = [edge for edge in mesh.edges if edge.is_manifold
              and sum(face in rim for face in edge.link_faces) == 1]
-    bmesh.ops.bevel(mesh, geom=edges, offset=1.10 * scale, segments=segments,
-                    profile=.5, clamp_overlap=True, affect="EDGES")
+    for face in rim:
+        face[tag] = 1
+    rounded = bmesh.ops.bevel(mesh, geom=edges, offset=1.10 * scale, segments=segments,
+                             profile=.5, clamp_overlap=True, affect="EDGES")
+    rim = set(rounded["faces"])
     for face in mesh.faces:
         face.smooth = True
+        if face[tag]:
+            rim.add(face)
+    return rim
+
+
+def FittingUv(mesh, fit, name, rim):
+    frame = fit["frame"]
+    left, right, top, bottom = FaceBounds(fit, name)
+    paths = tuple(RimPaths(fit, name))
+    bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+    mesh.normal_update()
+    layer = mesh.loops.layers.uv.new()
+    for face in mesh.faces:
+        if face not in rim:
+            for loop in face.loops:
+                u, v, _ = PhotoPosition(frame, loop.vert.co)
+                loop[layer].uv = AtlasUv(FACES[name], (u - left) / (right - left), (v - top) / (bottom - top))
+            continue
+        u, v, _ = PhotoPosition(frame, face.calc_center_median())
+        index = min(range(len(paths)), key=lambda i: ClosestOnRim(u, v, paths[i])[0])
+        outline = [PhotoPosition(frame, loop.vert.co) for loop in face.loops]
+        stations = [ClosestOnRim(u, v, paths[index])[1] for u, v, _ in outline]
+        seam = max(stations) - min(stations) > .5
+        for loop, point, station in zip(face.loops, outline, stations):
+            if seam and station < .5:
+                station = 1
+            width = .5 + .5 * max(-1., min(1., point[2] / RIM_DEPTH[name]))
+            loop[layer].uv = AtlasUv(RIMS[name][index], station, width)
 
 
 def BuildPlate(fit, name):
@@ -182,8 +217,9 @@ def BuildPlate(fit, name):
         SmoothBladeWall(mesh, wall)
     else:
         bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
-        RoundFitting(mesh, wall, frame["scale"], 2 if name == "Guard" else 1)
-        ApplyUv(mesh, fit)
+        rim = RoundFitting(mesh, wall, frame["scale"], 2 if name == "Guard" else 1)
+        FittingUv(mesh, fit, name, rim)
+        StoreCornerNormals(mesh)
     return mesh
 
 
@@ -253,6 +289,28 @@ def GripProfileAt(samples, u):
     return (samples[0] if u < samples[0][0] else samples[-1])[1:]
 
 
+def GripUv(mesh, fit, rows, sides):
+    frame = fit["frame"]
+    first, last = GripRange(fit)
+    around = {vert: ((i - sides // 4) % sides) / sides for row in rows for i, vert in enumerate(row)}
+    along = {vert: (PhotoPosition(frame, vert.co)[0] - first) / (last - first) for vert in around}
+    bmesh.ops.recalc_face_normals(mesh, faces=list(mesh.faces))
+    mesh.normal_update()
+    layer = mesh.loops.layers.uv.new()
+    for face in mesh.faces:
+        if len(face.verts) == sides:
+            # The buried end caps use a small patch of the same cloth.
+            for loop in face.loops:
+                phase = math.tau * around[loop.vert]
+                loop[layer].uv = AtlasUv(GRIP, .065 + .018 * math.cos(phase), .48 + .035 * math.sin(phase))
+            continue
+        fractions = [around[loop.vert] for loop in face.loops]
+        seam = max(fractions) - min(fractions) > .5
+        for loop, v in zip(face.loops, fractions):
+            loop[layer].uv = AtlasUv(GRIP, along[loop.vert], 1 if seam and v == 0 else v)
+    return mesh
+
+
 def BuildGrip(fit, guard):
     frame = fit["frame"]
     mesh = bmesh.new()
@@ -306,7 +364,7 @@ def BuildGrip(fit, guard):
             mesh.faces.new((a[i], a[j], b[j], b[i])).smooth = True
     mesh.faces.new(rows[0])
     mesh.faces.new(list(reversed(rows[-1])))
-    return ApplyUv(mesh, fit, sideThreshold=.42)
+    return GripUv(mesh, fit, rows, count)
 
 
 def ReadFit():
