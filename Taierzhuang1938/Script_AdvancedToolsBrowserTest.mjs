@@ -208,7 +208,8 @@ try {
   // --- 3. 独立页面 ----------------------------------------------------------------------
   if (!only || only.has("weapon")) {
     const vehicleIds = ["Type94Tankette", "Type89MediumTank"];
-    const assetIds = [...Object.values(WEAPONS).filter((weapon) => weapon.kind !== "vehicle").map((weapon) => weapon.id), ...vehicleIds];
+    const assetIds = [...Object.values(WEAPONS).filter((weapon) => weapon.kind !== "vehicle").map((weapon) => weapon.id),
+      "Type30Hmg", ...vehicleIds];
     const { page: center, errors } = await OpenPage(`${base}ControlCenter.html`, { viewport: { width: 1440, height: 900 } });
     const requests = [];
     center.context().on("request", (request) => requests.push({ url: request.url(), method: request.method() }));
@@ -727,14 +728,29 @@ try {
     }, assetIds);
     Check("所有模型条目都能绘制", Object.values(assets).every((model) => model?.triangles > 0),
       Object.entries(assets).filter(([, model]) => !model?.triangles).map(([id]) => id).join(","));
-    const { Type92Hmg, MediumMortar, OfficerSwordSet, Type94Tankette, Type89MediumTank, HanYang, Type38 } = assets;
+    const { Type30Hmg, Type92Hmg, MediumMortar, OfficerSwordSet, Type94Tankette, Type89MediumTank, HanYang, Type38 } = assets;
     Check("架设武器按各自姿态落地，军刀横放，车辆保留炮塔，GLB 使用原模型",
-      [Type92Hmg, MediumMortar, Type94Tankette, Type89MediumTank].every((model) => Math.abs(model?.minY) < .005)
+      [Type30Hmg, Type92Hmg, MediumMortar, Type94Tankette, Type89MediumTank].every((model) => Math.abs(model?.minY) < .005)
       && Math.abs(Type92Hmg.pitch) < .001 && MediumMortar.pitch > 1 && MediumMortar.pitch < 1.15
       && MediumMortar.span[1] > MediumMortar.span[0] * .9 && OfficerSwordSet?.span[0] > OfficerSwordSet?.span[1] * 5
       && Type94Tankette?.turret && /Model_Type94Tankette\.glb$/.test(Type94Tankette.file)
       && Type89MediumTank?.turret && /Model_Type89MediumTank\.glb$/.test(Type89MediumTank.file)
       && /173R.*\.glb$/.test(HanYang?.file) && /511.*\.glb$/.test(Type38?.file));
+    await search.fill("三十节式");
+    await Inspect("Type30Hmg");
+    Check("三十节式可从枪械清单打开，使用 GLB 的独立 AO UV",
+      await page.locator("#modelName").textContent() === "三十节式重机枪"
+      && Type30Hmg?.file === "Type30Hmg/Model_Type30Hmg.glb"
+      && await page.evaluate(() => {
+        let meshes = 0;
+        let aoMeshes = 0;
+        window.WeaponInspection.scene.model.body.traverse((object) => {
+          if (!object.isMesh) return;
+          meshes += 1;
+          if (object.geometry.hasAttribute("uv1") && object.material.aoMap?.channel === 1) aoMeshes += 1;
+        });
+        return meshes > 0 && aoMeshes === meshes;
+      }));
     for (const id of vehicleIds) {
       await search.fill(id);
       await Inspect(id);

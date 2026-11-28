@@ -12,6 +12,7 @@ import { ApplyPatches, MakePatch, PatchesOf } from "../Script_MaterialPatches.mj
 import { MaterialLibrary } from "../Script_Materials.mjs";
 import { ClearMeshCache, LoadDocument } from "../Script_MeshLoad.mjs";
 import { MeshUrl, WeaponMeshId } from "../Script_Meshes.mjs";
+import { ManagedGLTFLoader } from "../Script_ModelImports.mjs";
 import { Mulberry32 } from "../Script_Noise.mjs";
 import { SetTextureImportRenderer } from "../Script_TextureImports.mjs";
 import {
@@ -30,6 +31,11 @@ const GLB = {
 const VEHICLE_MODELS = [TYPE94_TANKETTE_ASSET, ...OPTIONAL_VEHICLE_ASSETS];
 export const INSPECTION_MODELS = Object.freeze(Object.fromEntries([
   ...Object.entries(WEAPONS).filter(([, weapon]) => weapon.kind !== "vehicle"),
+  ["Type30Hmg", {
+    id: "Type30Hmg", kind: "hmg", side: "nra", name: "三十节式重机枪", emplaced: true,
+    fullName: "三十节式重机枪",
+    external: { url: "./Model/Type30Hmg/Model_Type30Hmg.glb?v=08d642ae" },
+  }],
   ...VEHICLE_MODELS.map((asset) => [asset.id, {
     id: asset.id, kind: "vehicle", side: "ija", name: asset.name ?? asset.label,
     fullName: asset.label, external: asset,
@@ -276,6 +282,7 @@ export class WeaponInspectionScene {
     this.library = new MaterialLibrary(this.renderer);
     this.factory = new ActorFactory(this.library, {view: {camera: this.camera, renderer: this.renderer}});
     this.documents = new Map();
+    this.externalGlbs = new Map();
     this.configuredGlbs = new WeakSet();
     this.center = new THREE.Vector3();
     this.yaw = 0;
@@ -328,6 +335,21 @@ export class WeaponInspectionScene {
     if (!this.materials) this.loadingMaterials = null;
   }
 
+  async LoadExternal(asset) {
+    if (asset.catalogId) return InstantiateExternalProp(asset.catalogId, this.library);
+    const { url } = asset;
+    let pending = this.externalGlbs.get(url);
+    if (!pending) {
+      this.externalGlbLoader ??= new ManagedGLTFLoader();
+      pending = this.externalGlbLoader.loadAsync(url).catch((error) => {
+        this.externalGlbs.delete(url);
+        throw error;
+      });
+      this.externalGlbs.set(url, pending);
+    }
+    return (await pending).scene.clone(true);
+  }
+
   async Load(id, variant = 0) {
     const weapon = INSPECTION_MODELS[id];
     const external = weapon.external;
@@ -340,7 +362,7 @@ export class WeaponInspectionScene {
       glb?.Load(),
       !glb && MESHES[meshId] ? this.LoadMesh(meshId) : null,
       bayonetId ? this.LoadMesh(bayonetId).then(() => true, () => false) : false,
-      external ? InstantiateExternalProp(external.catalogId, this.library) : null,
+      external ? this.LoadExternal(external) : null,
     ]);
     this.materials ??= this.factory.ActorMaterials("nra", Mulberry32(7));
 
@@ -359,7 +381,7 @@ export class WeaponInspectionScene {
     let nodes = null;
     if (external) {
       if (!externalRoot) throw new Error(`模型无法实例化：${id}`);
-      // ExternalProps owns the cached geometry. Only the instance is mounted here.
+      // The external loaders own the shared geometry.
       body.add(externalRoot);
     } else if (glb) {
       if (!this.configuredGlbs.has(glbAsset)) {
