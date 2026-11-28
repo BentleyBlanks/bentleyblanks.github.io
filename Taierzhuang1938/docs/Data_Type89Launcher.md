@@ -126,6 +126,8 @@
 
 - 驻钣背面的钢色、氧化斑与反光按第 8 张照片重新拟合，并在第 1 张照片的共见区收小修正。发布格式下，背面平均亮度误差在近似馆藏布光下从 9.08 降至 5.12 个灰阶，独立布光下从 13.93 降至 8.26 个灰阶。独立布光下的磨痕相关系数从 0.581 提至 0.695。卷边相对于周围钢面的亮度通过复测，十个接缝 AO 视角通过验收。正面柔光下的平均亮度误差增加约 0.41 个灰阶。 [驻钣钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
 
+- 筒身背面以平均钢色和两组灯之间的反光差共同拟合材质。宽光下的平均亮度误差从 5.42 降至 3.79 个灰阶，第三组布光下的窄亮带从约 194 提至约 196 个灰阶，照片约为 203。外套筒用低频材质响应校准背面的整体明暗，独立布光下的平均亮度误差从 11.12 降至 9.89。外套筒中段环纹相关系数从 0.742 降至 0.724，默认灯下正面平均亮度误差约增加 0.30 个灰阶。接头底缘在远景压缩中变浅的局部暗缝已补强，复测正面、刻印、驻钣及十个接缝 AO 视角。 [钢面采样记录](../_import/Reference/Type89Launcher/Data_Type89LauncherSteelReference.json)
+
 ## 重建与贴图
 
 - BlenderMCP 通过本仓 `scripts/Script_BlenderMcp.mjs` 驱动。`_blender/Script_Type89LauncherExterior.py` 生成独立、可编辑的外观部件。`_blender/BuildAll.py --only Type89Launcher` 输出游戏用 `Model/Model_Type89Launcher.tzm.json`，在导出阶段执行三角面预算和网格自检。
@@ -184,4 +186,5 @@
 - 筒身正背共见区与套筒环纹的采样分别记录在 `barrelJointFinish.sharedHighlightCalibration` 和 `sleeveOpticalFinish.ringAlignment`。两张 16 位材质图由正式脚本生成底色、切线法线及 ORM。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
 - 正面磨痕和套筒两侧环纹的复校参数保存在 `barrelJointFinish.wearAndHighlightRefinement` 与 `sleeveOpticalFinish.sideRingCalibration`。底色 WebP 编码质量设为 83.66，使三张源贴图合计低于 1 MiB。 [贴图烘焙记录](../_import/TextureBakes/Texture_Type89LauncherSteel.json)
 - 驻钣大面材质复校保存在 `saddleSurfaceRefinement`。正式脚本核对已有钢面、两张馆藏照的采样记录及接缝 AO，再将 16 位响应图合入钢面的底色、法线、粗糙度和金属度。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
-- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV97/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。
+- 筒身的方向性反光和外套筒背面的整体明暗分别记录在 `barrelJointFinish.directionalResponseCalibration` 和 `sleeveOpticalFinish.rearToneCalibration`。接头底缘按 `contactAoRetouch` 中的接缝 UV 诊断调整 ORM 红通道，回烘时核对原接触遮蔽图的哈希。 [贴图烘焙脚本](../_import/Script_BakeType89LauncherSteel.py)
+- 本地独立枪械检查台在 `AdvancedTools/Tool_WeaponInspection.html` 的「其他武器」栏。角色和预演使用同一个 TZM 材质桶。当前修订的工程、GLB 和对照保存在 `OneDrive/AI/Models/Blender/Taierzhuang1938/Type89Launcher_20261126/MetalFinishV98/`。参考图原件和 OpenAI API 源图分别在同级 `ReferencePhotos/` 与 `MetalFinishV2/`。

@@ -14467,8 +14467,8 @@
     },
     "detail": {
       "file": "Texture_Type89LauncherBarrelJointWear.png",
-      "sha256": "61a5549996d0831d10f0b9f1d75728a862f32c4e7dca9c1d8566572ee1581951",
-      "scale": 24815,
+      "sha256": "165ef6f60f6d6b73c9aa754a3c6253a32690ac121ce2d39c2427a38bb81b5daf",
+      "scale": 24212,
       "strength": 0.76,
       "fields": [
         "gain",
@@ -14629,6 +14629,14 @@
       "highlightStrength": 0.34,
       "wearStrength": 1.42,
       "reviewSha256": "63190dc6496a1b2e7200e289f5a6ac99c0eb69e4afbaccec849d4fec8630048f"
+    },
+    "directionalResponseCalibration": {
+      "sourceRevision": "eb74b27feb16bcef869703c0a44e9048f4905bba",
+      "previousDetailSha256": "61a5549996d0831d10f0b9f1d75728a862f32c4e7dca9c1d8566572ee1581951",
+      "rearCaptureSha256": "11bf5f22b8591ed2eee121019d746012bdae39af8f76efd86900692012389e89",
+      "frontGallerySha256": "1bdb37dd8af4b73ea7b7dbabdaea5f1cd527e6f1c02c62c0e38eb3997d39fb8a",
+      "adjustmentStrength": 1.08,
+      "reviewSha256": "f94f35978f4577194a77faa3b2c6261c4d97c99e90961b8e720d20d7f7277c86"
     },
     "currentRearFit": {
       "sourceRevision": "72b5efbcae8bc8bc2945805f9df4b96162621fe1",
@@ -26132,8 +26140,8 @@
     "sourceSha256": "2b44ed3db54e0d6d1b587335529fa477cea12ab504856ab3daaa06e71129f347",
     "detail": {
       "file": "Texture_Type89LauncherSleeveOpticalResponse.png",
-      "sha256": "924c7a90abe1b8ab72d8df9cd9d32dc3fd65006096a2f1347ea50f4e377291e4",
-      "scale": 32766,
+      "sha256": "a61d8b7b560f6a2df66c1480cb8ad8e47c1984f0fa47978bec4996559e28774f",
+      "scale": 27191,
       "strength": 1.0,
       "fields": [
         "gain",
@@ -26162,6 +26170,32 @@
       "profileFitSha256": "a4f25660eb67ad27c5daf843df5186400e84fb1f05e1e89a92850983b41285e9",
       "adjustmentStrength": 1.51,
       "reviewSha256": "63190dc6496a1b2e7200e289f5a6ac99c0eb69e4afbaccec849d4fec8630048f"
+    },
+    "rearToneCalibration": {
+      "sourceRevision": "eb74b27feb16bcef869703c0a44e9048f4905bba",
+      "previousDetailSha256": "924c7a90abe1b8ab72d8df9cd9d32dc3fd65006096a2f1347ea50f4e377291e4",
+      "rearCaptureSha256": "8fca8c2a718f8deffa84235e91da2e98727b6cc07a6287005a65fe7506f397ec",
+      "adjustmentStrength": 1.2,
+      "reviewSha256": "f94f35978f4577194a77faa3b2c6261c4d97c99e90961b8e720d20d7f7277c86"
+    },
+    "contactAoRetouch": {
+      "contactDetailAoSha256": "e97c7f5348b2ef741ccbf695f627603bd9d12d96695d719d00c534ca5fef5a06",
+      "probeFrames": {
+        "Whole_ContactHi.png": "11ab037f9bf68a23f1abcafe27edeb56d1aedb5080523b745420ef55f7e3d31a",
+        "Whole_ContactLo.png": "12eab08169f9ba93ae4d082b1bfd679fb0f4632115eb5c4e80a78cc4b9164831"
+      },
+      "spot": {
+        "region": "BaseNeck",
+        "center": [
+          835.75,
+          530.82
+        ],
+        "radius": [
+          7.5,
+          4.8
+        ],
+        "darken": 12.0
+      }
     },
     "revision": "1f65f4b2adc9e221c056534afa93a58a91d2b2cf",
     "rearRigSha256": "0bc867bac19421a9eacffe0c84e4a1e6efdf3023b13d8d034436c982a16bcf87",
